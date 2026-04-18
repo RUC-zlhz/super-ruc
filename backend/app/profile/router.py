@@ -20,7 +20,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
-from app.core.dependencies import CurrentUserDep, DBDep, require_role
+from app.core.dependencies import ActiveStudentDep, CurrentUserDep, DBDep, require_role
 from app.core.exceptions import BizError, NotFoundError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
 from app.profile import repository as repo
@@ -65,7 +65,7 @@ async def my_profile(db: DBDep, user: CurrentUserDep) -> ApiResponse[ProfileStud
 
 @router.post("/me/corrections", response_model=ApiResponse[CorrectionOut])
 async def submit_my_correction(
-    payload: CorrectionIn, db: DBDep, user: CurrentUserDep,
+    payload: CorrectionIn, db: DBDep, user: ActiveStudentDep,
 ) -> ApiResponse[CorrectionOut]:
     if user.student_id is None:
         raise BizError("仅学生可提交申诉", code=40305, http_status=403)

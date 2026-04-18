@@ -228,6 +228,40 @@ async def test_archived_student_cannot_submit_request_but_can_read_profile(
     assert body["code"] == 40311
 
 
+async def test_archived_student_cannot_submit_correction(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    """v1.5 生命周期漏口回归：非在读学生提交画像纠错 → 403 / 40311。"""
+    token, student_id = await _login_as_student(
+        client, db, student_no="P500001", wx_code="wx_p500001"
+    )
+    stu_headers = {"Authorization": f"Bearer {token}"}
+
+    stu = await db.get(Student, student_id)
+    assert stu is not None
+    stu.enrollment_status = ENROLLMENT_ARCHIVED
+    await db.commit()
+
+    # 只读仍通过
+    mine = await client.get("/api/v1/profile/me", headers=stu_headers)
+    assert mine.status_code == 200
+
+    # 纠错申诉写操作被拦截
+    resp = await client.post(
+        "/api/v1/profile/me/corrections",
+        headers=stu_headers,
+        json={
+            "fact_id": None,
+            "field_name": "description",
+            "proposed_value": "归档后补申诉",
+            "reason": "测试",
+        },
+    )
+    assert resp.status_code == 403, resp.text
+    assert resp.json()["code"] == 40311
+
+
 async def test_profile_endpoints_reject_anonymous(client: AsyncClient) -> None:
     resp = await client.get("/api/v1/profile/me")
     assert resp.status_code == 401
