@@ -23,7 +23,7 @@
 
 ### S0 基线冻结
 
-- 当前状态：`[x]` `S0.1 ~ S0.4` 已全部完成；验收以冻结后的 `s0-*` baseline worktree 为准
+- 当前状态：`[x]` `S0.1 ~ S0.4` 已全部完成；历史验收曾以冻结后的 `s0-*` baseline worktree 为准，现已统一收口到 `codex/v1.6-integration`
 - [x] `S0.1` 拆分并整理当前工作区中已存在的有效改动，形成原子提交边界
 - [x] `S0.2` 回跑后端集成测试，确认当前基线可继续推进
 - [x] `S0.3` 回跑 `web` 与 `miniapp` 构建，确认当前前端基线可继续推进
@@ -35,7 +35,7 @@
 - `S0.2`：`D:\Codes\super-ruc-wt\s0-backend-baseline\backend` 执行 `uv run pytest tests/integration -v`，结果 `41 passed in 90.91s`。
 - `S0.3`：`miniapp` 在 `D:\Codes\super-ruc-wt\s0-miniapp-baseline` 构建通过；`web` 在 `D:\Codes\super-ruc-wt\s0-web-baseline` 修正 `web/src/utils/request.ts` 的 Axios 响应拦截器返回类型后，`pnpm -C web build` 已通过。
 - `S0.4`：已新增 `docs/notes/s0-gap-matrix-2026-04-18.md`，完成 `FR-001 ~ FR-018`、`NFR-001 ~ NFR-005` 的五维映射。
-- 说明：根工作区仍保留用户未冻结的本地改动，因此 `S0` 的测试与构建闸口统一以冻结后的 baseline worktree 为准，不以当前脏工作区直接判定。
+- 说明：`S0` 执行期间曾以 baseline worktree 作为独立验证入口；截至 `2026-04-19`，相关修正、计划文件与验证结论已收口到 `codex/v1.6-integration`，后续验证统一以该分支为准。
 
 出口条件：
 - 主线可构建
@@ -172,7 +172,8 @@
 | 2026-04-18 | S5 文档与交付闭环细化 | `docs/notes/refinements/2026-04-18-s5-doc-delivery-refinement.md` | `S5A.1, S5A.2, S5A.3, S5A.4, S5B.1, S5B.2, S5B.3, S5B.4` | `[x]` | 已落盘可执行任务树；执行状态以主计划条目为准 |
 | 2026-04-18 | 全阶段并行 worktree / branch 编排 | `docs/notes/refinements/2026-04-18-worktree-branch-orchestration-refinement.md` | `S0 ~ S5` | `[x]` | 已落盘跨阶段并行编排、子分支后缀规则、阶段集成分支与 worktree 分派表 |
 | 2026-04-18 | S0 启动命令与第一批 worktree 创建 | `docs/notes/refinements/2026-04-18-s0-bootstrap-commands-refinement.md` | `S0.1, S0.2, S0.3, S0.4` | `[x]` | 已落盘根工作区冻结顺序、冻结后创建 `int-s0` 与第一批 baseline worktree 的实际命令 |
-| 2026-04-19 | 仓库与工作树收拢细化 | `docs/notes/refinements/2026-04-19-repo-cleanup-refinement.md` | `S0, S1` | `[-]` | 收口根工作区真实改动、统一后续开发主线并清理 `S0` 临时分支/worktree |
+| 2026-04-19 | 仓库与工作树收拢细化 | `docs/notes/refinements/2026-04-19-repo-cleanup-refinement.md` | `S0, S1` | `[x]` | 已收口到 `codex/v1.6-integration`，并清理 `S0` 临时分支/worktree |
+| 2026-04-19 | 文档资产与计划目录正规化 | `docs/notes/refinements/2026-04-19-doc-asset-normalization-refinement.md` | `S5A.3, S5B.1, S5B.2, S5B.3, S5B.4` | `[x]` | 已落盘 `docs/notes` 权威入口与 `tmp/docs` 资产正规化任务树 |
 
 ## 会话更新要求
 
@@ -192,3 +193,6 @@
 - `2026-04-18`：完成 `S0.1`、`S0.2`、`S0.4` 的执行回写；新增 `docs/notes/s0-gap-matrix-2026-04-18.md`；随后修正 `web/src/utils/request.ts` 的响应拦截器返回类型，关闭 `S0.3` 的构建阻塞。
 - `2026-04-19`：清理根工作区额外的 `web` TypeScript 构建错误；`pnpm -C web build` 已通过。当前可开始准备分支/工作树收拢，但需先固化根工作区与 `s0-web-baseline` / `int-s0` 中仍未提交的改动。
 - `2026-04-19`：新增仓库与工作树收拢细化文件，开始将根工作区改动、`S0` 临时分支与 baseline worktree 收口到单一开发主线。
+- `2026-04-19`：`codex/v1.6-integration` 重新验证通过 `pnpm -C web build`、`pnpm -C miniapp build:mp-weixin` 与 `backend` 下的 `uv run pytest tests/integration -v`（`41 passed in 89.29s`），并完成 `web/src/views/workflow/QuizBank.vue` 的类型收口。
+- `2026-04-19`：完成仓库/worktree 收拢；删除 `codex/int-s0`、`codex/s0-*`、`codex/repo-cleanup-snapshot` 及其物理 worktree，保留 `codex/v1.6-integration` 作为当前唯一开发主线，`main` 保持与 `origin/main` 对齐。
+- `2026-04-19`：新增 `docs/notes/README.md` 与“文档资产与计划目录正规化”细化文件，明确 `docs/notes` 的权威入口、参考材料边界与 `tmp/docs` 资产后续正规化要求。

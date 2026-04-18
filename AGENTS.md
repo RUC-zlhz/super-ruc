@@ -23,3 +23,6 @@
    - `[!]` 阻塞
 4. 新对话开始时，必须先读取 `docs/notes/current-implementation-plan.md`，如有相关细化文件，也必须一并读取，再继续规划或实施。
 5. 不允许静默丢弃旧计划或旧细化。若方案被替换，只能标记为“已替代/已失效”，并留下替代文件或替代条目的引用。
+6. `docs/notes/current-implementation-plan.md` 与已在主计划登记的 `docs/notes/refinements/*.md` 是唯一权威的执行计划来源；未登记文件默认不能直接作为实施依据。
+7. `docs/notes/fix.md`、`docs/notes/v15-completion-plan.md`、`docs/notes/v15-acceptance-walkthrough.md`、`docs/notes/pending-business-decisions.md`、`docs/notes/s0-gap-matrix-2026-04-18.md` 默认视为参考/证据材料，只有被主计划显式登记后才可升级为执行计划。
+8. `tmp/docs/` 仅视作文档构建临时工作区；若其中出现需要长期保留的 Mermaid 图源、脚本或正式资产，必须先迁移到受版本控制的正式目录，并在 `docs/notes/refinements/` 新增对应细化记录。
