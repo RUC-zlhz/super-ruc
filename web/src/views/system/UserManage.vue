@@ -143,9 +143,20 @@ const enrollSubmitting = ref(false)
 const selectedStudent = ref<StudentBasic | null>(null)
 const enrollForm = reactive({ new_status: 'ACTIVE', reason: '' })
 
-function onEditEnrollment(stu: StudentBasic) {
-  selectedStudent.value = stu
-  enrollForm.new_status = stu.enrollment_status
+function onEditEnrollment(stu: StudentBasic | Record<string, any>) {
+  const current: StudentBasic = {
+    id: stu.id,
+    student_no: stu.student_no,
+    full_name: stu.full_name,
+    gender: stu.gender ?? null,
+    grade_code: stu.grade_code ?? null,
+    major_code: stu.major_code ?? null,
+    class_code: stu.class_code ?? null,
+    political_status: stu.political_status ?? null,
+    enrollment_status: stu.enrollment_status,
+  }
+  selectedStudent.value = current
+  enrollForm.new_status = current.enrollment_status
   enrollForm.reason = ''
   showEnrollmentModal.value = true
 }

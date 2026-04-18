@@ -127,7 +127,7 @@ const submitting = ref(false)
 const editingId = ref<number | null>(null)
 const form = reactive({ title: '', body: '', source_type: 'MANUAL' })
 
-function openEditor(record?: NoticeOut) {
+function openEditor(record?: NoticeOut | Record<string, any>) {
   if (record) {
     editingId.value = record.id
     Object.assign(form, { title: record.title, body: record.body || '', source_type: record.source_type })

@@ -15,20 +15,37 @@
 
 ```
 super-ruc/
-├── docs/                    需求与架构文档（SRS、业务决策、可追溯矩阵）
-│   ├── srs/                 正式需求规格（FR-001~018, NFR-001~005）
-│   └── architecture-decision-records/   ADR 技术决策记录
+├── docs/                    需求与架构文档
+│   ├── source/              原始需求输入（需求文档.md、需求补充.md、additional-request.txt）
+│   ├── templates/           正式文档模板（软件需求规格说明书模板.docx）
+│   ├── notes/               过程记录与待确认事项（pending-business-decisions.md、fix.md）
+│   ├── srs/                 正式需求规格（FR-001~018, NFR-001~005, traceability-matrix）
+│   └── architecture-decision-records/   ADR 技术决策记录（ADR-001-tech-stack.md）
 ├── specs/                   技术规格（数据模型、用例、UI/UX、分析模型）
 │   └── 001-student-service-platform/
-├── output/                  生成物（SRS docx/pdf 各版本）
+│       ├── spec.md, analysis-model.md, use-case-model.md
+│       ├── ui-ux-spec.md, traditional-srs-supplement.md
+│       └── checklists/
+├── output/
+│   └── doc/                 SRS 交付件，保留 v1.0 → v1.5 全部版本（含 v1.5-emf/ emf-inkscape 变体）
 │
-├── backend/                 后端 API 服务（Python 3.11 + FastAPI）
-├── web/                     管理端 PC 网页（Vue 3 + Ant Design Vue）
+├── backend/                 后端 API 服务（Python 3.11 + FastAPI，uv 管理）
+│   ├── app/                 各业务模块（见下文）
+│   ├── alembic/             数据库迁移
+│   ├── scripts/             运维脚本（seed_initial.py, archive_audit_logs.py, seed/）
+│   ├── tests/               pytest（conftest.py + integration/）
+│   ├── pyproject.toml       依赖声明（不再用 requirements.txt）
+│   └── uv.lock
+├── web/                     管理端 PC 网页（Vue 3 + Vite + Ant Design Vue 4.x）
 ├── miniapp/                 学生端（uni-app → 微信小程序为主，H5 兼容）
-├── deploy/                  部署配置（Docker Compose, Nginx, 初始化脚本）
+├── deploy/                  部署配置（docker-compose.yml + nginx/）
 │
-├── .gitignore
-└── CLAUDE.md                ← 本文件
+├── AGENTS.md                Codex 协作约束
+├── CLAUDE.md                ← 本文件（Claude Code 协作约束）
+├── README.md                仓库说明
+├── pnpm-workspace.yaml      前端 pnpm 工作区（packages: web, miniapp）
+├── .gitattributes           跨平台行尾/二进制规则
+└── .gitignore
 ```
 
 ---
@@ -48,7 +65,7 @@ super-ruc/
 | 文件存储 | **MinIO**（minio-py） | PDF/Word/Excel 附件存储 |
 | 管理前端 | **Vue 3 + Vite + Ant Design Vue (antdv 4.x)** | 企业风格管理台 |
 | 学生前端 | **uni-app**（Vue 3 基础） | 主输出微信小程序，H5 作为备用 |
-| 构建工具 | pip/uv（后端）+ pnpm（前端）| — |
+| 构建工具 | **uv**（后端，pyproject.toml + uv.lock）+ **pnpm workspace**（前端 `web` / `miniapp`） | — |
 | 受控 AI 问答 | **Anthropic Python SDK**（claude-haiku-4-5） | 需预算开关，默认关闭降级为关键词匹配 |
 | Excel 处理 | `openpyxl` | 导入导出批次处理 |
 | PDF 生成 | `weasyprint` 或 `reportlab` | 证明 PDF 预览（FR-006） |
@@ -191,22 +208,20 @@ Excel 主数据导入：存在任一 `fatal` 级错误 → 整批回滚（使用
 ## 开发环境快速启动
 
 ```bash
-# 启动基础设施（在 deploy/ 目录）
-docker compose up -d
+# 启动基础设施（在仓库根目录）
+docker compose -f deploy/docker-compose.yml up -d
 
-# 后端
+# 后端（统一用 uv）
 cd backend
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-alembic upgrade head          # 初始化数据库表结构
-uvicorn app.main:app --reload --port 8080
+uv sync --extra dev            # 安装 runtime + dev 依赖（pytest/ruff/black/mypy 等）
+uv run alembic upgrade head    # 初始化数据库表结构
+uv run uvicorn app.main:app --reload --port 8080
 
-# 管理前端
-cd web && pnpm install && pnpm dev    # http://localhost:5173
-
-# 学生端（微信小程序模式需要 HBuilderX 或微信开发者工具）
-cd miniapp && pnpm install && pnpm dev:mp-weixin
-# H5 调试：pnpm dev:h5
+# 前端（根目录即可，pnpm workspace）
+pnpm install -r
+pnpm -C web dev                # 管理端 http://localhost:5173
+pnpm -C miniapp dev:h5         # 学生端 H5 调试
+pnpm -C miniapp dev:mp-weixin  # 学生端 微信小程序（需 HBuilderX 或微信开发者工具）
 ```
 
 **端口映射** — docker-compose 默认值均避让本机同名服务：
@@ -219,7 +234,7 @@ cd miniapp && pnpm install && pnpm dev:mp-weixin
 | MailHog SMTP / UI | 1025 / 8025 | 1025 / 8025 |
 
 ### 集成测试
-测试库与开发库共用同一 docker-compose Postgres 实例，但使用独立 schema：
+测试库与开发库共用同一 docker-compose Postgres 实例，但使用独立 database（`sip_db_test`）：
 
 ```bash
 # 首次：创建测试库
@@ -227,22 +242,26 @@ python -c "import asyncio, asyncpg; asyncio.run(asyncpg.connect(dsn='postgresql:
 # 或手动 CREATE DATABASE sip_db_test;
 
 cd backend
-.venv/Scripts/python.exe -m pytest tests/ -v
+uv run pytest tests/ -v
 ```
 
 - `tests/conftest.py`：每个 test 前 TRUNCATE + 重塞种子，避免 service 层自 commit 与 SAVEPOINT-rollback 冲突
 - `tests/integration/`：happy-path 集成测试，覆盖 auth 与 knowledge 闭环
+- `scripts/seed_initial.py`：初始化种子数据；`scripts/archive_audit_logs.py`：审计日志归档脚本
 
 ---
 
 ## 参考文件
 
-- 需求源文件：`需求文档.md`，`需求补充.md`
-- 正式需求规格：`docs/srs/` 目录（FR-001~016, NFR-001~005）
+- 需求源文件：`docs/source/需求文档.md`，`docs/source/需求补充.md`，`docs/source/additional-request.txt`
+- 文档模板：`docs/templates/软件需求规格说明书模板.docx`
+- 正式需求规格：`docs/srs/` 目录（FR-001~018, NFR-001~005, `traceability-matrix.md`）
 - 技术规格：`specs/001-student-service-platform/spec.md`
 - UI/UX 规格：`specs/001-student-service-platform/ui-ux-spec.md`
 - 数据模型：`specs/001-student-service-platform/analysis-model.md`
 - 用例模型：`specs/001-student-service-platform/use-case-model.md`
-- 待确认决策：`docs/pending-business-decisions.md`
+- SRS 补充：`specs/001-student-service-platform/traditional-srs-supplement.md`
+- 待确认决策：`docs/notes/pending-business-decisions.md`
+- 过程备注：`docs/notes/fix.md`
 - 技术选型 ADR：`docs/architecture-decision-records/ADR-001-tech-stack.md`
-- SRS 文档：`output/doc/软件需求规格说明书-信息学院学生综合服务与党团管理平台-v1.3.docx`
+- SRS 最新交付件：`output/doc/软件需求规格说明书-信息学院学生综合服务与党团管理平台-v1.5.docx`（及 v1.5-emf / v1.5-emf-inkscape 变体）

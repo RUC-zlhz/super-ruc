@@ -41,7 +41,7 @@ http.interceptors.response.use(
         message.error(payload.message || '请求失败')
         return Promise.reject(payload)
       }
-      return payload
+      return resp
     }
     return resp
   },

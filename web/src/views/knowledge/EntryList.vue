@@ -126,7 +126,7 @@ function onTableChange(p: any) {
   reload()
 }
 
-function onEdit(record: KnowledgeEntry) {
+function onEdit(record: KnowledgeEntry | Record<string, any>) {
   editingId.value = record.id
   Object.assign(form, {
     code: record.code,

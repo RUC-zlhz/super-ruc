@@ -119,11 +119,11 @@ watch(
   { immediate: true },
 )
 
-function onMenuClick({ key }: { key: string }) {
-  router.push(key)
+function onMenuClick({ key }: { key: string | number }) {
+  router.push(String(key))
 }
 
-function onUserMenu({ key }: { key: string }) {
+function onUserMenu({ key }: { key: string | number }) {
   if (key === 'logout') {
     auth.logout()
     router.replace('/login')

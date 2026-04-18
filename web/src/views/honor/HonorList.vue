@@ -189,7 +189,7 @@ const form = reactive<any>({
   consent_flag: false,
 })
 
-function openEditor(record?: HonorRecordBrief) {
+function openEditor(record?: HonorRecordBrief | Record<string, any>) {
   if (record) {
     editingId.value = record.id
     Object.assign(form, {

@@ -1,6 +1,6 @@
 # Traceability Matrix
 
-**Version:** 1.0 | **Created:** 2026-04-13 | **Last Updated:** 2026-04-13
+**Version:** 1.1 | **Created:** 2026-04-13 | **Last Updated:** 2026-04-18
 
 ## End-to-End Traceability
 
@@ -28,6 +28,8 @@ flowchart LR
     CP9[CP-009 学业风险识别滞后且误导成本高] --> CN12[CN-012 弱结论学业风险提示]
     CP10[CP-010 官方内容缺少持续治理] --> CN1
     CP10 --> CN2
+    CP11[CP-011 荣誉信息分散难集中展示] --> CN14[CN-014 校级及以上荣誉集中公示]
+    CP12[CP-012 学生成长数据分散难形成全貌] --> CN15[CN-015 学籍与成长数据聚合画像]
 
     CN1 --> FR1[FR-001 查询]
     CN1 --> FR2[FR-002 权威答复治理]
@@ -45,6 +47,8 @@ flowchart LR
     CN11 --> FR13[FR-013 审计日志]
     CN12 --> FR14[FR-014 学业缺口展示]
     CN13 --> FR16[FR-016 运营统计看板]
+    CN14 --> FR17[FR-017 荣誉公示]
+    CN15 --> FR18[FR-018 学生画像]
 ```
 
 ## CP → CN Mapping
@@ -61,6 +65,8 @@ flowchart LR
 | CP-008 通知触达不精准且来源分散 | CN-009, CN-010, CN-013 | Complete |
 | CP-009 学业风险识别滞后且误导成本高 | CN-012 | Complete |
 | CP-010 官方内容缺少持续治理 | CN-001, CN-002 | Complete |
+| CP-011 荣誉信息分散难集中展示 | CN-014 | Complete（待上游 01-customer-problems.md 补充条目） |
+| CP-012 学生成长数据分散难形成全貌 | CN-015 | Complete（待上游 01-customer-problems.md 补充条目） |
 
 ## CN → FR Mapping
 
@@ -79,16 +85,18 @@ flowchart LR
 | CN-011 敏感字段与导出权限受控 | FR-012, FR-013 | Complete |
 | CN-012 弱结论学业风险提示 | FR-014 | Complete |
 | CN-013 学院运营统计汇总 | FR-016 | Complete |
+| CN-014 校级及以上荣誉集中公示 | FR-017 | Complete（待上游 03-customer-needs.md 补充条目） |
+| CN-015 学籍与成长数据聚合画像 | FR-018 | Complete（待上游 03-customer-needs.md 补充条目） |
 
 ## NFR Traceability
 
 | NFR | Traces To CN | Applies To FRs |
 |-----|--------------|----------------|
-| NFR-001 敏感数据安全 | CN-011 | FR-006, FR-009, FR-012, FR-013 |
-| NFR-002 审计留存与可追溯性 | CN-007 | FR-008, FR-012, FR-013, FR-016 |
-| NFR-003 常见操作响应时间 | CN-001 | FR-001, FR-004, FR-007, FR-011, FR-016 |
-| NFR-004 事务一致性与数据可靠性 | CN-008 | FR-005, FR-006, FR-008, FR-009, FR-014, FR-015 |
-| NFR-005 学生与老师的操作易用性 | CN-005 | FR-006, FR-007, FR-008 |
+| NFR-001 敏感数据安全 | CN-011, CN-015 | FR-006, FR-009, FR-012, FR-013, FR-018 |
+| NFR-002 审计留存与可追溯性 | CN-007, CN-011 | FR-008, FR-012, FR-013, FR-016, FR-017, FR-018 |
+| NFR-003 常见操作响应时间 | CN-001, CN-014 | FR-001, FR-004, FR-007, FR-011, FR-016, FR-017 |
+| NFR-004 事务一致性与数据可靠性 | CN-008 | FR-005, FR-006, FR-008, FR-009, FR-014, FR-015, FR-017 |
+| NFR-005 学生与老师的操作易用性 | CN-005, CN-015 | FR-006, FR-007, FR-008, FR-018 |
 
 ## Zigzag Validation Report
 
@@ -96,10 +104,10 @@ flowchart LR
 
 | Check Item | Result | Notes |
 |------------|--------|-------|
-| Every CP has at least one CN | ✅ | 10 / 10 covered |
-| Every CN has at least one FR | ✅ | 13 / 13 covered |
-| Every FR traces to a CN | ✅ | 16 / 16 traced |
-| Every FR traces to a CP | ✅ | 16 / 16 traced through CN and direct file traceability |
+| Every CP has at least one CN | ⚠️ | CP-001~010 已落稿；**CP-011 / CP-012 仅在 FR-017 / FR-018 与 `_index.md` 引用，尚未写入 `01-customer-problems.md`** |
+| Every CN has at least one FR | ⚠️ | CN-001~013 已落稿；**CN-014 / CN-015 仅在 FR-017 / FR-018 与 `_index.md` 引用，尚未写入 `03-customer-needs.md`** |
+| Every FR traces to a CN | ✅ | 18 / 18 traced |
+| Every FR traces to a CP | ✅ | 18 / 18 traced through CN |
 | Every NFR traces to a CN | ✅ | 5 / 5 traced |
 | Orphan CPs | ✅ None | — |
 | Orphan CNs | ✅ None | — |
@@ -113,17 +121,22 @@ flowchart LR
 | CN-008 | 由 FR-009 与 FR-015 共同承接文件交换与规则数据维护 | Accept |
 | CN-011 | 由 FR-012 与 FR-013 分别承接权限控制与审计能力 | Accept |
 | 学业模块 | FR-014 依赖 FR-015 提供规则基础 | 作为正式范围纳入实施，但以弱结论和样例数据兜底避免越界承诺 |
+| 展示与画像 | FR-017（荣誉公示）与 FR-018（画像）共用敏感字段治理与 consent 机制 | Accept；FR-018 额外承接账号生命周期状态机（v1.5 补充） |
 
 ### Gap Analysis
 
 | Gap Type | Item | Impact | Resolution |
 |----------|------|--------|------------|
-| Pending Business Decision | 校级正式流程与学院平台边界 | 影响部分事务是否仅做指引/归档 | 在详细设计前与业务方确认流程清单 |
-| Pending Data Decision | 培养方案结构化数据来源 | 影响 FR-014 / FR-015 可落地性 | 若真实数据暂不可得，则以甲方确认的样例数据、规则模板和弱结论模式完成 FR-014 / FR-015 的一期交付与验收 |
-| Pending Governance Decision | 字段级权限矩阵 | 影响 FR-012 配置明细 | 在实施前形成角色-字段矩阵 |
+| Upstream Doc | CP-011 / CP-012 未写入 `01-customer-problems.md` | 文档可追溯链条不完整 | 在 CP 文档中补齐 CP-011 / CP-012 条目 |
+| Upstream Doc | CN-014 / CN-015 未写入 `03-customer-needs.md` | 文档可追溯链条不完整 | 在 CN 文档中补齐 CN-014 / CN-015 条目 |
+| Pending Business Decision | 校级正式流程与学院平台边界（Q-02~Q-06） | 影响部分事务是否仅做指引/归档 | 在详细设计前与业务方确认流程清单 |
+| Pending Data Decision | 培养方案结构化数据来源（Q-08） | 影响 FR-014 / FR-015 可落地性 | 若真实数据暂不可得，以甲方确认的样例数据、规则模板和弱结论模式完成一期交付 |
+| Pending Governance Decision | 字段级权限矩阵（Q-P1） | 影响 FR-012 配置明细 | 在实施前形成角色-字段矩阵 |
 
 ## Validation Conclusion
 
-- 当前 CP → CN → FR 链条完整，无孤儿项。
-- 一期实施主线以五个核心闭环组织，但 `FR-001` 至 `FR-016` 均属于正式范围。
-- `FR-014`、`FR-015` 与学业模块相关，应通过真实数据或甲方确认的样例数据进入实施与验收计划。
+- 当前 CP → CN → FR 链条在 **FR-001 ~ FR-018** 范围内完整，无孤儿项。
+- 一期实施主线以**六个核心闭环**组织（知识库 / 流程 / 审批 / 通知 / 审计 / 展示与画像），`FR-001 ~ FR-018` 均属于正式范围。
+- `FR-014` / `FR-015` 与学业模块相关，应通过真实数据或甲方确认的样例数据进入实施与验收计划。
+- `FR-017` / `FR-018` 为 v1.5 新增：展示与画像闭环已纳入范围，`FR-018` 并承接账号生命周期全局状态机（见 `docs/notes/fix.md` 第 1 条）。
+- **文档待办**：在 `01-customer-problems.md` 补 CP-011 / CP-012；在 `03-customer-needs.md` 补 CN-014 / CN-015，以闭合追溯链条。

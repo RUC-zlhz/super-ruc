@@ -50,6 +50,7 @@ web/dist/
 miniapp/dist/
 web/.vite/
 miniapp/.vite/
+web/src/types/components.d.ts
 *.log
 npm-debug.log*
 pnpm-debug.log*
