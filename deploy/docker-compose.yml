@@ -1,0 +1,85 @@
+version: "3.9"
+
+# 信息学院学生综合服务与党团管理平台 — 本地开发环境
+# 生产部署请参考 scripts/deploy.sh 并替换为实际服务地址
+
+services:
+
+  # -----------------------------------------------------------------------
+  # Kingbase ES（PostgreSQL 兼容）
+  # 注意：官方 Kingbase Docker 镜像需从人大金仓官网下载并手动导入
+  # 临时替代：开发阶段可用 postgres:15-alpine 进行功能验证，
+  #           上线前必须在真实 Kingbase 环境中回归测试
+  #
+  # DDL / 种子数据：一律通过 Alembic + backend/scripts/seed_initial.py
+  # 完成，不挂载 /docker-entrypoint-initdb.d。
+  # -----------------------------------------------------------------------
+  kingbase:
+    image: postgres:15-alpine          # 开发阶段占位镜像，替换为 kingbase/kingbase-es:V9
+    container_name: sip-kingbase
+    environment:
+      POSTGRES_USER: sip_user
+      POSTGRES_PASSWORD: sip_pass_dev  # 生产环境使用 secrets，不在此硬编码
+      POSTGRES_DB: sip_db
+    ports:
+      - "54322:5432"                   # 使用非默认端口避免与本机 postgres/kingbase 冲突（54321 已被本机 Kingbase 占用）
+    volumes:
+      - kingbase_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sip_user -d sip_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -----------------------------------------------------------------------
+  # Redis 7.x — 会话缓存、权限缓存、限流
+  # -----------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: sip-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --requirepass sip_redis_dev
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # -----------------------------------------------------------------------
+  # MinIO — 附件存储（PDF/Word/Excel 上传）
+  # -----------------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: sip-minio
+    environment:
+      MINIO_ROOT_USER: sip_minio
+      MINIO_ROOT_PASSWORD: sip_minio_dev
+    ports:
+      - "9010:9000"     # API（9000 可能被本机其它 Python 服务占用）
+      - "9011:9001"     # Console
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # -----------------------------------------------------------------------
+  # MailHog — 本地邮件捕获（开发调试用，不真实发送）
+  # -----------------------------------------------------------------------
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: sip-mailhog
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+
+volumes:
+  kingbase_data:
+  redis_data:
+  minio_data:

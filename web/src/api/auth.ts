@@ -1,0 +1,27 @@
+import { get, post, patch } from '@/utils/request'
+import type { ApiEnvelope } from '@/utils/request'
+import type { TokenResponse, UserInfo } from './types'
+
+export function loginByWorkNo(work_no: string, password: string) {
+  return post<ApiEnvelope<TokenResponse>>('/auth/login', { work_no, password })
+}
+
+export function refreshToken(refresh_token: string) {
+  return post<ApiEnvelope<TokenResponse>>('/auth/refresh', { refresh_token })
+}
+
+export function getMe() {
+  return get<ApiEnvelope<UserInfo>>('/auth/me')
+}
+
+// v1.5 学籍状态变更
+export interface EnrollmentStatusUpdate {
+  status: 'ACTIVE' | 'SUSPENDED' | 'TRANSFERRED' | 'GRADUATED' | 'ARCHIVED'
+  reason?: string | null
+}
+export function updateEnrollmentStatus(studentId: number, payload: EnrollmentStatusUpdate) {
+  return patch<ApiEnvelope<{ student_id: number; status: string }>>(
+    `/admin/auth/students/${studentId}/enrollment-status`,
+    payload,
+  )
+}

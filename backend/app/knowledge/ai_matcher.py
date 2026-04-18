@@ -1,0 +1,150 @@
+"""受控 AI 问答引擎（Claude）。
+
+约束（C-07）：
+- 由 settings.AI_QA_ENABLED 开关控制；False 时返回关键词匹配降级结果
+- 所有候选必须携带 knowledge_entry_id 与官方来源
+- Claude 只负责对已检索出的候选做"语义匹配/重排序"，不生成新内容
+"""
+from __future__ import annotations
+
+import json
+import logging
+from typing import Any
+
+from app.core.config import settings
+from app.knowledge.models import KnowledgeEntry
+
+logger = logging.getLogger(__name__)
+
+_SYSTEM_PROMPT = (
+    "你是一个高校学生事务政策匹配助手。根据学生的问题，从下列候选知识条目中挑选最相关的 1-3 条，"
+    "按相关度从高到低排序。只能使用给定候选，严禁编造条目。"
+    "必须以 JSON 数组返回，每项字段：entry_id, score(0~1), reason(<=40 字)。"
+    "若所有候选都不够匹配，返回空数组 []。"
+)
+
+
+def _score_keyword(entry: KnowledgeEntry, query: str) -> float:
+    """简易关键词评分：字符串子串命中权重。用于降级与初筛。"""
+    q = query.lower().strip()
+    if not q:
+        return 0.0
+    tokens = [t for t in q.replace("?", " ").replace("？", " ").split() if t]
+    if not tokens:
+        tokens = [q]
+    score = 0.0
+    fields = [
+        (entry.title or "", 3.0),
+        (entry.summary or "", 1.5),
+        (entry.applicable_condition or "", 1.0),
+        (entry.required_materials or "", 1.0),
+        (entry.process_steps or "", 1.0),
+        (entry.body_md or "", 0.5),
+    ]
+    for tk in tokens:
+        for text, weight in fields:
+            if tk in text.lower():
+                score += weight
+    return score
+
+
+def rank_by_keyword(entries: list[KnowledgeEntry], query: str, top_k: int) -> list[tuple[KnowledgeEntry, float]]:
+    scored = [(e, _score_keyword(e, query)) for e in entries]
+    scored.sort(key=lambda x: x[1], reverse=True)
+    scored = [p for p in scored if p[1] > 0][:top_k]
+    return scored
+
+
+async def rank_by_claude(
+    entries: list[KnowledgeEntry], query: str, top_k: int
+) -> list[dict[str, Any]] | None:
+    """调用 Claude 对候选做语义匹配；失败返回 None 让调用方降级。"""
+    if not settings.AI_QA_ENABLED:
+        return None
+    if not settings.ANTHROPIC_API_KEY:
+        logger.warning("AI_QA_ENABLED 为 true 但 ANTHROPIC_API_KEY 为空，降级为关键词匹配")
+        return None
+
+    try:
+        # 延迟导入，避免未安装时启动失败
+        import anthropic  # type: ignore
+    except ImportError:
+        logger.warning("anthropic 包未安装，AI 问答降级")
+        return None
+
+    candidates = [
+        {
+            "entry_id": e.id,
+            "title": e.title,
+            "summary": e.summary or "",
+            "category": e.category_code or "",
+            "applicable_condition": (e.applicable_condition or "")[:280],
+            "required_materials": (e.required_materials or "")[:280],
+            "process_steps": (e.process_steps or "")[:280],
+        }
+        for e in entries
+    ]
+    user_msg = (
+        f"问题：{query}\n\n"
+        f"候选知识条目（JSON）：\n{json.dumps(candidates, ensure_ascii=False)}\n\n"
+        f"请挑选 top {top_k} 个，按 JSON 数组返回。"
+    )
+
+    try:
+        client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        resp = await client.messages.create(
+            model=settings.ANTHROPIC_MODEL,
+            max_tokens=512,
+            system=_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_msg}],
+        )
+    except Exception as e:  # 网络/鉴权等
+        logger.exception("Claude 调用失败：%s", e)
+        return None
+
+    text = "".join(
+        getattr(block, "text", "") for block in resp.content if getattr(block, "type", "") == "text"
+    ).strip()
+    if not text:
+        return None
+    # 允许模型回传纯 JSON 数组
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        # 尝试提取首个 [ ... ] 片段
+        start, end = text.find("["), text.rfind("]")
+        if start < 0 or end <= start:
+            logger.warning("Claude 回复非 JSON：%s", text[:200])
+            return None
+        try:
+            parsed = json.loads(text[start : end + 1])
+        except json.JSONDecodeError:
+            return None
+
+    if not isinstance(parsed, list):
+        return None
+
+    # 规范化输出
+    normalized: list[dict[str, Any]] = []
+    entry_ids = {e.id for e in entries}
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        try:
+            eid = int(item.get("entry_id"))
+        except (TypeError, ValueError):
+            continue
+        if eid not in entry_ids:
+            continue
+        try:
+            score = float(item.get("score", 0.0))
+        except (TypeError, ValueError):
+            score = 0.0
+        normalized.append(
+            {
+                "entry_id": eid,
+                "score": max(0.0, min(1.0, score)),
+                "reason": str(item.get("reason", ""))[:80] or None,
+            }
+        )
+    return normalized[:top_k]

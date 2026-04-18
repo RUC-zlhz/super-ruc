@@ -1,0 +1,98 @@
+<template>
+  <div>
+    <a-page-header title="审批工作台" sub-title="FR-007 / FR-008" />
+    <a-form layout="inline" :model="filters" class="mb16" @finish="reload">
+      <a-form-item label="关键字">
+        <a-input v-model:value="filters.q" placeholder="单号 / 申请人 / 标题" allow-clear />
+      </a-form-item>
+      <a-form-item label="类型">
+        <a-input v-model:value="filters.type_code" placeholder="LEAVE / CERTIFICATE / STAMP..." allow-clear />
+      </a-form-item>
+      <a-form-item label="状态">
+        <a-select v-model:value="filters.status" style="width: 160px" allow-clear>
+          <a-select-option value="SUBMITTED">待受理</a-select-option>
+          <a-select-option value="IN_REVIEW">审核中</a-select-option>
+          <a-select-option value="APPROVED">已通过</a-select-option>
+          <a-select-option value="REJECTED">已驳回</a-select-option>
+          <a-select-option value="OFFLINE_HANDLED">转线下</a-select-option>
+        </a-select>
+      </a-form-item>
+      <a-form-item>
+        <a-button type="primary" html-type="submit">查询</a-button>
+      </a-form-item>
+    </a-form>
+
+    <a-table
+      :columns="columns"
+      :data-source="rows"
+      :loading="loading"
+      :pagination="pagination"
+      row-key="id"
+      @change="onTableChange"
+    >
+      <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'status'">
+          <StatusTag :status="record.status" />
+        </template>
+        <template v-else-if="column.key === 'actions'">
+          <router-link :to="`/approval/${record.id}`">查看</router-link>
+        </template>
+      </template>
+    </a-table>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { onMounted, reactive, ref } from 'vue'
+import { listAdminRequests, type RequestBrief, type RequestStatus } from '@/api/workflow'
+import StatusTag from '@/components/StatusTag.vue'
+
+const columns = [
+  { title: '单号', dataIndex: 'request_no', key: 'request_no' },
+  { title: '类型', dataIndex: 'type_code', key: 'type_code' },
+  { title: '标题', dataIndex: 'title', key: 'title' },
+  { title: '状态', key: 'status' },
+  { title: '版本', dataIndex: 'revision', key: 'revision', width: 70 },
+  { title: '更新时间', dataIndex: 'updated_at', key: 'updated_at' },
+  { title: '操作', key: 'actions', width: 100 },
+]
+
+const filters = reactive<{
+  q?: string
+  type_code?: string
+  status?: RequestStatus
+}>({})
+
+const rows = ref<RequestBrief[]>([])
+const loading = ref(false)
+const pagination = reactive({ current: 1, pageSize: 20, total: 0 })
+
+async function reload() {
+  loading.value = true
+  try {
+    const resp = await listAdminRequests({
+      q: filters.q,
+      type_code: filters.type_code,
+      status: filters.status,
+      page: pagination.current,
+      size: pagination.pageSize,
+    })
+    rows.value = resp.data.items
+    pagination.total = resp.data.meta.total
+  } finally {
+    loading.value = false
+  }
+}
+
+function onTableChange(p: any) {
+  pagination.current = p.current
+  pagination.pageSize = p.pageSize
+  reload()
+}
+
+onMounted(reload)
+</script>
+
+<style scoped>
+.mb16 { margin-bottom: 16px; }
+</style>

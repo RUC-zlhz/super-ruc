@@ -1,0 +1,137 @@
+"""profile 模块 Pydantic schema — FR-018。"""
+from __future__ import annotations
+
+from datetime import date, datetime
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class StudentBasic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    student_no: str
+    full_name: str
+    gender: str | None
+    grade_code: str | None
+    major_code: str | None
+    class_code: str | None
+    political_status: str | None
+    enrollment_year: int | None
+    expected_graduation_year: int | None
+    status: str
+
+
+class ProfileFactIn(BaseModel):
+    fact_type: str
+    title: str = Field(min_length=1, max_length=256)
+    description: str | None = None
+    role_in_activity: str | None = None
+    started_on: date | None = None
+    ended_on: date | None = None
+    hours: float | None = None
+    rank_label: str | None = None
+    attachments: dict[str, Any] | None = None
+    extra: dict[str, Any] | None = None
+    source: str = "TEACHER_ENTRY"
+    source_ref: str | None = None
+    is_sensitive: bool = False
+
+
+class ProfileFactOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    student_id: int
+    fact_type: str
+    title: str
+    description: str | None
+    role_in_activity: str | None
+    started_on: date | None
+    ended_on: date | None
+    hours: float | None
+    rank_label: str | None
+    attachments: dict[str, Any] | None
+    extra: dict[str, Any] | None
+    source: str
+    source_ref: str | None
+    approval_status: str
+    is_sensitive: bool
+    # 管理元数据（学生端按视图隐藏）
+    created_by: int | None = None
+    updated_by: int | None = None
+    updated_at: datetime
+
+
+class ProfileFactStudentView(BaseModel):
+    """学生侧视图：不暴露 created_by / source_ref / approved_by 等管理元数据。"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    fact_type: str
+    title: str
+    description: str | None
+    role_in_activity: str | None
+    started_on: date | None
+    ended_on: date | None
+    hours: float | None
+    rank_label: str | None
+    attachments: dict[str, Any] | None = None
+    approval_status: str
+    updated_at: datetime
+
+
+class ProfileSummary(BaseModel):
+    """画像聚合视图。"""
+
+    student: StudentBasic
+    facts: list[ProfileFactOut] = []
+    research_count: int = 0
+    competition_count: int = 0
+    practice_count: int = 0
+    volunteer_hours: float = 0
+    leadership_count: int = 0
+    generated_at: datetime
+
+
+class ProfileStudentSelfView(BaseModel):
+    student: StudentBasic
+    facts: list[ProfileFactStudentView] = []
+    research_count: int = 0
+    competition_count: int = 0
+    practice_count: int = 0
+    volunteer_hours: float = 0
+    leadership_count: int = 0
+    generated_at: datetime
+
+
+class CorrectionIn(BaseModel):
+    fact_id: int | None = None
+    field_name: str
+    proposed_value: str | None = None
+    reason: str | None = None
+
+
+class CorrectionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    student_id: int
+    fact_id: int | None
+    field_name: str
+    current_value: str | None
+    proposed_value: str | None
+    reason: str | None
+    status: str
+    handled_by: int | None
+    handled_at: datetime | None
+    handler_comment: str | None
+    created_at: datetime
+
+
+class CorrectionDecisionIn(BaseModel):
+    decision: str = Field(description="APPROVED/REJECTED")
+    comment: str | None = None
+    apply_to_fact: bool = True

@@ -1,0 +1,27 @@
+{
+  "name": "信息学院综合服务",
+  "appid": "__UNI__TEST_SIP",
+  "description": "信息学院学生综合服务与党团管理平台 — 学生端",
+  "versionName": "0.1.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "h5": {
+    "title": "信息学院综合服务",
+    "router": { "mode": "hash" },
+    "devServer": {
+      "port": 5174,
+      "proxy": {
+        "/api": { "target": "http://localhost:8080", "changeOrigin": true }
+      }
+    }
+  },
+  "mp-weixin": {
+    "appid": "wx_test_appid",
+    "setting": {
+      "urlCheck": false,
+      "es6": true,
+      "minified": true
+    },
+    "usingComponents": true
+  }
+}
