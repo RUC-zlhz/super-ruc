@@ -48,6 +48,7 @@ from app.knowledge import models as _knowledge_models  # noqa: F401,E402
 from app.notice import models as _notice_models  # noqa: F401,E402
 from app.profile import models as _profile_models  # noqa: F401,E402
 from app.workflow import models as _workflow_models  # noqa: F401,E402
+from app.workflow import quiz_models as _workflow_quiz_models  # noqa: F401,E402
 
 
 async def _seed_reference(session: AsyncSession) -> None:

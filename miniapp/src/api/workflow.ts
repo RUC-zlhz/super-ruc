@@ -95,3 +95,53 @@ export function withdrawRequest(id: number, comment?: string) {
 export function getRequestDetail(id: number) {
   return get<RequestDetail>(`/requests/${id}`)
 }
+
+// =====================================================================
+// 理论自测 — FR-005
+// =====================================================================
+export type QuizType = 'SINGLE' | 'MULTI' | 'JUDGE'
+
+export interface QuizOption {
+  key: string
+  text: string
+}
+
+export interface QuizQuestionStudent {
+  id: number
+  topic: string
+  qtype: QuizType
+  stem: string
+  options_json: QuizOption[] | null
+  difficulty?: string | null
+}
+
+export interface QuizDrawResult {
+  batch_id: string
+  questions: QuizQuestionStudent[]
+}
+
+export interface QuizItemResult {
+  question_id: number
+  is_correct: boolean
+  correct_key: string
+  explanation?: string | null
+}
+
+export interface QuizSubmitResult {
+  batch_id: string
+  total: number
+  correct: number
+  score: number
+  items: QuizItemResult[]
+}
+
+export function drawQuiz(params: { topic?: string; qtype?: QuizType; limit?: number }) {
+  return get<QuizDrawResult>('/quiz/draw', params)
+}
+
+export function submitQuiz(payload: {
+  batch_id: string
+  answers: { question_id: number; answer: string }[]
+}) {
+  return post<QuizSubmitResult>('/quiz/submit', payload)
+}

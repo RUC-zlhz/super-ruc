@@ -269,3 +269,111 @@ class OfflineHandleIn(BaseModel):
 
     contact_info: str = Field(..., min_length=1, max_length=256)
     note: str | None = Field(default=None, max_length=512)
+
+
+# ============================================================
+# C. 理论自测题库（FR-005）
+# ============================================================
+class QuizOption(BaseModel):
+    """选择题单个选项。"""
+
+    key: str = Field(min_length=1, max_length=4, description="A/B/C/D…")
+    text: str = Field(min_length=1, max_length=512)
+
+
+class QuizQuestionIn(BaseModel):
+    """管理端新增/更新题目入参。"""
+
+    topic: str = Field(min_length=1, max_length=64)
+    qtype: str = Field(description="SINGLE/MULTI/JUDGE")
+    stem: str = Field(min_length=1)
+    options_json: list[QuizOption] | None = None
+    correct_key: str = Field(min_length=1, max_length=64)
+    explanation: str | None = None
+    difficulty: str | None = Field(default=None, description="EASY/MEDIUM/HARD")
+
+
+class QuizQuestionUpdate(BaseModel):
+    topic: str | None = None
+    qtype: str | None = None
+    stem: str | None = None
+    options_json: list[QuizOption] | None = None
+    correct_key: str | None = None
+    explanation: str | None = None
+    difficulty: str | None = None
+    is_active: bool | None = None
+
+
+class QuizQuestionAdminOut(BaseModel):
+    """管理端返回（含正确答案与解析）。"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    topic: str
+    qtype: str
+    stem: str
+    options_json: list[dict[str, Any]] | None
+    correct_key: str
+    explanation: str | None
+    difficulty: str | None
+    is_active: bool
+    created_by: int | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class QuizQuestionStudentOut(BaseModel):
+    """学生抽题返回（屏蔽正确答案和解析）。"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    topic: str
+    qtype: str
+    stem: str
+    options_json: list[dict[str, Any]] | None
+    difficulty: str | None
+
+
+class QuizDrawOut(BaseModel):
+    batch_id: str
+    questions: list[QuizQuestionStudentOut]
+
+
+class QuizAnswerIn(BaseModel):
+    question_id: int
+    answer: str = Field(default="", max_length=64)
+
+
+class QuizSubmitIn(BaseModel):
+    batch_id: str = Field(min_length=1, max_length=36)
+    answers: list[QuizAnswerIn] = Field(min_length=1)
+
+
+class QuizItemResultOut(BaseModel):
+    question_id: int
+    is_correct: bool
+    correct_key: str
+    explanation: str | None = None
+
+
+class QuizSubmitOut(BaseModel):
+    batch_id: str
+    total: int
+    correct: int
+    score: int
+    items: list[QuizItemResultOut]
+
+
+class QuizRecordOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    student_id: int
+    question_id: int
+    batch_id: str | None
+    answer: str
+    is_correct: bool
+    score: int
+    submitted_at: datetime

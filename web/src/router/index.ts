@@ -41,6 +41,15 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '党团流程' },
       },
       {
+        path: 'workflow/quiz-bank',
+        name: 'workflow-quiz-bank',
+        component: () => import('@/views/workflow/QuizBank.vue'),
+        meta: {
+          title: '理论自测题库',
+          roles: ['SUPER_ADMIN', 'COUNSELOR', 'HEAD_TEACHER', 'YOUTH_LEAGUE_TEACHER', 'PARTY_BUILD_TEACHER'],
+        },
+      },
+      {
         path: 'knowledge/entries',
         name: 'knowledge-entries',
         component: () => import('@/views/knowledge/EntryList.vue'),

@@ -1,4 +1,4 @@
-import { get, post, patch } from '@/utils/request'
+import { get, post, patch, del } from '@/utils/request'
 import type { ApiEnvelope } from '@/utils/request'
 import type { Paginated } from './types'
 
@@ -70,4 +70,67 @@ export function markRequestOffline(id: number, contact_info: string, note?: stri
     contact_info,
     note,
   })
+}
+
+// =====================================================================
+// 理论自测题库 — FR-005
+// =====================================================================
+export type QuizType = 'SINGLE' | 'MULTI' | 'JUDGE'
+export type QuizDifficulty = 'EASY' | 'MEDIUM' | 'HARD'
+
+export interface QuizOption {
+  key: string
+  text: string
+}
+
+export interface QuizQuestion {
+  id: number
+  topic: string
+  qtype: QuizType
+  stem: string
+  options_json: QuizOption[] | null
+  correct_key: string
+  explanation?: string | null
+  difficulty?: QuizDifficulty | null
+  is_active: boolean
+  created_by?: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface QuizQuestionPayload {
+  topic: string
+  qtype: QuizType
+  stem: string
+  options_json?: QuizOption[] | null
+  correct_key: string
+  explanation?: string | null
+  difficulty?: QuizDifficulty | null
+}
+
+export interface QuizQuestionPatch extends Partial<QuizQuestionPayload> {
+  is_active?: boolean
+}
+
+export function listQuizQuestions(params: {
+  topic?: string
+  qtype?: QuizType
+  is_active?: boolean
+  q?: string
+  page?: number
+  size?: number
+}) {
+  return get<ApiEnvelope<Paginated<QuizQuestion>>>('/admin/quiz/questions', { params })
+}
+
+export function createQuizQuestion(payload: QuizQuestionPayload) {
+  return post<ApiEnvelope<QuizQuestion>>('/admin/quiz/questions', payload)
+}
+
+export function updateQuizQuestion(id: number, payload: QuizQuestionPatch) {
+  return patch<ApiEnvelope<QuizQuestion>>(`/admin/quiz/questions/${id}`, payload)
+}
+
+export function deleteQuizQuestion(id: number) {
+  return del<ApiEnvelope<{ id: number; is_active: boolean }>>(`/admin/quiz/questions/${id}`)
 }

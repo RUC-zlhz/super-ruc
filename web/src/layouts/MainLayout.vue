@@ -88,6 +88,12 @@ const rawMenu: Item[] = [
   { key: '/dashboard', icon: () => h(DashboardOutlined), label: '运营看板', roles: ['SUPER_ADMIN', 'COLLEGE_LEADER'] },
   { key: '/approval/workbench', icon: () => h(SolutionOutlined), label: '审批工作台' },
   { key: '/workflow/party-stage', icon: () => h(BranchesOutlined), label: '党团流程' },
+  {
+    key: '/workflow/quiz-bank',
+    icon: () => h(ReadOutlined),
+    label: '理论自测题库',
+    roles: ['SUPER_ADMIN', 'COUNSELOR', 'HEAD_TEACHER', 'YOUTH_LEAGUE_TEACHER', 'PARTY_BUILD_TEACHER'],
+  },
   { key: '/knowledge/entries', icon: () => h(ReadOutlined), label: '知识库管理' },
   { key: '/notice/list', icon: () => h(NotificationOutlined), label: '通知中心' },
   { key: '/exchange/import', icon: () => h(ImportOutlined), label: '导入导出', roles: ['SUPER_ADMIN', 'COUNSELOR'] },

@@ -20,13 +20,20 @@ from app.core.dependencies import (
 )
 from app.core.exceptions import BizError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
-from app.workflow import pdf_generator, repository as repo, service
+from app.workflow import pdf_generator, quiz_service, repository as repo, service
 from app.workflow.schemas import (
     ApprovalActionIn,
     AttachmentOut,
     NodeCompleteIn,
     NodeMarkStatusIn,
     OfflineHandleIn,
+    QuizDrawOut,
+    QuizQuestionAdminOut,
+    QuizQuestionIn,
+    QuizQuestionStudentOut,
+    QuizQuestionUpdate,
+    QuizSubmitIn,
+    QuizSubmitOut,
     ReminderGenerateIn,
     RequestBrief,
     RequestCreate,
@@ -57,6 +64,7 @@ _AdminRole = require_role("SUPER_ADMIN")
 router = APIRouter(prefix="/workflow", tags=["workflow"])
 request_router = APIRouter(prefix="/requests", tags=["request"])
 admin_router = APIRouter(prefix="/admin", tags=["workflow-admin"])
+quiz_router = APIRouter(prefix="/quiz", tags=["quiz"])
 
 
 # ===========================================================
@@ -454,4 +462,175 @@ async def admin_reject_request(
             operator_id=user.user_id,
             operator_roles=user.roles,
         )
+    )
+
+
+# ===========================================================
+# D. 理论自测题库（FR-005）
+# ===========================================================
+
+# -------- 管理端：题库 CRUD --------
+@admin_router.get(
+    "/quiz/questions", response_model=ApiResponse[Paginated[QuizQuestionAdminOut]]
+)
+async def admin_list_quiz_questions(
+    db: DBDep,
+    _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+    topic: str | None = Query(default=None),
+    qtype: str | None = Query(default=None),
+    is_active: bool | None = Query(default=None),
+    q: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+) -> ApiResponse[Paginated[QuizQuestionAdminOut]]:
+    rows, total = await quiz_service.list_questions(
+        db,
+        topic=topic,
+        qtype=qtype,
+        is_active=is_active,
+        keyword=q,
+        page=page,
+        size=size,
+    )
+    items = [QuizQuestionAdminOut.model_validate(r) for r in rows]
+    return ok(
+        Paginated[QuizQuestionAdminOut](
+            items=items, meta=PageMeta(page=page, size=size, total=total)
+        )
+    )
+
+
+@admin_router.post(
+    "/quiz/questions", response_model=ApiResponse[QuizQuestionAdminOut]
+)
+async def admin_create_quiz_question(
+    payload: QuizQuestionIn,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+) -> ApiResponse[QuizQuestionAdminOut]:
+    row = await quiz_service.create_question(
+        db,
+        topic=payload.topic,
+        qtype=payload.qtype,
+        stem=payload.stem,
+        options_json=[o.model_dump() for o in payload.options_json]
+        if payload.options_json
+        else None,
+        correct_key=payload.correct_key,
+        explanation=payload.explanation,
+        difficulty=payload.difficulty,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    return ok(QuizQuestionAdminOut.model_validate(row))
+
+
+@admin_router.patch(
+    "/quiz/questions/{question_id}",
+    response_model=ApiResponse[QuizQuestionAdminOut],
+)
+async def admin_update_quiz_question(
+    question_id: int,
+    payload: QuizQuestionUpdate,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+) -> ApiResponse[QuizQuestionAdminOut]:
+    row = await quiz_service.update_question(
+        db,
+        question_id,
+        topic=payload.topic,
+        qtype=payload.qtype,
+        stem=payload.stem,
+        options_json=[o.model_dump() for o in payload.options_json]
+        if payload.options_json is not None
+        else None,
+        correct_key=payload.correct_key,
+        explanation=payload.explanation,
+        difficulty=payload.difficulty,
+        is_active=payload.is_active,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    return ok(QuizQuestionAdminOut.model_validate(row))
+
+
+@admin_router.delete(
+    "/quiz/questions/{question_id}", response_model=ApiResponse[dict]
+)
+async def admin_delete_quiz_question(
+    question_id: int,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+) -> ApiResponse[dict]:
+    await quiz_service.delete_question(
+        db,
+        question_id,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    return ok({"id": question_id, "is_active": False})
+
+
+# -------- 学生端：抽题 + 提交 + 记录 --------
+@quiz_router.get("/draw", response_model=ApiResponse[QuizDrawOut])
+async def student_draw_quiz(
+    db: DBDep,
+    user: CurrentUserDep,
+    topic: str | None = Query(default=None),
+    qtype: str | None = Query(default=None),
+    difficulty: str | None = Query(default=None),
+    limit: int = Query(default=5, ge=1, le=50),
+) -> ApiResponse[QuizDrawOut]:
+    if user.student_id is None:
+        raise BizError("仅学生可参加自测", code=40305, http_status=403)
+    batch_id, rows = await quiz_service.draw_quiz(
+        db, topic=topic, qtype=qtype, difficulty=difficulty, limit=limit
+    )
+    questions = [QuizQuestionStudentOut.model_validate(r) for r in rows]
+    return ok(QuizDrawOut(batch_id=batch_id, questions=questions))
+
+
+@quiz_router.post("/submit", response_model=ApiResponse[QuizSubmitOut])
+async def student_submit_quiz(
+    payload: QuizSubmitIn,
+    db: DBDep,
+    user: CurrentUserDep,
+) -> ApiResponse[QuizSubmitOut]:
+    if user.student_id is None:
+        raise BizError("仅学生可提交自测", code=40305, http_status=403)
+    result = await quiz_service.submit_quiz(
+        db,
+        student_id=user.student_id,
+        batch_id=payload.batch_id,
+        answers=[a.model_dump() for a in payload.answers],
+        operator_id=user.user_id,
+    )
+    return ok(QuizSubmitOut(**result))
+
+
+@quiz_router.get("/my/records", response_model=ApiResponse[list[dict]])
+async def student_list_my_records(
+    db: DBDep,
+    user: CurrentUserDep,
+    batch_id: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> ApiResponse[list[dict]]:
+    if user.student_id is None:
+        raise BizError("仅学生可查看本人记录", code=40305, http_status=403)
+    rows = await quiz_service.list_my_records(
+        db, student_id=user.student_id, batch_id=batch_id, limit=limit
+    )
+    return ok(
+        [
+            {
+                "id": r.id,
+                "question_id": r.question_id,
+                "batch_id": r.batch_id,
+                "answer": r.answer,
+                "is_correct": r.is_correct,
+                "score": r.score,
+                "submitted_at": r.submitted_at.isoformat(),
+            }
+            for r in rows
+        ]
     )

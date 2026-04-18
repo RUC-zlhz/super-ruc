@@ -2,6 +2,12 @@
   <view class="container">
     <text class="page-title">我的党团进度</text>
 
+    <view class="quiz-entry" @tap="goQuiz">
+      <text class="quiz-entry-title">理论自测</text>
+      <text class="quiz-entry-sub">党史 / 团章 / 思政 — 随机抽题 · 即时判分</text>
+      <text class="quiz-entry-arrow">›</text>
+    </view>
+
     <view v-if="workflows.length" class="flow-list">
       <view class="flow-card" v-for="wf in workflows" :key="wf.id" @tap="onDetail(wf.id)">
         <view class="flow-header">
@@ -39,6 +45,10 @@ function onDetail(id: number) {
   uni.navigateTo({ url: `/pages/workflow/detail?id=${id}` })
 }
 
+function goQuiz() {
+  uni.navigateTo({ url: '/pages/workflow/quiz' })
+}
+
 onMounted(async () => {
   try {
     const resp = await getMyWorkflows()
@@ -68,4 +78,22 @@ onMounted(async () => {
 .flow-date { font-size: 24rpx; color: #999; display: block; margin-top: 4rpx; }
 
 .empty { text-align: center; padding: 80rpx 0; color: #999; font-size: 28rpx; }
+
+.quiz-entry {
+  background: linear-gradient(135deg, #7f1722 0%, #b02a37 100%);
+  color: #fff;
+  padding: 24rpx 28rpx;
+  border-radius: 12rpx;
+  margin-bottom: 20rpx;
+  position: relative;
+}
+.quiz-entry-title { display: block; font-size: 30rpx; font-weight: 600; }
+.quiz-entry-sub { display: block; font-size: 24rpx; opacity: 0.85; margin-top: 6rpx; }
+.quiz-entry-arrow {
+  position: absolute;
+  right: 28rpx;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 40rpx;
+}
 </style>

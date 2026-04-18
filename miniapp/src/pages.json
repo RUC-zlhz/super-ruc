@@ -4,6 +4,7 @@
     { "path": "pages/knowledge/index", "style": { "navigationBarTitleText": "知识查询" } },
     { "path": "pages/workflow/index", "style": { "navigationBarTitleText": "党团进度" } },
     { "path": "pages/workflow/detail", "style": { "navigationBarTitleText": "流程详情" } },
+    { "path": "pages/workflow/quiz", "style": { "navigationBarTitleText": "理论自测" } },
     { "path": "pages/request/index", "style": { "navigationBarTitleText": "事务申请" } },
     { "path": "pages/request/create", "style": { "navigationBarTitleText": "发起申请" } },
     { "path": "pages/request/detail", "style": { "navigationBarTitleText": "申请详情" } },
