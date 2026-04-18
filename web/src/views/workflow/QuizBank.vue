@@ -121,7 +121,7 @@
                 v-model:value="opt.key"
                 placeholder="A"
                 style="width: 72px; margin-right: 8px;"
-                maxlength="2"
+                :maxlength="2"
               />
               <a-input
                 v-model:value="opt.text"
@@ -140,7 +140,7 @@
           </a-form-item>
 
           <a-form-item v-if="form.qtype === 'SINGLE'" label="正确答案（A/B/…）" required>
-            <a-input v-model:value="form.correct_key" style="width: 120px" maxlength="2" />
+            <a-input v-model:value="form.correct_key" style="width: 120px" :maxlength="2" />
           </a-form-item>
           <a-form-item
             v-else
@@ -194,7 +194,7 @@ const filters = reactive<{
   topic?: string
   qtype?: QuizType
   q?: string
-  is_active?: boolean
+  is_active?: 'true' | 'false'
 }>({})
 const rows = ref<QuizQuestion[]>([])
 const loading = ref(false)
@@ -210,11 +210,13 @@ function qtypeColor(t: QuizType) {
 async function reload() {
   loading.value = true
   try {
+    const isActive =
+      filters.is_active === undefined ? undefined : filters.is_active === 'true'
     const resp = await listQuizQuestions({
       topic: filters.topic || undefined,
       qtype: filters.qtype,
       q: filters.q || undefined,
-      is_active: filters.is_active,
+      is_active: isActive,
       page: pagination.current,
       size: pagination.pageSize,
     })
@@ -239,7 +241,7 @@ interface FormState {
   options_json: QuizOption[] | null
   correct_key: string
   explanation: string
-  difficulty?: QuizDifficulty | null
+  difficulty?: QuizDifficulty
 }
 
 const emptyForm = (): FormState => ({
@@ -252,7 +254,7 @@ const emptyForm = (): FormState => ({
   ],
   correct_key: 'A',
   explanation: '',
-  difficulty: null,
+  difficulty: undefined,
 })
 
 const drawerOpen = ref(false)
@@ -266,18 +268,19 @@ function openCreate() {
   drawerOpen.value = true
 }
 
-function openEdit(record: QuizQuestion) {
-  editing.value = record
+function openEdit(record: QuizQuestion | Record<string, any>) {
+  const current = record as QuizQuestion
+  editing.value = current
   Object.assign(form, {
-    topic: record.topic,
-    qtype: record.qtype,
-    stem: record.stem,
-    options_json: record.options_json
-      ? record.options_json.map((o) => ({ ...o }))
+    topic: current.topic,
+    qtype: current.qtype,
+    stem: current.stem,
+    options_json: current.options_json
+      ? current.options_json.map((o) => ({ ...o }))
       : null,
-    correct_key: record.correct_key,
-    explanation: record.explanation || '',
-    difficulty: record.difficulty || null,
+    correct_key: current.correct_key,
+    explanation: current.explanation || '',
+    difficulty: current.difficulty ?? undefined,
   })
   if (form.qtype !== 'JUDGE' && !form.options_json) {
     form.options_json = [
@@ -288,7 +291,8 @@ function openEdit(record: QuizQuestion) {
   drawerOpen.value = true
 }
 
-function onTypeChange(t: QuizType) {
+function onTypeChange(value: unknown) {
+  const t = value as QuizType
   if (t === 'JUDGE') {
     form.options_json = null
     form.correct_key = 'TRUE'
@@ -340,14 +344,16 @@ async function onSubmit() {
   }
 }
 
-async function onDelete(record: QuizQuestion) {
-  await deleteQuizQuestion(record.id)
+async function onDelete(record: QuizQuestion | Record<string, any>) {
+  const current = record as QuizQuestion
+  await deleteQuizQuestion(current.id)
   message.success('已停用')
   reload()
 }
 
-async function onReactivate(record: QuizQuestion) {
-  await updateQuizQuestion(record.id, { is_active: true })
+async function onReactivate(record: QuizQuestion | Record<string, any>) {
+  const current = record as QuizQuestion
+  await updateQuizQuestion(current.id, { is_active: true })
   message.success('已重新启用')
   reload()
 }
