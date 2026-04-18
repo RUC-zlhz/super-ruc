@@ -1,0 +1,104 @@
+%%{
+  init: {
+    "theme": "base",
+    "themeVariables": {
+      "fontFamily": "Times New Roman, SimSun, serif",
+      "primaryColor": "#ffffff",
+      "primaryBorderColor": "#000000",
+      "primaryTextColor": "#000000",
+      "lineColor": "#000000",
+      "clusterBkg": "#f0f0f0",
+      "clusterBorder": "#7f8c8d",
+      "fontSize": "16px",
+      "lineWidth": "2px"
+    },
+    "flowchart": {
+      "curve": "linear",
+      "nodeSpacing": 60,
+      "rankSpacing": 60,
+      "htmlLabels": false
+    }
+  }
+}%%
+flowchart TB
+    subgraph TopActors[管理侧参与者]
+        direction LR
+        Admin[超级管理员]
+        Leader[学院领导]
+        LeagueTeacher[团委老师]
+        Advisor[班主任 / 审批老师]
+    end
+
+    subgraph Platform[学院学生综合服务与党团管理平台]
+        direction TB
+        subgraph StudentLoop[学生服务闭环]
+            direction LR
+            UC1([查询政策与流程])
+            UC2([下载模板])
+            UC4([提交请假 / 盖章 / 证明申请])
+            UC5([开具电子证明])
+            UC6([查看申请状态])
+            UC3([查看党团进度])
+            UC15([查看学业风险提示])
+        end
+
+        subgraph StaffLoop[管理与审批闭环]
+            direction LR
+            UC7([审批事务申请])
+            UC8([党团流程审批])
+            UC11([维护知识库与模板])
+            UC14([查看运营统计])
+        end
+
+        subgraph GovernanceLoop[治理与运维闭环]
+            direction LR
+            UC9([发布通知并圈定目标人群])
+            UC10([导入 / 导出 Excel Word PDF])
+            UC12([维护角色与字段权限])
+            UC13([查看审计日志])
+        end
+    end
+
+    subgraph BottomActors[学生侧参与者]
+        direction LR
+        Cadre[团支书 / 党支部书记]
+        Student[学生]
+    end
+
+    Admin --> UC9
+    Admin --> UC10
+    Admin --> UC11
+    Admin --> UC12
+    Admin --> UC13
+    Admin --> UC14
+
+    Leader --> UC8
+    Leader --> UC14
+
+    LeagueTeacher --> UC7
+    LeagueTeacher --> UC8
+    LeagueTeacher --> UC9
+    LeagueTeacher --> UC11
+    LeagueTeacher --> UC14
+
+    Advisor --> UC5
+    Advisor --> UC7
+    Advisor --> UC14
+
+    Cadre --> UC3
+    Cadre --> UC8
+
+    Student --> UC1
+    Student --> UC2
+    Student --> UC3
+    Student --> UC4
+    Student --> UC5
+    Student --> UC6
+    Student --> UC15
+
+    UC5 -. 依赖 .-> UC4
+    UC7 -. 读取 .-> UC6
+    UC8 -. 更新 .-> UC3
+    UC10 -. 留痕 .-> UC13
+    UC11 -. 留痕 .-> UC13
+    UC12 -. 留痕 .-> UC13

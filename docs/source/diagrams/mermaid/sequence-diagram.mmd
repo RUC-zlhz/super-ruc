@@ -1,0 +1,94 @@
+%%{
+  init: {
+    "theme": "base",
+    "themeVariables": {
+      "fontFamily": "Times New Roman, SimSun, serif",
+      "primaryColor": "#ffffff",
+      "primaryBorderColor": "#000000",
+      "primaryTextColor": "#000000",
+      "lineColor": "#000000",
+      "clusterBkg": "#f0f0f0",
+      "clusterBorder": "#7f8c8d",
+      "fontSize": "16px",
+      "lineWidth": "2px"
+    },
+    "flowchart": {
+      "curve": "linear",
+      "nodeSpacing": 60,
+      "rankSpacing": 60,
+      "htmlLabels": false
+    }
+  }
+}%%
+sequenceDiagram
+    autonumber
+    actor Student as 学生
+    participant Frontend as 学生端
+    participant ProofService as 证明服务
+    participant PreviewGenerator as 预览生成
+    participant ApprovalService as 审批服务
+    participant DB as 业务库
+    actor Advisor as 班主任/审批老师
+    actor FinalReviewer as 团委老师/授权出件人
+
+    Student->>Frontend: 进入证明申请页
+    Frontend->>ProofService: 请求证明类型\\n模板与附件要求
+    ProofService->>DB: 读取模板配置\\n与学生基础信息范围
+    DB-->>ProofService: 返回用途说明\\n模板与字段要求
+    ProofService-->>Frontend: 展示证明类型\\n用途说明和边界提示
+
+    Student->>Frontend: 填写用途\\n选择模板或补充说明
+    opt 上传已有附件
+        Frontend->>ProofService: 提交附件元数据
+        ProofService->>DB: 写入附件引用
+    end
+    Frontend->>ProofService: 提交证明申请
+    ProofService->>DB: 校验权限范围\\n附件规则和正式边界
+
+    alt 必须走校级正式链路
+        ProofService-->>Frontend: 返回“仅预检/归档/跟踪”提示\\n并引导正式渠道
+        Frontend-->>Student: 展示边界说明
+    else 校验通过
+        ProofService->>PreviewGenerator: 载入模板和学生数据\\n生成 PDF 预览
+        PreviewGenerator-->>ProofService: 返回 preview_file_key
+        ProofService->>DB: 写入 CommonRequest(待审核)
+        ProofService->>DB: 写入 DocumentAuditLog(提交事件)
+        ProofService->>ApprovalService: 创建班主任审核任务
+        ApprovalService->>DB: 写入 ApprovalTask
+        ApprovalService-->>Frontend: 返回申请编号\\n与预览文件引用
+        Frontend-->>Student: 展示“待审核”和 PDF 预览
+    end
+
+    Advisor->>Frontend: 打开审核工作台
+    Frontend->>ApprovalService: 加载申请详情\\n附件/预览/历史动作
+    ApprovalService->>DB: 查询申请单、附件和审批历史
+    DB-->>ApprovalService: 返回审核数据
+    ApprovalService-->>Frontend: 展示统一审核视图
+
+    Advisor->>Frontend: 提交通过或驳回意见
+    Frontend->>ApprovalService: 写入初审动作
+    alt 驳回
+        ApprovalService->>DB: 写入 ApprovalAction(驳回)
+        ApprovalService->>DB: 写入 ResubmissionSnapshot
+        ApprovalService->>DB: 更新 CommonRequest 为已驳回
+        ApprovalService->>DB: 写入 DocumentAuditLog(驳回事件)
+        Frontend-->>Student: 通知在原表单基础上修改重提
+    else 通过
+        ApprovalService->>DB: 写入 ApprovalAction(通过)
+        ApprovalService->>DB: 更新 CommonRequest 为待出件
+        ApprovalService->>DB: 创建团委/出件任务
+    end
+
+    FinalReviewer->>Frontend: 审核证明并决定出件方式
+    Frontend->>ApprovalService: 提交终审结果
+    alt 转线下处理
+        ApprovalService->>DB: 写入 ApprovalAction(转线下处理)
+        ApprovalService->>DB: 更新 CommonRequest 为转线下处理
+        ApprovalService->>DB: 写入 DocumentAuditLog(线下处理)
+        Frontend-->>Student: 展示线下出件通知
+    else 在线出件完成
+        ApprovalService->>DB: 写入 ApprovalAction(终审通过)
+        ApprovalService->>DB: 更新 CommonRequest 为已完成
+        ApprovalService->>DB: 写入 DocumentAuditLog(出件完成)
+        Frontend-->>Student: 返回出件结果\\n与预览文件下载入口
+    end

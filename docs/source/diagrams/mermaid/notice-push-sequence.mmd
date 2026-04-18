@@ -1,0 +1,63 @@
+%%{
+  init: {
+    "theme": "base",
+    "themeVariables": {
+      "fontFamily": "Times New Roman, SimSun, serif",
+      "primaryColor": "#ffffff",
+      "primaryBorderColor": "#000000",
+      "primaryTextColor": "#000000",
+      "lineColor": "#000000",
+      "clusterBkg": "#f0f0f0",
+      "clusterBorder": "#7f8c8d",
+      "fontSize": "16px",
+      "lineWidth": "2px"
+    },
+    "flowchart": {
+      "curve": "linear",
+      "nodeSpacing": 60,
+      "rankSpacing": 60,
+      "htmlLabels": false
+    }
+  }
+}%%
+sequenceDiagram
+    autonumber
+    actor Admin as 管理员
+    participant Console as 管理端
+    participant SourceRegistry as 来源治理
+    participant NoticeService as 通知服务
+    participant AudienceResolver as 目标圈选
+    participant DeliveryService as 投递服务
+    actor Student as 学生
+
+    Admin->>Console: 选择通知来源与发布方式
+    alt 公开站点可受控抓取
+        Console->>SourceRegistry: 发起公开站点抓取
+        SourceRegistry-->>Console: 返回官方通知草稿\\n与来源记录
+    else 手工导入官方内容
+        Console->>SourceRegistry: 录入官方链接/正文/附件
+        SourceRegistry-->>Console: 返回来源记录
+    end
+
+    Console->>NoticeService: 编辑标题、正文、标签\\n并确认官方来源
+    NoticeService->>AudienceResolver: 按年级/专业/角色/毕业状态圈定目标
+    AudienceResolver-->>NoticeService: 返回目标范围与人数
+    NoticeService-->>Console: 展示发布预览和目标范围
+
+    Admin->>Console: 确认发布
+    Console->>DeliveryService: 创建通知批次\\n并生成投递任务
+    DeliveryService->>NoticeService: 写入投递结果\\n与通知状态
+    DeliveryService-->>Student: 写入站内消息
+
+    opt 启用邮件渠道
+        DeliveryService-->>Student: 发送邮件通知
+    end
+
+    opt 启用短信渠道
+        DeliveryService-->>Student: 发送短信或记录模拟结果
+    end
+
+    Student->>Console: 打开通知中心
+    Console->>NoticeService: 读取本人通知列表
+    NoticeService-->>Console: 返回标题、发布时间\\n标签与状态
+    Console-->>Student: 展示通知内容与回看状态

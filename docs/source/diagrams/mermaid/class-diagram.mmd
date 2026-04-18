@@ -1,0 +1,255 @@
+%%{
+  init: {
+    "theme": "base",
+    "themeVariables": {
+      "fontFamily": "Times New Roman, SimSun, serif",
+      "primaryColor": "#ffffff",
+      "primaryBorderColor": "#000000",
+      "primaryTextColor": "#000000",
+      "lineColor": "#000000",
+      "clusterBkg": "#f0f0f0",
+      "clusterBorder": "#7f8c8d",
+      "fontSize": "16px",
+      "lineWidth": "2px"
+    }
+  }
+}%%
+classDiagram
+    direction TB
+
+    class StudentProfile {
+        +student_id
+        +student_no
+        +grade_code
+        +major_code
+    }
+
+    class KnowledgeSource {
+        +source_id
+        +source_name
+        +version_label
+    }
+
+    class KnowledgeEntry {
+        +knowledge_id
+        +title
+        +status
+    }
+
+    class TemplateAsset {
+        +template_id
+        +template_name
+        +template_type
+    }
+
+    class PartyMemberStatus {
+        +status_id
+        +current_stage_code
+        +next_due_at
+    }
+
+    class PartyWorkflowEvent {
+        +event_id
+        +event_type
+        +event_status
+    }
+
+    class CommonRequest {
+        +request_id
+        +request_type
+        +current_status
+        +formal_boundary_flag
+    }
+
+    class CommonRequestAttachment {
+        +attachment_id
+        +file_name
+        +confidential_flag
+    }
+
+    class ApprovalTask {
+        +task_id
+        +approver_role
+        +task_status
+    }
+
+    class ApprovalAction {
+        +action_id
+        +action_type
+        +action_at
+    }
+
+    class NoticeMessage {
+        +notice_id
+        +title
+        +published_at
+    }
+
+    class NoticeDelivery {
+        +delivery_id
+        +channel_code
+        +delivery_status
+    }
+
+    class ImportBatch {
+        +batch_id
+        +batch_type
+        +batch_status
+    }
+
+    class CurriculumRuleSet {
+        +rule_set_id
+        +major_code
+        +version_label
+    }
+
+    class TermCourseOffering {
+        +offering_id
+        +term_code
+        +course_type
+    }
+
+    class AcademicGapResult {
+        +gap_result_id
+        +result_status
+        +missing_credit
+        +manual_review_required
+    }
+
+    class DocumentAuditLog {
+        +audit_id
+        +event_type
+        +result_code
+    }
+
+    KnowledgeSource "1" --> "0..*" KnowledgeEntry : governs
+    KnowledgeEntry "0..*" --> "0..*" TemplateAsset : references
+
+    StudentProfile "1" --> "0..1" PartyMemberStatus : current_stage
+    PartyMemberStatus "1" --> "0..*" PartyWorkflowEvent : timeline
+
+    StudentProfile "1" --> "0..*" CommonRequest : submits
+    CommonRequest "1" *-- "0..*" CommonRequestAttachment : contains
+    CommonRequest "1" *-- "0..*" ApprovalTask : creates
+    ApprovalTask "1" *-- "0..*" ApprovalAction : records
+
+    NoticeMessage "1" o-- "0..*" NoticeDelivery : delivers
+    StudentProfile "1" --> "0..*" NoticeDelivery : receives
+
+    CurriculumRuleSet "1" o-- "0..*" AcademicGapResult : generates
+    TermCourseOffering "0..*" --> "0..*" AcademicGapResult : supports
+    StudentProfile "1" --> "0..*" AcademicGapResult : owns
+
+    KnowledgeEntry "1" --> "0..*" DocumentAuditLog : audited_by
+    CommonRequest "1" --> "0..*" DocumentAuditLog : audited_by
+    ApprovalAction "1" --> "0..*" DocumentAuditLog : audited_by
+    NoticeMessage "1" --> "0..*" DocumentAuditLog : audited_by
+    ImportBatch "1" --> "0..*" DocumentAuditLog : audited_by
+    AcademicGapResult "1" --> "0..*" DocumentAuditLog : audited_by
+*** Add File: D:/Codes/super-ruc/tmp/docs/diagrams/extension-class-diagram.mmd
+%%{
+  init: {
+    "theme": "base",
+    "themeVariables": {
+      "fontFamily": "Times New Roman, SimSun, serif",
+      "primaryColor": "#ffffff",
+      "primaryBorderColor": "#000000",
+      "primaryTextColor": "#000000",
+      "lineColor": "#000000",
+      "clusterBkg": "#f0f0f0",
+      "clusterBorder": "#7f8c8d",
+      "fontSize": "16px",
+      "lineWidth": "2px"
+    }
+  }
+}%%
+classDiagram
+    direction TB
+
+    class StudentProfile {
+        +student_id
+        +student_no
+        +full_name
+        +major_code
+        +grade_code
+    }
+
+    class HonorCategory {
+        +category_id
+        +category_name
+    }
+
+    class HonorDisplayConfig {
+        +config_id
+        +display_scope
+        +history_visible_flag
+    }
+
+    class HonorRecord {
+        +honor_id
+        +honor_name
+        +award_unit
+        +document_ref
+        +publicity_date
+        +story_summary
+        +display_until
+        +display_status
+    }
+
+    class StudentProfileExtension {
+        +extension_id
+        +volunteer_service_hours
+        +cadre_position_summary
+        +updated_at
+    }
+
+    class ResearchExperience {
+        +research_id
+        +project_name
+        +data_source
+        +entered_by
+        +updated_at
+    }
+
+    class CompetitionAward {
+        +award_id
+        +award_name
+        +award_level
+        +data_source
+        +entered_by
+        +updated_at
+    }
+
+    class SocialPractice {
+        +practice_id
+        +practice_name
+        +practice_period
+        +data_source
+        +entered_by
+        +updated_at
+    }
+
+    class ImportBatch {
+        +batch_id
+        +batch_type
+        +batch_status
+    }
+
+    class DocumentAuditLog {
+        +audit_id
+        +event_type
+        +result_code
+    }
+
+    StudentProfile "0..1" <-- "0..*" HonorRecord : links_to
+    HonorCategory "1" --> "0..*" HonorRecord : classifies
+    HonorDisplayConfig "1" --> "0..*" HonorRecord : governs
+    ImportBatch "1" --> "0..*" HonorRecord : imports
+
+    StudentProfile "1" o-- "0..1" StudentProfileExtension : extends
+    StudentProfileExtension "1" *-- "0..*" ResearchExperience : research_records
+    StudentProfileExtension "1" *-- "0..*" CompetitionAward : competition_records
+    StudentProfileExtension "1" *-- "0..*" SocialPractice : practice_records
+
+    HonorRecord "1" --> "0..*" DocumentAuditLog : audited_by
+    StudentProfileExtension "1" --> "0..*" DocumentAuditLog : audited_by

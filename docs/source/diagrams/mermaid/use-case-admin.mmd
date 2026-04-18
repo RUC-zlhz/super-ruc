@@ -1,0 +1,132 @@
+%%{
+  init: {
+    "theme": "base",
+    "themeVariables": {
+      "fontFamily": "Times New Roman, SimSun, serif",
+      "primaryColor": "#ffffff",
+      "primaryBorderColor": "#000000",
+      "primaryTextColor": "#000000",
+      "lineColor": "#000000",
+      "clusterBkg": "#f0f0f0",
+      "clusterBorder": "#7f8c8d",
+      "fontSize": "16px",
+      "lineWidth": "2px"
+    },
+    "flowchart": {
+      "curve": "linear",
+      "nodeSpacing": 60,
+      "rankSpacing": 60,
+      "htmlLabels": false
+    }
+  }
+}%%
+flowchart LR
+    subgraph Actors[管理侧参与者]
+        direction TB
+        Advisor[辅导员 / 班主任 / 审批老师]
+        LeagueTeacher[团委老师]
+        Leader[学院领导]
+        Admin[超级管理员]
+    end
+
+    subgraph Platform[学院学生综合服务与党团管理平台 - 管理侧七模块用例]
+        direction TB
+        subgraph M1Group[模块一：智能问答与政策知识库]
+            direction LR
+            UC1([维护政策知识库])
+            UC2([维护标准答案与模板])
+        end
+
+        subgraph M2Group[模块二：党团事务流程管理]
+            direction LR
+            UC3([维护党团节点与提醒])
+            UC4([维护理论题库])
+            UC5([审批党团流程])
+        end
+
+        subgraph M3Group[模块三：信息集成与精准推送]
+            direction LR
+            UC6([录入 / 汇聚官方通知])
+            UC7([圈定人群并推送])
+            UC8([查看触达结果])
+        end
+
+        subgraph M4Group[模块四：电子证明生成与审批流程]
+            direction LR
+            UC9([审批事务申请])
+            UC10([查看附件 / 历史 / PDF 预览])
+            UC11([导出审批记录])
+        end
+
+        subgraph M5Group[模块五：学业情况分析与预警]
+            direction LR
+            UC12([维护培养方案与规则])
+            UC13([查看学业风险与建议统计])
+        end
+
+        subgraph M6Group[模块六：奖励荣誉展示]
+            direction LR
+            UC14([查看荣誉榜单与详情])
+            UC15([导入荣誉并核验学籍])
+            UC16([维护授权 / 审核 / 展示有效期])
+            UC17([归档 / 撤销荣誉条目])
+        end
+
+        subgraph M7Group[模块七：学生画像与信息管理]
+            direction LR
+            UC17([查看学生画像全景])
+            UC18([导出画像快照])
+            UC19([审核补录并处理纠错])
+        end
+
+        subgraph SupportGroup[平台治理与运维]
+            direction LR
+            UC20([维护角色与字段权限])
+            UC21([查看审计日志])
+            UC22([导入 / 导出 Excel Word PDF])
+        end
+    end
+
+    Advisor --> UC9
+    Advisor --> UC10
+    Advisor --> UC13
+    Advisor --> UC14
+    Advisor --> UC17
+    Advisor --> UC18
+    Advisor --> UC19
+
+    LeagueTeacher --> UC3
+    LeagueTeacher --> UC4
+    LeagueTeacher --> UC5
+    LeagueTeacher --> UC6
+    LeagueTeacher --> UC7
+    LeagueTeacher --> UC8
+
+    Leader --> UC5
+    Leader --> UC9
+    Leader --> UC13
+    Leader --> UC14
+    Leader --> UC17
+    Leader --> UC18
+
+    Admin --> UC1
+    Admin --> UC2
+    Admin --> UC6
+    Admin --> UC7
+    Admin --> UC12
+    Admin --> UC15
+    Admin --> UC16
+    Admin --> UC17
+    Admin --> UC20
+    Admin --> UC21
+    Admin --> UC22
+
+    UC10 -. 支撑 .-> UC9
+    UC11 -. 留痕 .-> UC21
+    UC15 -. 导入依赖 .-> UC22
+    UC16 -. 留痕 .-> UC21
+    UC17 -. 留痕 .-> UC21
+    UC18 -. 导出留痕 .-> UC21
+    UC19 -. 留痕 .-> UC21
+    UC22 -. 留痕 .-> UC21
+    UC13 -. 读取 .-> UC12

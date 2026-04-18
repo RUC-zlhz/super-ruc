@@ -173,7 +173,7 @@
 | 2026-04-18 | 全阶段并行 worktree / branch 编排 | `docs/notes/refinements/2026-04-18-worktree-branch-orchestration-refinement.md` | `S0 ~ S5` | `[x]` | 已落盘跨阶段并行编排、子分支后缀规则、阶段集成分支与 worktree 分派表 |
 | 2026-04-18 | S0 启动命令与第一批 worktree 创建 | `docs/notes/refinements/2026-04-18-s0-bootstrap-commands-refinement.md` | `S0.1, S0.2, S0.3, S0.4` | `[x]` | 已落盘根工作区冻结顺序、冻结后创建 `int-s0` 与第一批 baseline worktree 的实际命令 |
 | 2026-04-19 | 仓库与工作树收拢细化 | `docs/notes/refinements/2026-04-19-repo-cleanup-refinement.md` | `S0, S1` | `[x]` | 已收口到 `codex/v1.6-integration`，并清理 `S0` 临时分支/worktree |
-| 2026-04-19 | 文档资产与计划目录正规化 | `docs/notes/refinements/2026-04-19-doc-asset-normalization-refinement.md` | `S5A.3, S5B.1, S5B.2, S5B.3, S5B.4` | `[x]` | 已落盘 `docs/notes` 权威入口与 `tmp/docs` 资产正规化任务树 |
+| 2026-04-19 | 文档资产与计划目录正规化 | `docs/notes/refinements/2026-04-19-doc-asset-normalization-refinement.md` | `S5A.3, S5B.1, S5B.2, S5B.3, S5B.4` | `[-]` | 已完成首批图源/脚本正规化；仍需继续迁移剩余历史资产 |
 
 ## 会话更新要求
 
@@ -196,3 +196,4 @@
 - `2026-04-19`：`codex/v1.6-integration` 重新验证通过 `pnpm -C web build`、`pnpm -C miniapp build:mp-weixin` 与 `backend` 下的 `uv run pytest tests/integration -v`（`41 passed in 89.29s`），并完成 `web/src/views/workflow/QuizBank.vue` 的类型收口。
 - `2026-04-19`：完成仓库/worktree 收拢；删除 `codex/int-s0`、`codex/s0-*`、`codex/repo-cleanup-snapshot` 及其物理 worktree，保留 `codex/v1.6-integration` 作为当前唯一开发主线，`main` 保持与 `origin/main` 对齐。
 - `2026-04-19`：新增 `docs/notes/README.md` 与“文档资产与计划目录正规化”细化文件，明确 `docs/notes` 的权威入口、参考材料边界与 `tmp/docs` 资产后续正规化要求。
+- `2026-04-19`：新增受版本控制的 `scripts/srs/` 出件脚本入口与 `docs/source/diagrams/mermaid/` 正式图源目录，并完成首批脚本的 `py_compile` 静态验证。

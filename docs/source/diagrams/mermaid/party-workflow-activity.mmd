@@ -1,0 +1,49 @@
+%%{
+  init: {
+    "theme": "base",
+    "themeVariables": {
+      "fontFamily": "Times New Roman, SimSun, serif",
+      "primaryColor": "#ffffff",
+      "primaryBorderColor": "#000000",
+      "primaryTextColor": "#000000",
+      "lineColor": "#000000",
+      "clusterBkg": "#f0f0f0",
+      "clusterBorder": "#7f8c8d",
+      "fontSize": "16px",
+      "lineWidth": "2px"
+    },
+    "flowchart": {
+      "curve": "linear",
+      "nodeSpacing": 60,
+      "rankSpacing": 60,
+      "htmlLabels": false
+    }
+  }
+}%%
+flowchart TB
+    A([发起党团阶段申请\\n或进入待审批节点]) --> B[系统读取当前阶段\\n与节点定义]
+    B --> C[生成节点待办]
+    C --> D{节点到期未处理?}
+    D -- 是 --> E[自动触发提醒]
+    E --> F{超期后仍未处理?}
+    F -- 是 --> G[标记异常并管理端汇总]
+    F -- 否 --> H[进入初审]
+    D -- 否 --> H
+    G --> H
+    H --> I[初审角色核验材料\\n时间节点和组织条件]
+    I --> J{材料完整且条件满足?}
+    J -- 否 --> K[记录驳回或补件原因]
+    K --> L[学生补全材料后\\n重新进入当前节点]
+    L --> C
+    J -- 是 --> M[流转给团委老师\\n或下一审批角色]
+    M --> N[团委老师复审]
+    N --> O{复审通过?}
+    O -- 否 --> K
+    O -- 是 --> P{是否需要学院领导终审?}
+    P -- 是 --> Q[创建学院领导待办]
+    Q --> R{终审通过?}
+    R -- 否 --> K
+    R -- 是 --> S[更新党团阶段\\n与节点事件]
+    P -- 否 --> S
+    S --> T[生成下一节点提醒计划]
+    T --> U([学生查看新阶段\\n已完成动作和下一要求])

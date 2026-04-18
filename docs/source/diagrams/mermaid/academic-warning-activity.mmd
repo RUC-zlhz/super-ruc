@@ -1,0 +1,44 @@
+%%{
+  init: {
+    "theme": "base",
+    "themeVariables": {
+      "fontFamily": "Times New Roman, SimSun, serif",
+      "primaryColor": "#ffffff",
+      "primaryBorderColor": "#000000",
+      "primaryTextColor": "#000000",
+      "lineColor": "#000000",
+      "clusterBkg": "#f0f0f0",
+      "clusterBorder": "#7f8c8d",
+      "fontSize": "16px",
+      "lineWidth": "2px"
+    },
+    "flowchart": {
+      "curve": "linear",
+      "nodeSpacing": 60,
+      "rankSpacing": 60,
+      "htmlLabels": false
+    }
+  }
+}%%
+flowchart TB
+    A([进入学业分析页]) --> B[读取培养方案规则]
+    B --> C[读取成绩数据\\n或 PDF 成绩单]
+    C --> D{成绩来源为 PDF?}
+    D -- 是 --> E[解析文本层\\n并映射成绩暂存]
+    E --> F{关键字段完整且置信度足够?}
+    F -- 否 --> G[标记 REVIEW_REQUIRED\\n不更新分析结果]
+    G --> H[展示人工核验提示]
+    H --> I[固定展示“仅供风险提示\\n与辅助选课参考”]
+    I --> Z([结束])
+    F -- 是 --> J[加载已修课程结果]
+    D -- 否 --> J
+    J --> K{规则与成绩数据完整?}
+    K -- 否 --> L[展示数据不足提示\\n不输出最终资格结论]
+    L --> I
+    K -- 是 --> M[比对培养方案模块\\n与已修课程]
+    M --> N[生成缺口模块\\n风险提示和人工核验说明]
+    N --> O{本学期开课信息可用?}
+    O -- 是 --> P[生成课程类型级选课建议]
+    O -- 否 --> Q[仅展示缺口与风险提示]
+    P --> I
+    Q --> I

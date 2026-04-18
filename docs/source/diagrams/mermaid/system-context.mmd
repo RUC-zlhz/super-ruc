@@ -1,0 +1,81 @@
+%%{
+  init: {
+    "theme": "base",
+    "themeVariables": {
+      "fontFamily": "Times New Roman, SimSun, serif",
+      "primaryColor": "#ffffff",
+      "primaryBorderColor": "#000000",
+      "primaryTextColor": "#000000",
+      "lineColor": "#000000",
+      "clusterBkg": "#f0f0f0",
+      "clusterBorder": "#7f8c8d",
+      "fontSize": "16px",
+      "lineWidth": "2px"
+    },
+    "flowchart": {
+      "curve": "linear",
+      "nodeSpacing": 60,
+      "rankSpacing": 60,
+      "htmlLabels": false
+    }
+  }
+}%%
+flowchart TB
+    subgraph Users[院内用户]
+        direction LR
+        Student([学生])
+        Cadre([班团骨干 / 团支书])
+        Teacher([辅导员 / 班主任 / 学院老师])
+        Leader([学院领导])
+        Admin([超级管理员])
+    end
+
+    Platform[学院学生综合服务与党团管理平台]
+
+    subgraph Capability[五个业务模块]
+        direction TB
+        M1[模块一：智能问答与政策知识库]
+        M2[模块二：党团事务流程管理]
+        M3[模块三：信息集成与精准推送]
+        M4[模块四：电子证明生成与审批流程]
+        M5[模块五：学业情况分析与预警]
+    end
+
+    subgraph Support[平台支撑能力]
+        direction LR
+        Audit[权限与审计]
+        Exchange[Excel / Word / PDF 导入导出]
+    end
+
+    subgraph External[外部环境]
+        direction LR
+        Official[(官方文件 / 公开网站 / 公众号)]
+        School[(校级正式系统)]
+        Message[(站内消息 / 邮件 / 短信)]
+        Identity[(微信实名 / 基础身份信息)]
+        Files[(Excel / Word / PDF)]
+    end
+
+    Student --> Platform
+    Cadre --> Platform
+    Teacher --> Platform
+    Leader --> Platform
+    Admin --> Platform
+
+    Platform --> M1
+    Platform --> M2
+    Platform --> M3
+    Platform --> M4
+    Platform --> M5
+    Platform --> Audit
+    Platform --> Exchange
+
+    M1 --> Official
+    M1 --> Exchange
+    M3 --> Official
+    M3 --> Message
+    M4 --> Exchange
+    Exchange --> Identity
+    Exchange --> Files
+    M4 -. 引导 / 补件 / 归档 .-> School
+    M5 --> Exchange

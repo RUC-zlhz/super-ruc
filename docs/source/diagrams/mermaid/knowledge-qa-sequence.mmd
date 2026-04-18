@@ -1,0 +1,53 @@
+%%{
+  init: {
+    "theme": "base",
+    "themeVariables": {
+      "fontFamily": "Times New Roman, SimSun, serif",
+      "primaryColor": "#ffffff",
+      "primaryBorderColor": "#000000",
+      "primaryTextColor": "#000000",
+      "lineColor": "#000000",
+      "clusterBkg": "#f0f0f0",
+      "clusterBorder": "#7f8c8d",
+      "fontSize": "16px",
+      "lineWidth": "2px"
+    }
+  }
+}%%
+sequenceDiagram
+    autonumber
+    actor Teacher as 管理老师
+    participant AdminPortal as 管理端
+    participant KnowledgeService as 知识与模板服务
+    participant SourceGovernance as 来源治理
+    participant StudentApp as 学生端
+    actor Student as 学生
+
+    rect rgb(245,245,245)
+        Teacher->>AdminPortal: 上传政策文件、标准答案与模板
+        AdminPortal->>KnowledgeService: 创建或更新知识条目
+        KnowledgeService->>SourceGovernance: 记录来源、版本、更新时间\\n与停用状态
+        alt 来源信息不完整或模板不合规
+            SourceGovernance-->>AdminPortal: 返回修正要求
+            AdminPortal-->>Teacher: 补充来源或调整模板
+        else 发布成功
+            SourceGovernance-->>KnowledgeService: 来源有效
+            KnowledgeService-->>AdminPortal: 条目与模板可用
+            AdminPortal-->>Teacher: 完成发布
+        end
+    end
+
+    rect rgb(250,250,250)
+        Student->>StudentApp: 输入关键词或选择事项
+        StudentApp->>KnowledgeService: 关键词检索/受控匹配
+        KnowledgeService->>SourceGovernance: 校验来源状态与更新时间
+        alt 命中标准答案且口径明确
+            SourceGovernance-->>KnowledgeService: 来源有效
+            KnowledgeService-->>StudentApp: 返回标准答案、官方链接\\n与模板下载入口
+            StudentApp-->>Student: 展示答案与下载入口
+        else 内容模糊、敏感或已过期
+            SourceGovernance-->>KnowledgeService: 标记人工兜底
+            KnowledgeService-->>StudentApp: 返回官方链接与人工咨询提示
+            StudentApp-->>Student: 展示转人工说明
+        end
+    end

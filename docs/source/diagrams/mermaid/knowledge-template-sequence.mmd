@@ -1,0 +1,53 @@
+%%{
+  init: {
+    "theme": "base",
+    "themeVariables": {
+      "fontFamily": "Times New Roman, SimSun, serif",
+      "primaryColor": "#ffffff",
+      "primaryBorderColor": "#000000",
+      "primaryTextColor": "#000000",
+      "lineColor": "#000000",
+      "clusterBkg": "#f0f0f0",
+      "clusterBorder": "#7f8c8d",
+      "fontSize": "16px",
+      "lineWidth": "2px"
+    },
+    "flowchart": {
+      "curve": "linear",
+      "nodeSpacing": 60,
+      "rankSpacing": 60,
+      "htmlLabels": false
+    }
+  }
+}%%
+sequenceDiagram
+    autonumber
+    actor Student as 学生
+    participant Frontend as 学生端
+    participant API as 后端API
+    participant KnowledgeService as 知识服务
+    participant SourceService as 来源治理
+    participant TemplateService as 模板服务
+
+    Student->>Frontend: 输入关键词或自然语言问题
+    Frontend->>API: 发起知识检索请求
+    API->>KnowledgeService: 按关键词/分类/标签检索\\n并执行受控 AI 匹配
+    KnowledgeService->>SourceService: 读取官方来源\\n版本与更新时间
+    SourceService-->>KnowledgeService: 返回有效来源信息
+    KnowledgeService-->>API: 返回标准答案\\n材料说明和来源元数据
+    API-->>Frontend: 展示办理步骤\\n官方链接与更新时间
+
+    alt 命中模糊或敏感场景
+        Frontend-->>Student: 显示官方来源\\n并提示转人工咨询
+    else 命中有效标准答案
+        Frontend-->>Student: 展示标准答案\\n和下一步办理说明
+    end
+
+    opt 存在可下载模板
+        Student->>Frontend: 点击下载模板
+        Frontend->>API: 请求模板文件
+        API->>TemplateService: 读取当前版本\\n与适用模板
+        TemplateService-->>API: 返回 Word/Excel 模板引用
+        API-->>Frontend: 返回模板下载地址
+        Frontend-->>Student: 完成模板下载
+    end

@@ -1,0 +1,80 @@
+%%{
+  init: {
+    "theme": "base",
+    "themeVariables": {
+      "fontFamily": "Times New Roman, SimSun, serif",
+      "primaryColor": "#ffffff",
+      "primaryBorderColor": "#000000",
+      "primaryTextColor": "#000000",
+      "lineColor": "#000000",
+      "clusterBkg": "#f0f0f0",
+      "clusterBorder": "#7f8c8d",
+      "fontSize": "16px",
+      "lineWidth": "2px"
+    }
+  }
+}%%
+stateDiagram-v2
+    direction TB
+
+    state "入党阶段主线" as PartyPath {
+        direction TB
+        [*] --> PartyApplicant
+        state "入党申请人" as PartyApplicant
+        PartyApplicant --> PositiveMember: 阶段变更通过
+        state "积极分子" as PositiveMember
+        PositiveMember --> DevelopmentTarget: 阶段变更通过
+        state "发展对象" as DevelopmentTarget
+        DevelopmentTarget --> ProbationaryMember: 阶段变更通过
+        state "预备党员" as ProbationaryMember
+        ProbationaryMember --> FullMember: 阶段变更通过
+        state "正式党员" as FullMember
+    }
+
+    state "入团办理主线" as YouthPath {
+        direction TB
+        [*] --> YouthApply
+        state "学生提交申请" as YouthApply
+        YouthApply --> YouthOrgReview: 组织初审
+        state "组织初审" as YouthOrgReview
+        YouthOrgReview --> YouthCollegeReview: 学院复核/审批
+        state "学院复核/审批" as YouthCollegeReview
+        YouthCollegeReview --> YouthDone: 状态更新
+        state "入团记录完成" as YouthDone
+    }
+
+    state "辅助能力" as SupportPath {
+        direction TB
+        [*] --> ReminderPlan
+        state "关键节点提醒" as ReminderPlan
+        ReminderPlan --> CompletionRecord: 待办与完成记录
+        state "完成记录" as CompletionRecord
+        CompletionRecord --> TheoryQuiz
+        state "理论自测" as TheoryQuiz
+        TheoryQuiz --> QuizRecord: 成绩留存
+        state "结果留存" as QuizRecord
+    }
+
+    note right of PartyPath
+      学生侧展示：
+      当前阶段
+      已完成动作
+      下一动作
+    end note
+
+    note right of PositiveMember
+      提醒示例：
+      满 3 个月提交思想汇报
+    end note
+
+    note right of YouthPath
+      默认审批角色：
+      团支书初审
+      团委老师复核/终审
+      学院领导节点可选
+    end note
+
+    note right of SupportPath
+      理论自测是辅助学习能力
+      不作为阶段推进门槛
+    end note

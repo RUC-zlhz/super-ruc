@@ -1,0 +1,109 @@
+%%{
+  init: {
+    "theme": "base",
+    "themeVariables": {
+      "fontFamily": "Times New Roman, SimSun, serif",
+      "primaryColor": "#ffffff",
+      "primaryBorderColor": "#000000",
+      "primaryTextColor": "#000000",
+      "lineColor": "#000000",
+      "clusterBkg": "#f0f0f0",
+      "clusterBorder": "#7f8c8d",
+      "fontSize": "16px",
+      "lineWidth": "1.5px"
+    },
+    "flowchart": {
+      "curve": "linear",
+      "nodeSpacing": 60,
+      "rankSpacing": 60,
+      "htmlLabels": false
+    }
+  }
+}%%
+flowchart LR
+    subgraph Actors[学生侧参与者]
+        direction TB
+        Student[学生]
+        Cadre[班团骨干 / 团支书 / 党支部书记]
+    end
+
+    subgraph Platform[学院学生综合服务与党团管理平台 - 学生侧七模块用例]
+        direction TB
+        subgraph M1Group[模块一：智能问答与政策知识库]
+            direction LR
+            UC1([查询政策与流程])
+            UC2([使用智能问答])
+            UC3([下载标准模板])
+        end
+
+        subgraph M2Group[模块二：党团事务流程管理]
+            direction LR
+            UC4([查看党团进度])
+            UC5([查看关键节点提醒])
+            UC6([参加理论自测])
+        end
+
+        subgraph M3Group[模块三：信息集成与精准推送]
+            direction LR
+            UC7([查看聚合通知])
+            UC8([接收精准推送])
+        end
+
+        subgraph M4Group[模块四：电子证明生成与审批流程]
+            direction LR
+            UC9([提交请假 / 盖章 / 证明申请])
+            UC10([查看 PDF 预览])
+            UC11([查看状态并补件 / 重提])
+        end
+
+        subgraph M5Group[模块五：学业情况分析与预警]
+            direction LR
+            UC12([上传成绩单])
+            UC13([查看学业缺口与风险提示])
+            UC14([查看课程类型建议])
+        end
+
+        subgraph M6Group[模块六：奖励荣誉展示]
+            direction LR
+            UC15([浏览荣誉榜单])
+            UC16([按类别 / 学年筛选荣誉])
+            UC17([查看个人 / 集体榜样事迹])
+        end
+
+        subgraph M7Group[模块七：学生画像与信息管理]
+            direction LR
+            UC18([查看本人画像与成长档案])
+            UC19([提交信息纠错 / 成长补录申请])
+        end
+    end
+
+    Student --- UC1
+    Student --- UC2
+    Student --- UC3
+    Student --- UC4
+    Student --- UC5
+    Student --- UC6
+    Student --- UC7
+    Student --- UC8
+    Student --- UC9
+    Student --- UC10
+    Student --- UC11
+    Student --- UC12
+    Student --- UC13
+    Student --- UC14
+    Student --- UC15
+    Student --- UC16
+    Student --- UC17
+    Student --- UC18
+    Student --- UC19
+
+    Cadre --- UC4
+    Cadre --- UC5
+    Cadre --- UC8
+
+    UC10 -. 依赖 .-> UC9
+    UC11 -. 跟踪 .-> UC9
+    UC13 -. 读取 .-> UC12
+    UC14 -. 基于 .-> UC13
+    UC17 -. 依赖 .-> UC15
+    UC19 -. 基于 .-> UC18

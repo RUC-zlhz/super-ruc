@@ -1,0 +1,59 @@
+%%{
+  init: {
+    "theme": "base",
+    "themeVariables": {
+      "fontFamily": "Times New Roman, SimSun, serif",
+      "primaryColor": "#ffffff",
+      "primaryBorderColor": "#000000",
+      "primaryTextColor": "#000000",
+      "lineColor": "#000000",
+      "clusterBkg": "#f0f0f0",
+      "clusterBorder": "#7f8c8d",
+      "fontSize": "16px",
+      "lineWidth": "2px"
+    }
+  }
+}%%
+sequenceDiagram
+    autonumber
+    actor Student as 学生
+    participant StudentApp as 学生端
+    participant HonorService as 荣誉展示服务
+    participant HonorRepo as 荣誉记录库
+    participant ProfileRepo as 学籍信息
+    participant VisitLog as 访问日志/热度统计
+
+    rect rgb(245,245,245)
+        Student->>StudentApp: 进入荣誉展示模块首页
+        StudentApp->>HonorService: 请求荣誉榜单(category, year)
+        HonorService->>HonorRepo: 查询已授权、已审核、已核验的有效荣誉与历史标记
+        HonorRepo-->>HonorService: 返回荣誉条目
+        HonorService->>ProfileRepo: 读取获奖者或集体展示主体
+        ProfileRepo-->>HonorService: 返回姓名 / 集体名称、专业、年级等公开字段
+        HonorService-->>StudentApp: 返回榜单与筛选结果
+        StudentApp-->>Student: 展示荣誉卡片
+    end
+
+    rect rgb(250,250,250)
+        Student->>StudentApp: 点击荣誉条目
+        StudentApp->>HonorService: 请求荣誉详情
+        HonorService->>HonorRepo: 加载详情、展示有效期与归档状态
+        alt 荣誉已过期或归档
+            HonorRepo-->>HonorService: 标记为历史荣誉
+            HonorService-->>StudentApp: 返回详情并标注“历史荣誉”
+        else 当前有效荣誉
+            HonorRepo-->>HonorService: 返回正式荣誉详情、事迹摘要与获奖感言
+            alt 集体荣誉
+                HonorService-->>StudentApp: 返回集体名称与公开展示字段
+            else 个人荣誉
+                alt 获奖者已毕业
+                    HonorService-->>StudentApp: 返回详情并隐藏联系方式
+                else 在读学生
+                    HonorService-->>StudentApp: 返回公开展示字段
+                end
+            end
+        end
+        HonorService->>VisitLog: 记录访问行为
+        VisitLog-->>HonorService: 记录完成
+        StudentApp-->>Student: 展示榜样事迹详情
+    end
