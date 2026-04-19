@@ -175,6 +175,7 @@
 | 2026-04-19 | 仓库与工作树收拢细化 | `docs/notes/refinements/2026-04-19-repo-cleanup-refinement.md` | `S0, S1` | `[x]` | 已收口到 `codex/v1.6-integration`，并清理 `S0` 临时分支/worktree |
 | 2026-04-19 | 文档资产与计划目录正规化 | `docs/notes/refinements/2026-04-19-doc-asset-normalization-refinement.md` | `S5A.3, S5B.1, S5B.2, S5B.3, S5B.4` | `[x]` | 已完成当前活跃出件链正规化与实跑验证；剩余为历史 `v1.2 ~ v1.4` 资产整理 |
 | 2026-04-19 | 历史文档资产与脚本清理（v1.2 ~ v1.4） | `docs/notes/refinements/2026-04-19-historical-doc-asset-cleanup-refinement.md` | `S5A.3, S5B.1, S5B.2, S5B.3` | `[x]` | 已迁移历史主链最小脚本与 PNG 输入，并明确包装脚本/截图的降级边界 |
+| 2026-04-19 | 历史文档链第二阶段收口（v1.3 入口定版 + tmp/docs 本地遗留清理） | `docs/notes/refinements/2026-04-19-historical-tmpdocs-prune-refinement.md` | `S5A.3, S5B.1, S5B.2, S5B.3` | `[x]` | 已定版 `v1.3` 权威入口，并清理 `tmp/docs` 中已定性的本地历史实验件与中间产物 |
 
 ## 会话更新要求
 
@@ -202,3 +203,4 @@
 - `2026-04-19`：继续修正文档出件链的可重复执行性与正式源边界：`update_v15_docx_split_svg.py` 已支持重复执行、已直接从受控图源重建 `图 3-8 / 图 3-11` 的派生 Mermaid 文本；`class-diagram.mmd` 的补丁污染已清理，并已补跑 `v1.5` 基础版及两套 EMF 变体，确保 6 个交付件重新一致。
 - `2026-04-19`：新增“历史文档资产与脚本清理（v1.2 ~ v1.4）”细化文件；已将 `v1.2 / v1.3` 历史主链脚本迁入 `scripts/srs/v1_2/` 与 `scripts/srs/v1_3/`，建立 `docs/source/diagrams/rendered/v1_2 ~ v1_4/` 受控 PNG 目录，并把 `scripts/srs/update_srs_v14_incremental.py` 的默认图目录切到受控历史资产。
 - `2026-04-19`：补做历史链验证收口；`scripts/srs/v1_2/polish_srs_v12_layout.ps1` 已通过 PowerShell Parser 校验，且仓库跟踪文件内对历史 `refresh/export/preview` 包装脚本的正式引用检索结果为 `NO_TRACKED_MATCHES`，明确其仅保留为历史最小复现参考。
+- `2026-04-19`：继续推进历史链第二阶段收口；已确认 `scripts/srs/v1_3/build_srs_v13_from_v12.py` 是唯一 `v1.3` 受控入口，`tmp/docs` 完全 ignored 且不构成仓库保证内容，并已清理本地 `tmp/docs` 中已定性的 `v1.2 ~ v1.4` 历史截图、compare 图、test 图、raw 图集与实验脚本遗留。

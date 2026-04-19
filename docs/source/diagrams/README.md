@@ -7,6 +7,8 @@
 - `mermaid/`：Mermaid 原始图源，是当前 SRS 图的正式文本源文件目录。
 - `rendered/`：`v1.2 ~ v1.4` 历史主链仍直接依赖的受控 PNG 资产目录。
 - `tmp/docs/`：仅作为渲染、导出、预览和临时实验目录，不再作为唯一正式图源入口。
+- `tmp/docs/diagrams/` 中的 PNG 副本、`v1_3/`、`v1_4/` 与 `raw/` 目录仅属于本地工作副产物，可在工作区清理时删除重建。
+- `rendered/v1_3/` 当前由 `scripts/srs/v1_3/build_srs_v13_from_v12.py` 消费，`tmp/docs/diagrams/v1_3` 不再是权威输入目录。
 
 ## 使用规则
 

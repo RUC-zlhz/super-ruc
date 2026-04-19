@@ -42,10 +42,10 @@
 
 ## 未迁移但已定性的历史件
 
-- `tmp/docs/update_srs_v13_incremental.py`：保留为历史增量实验脚本；其默认图集命名与现存 `v1_3` 冻结 PNG 不一致，不作为当前最小可复现主链入口。
-- `tmp/docs/refresh_export_v12.py` 与 `tmp/docs/refresh_export_v12.ps1`：保留为历史导出包装层；正式导出能力已由 `scripts/srs/export_docx_pdf.py` 覆盖。
-- `tmp/docs/export_preview.ps1`：保留为预览脚本，不升级为正式出件入口。
-- `tmp/docs/polish_srs_layout.py`：保留为简化实验脚本；`v1.2` 历史主链保留更完整的 `polish_srs_v12_layout.ps1`。
+- 若本地仍存在 `tmp/docs/update_srs_v13_incremental.py`：应视为 ignored 的历史增量实验脚本；其默认图集命名与现存 `v1_3` 冻结 PNG 不一致，不属于仓库保证内容，也不作为当前最小可复现主链入口。
+- 若本地仍存在 `tmp/docs/refresh_export_v12.py` 与 `tmp/docs/refresh_export_v12.ps1`：应视为 ignored 的历史导出包装层；正式导出能力已由 `scripts/srs/export_docx_pdf.py` 覆盖。
+- 若本地仍存在 `tmp/docs/export_preview.ps1`：应视为 ignored 的预览脚本，不升级为正式出件入口。
+- 若本地仍存在 `tmp/docs/polish_srs_layout.py`：应视为 ignored 的简化实验脚本；`v1.2` 历史主链保留更完整的 `polish_srs_v12_layout.ps1`。
 
 ## 验收条件
 
