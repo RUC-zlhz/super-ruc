@@ -29,7 +29,6 @@ BACKUP_DIR = WORK_DIR / "backups"
 SVG_SRC_DIR = WORK_DIR / "svg-src"
 SVG_OUT_DIR = WORK_DIR / "svg"
 DIAGRAM_DIR = BASE / "docs" / "source" / "diagrams" / "mermaid"
-DIAGRAM_V15_DIR = WORK_DIR / "diagrams"
 PUPPETEER_CONFIG = WORK_DIR / "puppeteer.json"
 MMDc_SCRIPT = Path(r"C:\Users\znnnnnh2\scoop\apps\nodejs-lts\current\bin\mmdc.ps1")
 CHROME = Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe")
@@ -100,6 +99,12 @@ def clone_paragraph_after(paragraph: Paragraph, template: Paragraph) -> Paragrap
 
 def prepare_docx_structure() -> None:
     document = Document(WORK_DOCX)
+    split_a_exists = any(paragraph_text_matches(paragraph, SPLIT_CAPTION_A) for paragraph in document.paragraphs)
+    split_b_exists = any(paragraph_text_matches(paragraph, SPLIT_CAPTION_B) for paragraph in document.paragraphs)
+    if split_a_exists and split_b_exists:
+        document.save(WORK_DOCX)
+        return
+
     original_caption = find_paragraph(document, "图 3-2 管理侧七模块用例图")
     picture_paragraph = get_previous_paragraph(document, original_caption)
 
@@ -295,6 +300,63 @@ flowchart LR
 """
 
 
+def build_document_approval_sequence_text() -> str:
+    original_sequence = (DIAGRAM_DIR / "sequence-diagram.mmd").read_text(encoding="utf-8")
+    updated_sequence = original_sequence.replace(
+        "    alt 转线下处理\n"
+        "        ApprovalService->>DB: 写入 ApprovalAction(转线下处理)\n"
+        "        ApprovalService->>DB: 更新 CommonRequest 为转线下处理\n"
+        "        ApprovalService->>DB: 写入 DocumentAuditLog(线下处理)\n"
+        "        Frontend-->>Student: 展示线下出件通知\n"
+        "    else 在线出件完成\n",
+        "    alt 涉密转线下\n"
+        "        ApprovalService->>DB: 写入 ApprovalAction(转线下处理)\n"
+        "        ApprovalService->>DB: 更新 CommonRequest 为线下办理\n"
+        "        ApprovalService->>DB: 写入 DocumentAuditLog(涉密线下处理)\n"
+        "        Frontend-->>Student: 返回带负责老师联系方式的线下提示卡片\n"
+        "    else 在线出件完成\n",
+    )
+    if updated_sequence == original_sequence:
+        raise RuntimeError("Failed to build document approval sequence source")
+    return updated_sequence
+
+
+def build_student_profile_sequence_text() -> str:
+    original_profile = (DIAGRAM_DIR / "student-profile-sequence.mmd").read_text(encoding="utf-8")
+    updated_profile = original_profile.replace(
+        "        ProfileService->>ProfileRepo: 读取本人静态字段与动态记录\n"
+        "        ProfileService-->>StudentApp: 返回本人画像并隐藏管理元数据\n"
+        "        StudentApp-->>Student: 展示画像、纠错申诉与成长补录入口\n"
+        "        Student->>StudentApp: 提交信息纠错或成长补录申请\n"
+        "        StudentApp->>UpdateService: 提交申诉说明或补录内容\n"
+        "        UpdateService->>ProfileRepo: 保存待审核申请与来源信息\n"
+        "        ProfileRepo-->>UpdateService: 保存成功\n"
+        "        UpdateService->>AuditLog: 记录申请提交\n"
+        "        AuditLog-->>UpdateService: 留痕完成\n"
+        "        UpdateService-->>StudentApp: 返回提交成功\n"
+        "        StudentApp-->>Student: 提示已提交至辅导员审核\n",
+        "        ProfileService->>ProfileRepo: 读取本人静态字段与动态记录\n"
+        "        alt 在读学生\n"
+        "            ProfileService-->>StudentApp: 返回本人画像并展示纠错与成长补录入口\n"
+        "            StudentApp-->>Student: 展示画像、纠错申诉与成长补录入口\n"
+        "            Student->>StudentApp: 提交信息纠错或成长补录申请\n"
+        "            StudentApp->>UpdateService: 提交申诉说明或补录内容\n"
+        "            UpdateService->>ProfileRepo: 保存待审核申请与来源信息\n"
+        "            ProfileRepo-->>UpdateService: 保存成功\n"
+        "            UpdateService->>AuditLog: 记录申请提交\n"
+        "            AuditLog-->>UpdateService: 留痕完成\n"
+        "            UpdateService-->>StudentApp: 返回提交成功\n"
+        "            StudentApp-->>Student: 提示已提交至辅导员审核\n"
+        "        else 非在读/已归档学生\n"
+        "            ProfileService-->>StudentApp: 返回只读画像并隐藏纠错与补录入口\n"
+        "            StudentApp-->>Student: 展示只读画像\n"
+        "        end\n",
+    )
+    if updated_profile == original_profile:
+        raise RuntimeError("Failed to build student profile sequence source")
+    return updated_profile
+
+
 def ensure_workdirs() -> None:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     SVG_SRC_DIR.mkdir(parents=True, exist_ok=True)
@@ -350,10 +412,10 @@ def build_render_specs() -> list[FigureRenderSpec]:
         FigureRenderSpec("图 3-5 知识问答与模板下载时序图", DIAGRAM_DIR / "knowledge-template-sequence.mmd", "fig-3-5-knowledge-template-sequence.svg"),
         FigureRenderSpec("图 3-6 党团事务流程状态图", DIAGRAM_DIR / "party-workflow-state.mmd", "fig-3-6-party-workflow-state.svg"),
         FigureRenderSpec("图 3-7 官方信息汇聚与精准推送时序图", DIAGRAM_DIR / "notice-push-sequence.mmd", "fig-3-7-notice-push-sequence.svg"),
-        FigureRenderSpec("图 3-8 电子证明生成与审批时序图", DIAGRAM_V15_DIR / "fig-3-8-document-approval-sequence.mmd", "fig-3-8-document-approval-sequence.svg"),
+        FigureRenderSpec("图 3-8 电子证明生成与审批时序图", None, "fig-3-8-document-approval-sequence.svg", build_document_approval_sequence_text()),
         FigureRenderSpec("图 3-9 学业分析与预警活动图", DIAGRAM_DIR / "academic-warning-activity.mmd", "fig-3-9-academic-warning-activity.svg"),
         FigureRenderSpec("图 3-10 荣誉榜单浏览与详情查看时序图", DIAGRAM_DIR / "honor-display-sequence.mmd", "fig-3-10-honor-display-sequence.svg"),
-        FigureRenderSpec("图 3-11 学生画像查看与纠错 / 成长补录时序图", DIAGRAM_V15_DIR / "fig-3-11-student-profile-sequence.mmd", "fig-3-11-student-profile-sequence.svg"),
+        FigureRenderSpec("图 3-11 学生画像查看与纠错 / 成长补录时序图", None, "fig-3-11-student-profile-sequence.svg", build_student_profile_sequence_text()),
     ]
 
 
@@ -497,7 +559,7 @@ def export_pdf(docx_path: Path, pdf_path: Path) -> None:
     subprocess.run(
         [
             "python",
-            str(BASE / "tmp" / "docs" / "export_docx_pdf.py"),
+            str(BASE / "scripts" / "srs" / "export_docx_pdf.py"),
             "--docx",
             str(docx_path),
             "--pdf",

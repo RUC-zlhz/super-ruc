@@ -19,4 +19,6 @@
 
 - `docs/source/diagrams/mermaid/` 是当前正式受控的 Mermaid 图源目录。
 - `tmp/docs/` 继续作为工作目录和中间产物目录使用，例如 `svg/`、`emf/`、`work-*.docx`、预览 PDF 等。
+- `tmp/docs/v1_5/diagrams/` 仅保存 `build_srs_v15_from_v14.py` 生成的阶段性图源变体，不是权威 Mermaid 源目录。
+- `scripts/srs/v1_5/update_v15_docx_split_svg.py` 当前已直接基于受控图源重建 `图 3-8 / 图 3-11` 的派生 Mermaid 文本，不再把 `tmp/docs/v1_5/diagrams/` 作为下游输入前提。
 - 如后续继续清理历史版本脚本，应优先迁移当前真实使用的链路，再处理 `v1.2 ~ v1.4` 的历史遗留脚本。

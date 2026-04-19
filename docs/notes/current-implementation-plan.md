@@ -173,7 +173,7 @@
 | 2026-04-18 | 全阶段并行 worktree / branch 编排 | `docs/notes/refinements/2026-04-18-worktree-branch-orchestration-refinement.md` | `S0 ~ S5` | `[x]` | 已落盘跨阶段并行编排、子分支后缀规则、阶段集成分支与 worktree 分派表 |
 | 2026-04-18 | S0 启动命令与第一批 worktree 创建 | `docs/notes/refinements/2026-04-18-s0-bootstrap-commands-refinement.md` | `S0.1, S0.2, S0.3, S0.4` | `[x]` | 已落盘根工作区冻结顺序、冻结后创建 `int-s0` 与第一批 baseline worktree 的实际命令 |
 | 2026-04-19 | 仓库与工作树收拢细化 | `docs/notes/refinements/2026-04-19-repo-cleanup-refinement.md` | `S0, S1` | `[x]` | 已收口到 `codex/v1.6-integration`，并清理 `S0` 临时分支/worktree |
-| 2026-04-19 | 文档资产与计划目录正规化 | `docs/notes/refinements/2026-04-19-doc-asset-normalization-refinement.md` | `S5A.3, S5B.1, S5B.2, S5B.3, S5B.4` | `[-]` | 已完成首批图源/脚本正规化；仍需继续迁移剩余历史资产 |
+| 2026-04-19 | 文档资产与计划目录正规化 | `docs/notes/refinements/2026-04-19-doc-asset-normalization-refinement.md` | `S5A.3, S5B.1, S5B.2, S5B.3, S5B.4` | `[x]` | 已完成当前活跃出件链正规化与实跑验证；剩余为历史 `v1.2 ~ v1.4` 资产整理 |
 
 ## 会话更新要求
 
@@ -197,3 +197,5 @@
 - `2026-04-19`：完成仓库/worktree 收拢；删除 `codex/int-s0`、`codex/s0-*`、`codex/repo-cleanup-snapshot` 及其物理 worktree，保留 `codex/v1.6-integration` 作为当前唯一开发主线，`main` 保持与 `origin/main` 对齐。
 - `2026-04-19`：新增 `docs/notes/README.md` 与“文档资产与计划目录正规化”细化文件，明确 `docs/notes` 的权威入口、参考材料边界与 `tmp/docs` 资产后续正规化要求。
 - `2026-04-19`：新增受版本控制的 `scripts/srs/` 出件脚本入口与 `docs/source/diagrams/mermaid/` 正式图源目录，并完成首批脚本的 `py_compile` 静态验证。
+- `2026-04-19`：真实回跑当前 `v1.5` 文档出件链四段脚本，重新生成 `docx / pdf / emf / emf-inkscape` 6 个交付件；随后修正 `scripts/srs/v1_5/update_v15_docx_split_svg.py` 对 `tmp/docs/export_docx_pdf.py` 的遗留硬编码，并对 `v1.5.pdf` 第 `6 / 14 / 15 / 26 / 29` 页完成快速视觉抽检。
+- `2026-04-19`：继续修正文档出件链的可重复执行性与正式源边界：`update_v15_docx_split_svg.py` 已支持重复执行、已直接从受控图源重建 `图 3-8 / 图 3-11` 的派生 Mermaid 文本；`class-diagram.mmd` 的补丁污染已清理，并已补跑 `v1.5` 基础版及两套 EMF 变体，确保 6 个交付件重新一致。

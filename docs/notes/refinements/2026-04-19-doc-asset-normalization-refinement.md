@@ -2,7 +2,7 @@
 
 - 日期：`2026-04-19`
 - 关联主计划：`S5A.3, S5B.1, S5B.2, S5B.3, S5B.4`
-- 当前状态：`ACTIVE`
+- 当前状态：`DONE`
 
 ## 范围
 
@@ -37,7 +37,14 @@
 - 已新增 `scripts/srs/` 与 `scripts/srs/v1_5/`，将当前仍在使用的 `v1.5 / v1.6` 出件脚本复制到受版本控制目录。
 - `scripts/srs/build_srs_v15_from_v14.py` 与 `scripts/srs/v1_5/update_v15_docx_split_svg.py` 已改为读取 `docs/source/diagrams/mermaid/`。
 - `scripts/srs/v1_5/build_v15_emf_variant.py` 与 `scripts/srs/v1_5/build_v15_inkscape_emf_variant.py` 已改为调用 `scripts/srs/export_docx_pdf.py`。
+- `scripts/srs/v1_5/update_v15_docx_split_svg.py` 已改为调用 `scripts/srs/export_docx_pdf.py`；`tmp/docs/v1_5/diagrams/` 明确仅作为前序脚本生成的阶段性图源变体目录。
+- `scripts/srs/v1_5/update_v15_docx_split_svg.py` 已改为直接基于受控图源重建 `图 3-8 / 图 3-11` 的派生 Mermaid 文本，不再把 `tmp/docs/v1_5/diagrams/` 作为下游执行输入。
+- `scripts/srs/v1_5/update_v15_docx_split_svg.py` 已补幂等处理；当 `图 3-2` 已拆分为 `（a）/（b）` 双图时，重复执行不会再次失败。
+- 已清理 `docs/source/diagrams/mermaid/class-diagram.mmd` 中混入的补丁残留，恢复 `class-diagram.mmd` 与 `extension-class-diagram.mmd` 的单一职责边界。
 - 已对 `scripts/srs/` 下首批脚本执行 `python -m py_compile` 静态验证，通过。
+- 已真实回跑 `build_srs_v15_from_v14.py -> update_v15_docx_split_svg.py -> build_v15_emf_variant.py -> build_v15_inkscape_emf_variant.py` 整条活跃出件链，并在修正脚本后再次回跑后 3 段，6 个 `v1.5` 交付件均已重新生成。
+- 已对 `v1.5.pdf` 的第 `6 / 14 / 15 / 26 / 29` 页完成快速视觉抽检；当前未发现炸版或图文错位，但 `图 3-8`、`图 3-11` 的信息密度仍偏高，属于后续 `v1.6` 文档优化项。
+- 已对 `v1.5.pdf` 的第 `21` 页完成补充视觉抽检，确认 `图 3-3` 在清理污染图源后仍可正常渲染。
 - `tmp/docs/` 继续保留为工作目录和中间产物目录，不再承载唯一正式图源入口。
 
 ## 验收条件
@@ -48,8 +55,7 @@
 
 ## 风险 / 阻塞
 
-- `tmp/docs/` 中混合了脚本、实验文件、正式图源和大量渲染产物，若不先分层就整体搬迁，容易把纯中间产物一起纳入版本控制。
-- 文档构建脚本可能存在对 `tmp/docs/` 的硬编码路径；迁移前需要先回溯调用链。
+- `tmp/docs/` 中仍混合了脚本、实验文件和大量历史渲染产物；若后续要继续清理 `v1.2 ~ v1.4` 遗留资产，仍需先分层再迁移。
 - `output/doc/` 下可能存在 Office 临时锁文件，清理前需要确认对应文档未在外部程序中占用。
 
 ## 变更记录
@@ -57,3 +63,5 @@
 - `2026-04-19`：创建文档资产与计划目录正规化细化文件。
 - `2026-04-19`：完成首轮结构审计，并新增 `docs/notes/README.md` 作为权威入口说明。
 - `2026-04-19`：新增 `scripts/srs/` 受版本控制脚本入口与 `docs/source/diagrams/mermaid/` 正式图源目录，完成首批迁移与静态验证。
+- `2026-04-19`：真实回跑当前活跃 `v1.5` 出件链，修正 `update_v15_docx_split_svg.py` 对 `tmp/docs/export_docx_pdf.py` 的遗留硬编码，并完成关键页视觉抽检。
+- `2026-04-19`：补齐 `update_v15_docx_split_svg.py` 的幂等性与受控图源重建逻辑，清理 `class-diagram.mmd` 污染段，并将 6 个 `v1.5` 交付件重新导出到一致状态。
