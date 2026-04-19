@@ -54,13 +54,52 @@ export function request<T>(
   })
 }
 
-export function get<T>(url: string, params?: Record<string, any>) {
+function withQuery(url: string, params?: Record<string, any>) {
   const qs = params
-    ? '?' + Object.entries(params).filter(([, v]) => v != null).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&')
+    ? '?' + Object.entries(params)
+      .filter(([, v]) => v != null)
+      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+      .join('&')
     : ''
-  return request<T>(`${url}${qs}`, 'GET')
+  return `${url}${qs}`
+}
+
+export function get<T>(url: string, params?: Record<string, any>) {
+  return request<T>(withQuery(url, params), 'GET')
 }
 
 export function post<T>(url: string, data?: any) {
   return request<T>(url, 'POST', data)
+}
+
+export function put<T>(url: string, data?: any) {
+  return request<T>(url, 'PUT', data)
+}
+
+export function download(url: string, params?: Record<string, any>) {
+  return new Promise<{ tempFilePath: string; statusCode: number }>((resolve, reject) => {
+    const token = getToken()
+    uni.downloadFile({
+      url: `${BASE_URL}${withQuery(url, params)}`,
+      header: token ? { Authorization: `Bearer ${token}` } : {},
+      success(res) {
+        if (res.statusCode === 401) {
+          setToken(null)
+          uni.reLaunch({ url: '/pages/profile/index' })
+          reject(new Error('登录已失效'))
+          return
+        }
+        if (res.statusCode >= 200 && res.statusCode < 300 && res.tempFilePath) {
+          resolve({ tempFilePath: res.tempFilePath, statusCode: res.statusCode })
+          return
+        }
+        uni.showToast({ title: '文件下载失败', icon: 'none' })
+        reject(res)
+      },
+      fail(err) {
+        uni.showToast({ title: '网络异常', icon: 'none' })
+        reject(err)
+      },
+    })
+  })
 }
