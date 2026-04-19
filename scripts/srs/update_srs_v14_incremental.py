@@ -31,7 +31,7 @@ DEFAULT_TARGET_DOCX = (
     / "doc"
     / "软件需求规格说明书-信息学院学生综合服务与党团管理平台-v1.4.docx"
 )
-DEFAULT_DIAGRAM_DIR = BASE / "tmp" / "docs" / "diagrams" / "v1_4"
+DEFAULT_DIAGRAM_DIR = BASE / "docs" / "source" / "diagrams" / "rendered" / "v1_4"
 
 SPACE_RE = re.compile(r"\s+")
 
