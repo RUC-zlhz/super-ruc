@@ -71,3 +71,15 @@ async def get_student_by_no(db: AsyncSession, student_no: str) -> Student | None
 async def get_role_by_code(db: AsyncSession, code: str) -> Role | None:
     stmt = select(Role).where(Role.code == code)
     return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def get_users_by_ids(
+    db: AsyncSession, user_ids: set[int] | list[int]
+) -> dict[int, User]:
+    ids = [int(user_id) for user_id in user_ids if user_id is not None]
+    if not ids:
+        return {}
+    rows = (
+        await db.execute(select(User).where(User.id.in_(ids), User.deleted_at.is_(None)))
+    ).scalars().all()
+    return {row.id: row for row in rows}
