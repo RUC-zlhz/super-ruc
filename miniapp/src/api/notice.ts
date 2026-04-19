@@ -3,10 +3,32 @@ import { get, post } from '@/utils/request'
 export interface StudentNoticeItem {
   id: number
   title: string
-  body?: string | null
+  summary?: string | null
+  category?: string | null
+  is_pinned: boolean
+  published_at?: string | null
+  read_at?: string | null
+  delivery_id?: number | null
+}
+
+export interface NoticeDetail {
+  id: number
+  title: string
+  body_md: string
+  summary?: string | null
+  category?: string | null
+  status: string
   source_type: string
-  published_at: string
-  is_read: boolean
+  source_url?: string | null
+  channels: string
+  target_rule?: Record<string, any> | null
+  target_summary?: string | null
+  effective_start?: string | null
+  effective_end?: string | null
+  is_pinned: boolean
+  published_at?: string | null
+  updated_at: string
+  tags: string[]
 }
 
 export function getMyNotices(params?: { page?: number; size?: number }) {
@@ -14,9 +36,9 @@ export function getMyNotices(params?: { page?: number; size?: number }) {
 }
 
 export function markRead(deliveryId: number) {
-  return post<any>(`/notices/${deliveryId}/read`)
+  return post<any>(`/notices/read/${deliveryId}`)
 }
 
-export function getNoticeDetail(deliveryId: number) {
-  return get<StudentNoticeItem>(`/notices/${deliveryId}`)
+export function getNoticeDetail(noticeId: number) {
+  return get<NoticeDetail>(`/notices/${noticeId}`)
 }

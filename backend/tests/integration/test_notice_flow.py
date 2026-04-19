@@ -102,6 +102,14 @@ async def test_notice_publish_dispatch_and_student_inbox(
         political_status="中共党员",
     )
     stu_headers = {"Authorization": f"Bearer {token}"}
+    other_token, _ = await _login_as_student(
+        client,
+        db,
+        student_no="N20002",
+        wx_code="wx_n20002",
+        political_status="群众",
+    )
+    other_headers = {"Authorization": f"Bearer {other_token}"}
 
     # 2. 管理员创建通知
     create = await admin_client.post(
@@ -163,10 +171,40 @@ async def test_notice_publish_dispatch_and_student_inbox(
     assert len(items) == 1
     item = items[0]
     assert item["id"] == notice_id
+    assert "delivery_id" in item
+    assert "read_at" in item
+    assert "is_read" not in item
     assert item["read_at"] is None
     delivery_id = item["delivery_id"]
 
-    # 7. mark-read → 再查 unread_only=true 应为空
+    # 7. 详情走 canonical notice_id，返回 NoticeOut 而不是学生端旧别名
+    detail = await client.get(f"/api/v1/notices/{notice_id}", headers=stu_headers)
+    assert detail.status_code == 200, detail.text
+    detail_data = detail.json()["data"]
+    assert detail_data["id"] == notice_id
+    assert detail_data["body_md"] == "## 议程\n1. 学习材料\n2. 组织生活"
+    assert "body" not in detail_data
+    assert set(detail_data["tags"]) == {"党员", "例会"}
+
+    admin_detail = await admin_client.get(f"/api/v1/notices/{notice_id}")
+    assert admin_detail.status_code == 200, admin_detail.text
+    admin_detail_data = admin_detail.json()["data"]
+    assert admin_detail_data["source_type"] == "MANUAL"
+    assert admin_detail_data["channels"] == "IN_APP,SMS"
+
+    other_detail = await client.get(
+        f"/api/v1/notices/{notice_id}",
+        headers=other_headers,
+    )
+    assert other_detail.status_code == 404
+
+    other_mark = await client.post(
+        f"/api/v1/notices/read/{delivery_id}",
+        headers=other_headers,
+    )
+    assert other_mark.status_code == 404
+
+    # 8. mark-read → 再查 unread_only=true 应为空
     mark = await client.post(
         f"/api/v1/notices/read/{delivery_id}", headers=stu_headers,
     )
@@ -177,7 +215,7 @@ async def test_notice_publish_dispatch_and_student_inbox(
     )
     assert unread.json()["data"]["meta"]["total"] == 0
 
-    # 8. admin 查批次 + 投递明细
+    # 9. admin 查批次 + 投递明细
     batches = await admin_client.get(
         f"/api/v1/admin/notices/{notice_id}/batches"
     )
@@ -194,7 +232,10 @@ async def test_notice_publish_dispatch_and_student_inbox(
     assert by_ch["IN_APP"] == "READ"  # mark_read 把 IN_APP 的 status 置为 READ
     assert by_ch["SMS"] == "SKIPPED"
     sms_row = next(d for d in dlist if d["channel"] == "SMS")
+    in_app_row = next(d for d in dlist if d["channel"] == "IN_APP")
+    assert in_app_row["target_handle"] is None
     assert sms_row["error_code"] == "SMS_DISABLED"
+    assert "target_handle" in sms_row
 
 
 async def test_archived_notice_cannot_be_edited(

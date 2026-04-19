@@ -28,6 +28,7 @@ from app.exchange.models import (
     IMPORT_TYPE_COURSE_EQUIV,
     IMPORT_TYPE_COURSE_OFFERING,
     IMPORT_TYPE_CURRICULUM_MODULE,
+    IMPORT_TYPE_HONOR,
     IMPORT_TYPE_STUDENT,
     IMPORT_TYPE_TRANSCRIPT,
     ROW_RESULT_FAILED,
@@ -354,12 +355,114 @@ async def _apply_course_offering(db: AsyncSession, batch: ImportBatch) -> None:
         await repo.upsert_course_offering(db, payload)
 
 
+async def _apply_honor(db: AsyncSession, batch: ImportBatch) -> None:
+    from app.honor import repository as honor_repo
+    from app.honor.models import HONOR_STATUS_ACTIVE
+
+    rows = await repo.list_batch_rows(db, batch.id, severity=ROW_SEVERITY_INFO, limit=100000)
+    rows_warn = await repo.list_batch_rows(db, batch.id, severity=ROW_SEVERITY_WARN, limit=100000)
+    grouped: dict[
+        tuple[Any, ...], dict[str, Any]
+    ] = {}
+    for row in rows + rows_warn:
+        data = row.raw_data or {}
+        key = (
+            data.get("category_code"),
+            data.get("title"),
+            data.get("level"),
+            data.get("awarded_by"),
+            data.get("document_no"),
+            data.get("announced_at"),
+            data.get("effective_from"),
+            data.get("effective_to"),
+            _parse_bool(data.get("is_collective"), default=False),
+            data.get("summary"),
+            data.get("story_md"),
+            data.get("acceptance_speech"),
+            data.get("cover_image_url"),
+            _parse_bool(data.get("consent_flag"), default=True),
+        )
+        group = grouped.get(key)
+        if group is None:
+            group = {
+                "payload": {
+                    "category_code": data.get("category_code"),
+                    "title": data.get("title"),
+                    "level": data.get("level"),
+                    "awarded_by": data.get("awarded_by"),
+                    "document_no": data.get("document_no"),
+                    "announced_at": _parse_date(data.get("announced_at")),
+                    "effective_from": _parse_date(data.get("effective_from")),
+                    "effective_to": _parse_date(data.get("effective_to")),
+                    "is_collective": _parse_bool(data.get("is_collective"), default=False),
+                    "summary": data.get("summary"),
+                    "story_md": data.get("story_md"),
+                    "acceptance_speech": data.get("acceptance_speech"),
+                    "cover_image_url": data.get("cover_image_url"),
+                    "consent_flag": _parse_bool(data.get("consent_flag"), default=True),
+                    "status": HONOR_STATUS_ACTIVE,
+                    "created_by": batch.operator_id,
+                    "updated_by": batch.operator_id,
+                },
+                "recipients": [],
+            }
+            grouped[key] = group
+        group["recipients"].append(data)
+
+    categories = await honor_repo.get_categories_by_codes(
+        db,
+        {
+            str(group["payload"]["category_code"])
+            for group in grouped.values()
+            if group["payload"].get("category_code")
+        },
+    )
+    missing_codes = sorted(
+        {
+            str(group["payload"]["category_code"])
+            for group in grouped.values()
+            if group["payload"].get("category_code")
+        }
+        - set(categories.keys())
+    )
+    if missing_codes:
+        raise BizError(f"荣誉类别不存在：{', '.join(missing_codes)}", code=40045)
+
+    for group in grouped.values():
+        record = await honor_repo.create_record(db, group["payload"])
+        recipients: list[dict[str, Any]] = []
+        for raw in group["recipients"]:
+            student = None
+            student_no = str(raw.get("student_no") or raw.get("student_no_snapshot") or "").strip()
+            if student_no:
+                student = await repo.get_student_by_no(db, student_no)
+                if student is None:
+                    raise BizError(f"学号 {student_no} 未在学生主档中，无法核验荣誉记录", code=40046)
+            recipients.append(
+                {
+                    "student_id": student.id if student is not None else None,
+                    "student_no_snapshot": student.student_no if student is not None else (student_no or None),
+                    "display_name": (
+                        raw.get("display_name")
+                        or (student.full_name if student is not None else None)
+                        or student_no
+                    ),
+                    "major_snapshot": raw.get("major_snapshot") or (student.major_code if student is not None else None),
+                    "grade_snapshot": raw.get("grade_snapshot") or (student.grade_code if student is not None else None),
+                    "class_snapshot": raw.get("class_snapshot") or (student.class_code if student is not None else None),
+                    "role_in_collective": raw.get("role_in_collective"),
+                }
+            )
+        await honor_repo.set_recipients(db, record.id, recipients)
+
+
 _APPLIERS = {
     IMPORT_TYPE_STUDENT: _apply_student,
     IMPORT_TYPE_TRANSCRIPT: _apply_transcript,
     IMPORT_TYPE_CURRICULUM_MODULE: _apply_curriculum_module,
     IMPORT_TYPE_COURSE_EQUIV: _apply_course_equiv,
     IMPORT_TYPE_COURSE_OFFERING: _apply_course_offering,
+    IMPORT_TYPE_HONOR: _apply_honor,
 }
 
 

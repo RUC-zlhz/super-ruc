@@ -13,19 +13,19 @@
     <view v-if="visibleNotices.length" class="list">
       <view
         v-for="n in visibleNotices"
-        :key="n.id"
+        :key="n.delivery_id ?? n.id"
         class="notice-card"
-        :class="{ unread: !n.is_read }"
+        :class="{ unread: isUnread(n) }"
         @tap="onDetail(n)"
       >
         <view class="notice-head">
           <text class="notice-title">{{ n.title }}</text>
-          <text class="notice-source">{{ sourceLabel(n.source_type) }}</text>
+          <text class="notice-source">{{ noticeTag(n) }}</text>
         </view>
-        <text class="notice-preview" v-if="n.body">{{ n.body.slice(0, 80) }}</text>
+        <text class="notice-preview" v-if="n.summary">{{ n.summary.slice(0, 80) }}</text>
         <view class="notice-footer">
           <text class="notice-date">{{ n.published_at?.slice(0, 16).replace('T', ' ') }}</text>
-          <text class="notice-flag" v-if="!n.is_read">未读</text>
+          <text class="notice-flag" v-if="isUnread(n)">未读</text>
         </view>
       </view>
     </view>
@@ -37,7 +37,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { getMyNotices, type StudentNoticeItem } from '@/api/notice'
 
 const TABS = [
@@ -47,12 +48,12 @@ const TABS = [
 ]
 const tab = ref<'all' | 'unread' | 'read'>('all')
 
-const SOURCE_LABELS: Record<string, string> = {
-  MANUAL: '手工发布',
-  FEED: '订阅抓取',
-  SYSTEM: '系统提醒',
+const CATEGORY_LABELS: Record<string, string> = {
+  SYSTEM: '系统通知',
+  ACADEMIC: '教学通知',
+  PARTY: '党团通知',
+  CAMPUS: '校园通知',
 }
-function sourceLabel(s: string) { return SOURCE_LABELS[s] || s }
 
 const notices = ref<StudentNoticeItem[]>([])
 const page = ref(1)
@@ -61,13 +62,24 @@ const total = ref(0)
 const loading = ref(false)
 const hasMore = computed(() => notices.value.length < total.value)
 
+function isUnread(notice: StudentNoticeItem) {
+  return !notice.read_at
+}
+
+function noticeTag(notice: StudentNoticeItem) {
+  if (notice.is_pinned) return '置顶'
+  if (notice.category) return CATEGORY_LABELS[notice.category] || notice.category
+  return '通知'
+}
+
 const visibleNotices = computed(() => {
-  if (tab.value === 'unread') return notices.value.filter(n => !n.is_read)
-  if (tab.value === 'read') return notices.value.filter(n => n.is_read)
+  if (tab.value === 'unread') return notices.value.filter(isUnread)
+  if (tab.value === 'read') return notices.value.filter(n => !isUnread(n))
   return notices.value
 })
 
 async function reload(reset = true) {
+  if (loading.value) return
   if (reset) { page.value = 1; notices.value = [] }
   loading.value = true
   try {
@@ -80,6 +92,7 @@ async function reload(reset = true) {
 }
 
 function loadMore() {
+  if (loading.value || !hasMore.value) return
   page.value += 1
   reload(false)
 }
@@ -88,12 +101,15 @@ function onTab(v: 'all' | 'unread' | 'read') {
   tab.value = v
 }
 
-function onDetail(n: StudentNoticeItem) {
-  n.is_read = true
-  uni.navigateTo({ url: `/pages/notice/detail?id=${n.id}` })
+function onDetail(notice: StudentNoticeItem) {
+  const query = [`noticeId=${notice.id}`]
+  if (notice.delivery_id != null) {
+    query.push(`deliveryId=${notice.delivery_id}`)
+  }
+  uni.navigateTo({ url: `/pages/notice/detail?${query.join('&')}` })
 }
 
-onMounted(() => reload())
+onShow(() => reload())
 </script>
 
 <style scoped>

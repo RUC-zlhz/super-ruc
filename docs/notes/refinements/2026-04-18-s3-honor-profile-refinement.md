@@ -2,7 +2,8 @@
 
 - 日期：`2026-04-18`
 - 关联主计划：`S3A.1, S3A.2, S3A.3, S3A.4, S3A.5, S3B.1, S3B.2, S3B.3, S3B.4, S3B.5`
-- 当前状态：`ACTIVE`
+- 当前状态：`SUPERSEDED`
+- 替代关系：当前完成态已由 [2026-04-19-s3-current-state-closure-refinement.md](D:/Codes/super-ruc/docs/notes/refinements/2026-04-19-s3-current-state-closure-refinement.md) 覆盖；本文件保留为 `S3` 初版任务拆分记录。
 - 说明：本文件只细化 `S3 荣誉与画像闭环`，不替代 `docs/notes/current-implementation-plan.md` 的主计划地位。
 
 ## 范围
@@ -94,3 +95,4 @@
 ## 变更记录
 
 - `2026-04-18`：创建文件，按主计划 `S3A / S3B` 输出可执行任务树；本次仅落盘 refinement 文件，未回写主计划登记表。
+- `2026-04-19`：标记为被 `2026-04-19-s3-current-state-closure-refinement.md` 覆盖，后续 `S3` 完成态以新文件与主计划为准。

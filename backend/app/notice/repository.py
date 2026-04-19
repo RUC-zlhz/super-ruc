@@ -185,6 +185,22 @@ async def list_notices_for_student(
     return rows, total
 
 
+async def student_has_notice_delivery(
+    db: AsyncSession,
+    notice_id: int,
+    student_id: int,
+    *,
+    channel: str | None = None,
+) -> bool:
+    stmt = select(NoticeDelivery.id).where(
+        NoticeDelivery.notice_id == notice_id,
+        NoticeDelivery.student_id == student_id,
+    )
+    if channel:
+        stmt = stmt.where(NoticeDelivery.channel == channel)
+    return (await db.execute(stmt.limit(1))).scalar_one_or_none() is not None
+
+
 async def mark_delivery_read(
     db: AsyncSession, delivery_id: int, student_id: int
 ) -> NoticeDelivery | None:

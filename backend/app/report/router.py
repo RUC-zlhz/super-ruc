@@ -15,9 +15,13 @@ from fastapi import APIRouter, Depends
 
 from app.core.dependencies import CurrentUserDep, DBDep, require_role
 from app.core.exceptions import BizError
-from app.core.response import ApiResponse, ok
+from app.core.response import ApiResponse, PageMeta, Paginated, ok
 from app.report import service
-from app.report.schemas import AcademicGapResult, OverviewResult
+from app.report.schemas import (
+    AcademicGapAggregateItem,
+    AcademicGapResult,
+    OverviewResult,
+)
 
 _LEADER_ROLES = (
     "SUPER_ADMIN",
@@ -54,6 +58,37 @@ async def admin_overview(
     _user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
 ) -> ApiResponse[OverviewResult]:
     return ok(await service.build_overview(db))
+
+
+@router.get(
+    "/admin/report/academic-gap",
+    response_model=ApiResponse[Paginated[AcademicGapAggregateItem]],
+)
+async def admin_academic_gap_list(
+    db: DBDep,
+    _user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
+    keyword: str | None = None,
+    grade_code: str | None = None,
+    major_code: str | None = None,
+    risk_level: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> ApiResponse[Paginated[AcademicGapAggregateItem]]:
+    items, total = await service.list_academic_gap_overview(
+        db,
+        keyword=keyword,
+        grade_code=grade_code,
+        major_code=major_code,
+        risk_level=risk_level,
+        page=page,
+        page_size=page_size,
+    )
+    return ok(
+        Paginated[AcademicGapAggregateItem](
+            items=items,
+            meta=PageMeta(page=page, size=page_size, total=total),
+        )
+    )
 
 
 @router.get(

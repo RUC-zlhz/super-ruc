@@ -1,11 +1,4 @@
-"""exchange 导入导出闭环 — FR-009 + v1.5 行级错误报告。
-
-覆盖：
-- student 导入：happy-path 上传 → VALIDATED → commit → COMMITTED；正式表可见
-- student 导入：含缺失学号的行 → status=FAILED；不可 commit
-- v1.5：失败批次 /error-report 下载 Excel，末列含"错误原因"定位行与字段
-- C-03：无 token 401
-"""
+"""exchange 导入导出闭环 — 覆盖 student 与 honor 两阶段导入。"""
 from __future__ import annotations
 
 import io
@@ -15,7 +8,9 @@ from openpyxl import Workbook, load_workbook
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.models import Student
+from app.auth.models import Student, User, UserRole
+from app.core.security import create_token
+from app.honor.models import HonorRecord
 from app.exchange.service import ERROR_REPORT_COLUMN
 
 
@@ -36,6 +31,55 @@ def _build_student_xlsx(rows: list[dict]) -> bytes:
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+def _build_honor_xlsx(rows: list[dict]) -> bytes:
+    headers = [
+        "category_code",
+        "title",
+        "level",
+        "awarded_by",
+        "document_no",
+        "announced_at",
+        "effective_from",
+        "effective_to",
+        "is_collective",
+        "summary",
+        "story_md",
+        "acceptance_speech",
+        "cover_image_url",
+        "consent_flag",
+        "student_no",
+        "display_name",
+        "major_snapshot",
+        "grade_snapshot",
+        "class_snapshot",
+        "role_in_collective",
+    ]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "honors"
+    ws.append(headers)
+    for row in rows:
+        ws.append([row.get(header) for header in headers])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+async def _create_admin_headers(
+    db: AsyncSession,
+    *,
+    work_no: str,
+    display_name: str,
+) -> dict[str, str]:
+    user = User(work_no=work_no, display_name=display_name, is_active=True)
+    db.add(user)
+    await db.flush()
+    db.add(UserRole(user_id=user.id, role_code="SUPER_ADMIN"))
+    await db.commit()
+    token = create_token(str(user.id), "access", extra_claims={"roles": ["SUPER_ADMIN"]})
+    return {"Authorization": f"Bearer {token}"}
 
 
 async def test_student_import_happy_path_validate_and_commit(
@@ -161,3 +205,217 @@ async def test_v15_error_report_download_has_reason_column(
 async def test_exchange_endpoints_reject_anonymous(client: AsyncClient) -> None:
     resp = await client.get("/api/v1/admin/exchange/imports")
     assert resp.status_code == 401
+
+
+async def test_honor_import_groups_rows_into_single_record(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    admin_headers = await _create_admin_headers(
+        db,
+        work_no="T400001",
+        display_name="Import Honor Admin",
+    )
+    first_student = Student(
+        student_no="IMP-H-001",
+        full_name="荣誉导入甲",
+        grade_code="2023",
+        major_code="CS",
+        class_code="CS2301",
+    )
+    second_student = Student(
+        student_no="IMP-H-002",
+        full_name="荣誉导入乙",
+        grade_code="2023",
+        major_code="CS",
+        class_code="CS2302",
+    )
+    db.add_all([first_student, second_student])
+    await db.commit()
+    await db.refresh(first_student)
+    await db.refresh(second_student)
+
+    category = await client.post(
+        "/api/v1/admin/honors/categories",
+        headers=admin_headers,
+        json={
+            "code": "SCHOLARSHIP",
+            "name": "奖学金",
+            "description": "导入测试类目",
+            "sort_order": 1,
+            "is_active": True,
+        },
+    )
+    assert category.status_code == 200, category.text
+
+    xlsx = _build_honor_xlsx(
+        [
+            {
+                "category_code": "SCHOLARSHIP",
+                "title": "国家奖学金",
+                "level": "NATIONAL",
+                "awarded_by": "教育部",
+                "document_no": "DOC-001",
+                "announced_at": "2026-04-10",
+                "effective_from": "2026-04-10",
+                "effective_to": "2026-12-31",
+                "is_collective": False,
+                "summary": "同一荣誉导入分组",
+                "story_md": "## 先进事迹",
+                "acceptance_speech": "谢谢",
+                "cover_image_url": "https://example.com/cover.png",
+                "consent_flag": True,
+                "student_no": "IMP-H-001",
+            },
+            {
+                "category_code": "SCHOLARSHIP",
+                "title": "国家奖学金",
+                "level": "NATIONAL",
+                "awarded_by": "教育部",
+                "document_no": "DOC-001",
+                "announced_at": "2026-04-10",
+                "effective_from": "2026-04-10",
+                "effective_to": "2026-12-31",
+                "is_collective": False,
+                "summary": "同一荣誉导入分组",
+                "story_md": "## 先进事迹",
+                "acceptance_speech": "谢谢",
+                "cover_image_url": "https://example.com/cover.png",
+                "consent_flag": True,
+                "student_no": "IMP-H-002",
+            },
+        ]
+    )
+
+    upload = await client.post(
+        "/api/v1/admin/exchange/imports/honor",
+        headers=admin_headers,
+        files={
+            "file": (
+                "honors.xlsx",
+                xlsx,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+    assert upload.status_code == 200, upload.text
+    batch = upload.json()["data"]["batch"]
+    assert batch["status"] == "VALIDATED"
+    assert batch["fatal_rows"] == 0
+
+    commit = await client.post(
+        f"/api/v1/admin/exchange/imports/{batch['id']}/commit",
+        headers=admin_headers,
+        json={"note": "honor import"},
+    )
+    assert commit.status_code == 200, commit.text
+    assert commit.json()["data"]["status"] == "COMMITTED"
+
+    records = list((await db.execute(select(HonorRecord))).scalars().all())
+    assert len(records) == 1
+    record = records[0]
+    assert record.title == "国家奖学金"
+    assert len(record.recipients) == 2
+    assert {recipient.student_no_snapshot for recipient in record.recipients} == {
+        "IMP-H-001",
+        "IMP-H-002",
+    }
+    assert {recipient.display_name for recipient in record.recipients} == {
+        "荣誉导入甲",
+        "荣誉导入乙",
+    }
+
+
+async def test_honor_import_error_report_and_unknown_student_commit_guard(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    admin_headers = await _create_admin_headers(
+        db,
+        work_no="T400002",
+        display_name="Import Guard Admin",
+    )
+    category = await client.post(
+        "/api/v1/admin/honors/categories",
+        headers=admin_headers,
+        json={
+            "code": "MERIT",
+            "name": "表彰",
+            "description": "导入保护类目",
+            "sort_order": 1,
+            "is_active": True,
+        },
+    )
+    assert category.status_code == 200, category.text
+
+    invalid_xlsx = _build_honor_xlsx(
+        [
+            {
+                "category_code": "MERIT",
+                "title": "错误荣誉",
+                "level": "INVALID",
+                "awarded_by": "学院",
+                "announced_at": "2026/04/10",
+                "display_name": "未命中校验",
+            }
+        ]
+    )
+    invalid_upload = await client.post(
+        "/api/v1/admin/exchange/imports/honor",
+        headers=admin_headers,
+        files={
+            "file": (
+                "honor-invalid.xlsx",
+                invalid_xlsx,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+    assert invalid_upload.status_code == 200, invalid_upload.text
+    invalid_batch_id = invalid_upload.json()["data"]["batch"]["id"]
+    assert invalid_upload.json()["data"]["batch"]["status"] == "FAILED"
+
+    error_report = await client.get(
+        f"/api/v1/admin/exchange/imports/{invalid_batch_id}/error-report",
+        headers=admin_headers,
+    )
+    assert error_report.status_code == 200, error_report.text
+    report_wb = load_workbook(io.BytesIO(error_report.content), read_only=True)
+    report_rows = list(report_wb.active.iter_rows(values_only=True))
+    assert list(report_rows[0])[-1] == ERROR_REPORT_COLUMN
+    assert "level" in str(report_rows[1][-1]) or "announced_at" in str(report_rows[1][-1])
+
+    unknown_student_xlsx = _build_honor_xlsx(
+        [
+            {
+                "category_code": "MERIT",
+                "title": "待核验荣誉",
+                "level": "SCHOOL",
+                "awarded_by": "学院",
+                "announced_at": "2026-04-10",
+                "student_no": "NOT-FOUND-001",
+            }
+        ]
+    )
+    unknown_upload = await client.post(
+        "/api/v1/admin/exchange/imports/honor",
+        headers=admin_headers,
+        files={
+            "file": (
+                "honor-unknown-student.xlsx",
+                unknown_student_xlsx,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+    assert unknown_upload.status_code == 200, unknown_upload.text
+    unknown_batch_id = unknown_upload.json()["data"]["batch"]["id"]
+    assert unknown_upload.json()["data"]["batch"]["status"] == "VALIDATED"
+
+    commit = await client.post(
+        f"/api/v1/admin/exchange/imports/{unknown_batch_id}/commit",
+        headers=admin_headers,
+        json={"note": "should fail"},
+    )
+    assert commit.status_code == 400
+    assert "NOT-FOUND-001" in commit.json()["message"]

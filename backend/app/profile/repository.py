@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import Student
@@ -14,9 +14,31 @@ from app.profile.models import (
     PROFILE_FACT_PRACTICE,
     PROFILE_FACT_RESEARCH,
     PROFILE_FACT_VOLUNTEER,
+    PROFILE_SOURCE_STUDENT_SELF,
     ProfileCorrection,
     ProfileFact,
 )
+
+
+def _apply_student_scope(
+    stmt,
+    *,
+    class_codes: set[str] | None = None,
+    major_codes: set[str] | None = None,
+    legacy_codes: set[str] | None = None,
+):
+    scope_conds = []
+    if class_codes:
+        scope_conds.append(Student.class_code.in_(sorted(class_codes)))
+    if major_codes:
+        scope_conds.append(Student.major_code.in_(sorted(major_codes)))
+    if legacy_codes:
+        codes = sorted(legacy_codes)
+        scope_conds.append(Student.class_code.in_(codes))
+        scope_conds.append(Student.major_code.in_(codes))
+    if scope_conds:
+        stmt = stmt.where(or_(*scope_conds))
+    return stmt
 
 
 async def get_student(db: AsyncSession, student_id: int) -> Student | None:
@@ -31,10 +53,19 @@ async def search_students(
     grade_code: str | None,
     major_code: str | None,
     class_code: str | None,
+    class_scope_codes: set[str] | None = None,
+    major_scope_codes: set[str] | None = None,
+    legacy_scope_codes: set[str] | None = None,
     page: int,
     size: int,
 ) -> tuple[list[Student], int]:
     stmt = select(Student).where(Student.deleted_at.is_(None))
+    stmt = _apply_student_scope(
+        stmt,
+        class_codes=class_scope_codes,
+        major_codes=major_scope_codes,
+        legacy_codes=legacy_scope_codes,
+    )
     if q:
         like = f"%{q}%"
         stmt = stmt.where(
@@ -46,9 +77,9 @@ async def search_students(
         stmt = stmt.where(Student.major_code == major_code)
     if class_code:
         stmt = stmt.where(Student.class_code == class_code)
-    total = (await db.execute(
-        select(func.count()).select_from(stmt.subquery())
-    )).scalar_one()
+    total = (
+        await db.execute(select(func.count()).select_from(stmt.subquery()))
+    ).scalar_one()
     stmt = stmt.order_by(Student.student_no.asc()).offset((page - 1) * size).limit(size)
     return list((await db.execute(stmt)).scalars().all()), total
 
@@ -58,16 +89,80 @@ async def list_facts(
     student_id: int,
     *,
     only_approved: bool = True,
+    source: str | None = None,
+    approval_statuses: list[str] | None = None,
 ) -> list[ProfileFact]:
     stmt = select(ProfileFact).where(ProfileFact.student_id == student_id)
     if only_approved:
         stmt = stmt.where(ProfileFact.approval_status == PROFILE_APPROVAL_APPROVED)
+    elif approval_statuses:
+        stmt = stmt.where(ProfileFact.approval_status.in_(approval_statuses))
+    if source:
+        stmt = stmt.where(ProfileFact.source == source)
     stmt = stmt.order_by(
         ProfileFact.fact_type.asc(),
         ProfileFact.started_on.desc().nullslast(),
         ProfileFact.id.desc(),
     )
     return list((await db.execute(stmt)).scalars().all())
+
+
+async def list_fact_submissions(
+    db: AsyncSession,
+    *,
+    student_id: int,
+    page: int,
+    size: int,
+) -> tuple[list[ProfileFact], int]:
+    stmt = select(ProfileFact).where(
+        ProfileFact.student_id == student_id,
+        ProfileFact.source == PROFILE_SOURCE_STUDENT_SELF,
+    )
+    total = (
+        await db.execute(select(func.count()).select_from(stmt.subquery()))
+    ).scalar_one()
+    stmt = (
+        stmt.order_by(ProfileFact.updated_at.desc(), ProfileFact.id.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+    )
+    return list((await db.execute(stmt)).scalars().all()), total
+
+
+async def list_pending_facts(
+    db: AsyncSession,
+    *,
+    student_id: int | None,
+    approval_statuses: list[str],
+    class_scope_codes: set[str] | None = None,
+    major_scope_codes: set[str] | None = None,
+    legacy_scope_codes: set[str] | None = None,
+    page: int,
+    size: int,
+) -> tuple[list[ProfileFact], int]:
+    stmt = (
+        select(ProfileFact)
+        .join(Student, Student.id == ProfileFact.student_id)
+        .where(ProfileFact.source == PROFILE_SOURCE_STUDENT_SELF)
+        .where(ProfileFact.approval_status.in_(approval_statuses))
+    )
+    stmt = _apply_student_scope(
+        stmt,
+        class_codes=class_scope_codes,
+        major_codes=major_scope_codes,
+        legacy_codes=legacy_scope_codes,
+    )
+    if student_id is not None:
+        stmt = stmt.where(ProfileFact.student_id == student_id)
+    total = (
+        await db.execute(select(func.count()).select_from(stmt.subquery()))
+    ).scalar_one()
+    stmt = (
+        stmt.order_by(ProfileFact.updated_at.desc(), ProfileFact.id.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+    )
+    return list((await db.execute(stmt)).scalars().all()), total
 
 
 async def create_fact(db: AsyncSession, payload: dict[str, Any]) -> ProfileFact:
@@ -78,36 +173,38 @@ async def create_fact(db: AsyncSession, payload: dict[str, Any]) -> ProfileFact:
 
 
 async def get_fact(db: AsyncSession, fact_id: int) -> ProfileFact | None:
-    return (await db.execute(
-        select(ProfileFact).where(ProfileFact.id == fact_id)
-    )).scalar_one_or_none()
+    return (
+        await db.execute(select(ProfileFact).where(ProfileFact.id == fact_id))
+    ).scalar_one_or_none()
 
 
 async def delete_fact(db: AsyncSession, fact: ProfileFact) -> None:
     await db.delete(fact)
 
 
-async def count_by_type(
-    db: AsyncSession, student_id: int
-) -> dict[str, float]:
-    """返回 { 'RESEARCH': n, 'COMPETITION': n, ..., 'VOLUNTEER_HOURS': sum_hours }"""
-    rows = (await db.execute(
-        select(ProfileFact.fact_type, func.count(), func.coalesce(func.sum(ProfileFact.hours), 0))
-        .where(
-            ProfileFact.student_id == student_id,
-            ProfileFact.approval_status == PROFILE_APPROVAL_APPROVED,
+async def count_by_type(db: AsyncSession, student_id: int) -> dict[str, float]:
+    rows = (
+        await db.execute(
+            select(
+                ProfileFact.fact_type,
+                func.count(),
+                func.coalesce(func.sum(ProfileFact.hours), 0),
+            )
+            .where(
+                ProfileFact.student_id == student_id,
+                ProfileFact.approval_status == PROFILE_APPROVAL_APPROVED,
+            )
+            .group_by(ProfileFact.fact_type)
         )
-        .group_by(ProfileFact.fact_type)
-    )).all()
+    ).all()
     out: dict[str, float] = {}
-    for t, c, h in rows:
-        out[t] = float(c)
-        if t == PROFILE_FACT_VOLUNTEER:
-            out["VOLUNTEER_HOURS"] = float(h or 0)
+    for fact_type, count, hours in rows:
+        out[fact_type] = float(count)
+        if fact_type == PROFILE_FACT_VOLUNTEER:
+            out["VOLUNTEER_HOURS"] = float(hours or 0)
     return out
 
 
-# ---- 纠错申诉 ----
 async def create_correction(
     db: AsyncSession, payload: dict[str, Any]
 ) -> ProfileCorrection:
@@ -122,10 +219,21 @@ async def list_corrections(
     *,
     student_id: int | None,
     status: str | None,
+    class_scope_codes: set[str] | None = None,
+    major_scope_codes: set[str] | None = None,
+    legacy_scope_codes: set[str] | None = None,
     page: int,
     size: int,
 ) -> tuple[list[ProfileCorrection], int]:
     stmt = select(ProfileCorrection)
+    if class_scope_codes or major_scope_codes or legacy_scope_codes:
+        stmt = stmt.join(Student, Student.id == ProfileCorrection.student_id)
+        stmt = _apply_student_scope(
+            stmt,
+            class_codes=class_scope_codes,
+            major_codes=major_scope_codes,
+            legacy_codes=legacy_scope_codes,
+        )
     conds = []
     if student_id is not None:
         conds.append(ProfileCorrection.student_id == student_id)
@@ -133,9 +241,9 @@ async def list_corrections(
         conds.append(ProfileCorrection.status == status)
     if conds:
         stmt = stmt.where(and_(*conds))
-    total = (await db.execute(
-        select(func.count()).select_from(stmt.subquery())
-    )).scalar_one()
+    total = (
+        await db.execute(select(func.count()).select_from(stmt.subquery()))
+    ).scalar_one()
     stmt = stmt.order_by(ProfileCorrection.id.desc()).offset((page - 1) * size).limit(size)
     return list((await db.execute(stmt)).scalars().all()), total
 
@@ -143,6 +251,8 @@ async def list_corrections(
 async def get_correction(
     db: AsyncSession, correction_id: int
 ) -> ProfileCorrection | None:
-    return (await db.execute(
-        select(ProfileCorrection).where(ProfileCorrection.id == correction_id)
-    )).scalar_one_or_none()
+    return (
+        await db.execute(
+            select(ProfileCorrection).where(ProfileCorrection.id == correction_id)
+        )
+    ).scalar_one_or_none()

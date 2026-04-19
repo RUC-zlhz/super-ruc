@@ -2,59 +2,147 @@
   <div>
     <a-page-header title="荣誉公示管理" sub-title="FR-017" />
 
-    <a-form layout="inline" :model="filters" class="mb16" @finish="reload">
-      <a-form-item label="关键字">
-        <a-input v-model:value="filters.q" placeholder="标题 / 获奖人" allow-clear style="width: 180px" />
-      </a-form-item>
-      <a-form-item label="级别">
-        <a-select v-model:value="filters.level" style="width: 140px" allow-clear>
-          <a-select-option value="NATIONAL">国家级</a-select-option>
-          <a-select-option value="PROVINCIAL">省部级</a-select-option>
-          <a-select-option value="MINISTERIAL">厅局级</a-select-option>
-          <a-select-option value="SCHOOL">校级</a-select-option>
-        </a-select>
-      </a-form-item>
-      <a-form-item label="状态">
-        <a-select v-model:value="filters.status" style="width: 120px" allow-clear>
-          <a-select-option value="ACTIVE">生效</a-select-option>
-          <a-select-option value="ARCHIVED">归档</a-select-option>
-          <a-select-option value="REVOKED">撤销</a-select-option>
-        </a-select>
-      </a-form-item>
-      <a-form-item>
-        <a-button type="primary" html-type="submit">查询</a-button>
-      </a-form-item>
-      <a-form-item>
-        <a-button type="primary" @click="openEditor()">新增荣誉</a-button>
-      </a-form-item>
-    </a-form>
+    <a-card :bordered="false" class="mb16">
+      <a-form layout="inline" :model="filters" @finish="onSearch">
+        <a-form-item label="关键字">
+          <a-input
+            v-model:value="filters.q"
+            placeholder="标题 / 授奖单位 / 获奖人"
+            allow-clear
+            style="width: 220px"
+          />
+        </a-form-item>
+        <a-form-item label="类别">
+          <a-select
+            v-model:value="filters.category_code"
+            :options="categorySelectOptions"
+            allow-clear
+            show-search
+            placeholder="全部类别"
+            style="width: 200px"
+            :filter-option="filterSelectOption"
+          />
+        </a-form-item>
+        <a-form-item label="年份">
+          <a-select
+            v-model:value="filters.year"
+            allow-clear
+            placeholder="全部年份"
+            style="width: 140px"
+          >
+            <a-select-option
+              v-for="year in YEAR_OPTIONS"
+              :key="year"
+              :value="year"
+            >
+              {{ year }} 年
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="级别">
+          <a-select v-model:value="filters.level" style="width: 140px" allow-clear>
+            <a-select-option value="NATIONAL">国家级</a-select-option>
+            <a-select-option value="PROVINCIAL">省部级</a-select-option>
+            <a-select-option value="MINISTERIAL">厅局级</a-select-option>
+            <a-select-option value="SCHOOL">校级</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="状态">
+          <a-select v-model:value="filters.status" style="width: 140px" allow-clear>
+            <a-select-option value="ACTIVE">生效</a-select-option>
+            <a-select-option value="ARCHIVED">归档</a-select-option>
+            <a-select-option value="REVOKED">撤销</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item>
+          <a-space wrap>
+            <a-button type="primary" html-type="submit">查询</a-button>
+            <a-button @click="onResetFilters">重置</a-button>
+            <a-button @click="openCategoryManager">类别维护</a-button>
+            <a-button @click="openImportModal">批量导入</a-button>
+            <a-button type="primary" @click="openEditor()">新增荣誉</a-button>
+          </a-space>
+        </a-form-item>
+      </a-form>
+    </a-card>
 
     <a-table
       :columns="columns"
       :data-source="rows"
       :loading="loading"
       :pagination="pagination"
+      :scroll="{ x: 1520 }"
       row-key="id"
       @change="onTableChange"
     >
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'">
-          <a-tag :color="record.status === 'ACTIVE' ? 'green' : record.status === 'REVOKED' ? 'red' : 'default'">
-            {{ record.status }}
-          </a-tag>
+        <template v-if="column.key === 'title'">
+          <div class="title-cell">
+            <div class="title-main">{{ record.title }}</div>
+            <div v-if="isHistoricalRecord(record) || record.summary" class="cell-subtle">
+              <a-tag v-if="isHistoricalRecord(record)" color="orange">历史荣誉</a-tag>
+              <span>{{ historyReasonText(record) || record.summary }}</span>
+            </div>
+          </div>
         </template>
+
+        <template v-else-if="column.key === 'category'">
+          <div class="category-cell">
+            <span>{{ categoryLabel(record) }}</span>
+            <a-tag
+              v-if="categoryMap.get(record.category_code)?.is_active === false"
+              class="mt4"
+            >
+              已停用
+            </a-tag>
+          </div>
+        </template>
+
+        <template v-else-if="column.key === 'level'">
+          {{ levelLabel(record.level) }}
+        </template>
+
         <template v-else-if="column.key === 'recipients'">
           {{ (record.recipient_names || []).join('、') || '-' }}
         </template>
+
+        <template v-else-if="column.key === 'status'">
+          <div class="status-cell">
+            <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
+            <a-tag
+              v-if="isHistoricalRecord(record) && record.status === 'ACTIVE'"
+              color="orange"
+            >
+              历史荣誉
+            </a-tag>
+          </div>
+        </template>
+
+        <template v-else-if="column.key === 'maintenance'">
+          <div class="maintenance-cell">
+            <div>{{ record.updated_by_name || '-' }}</div>
+            <div class="cell-subtle">{{ formatDateTime(record.updated_at) }}</div>
+          </div>
+        </template>
+
         <template v-else-if="column.key === 'actions'">
-          <a-button type="link" size="small" @click="openEditor(record)">编辑</a-button>
-          <a-popconfirm
-            v-if="record.status === 'ACTIVE'"
-            title="确定归档？"
-            @confirm="onArchive(record.id)"
-          >
-            <a-button type="link" size="small">归档</a-button>
-          </a-popconfirm>
+          <a-space size="small">
+            <a-button type="link" size="small" @click="openEditor(record as HonorRecordBrief)">编辑</a-button>
+            <a-popconfirm
+              v-if="record.status === 'ACTIVE'"
+              title="确定将该荣誉归档为历史荣誉？"
+              @confirm="onArchive(record.id, 'ARCHIVED')"
+            >
+              <a-button type="link" size="small">归档</a-button>
+            </a-popconfirm>
+            <a-popconfirm
+              v-if="record.status !== 'REVOKED'"
+              title="确定撤销该荣誉展示？"
+              @confirm="onArchive(record.id, 'REVOKED')"
+            >
+              <a-button type="link" size="small" danger>撤销</a-button>
+            </a-popconfirm>
+          </a-space>
         </template>
       </template>
     </a-table>
@@ -62,99 +150,563 @@
     <a-drawer
       :open="showDrawer"
       :title="editingId ? '编辑荣誉记录' : '新增荣誉记录'"
-      width="600"
+      width="720"
       @close="resetForm"
     >
-      <a-form layout="vertical" :model="form" @finish="onSubmit">
-        <a-row :gutter="16">
-          <a-col :span="12">
-            <a-form-item label="标题" :rules="[{ required: true }]">
-              <a-input v-model:value="form.title" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="类别编码" :rules="[{ required: true }]">
-              <a-input v-model:value="form.category_code" />
-            </a-form-item>
-          </a-col>
-        </a-row>
-        <a-row :gutter="16">
-          <a-col :span="12">
-            <a-form-item label="级别" :rules="[{ required: true }]">
-              <a-select v-model:value="form.level">
-                <a-select-option value="NATIONAL">国家级</a-select-option>
-                <a-select-option value="PROVINCIAL">省部级</a-select-option>
-                <a-select-option value="MINISTERIAL">厅局级</a-select-option>
-                <a-select-option value="SCHOOL">校级</a-select-option>
-              </a-select>
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="授奖单位" :rules="[{ required: true }]">
-              <a-input v-model:value="form.awarded_by" />
-            </a-form-item>
-          </a-col>
-        </a-row>
-        <a-row :gutter="16">
-          <a-col :span="12">
-            <a-form-item label="公布日期" :rules="[{ required: true }]">
-              <a-date-picker v-model:value="form.announced_at" style="width: 100%" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="文号">
-              <a-input v-model:value="form.document_no" />
-            </a-form-item>
-          </a-col>
-        </a-row>
-        <a-form-item label="简介">
-          <a-textarea v-model:value="form.summary" :rows="3" />
-        </a-form-item>
-        <a-form-item label="榜样风采（Markdown）">
-          <a-textarea v-model:value="form.story_md" :rows="4" />
-        </a-form-item>
-        <a-form-item>
-          <a-checkbox v-model:checked="form.is_collective">集体荣誉</a-checkbox>
-        </a-form-item>
-        <a-form-item>
-          <a-checkbox v-model:checked="form.consent_flag">已获获奖人同意展示</a-checkbox>
-        </a-form-item>
-        <a-form-item>
-          <a-button type="primary" html-type="submit" :loading="submitting">保存</a-button>
-        </a-form-item>
-      </a-form>
+      <a-spin :spinning="drawerLoading">
+        <a-alert
+          v-if="currentDetail && isHistoricalRecord(currentDetail)"
+          class="mb16"
+          type="warning"
+          show-icon
+          message="当前记录按历史荣誉展示"
+          :description="historyReasonText(currentDetail)"
+        />
+
+        <a-descriptions
+          v-if="currentDetail"
+          :column="1"
+          size="small"
+          class="mb16"
+        >
+          <a-descriptions-item label="当前状态">
+            {{ statusLabel(currentDetail.status) }}
+          </a-descriptions-item>
+          <a-descriptions-item label="最近维护人">
+            {{ currentDetail.updated_by_name || '-' }}
+          </a-descriptions-item>
+          <a-descriptions-item label="最近维护时间">
+            {{ formatDateTime(currentDetail.updated_at) }}
+          </a-descriptions-item>
+          <a-descriptions-item v-if="currentDetail.archive_reason" label="归档/撤销原因">
+            {{ currentDetail.archive_reason }}
+          </a-descriptions-item>
+        </a-descriptions>
+
+        <a-form layout="vertical" :model="form" @finish="onSubmit">
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item label="标题" :rules="[{ required: true }]">
+                <a-input v-model:value="form.title" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="荣誉类别" :rules="[{ required: true }]">
+                <a-select
+                  v-model:value="form.category_code"
+                  :options="categorySelectOptions"
+                  show-search
+                  placeholder="请选择类别"
+                  :filter-option="filterSelectOption"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item label="级别" :rules="[{ required: true }]">
+                <a-select v-model:value="form.level">
+                  <a-select-option value="NATIONAL">国家级</a-select-option>
+                  <a-select-option value="PROVINCIAL">省部级</a-select-option>
+                  <a-select-option value="MINISTERIAL">厅局级</a-select-option>
+                  <a-select-option value="SCHOOL">校级</a-select-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="授奖单位" :rules="[{ required: true }]">
+                <a-input v-model:value="form.awarded_by" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item label="公布日期" :rules="[{ required: true }]">
+                <a-date-picker
+                  v-model:value="form.announced_at"
+                  value-format="YYYY-MM-DD"
+                  style="width: 100%"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="文号 / 证书编号">
+                <a-input v-model:value="form.document_no" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item label="生效开始">
+                <a-date-picker
+                  v-model:value="form.effective_from"
+                  value-format="YYYY-MM-DD"
+                  style="width: 100%"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="展示有效期截止">
+                <a-date-picker
+                  v-model:value="form.effective_to"
+                  value-format="YYYY-MM-DD"
+                  style="width: 100%"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+
+          <a-form-item label="简介">
+            <a-textarea v-model:value="form.summary" :rows="3" />
+          </a-form-item>
+          <a-form-item label="榜样风采（Markdown）">
+            <a-textarea v-model:value="form.story_md" :rows="5" />
+          </a-form-item>
+          <a-form-item label="获奖感言">
+            <a-textarea v-model:value="form.acceptance_speech" :rows="3" />
+          </a-form-item>
+
+          <a-space direction="vertical" style="width: 100%">
+            <a-checkbox v-model:checked="form.is_collective">集体荣誉</a-checkbox>
+            <a-checkbox v-model:checked="form.consent_flag">已获获奖人同意展示</a-checkbox>
+          </a-space>
+
+          <div class="drawer-actions">
+            <a-space>
+              <a-button type="primary" html-type="submit" :loading="submitting">保存</a-button>
+              <a-button @click="resetForm">取消</a-button>
+            </a-space>
+          </div>
+        </a-form>
+      </a-spin>
     </a-drawer>
+
+    <a-modal
+      :open="showCategoryModal"
+      title="荣誉类别维护"
+      width="980"
+      :footer="null"
+      @cancel="closeCategoryManager"
+    >
+      <a-alert
+        class="mb16"
+        type="info"
+        show-icon
+        message="类别编码建议一经启用后保持稳定"
+        description="当前后端以类别编码作为 upsert 键。编辑现有类别时保留编码不变，可避免生成重复类别。"
+      />
+
+      <a-row :gutter="16">
+        <a-col :span="14">
+          <a-table
+            :columns="categoryColumns"
+            :data-source="categoryRows"
+            :loading="categoryLoading"
+            row-key="code"
+            :pagination="false"
+            size="small"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'active'">
+                <a-tag :color="record.is_active ? 'green' : 'default'">
+                  {{ record.is_active ? '启用中' : '已停用' }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'actions'">
+                <a-button type="link" size="small" @click="onEditCategory(record as HonorCategoryOut)">
+                  编辑
+                </a-button>
+              </template>
+            </template>
+          </a-table>
+        </a-col>
+
+        <a-col :span="10">
+          <a-card :bordered="false" class="category-form-card">
+            <div class="section-title">
+              {{ editingCategoryCode ? '编辑类别' : '新增类别' }}
+            </div>
+            <a-form layout="vertical" :model="categoryForm" @finish="onSubmitCategory">
+              <a-form-item label="类别编码" :rules="[{ required: true }]">
+                <a-input
+                  v-model:value="categoryForm.code"
+                  :disabled="Boolean(editingCategoryCode)"
+                  placeholder="如：NATIONAL_SCHOLARSHIP"
+                />
+              </a-form-item>
+              <a-form-item label="类别名称" :rules="[{ required: true }]">
+                <a-input v-model:value="categoryForm.name" placeholder="如：国家奖学金" />
+              </a-form-item>
+              <a-form-item label="排序">
+                <a-input-number v-model:value="categoryForm.sort_order" :min="0" style="width: 100%" />
+              </a-form-item>
+              <a-form-item label="说明">
+                <a-textarea v-model:value="categoryForm.description" :rows="4" />
+              </a-form-item>
+              <a-form-item label="是否启用">
+                <a-switch v-model:checked="categoryForm.is_active" checked-children="启用" un-checked-children="停用" />
+              </a-form-item>
+              <a-space>
+                <a-button type="primary" html-type="submit" :loading="categorySubmitting">
+                  保存类别
+                </a-button>
+                <a-button @click="resetCategoryForm">新建一条</a-button>
+              </a-space>
+            </a-form>
+          </a-card>
+        </a-col>
+      </a-row>
+    </a-modal>
+
+    <a-modal
+      :open="showImportModal"
+      title="荣誉批量导入"
+      width="1080"
+      :footer="null"
+      @cancel="closeImportModal"
+    >
+      <a-alert
+        class="mb16"
+        type="info"
+        show-icon
+        message="导入流程沿用校验预览、整批提交、错误报告下载的模式"
+        description="如果当前环境尚未部署荣誉导入接口，下面会显示预留提示；接口到位后本页可直接联调。"
+      />
+
+      <a-alert
+        v-if="importUnavailable"
+        class="mb16"
+        type="warning"
+        show-icon
+        message="当前环境尚未部署荣誉导入接口"
+        description="页面入口、批次预览和错误报告下载交互已预留；待后端导入端点上线后，无需再扩展页面结构。"
+      />
+
+      <template v-else>
+        <a-card :bordered="false" class="mb16">
+          <a-space>
+            <a-upload :show-upload-list="false" :before-upload="onBeforeHonorImport">
+              <a-button type="primary" :loading="importLoading">选择 Excel 文件</a-button>
+            </a-upload>
+            <span class="cell-subtle">建议使用最终公示名单对应的标准导入模板。</span>
+          </a-space>
+        </a-card>
+
+        <a-card v-if="importPreview" :bordered="false" class="mb16">
+          <a-descriptions title="校验结果" :column="4" size="small">
+            <a-descriptions-item label="批次号">{{ importPreview.batch.batch_no }}</a-descriptions-item>
+            <a-descriptions-item label="文件名">{{ importPreview.batch.filename }}</a-descriptions-item>
+            <a-descriptions-item label="总行数">{{ importPreview.batch.total_rows }}</a-descriptions-item>
+            <a-descriptions-item label="状态">
+              <a-tag :color="importStatusColor(importPreview.batch.status)">
+                {{ importPreview.batch.status }}
+              </a-tag>
+            </a-descriptions-item>
+            <a-descriptions-item label="正常">
+              <span style="color: #389e0d">{{ importPreview.batch.ok_rows }}</span>
+            </a-descriptions-item>
+            <a-descriptions-item label="警告">
+              <span style="color: #d48806">{{ importPreview.batch.warn_rows }}</span>
+            </a-descriptions-item>
+            <a-descriptions-item label="致命">
+              <span style="color: #cf1322">{{ importPreview.batch.fatal_rows }}</span>
+            </a-descriptions-item>
+          </a-descriptions>
+
+          <a-table
+            :columns="importRowColumns"
+            :data-source="importPreview.rows"
+            row-key="id"
+            size="small"
+            :pagination="{ pageSize: 10 }"
+            class="mt8"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'severity'">
+                <a-tag :color="severityColor(record.severity)">{{ record.severity }}</a-tag>
+              </template>
+            </template>
+          </a-table>
+
+          <a-space class="mt8">
+            <a-button
+              type="primary"
+              :loading="importLoading"
+              :disabled="importPreview.batch.fatal_rows > 0"
+              @click="onCommitHonorImport"
+            >
+              {{ importPreview.batch.fatal_rows > 0 ? '存在致命错误，暂不能提交' : '正式提交' }}
+            </a-button>
+            <a-button @click="onDownloadImportErrors(importPreview.batch.id)">下载错误报告</a-button>
+          </a-space>
+        </a-card>
+
+        <a-card title="历史批次" :bordered="false">
+          <a-table
+            :columns="importBatchColumns"
+            :data-source="importBatches"
+            :loading="importBatchLoading"
+            :pagination="importBatchPagination"
+            row-key="id"
+            size="small"
+            @change="onImportTableChange"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'status'">
+                <a-tag :color="importStatusColor(record.status)">{{ record.status }}</a-tag>
+              </template>
+              <template v-else-if="column.key === 'actions'">
+                <a-space size="small">
+                  <a-button type="link" size="small" @click="onOpenImportBatch(record.id)">查看</a-button>
+                  <a-button type="link" size="small" @click="onDownloadImportErrors(record.id)">错误报告</a-button>
+                </a-space>
+              </template>
+            </template>
+          </a-table>
+        </a-card>
+      </template>
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import {
-  adminListRecords, adminCreateRecord, adminUpdateRecord, adminArchiveRecord,
-  type HonorRecordBrief, type HonorRecordIn,
+  adminArchiveRecord,
+  adminCreateRecord,
+  adminGetRecord,
+  adminListCategories,
+  adminListRecords,
+  adminUpdateRecord,
+  adminUpsertCategory,
+  commitHonorImport,
+  downloadHonorImportErrorReport,
+  getHonorImport,
+  listHonorImports,
+  uploadHonorImport,
+  type HonorCategoryOut,
+  type HonorImportBatchBrief,
+  type HonorImportPreviewResult,
+  type HonorLevel,
+  type HonorRecordBrief,
+  type HonorRecordDetail,
+  type HonorRecordIn,
+  type HonorRecipientIn,
+  type HonorStatus,
 } from '@/api/honor'
 
+const YEAR_OPTIONS = Array.from({ length: 10 }, (_, index) => new Date().getFullYear() - index)
+
 const columns = [
-  { title: '标题', dataIndex: 'title', key: 'title' },
-  { title: '级别', dataIndex: 'level', key: 'level', width: 90 },
-  { title: '授奖单位', dataIndex: 'awarded_by', key: 'awarded_by', width: 140 },
-  { title: '获奖人', key: 'recipients', width: 200 },
+  { title: '荣誉信息', dataIndex: 'title', key: 'title', width: 280 },
+  { title: '类别', key: 'category', width: 170 },
+  { title: '级别', dataIndex: 'level', key: 'level', width: 100 },
+  { title: '授奖单位', dataIndex: 'awarded_by', key: 'awarded_by', width: 180 },
+  { title: '获奖人', key: 'recipients', width: 220 },
   { title: '公布日期', dataIndex: 'announced_at', key: 'announced_at', width: 120 },
-  { title: '状态', key: 'status', width: 80 },
+  { title: '状态', key: 'status', width: 150 },
+  { title: '维护信息', key: 'maintenance', width: 180 },
+  { title: '操作', key: 'actions', width: 190, fixed: 'right' as const },
+]
+
+const categoryColumns = [
+  { title: '编码', dataIndex: 'code', key: 'code', width: 170 },
+  { title: '名称', dataIndex: 'name', key: 'name', width: 180 },
+  { title: '排序', dataIndex: 'sort_order', key: 'sort_order', width: 80 },
+  { title: '状态', key: 'active', width: 90 },
+  { title: '说明', dataIndex: 'description', key: 'description' },
+  { title: '操作', key: 'actions', width: 80 },
+]
+
+const importRowColumns = [
+  { title: '行号', dataIndex: 'row_no', key: 'row_no', width: 70 },
+  { title: '级别', key: 'severity', width: 80 },
+  { title: '字段', dataIndex: 'field_name', key: 'field_name', width: 120 },
+  { title: '结果', dataIndex: 'result', key: 'result', width: 80 },
+  { title: '消息', dataIndex: 'message', key: 'message' },
+]
+
+const importBatchColumns = [
+  { title: '批次号', dataIndex: 'batch_no', key: 'batch_no', width: 160 },
+  { title: '文件名', dataIndex: 'filename', key: 'filename' },
+  { title: '状态', key: 'status', width: 120 },
+  {
+    title: '总行/正常/警告/致命',
+    key: 'counts',
+    width: 180,
+    customRender: ({ record }: { record: HonorImportBatchBrief }) =>
+      `${record.total_rows} / ${record.ok_rows} / ${record.warn_rows} / ${record.fatal_rows}`,
+  },
+  { title: '开始时间', dataIndex: 'started_at', key: 'started_at', width: 180 },
   { title: '操作', key: 'actions', width: 140 },
 ]
 
-const filters = reactive<{ q?: string; level?: string; status?: string }>({})
+const filters = reactive<{
+  q?: string
+  category_code?: string
+  year?: number
+  level?: HonorLevel
+  status?: HonorStatus
+}>({})
+
 const rows = ref<HonorRecordBrief[]>([])
 const loading = ref(false)
 const pagination = reactive({ current: 1, pageSize: 20, total: 0 })
 
-async function reload() {
+const categoryRows = ref<HonorCategoryOut[]>([])
+const categoryLoading = ref(false)
+const lastTouchedCategory = ref<HonorCategoryOut | null>(null)
+
+const categoryMap = computed(() => {
+  const map = new Map<string, HonorCategoryOut>()
+  for (const category of categoryRows.value) {
+    map.set(category.code, category)
+  }
+  return map
+})
+
+const categorySelectOptions = computed(() => {
+  const merged = new Map<string, string>()
+  for (const category of categoryRows.value) {
+    merged.set(category.code, category.name)
+  }
+  for (const record of rows.value) {
+    if (record.category_code) {
+      merged.set(record.category_code, record.category_name || merged.get(record.category_code) || record.category_code)
+    }
+  }
+  if (currentDetail.value?.category_code) {
+    merged.set(
+      currentDetail.value.category_code,
+      currentDetail.value.category_name || merged.get(currentDetail.value.category_code) || currentDetail.value.category_code,
+    )
+  }
+  if (form.category_code) {
+    merged.set(form.category_code, merged.get(form.category_code) || form.category_code)
+  }
+  return Array.from(merged.entries()).map(([value, label]) => ({ value, label }))
+})
+
+type HistoricalLike = {
+  status?: string
+  effective_to?: string | null
+  is_historical?: boolean | null
+  history_reason?: string | null
+  archive_reason?: string | null
+  category_code?: string
+  category_name?: string | null
+}
+
+function filterSelectOption(input: string, option?: { label?: unknown }) {
+  return String(option?.label ?? '').toLowerCase().includes(input.trim().toLowerCase())
+}
+
+function levelLabel(level: HonorLevel) {
+  return {
+    NATIONAL: '国家级',
+    PROVINCIAL: '省部级',
+    MINISTERIAL: '厅局级',
+    SCHOOL: '校级',
+  }[level] || level
+}
+
+function statusLabel(status: HonorStatus | string) {
+  return {
+    ACTIVE: '生效',
+    ARCHIVED: '归档',
+    REVOKED: '撤销',
+  }[status as HonorStatus] || status
+}
+
+function statusColor(status: HonorStatus | string) {
+  return status === 'ACTIVE' ? 'green' : status === 'REVOKED' ? 'red' : 'default'
+}
+
+function importStatusColor(status: string) {
+  return status === 'COMPLETED' || status === 'COMMITTED'
+    ? 'green'
+    : status === 'FAILED' || status === 'ROLLBACK'
+      ? 'red'
+      : status === 'VALIDATED'
+        ? 'blue'
+        : 'default'
+}
+
+function severityColor(severity: string) {
+  return severity === 'FATAL' ? 'red' : severity === 'WARN' ? 'orange' : 'green'
+}
+
+function formatDate(value?: string | null) {
+  return value ? value.slice(0, 10) : '-'
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return '-'
+  return value.replace('T', ' ').slice(0, 16)
+}
+
+function isPastDate(value?: string | null) {
+  if (!value) return false
+  const target = new Date(`${value.slice(0, 10)}T00:00:00`)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return Number.isFinite(target.getTime()) && target.getTime() < today.getTime()
+}
+
+function isHistoricalRecord(record: HistoricalLike) {
+  if (typeof record.is_historical === 'boolean') return record.is_historical
+  if (record.status === 'ARCHIVED') return true
+  if (record.status === 'REVOKED') return false
+  return isPastDate(record.effective_to)
+}
+
+function historyReasonText(record: HistoricalLike) {
+  if (record.history_reason) return record.history_reason
+  if (record.status === 'ARCHIVED') return record.archive_reason || '已归档'
+  if (isPastDate(record.effective_to)) return `展示有效期已于 ${formatDate(record.effective_to)} 结束`
+  return ''
+}
+
+function categoryLabel(record: HistoricalLike) {
+  return record.category_name || categoryMap.value.get(record.category_code || '')?.name || record.category_code || '-'
+}
+
+function mergeCategories(categories: HonorCategoryOut[], extra?: HonorCategoryOut | null) {
+  const map = new Map<string, HonorCategoryOut>()
+  for (const category of categories) {
+    map.set(category.code, category)
+  }
+  if (extra && !map.has(extra.code)) {
+    map.set(extra.code, extra)
+  }
+  return Array.from(map.values()).sort((left, right) => {
+    if (left.sort_order !== right.sort_order) return left.sort_order - right.sort_order
+    return left.id - right.id
+  })
+}
+
+async function loadCategories() {
+  categoryLoading.value = true
+  try {
+    const resp = await adminListCategories()
+    categoryRows.value = mergeCategories(resp.data, lastTouchedCategory.value)
+  } finally {
+    categoryLoading.value = false
+  }
+}
+
+async function reload(resetPage = false) {
+  if (resetPage) pagination.current = 1
   loading.value = true
   try {
     const resp = await adminListRecords({
-      q: filters.q,
+      q: filters.q?.trim() || undefined,
+      category_code: filters.category_code,
+      year: filters.year,
       level: filters.level,
       status: filters.status,
       page: pagination.current,
@@ -167,80 +719,420 @@ async function reload() {
   }
 }
 
-function onTableChange(p: any) {
-  pagination.current = p.current
-  pagination.pageSize = p.pageSize
-  reload()
+function onSearch() {
+  void reload(true).catch(() => undefined)
+}
+
+function onResetFilters() {
+  filters.q = undefined
+  filters.category_code = undefined
+  filters.year = undefined
+  filters.level = undefined
+  filters.status = undefined
+  void reload(true).catch(() => undefined)
+}
+
+function onTableChange(p: { current?: number; pageSize?: number }) {
+  pagination.current = p.current ?? pagination.current
+  pagination.pageSize = p.pageSize ?? pagination.pageSize
+  void reload().catch(() => undefined)
+}
+
+interface HonorFormState {
+  category_code: string
+  title: string
+  level: HonorLevel
+  awarded_by: string
+  document_no: string
+  announced_at?: string
+  effective_from?: string
+  effective_to?: string
+  is_collective: boolean
+  summary: string
+  story_md: string
+  acceptance_speech: string
+  cover_image_url: string
+  media: Record<string, unknown> | null
+  consent_flag: boolean
+  recipients: HonorRecipientIn[]
+}
+
+interface CategoryFormState {
+  id?: number | null
+  code: string
+  name: string
+  description: string
+  sort_order: number
+  is_active: boolean
+}
+
+function createEmptyForm(): HonorFormState {
+  return {
+    category_code: '',
+    title: '',
+    level: 'SCHOOL',
+    awarded_by: '',
+    document_no: '',
+    announced_at: undefined,
+    effective_from: undefined,
+    effective_to: undefined,
+    is_collective: false,
+    summary: '',
+    story_md: '',
+    acceptance_speech: '',
+    cover_image_url: '',
+    media: null,
+    consent_flag: false,
+    recipients: [],
+  }
+}
+
+function buildFormFromDetail(detail: HonorRecordDetail): HonorFormState {
+  return {
+    category_code: detail.category_code,
+    title: detail.title,
+    level: detail.level,
+    awarded_by: detail.awarded_by,
+    document_no: detail.document_no || '',
+    announced_at: detail.announced_at,
+    effective_from: detail.effective_from || undefined,
+    effective_to: detail.effective_to || undefined,
+    is_collective: detail.is_collective,
+    summary: detail.summary || '',
+    story_md: detail.story_md || '',
+    acceptance_speech: detail.acceptance_speech || '',
+    cover_image_url: detail.cover_image_url || '',
+    media: detail.media || null,
+    consent_flag: detail.consent_flag,
+    recipients: detail.recipients.map((recipient) => ({
+      student_id: recipient.student_id ?? null,
+      student_no_snapshot: recipient.student_no_snapshot ?? null,
+      display_name: recipient.display_name,
+      major_snapshot: recipient.major_snapshot ?? null,
+      grade_snapshot: recipient.grade_snapshot ?? null,
+      class_snapshot: recipient.class_snapshot ?? null,
+      role_in_collective: recipient.role_in_collective ?? null,
+    })),
+  }
 }
 
 const showDrawer = ref(false)
+const drawerLoading = ref(false)
 const submitting = ref(false)
 const editingId = ref<number | null>(null)
-const form = reactive<any>({
-  title: '',
-  category_code: '',
-  level: 'SCHOOL',
-  awarded_by: '',
-  announced_at: null,
-  document_no: '',
-  summary: '',
-  story_md: '',
-  is_collective: false,
-  consent_flag: false,
-})
+const currentDetail = ref<HonorRecordDetail | null>(null)
+const form = reactive<HonorFormState>(createEmptyForm())
 
-function openEditor(record?: HonorRecordBrief | Record<string, any>) {
-  if (record) {
-    editingId.value = record.id
-    Object.assign(form, {
-      title: record.title,
-      category_code: record.category_code,
-      level: record.level,
-      awarded_by: record.awarded_by,
-      announced_at: record.announced_at,
-      summary: record.summary || '',
-      is_collective: record.is_collective,
-    })
+function assignForm(next: HonorFormState) {
+  Object.assign(form, createEmptyForm(), next)
+}
+
+function buildPayload(): HonorRecordIn {
+  return {
+    category_code: form.category_code,
+    title: form.title.trim(),
+    level: form.level,
+    awarded_by: form.awarded_by.trim(),
+    document_no: form.document_no.trim() || undefined,
+    announced_at: form.announced_at || '',
+    effective_from: form.effective_from,
+    effective_to: form.effective_to,
+    is_collective: form.is_collective,
+    summary: form.summary.trim() || undefined,
+    story_md: form.story_md.trim() || undefined,
+    acceptance_speech: form.acceptance_speech.trim() || undefined,
+    cover_image_url: form.cover_image_url.trim() || undefined,
+    media: form.media,
+    consent_flag: form.consent_flag,
+    recipients: form.recipients,
   }
+}
+
+async function openEditor(record?: HonorRecordBrief | Record<string, unknown>) {
   showDrawer.value = true
+  currentDetail.value = null
+  if (!categoryRows.value.length) {
+    await loadCategories()
+  }
+  if (!record) {
+    editingId.value = null
+    assignForm(createEmptyForm())
+    return
+  }
+
+  editingId.value = Number(record.id)
+  drawerLoading.value = true
+  try {
+    const resp = await adminGetRecord(Number(record.id))
+    currentDetail.value = resp.data
+    assignForm(buildFormFromDetail(resp.data))
+  } finally {
+    drawerLoading.value = false
+  }
 }
 
 function resetForm() {
   showDrawer.value = false
+  drawerLoading.value = false
   editingId.value = null
-  Object.assign(form, {
-    title: '', category_code: '', level: 'SCHOOL', awarded_by: '',
-    announced_at: null, document_no: '', summary: '', story_md: '',
-    is_collective: false, consent_flag: false,
-  })
+  currentDetail.value = null
+  assignForm(createEmptyForm())
 }
 
 async function onSubmit() {
+  if (!form.title.trim() || !form.category_code || !form.awarded_by.trim() || !form.announced_at) {
+    message.warning('请补全标题、荣誉类别、授奖单位和公布日期')
+    return
+  }
+
   submitting.value = true
   try {
-    const payload: HonorRecordIn = { ...form }
+    const payload = buildPayload()
     if (editingId.value) {
-      await adminUpdateRecord(editingId.value, payload)
+      const resp = await adminUpdateRecord(editingId.value, payload)
+      currentDetail.value = resp.data
     } else {
-      await adminCreateRecord(payload)
+      const resp = await adminCreateRecord(payload)
+      currentDetail.value = resp.data
     }
     message.success('保存成功')
     resetForm()
-    reload()
+    await reload(true)
   } finally {
     submitting.value = false
   }
 }
 
-async function onArchive(id: number) {
-  await adminArchiveRecord(id)
-  message.success('已归档')
-  reload()
+async function onArchive(id: number, newStatus: HonorStatus) {
+  await adminArchiveRecord(id, undefined, newStatus)
+  message.success(newStatus === 'REVOKED' ? '已撤销' : '已归档')
+  await reload()
 }
 
-onMounted(reload)
+function createEmptyCategoryForm(): CategoryFormState {
+  return {
+    code: '',
+    name: '',
+    description: '',
+    sort_order: 0,
+    is_active: true,
+  }
+}
+
+const showCategoryModal = ref(false)
+const categorySubmitting = ref(false)
+const editingCategoryCode = ref<string | null>(null)
+const categoryForm = reactive<CategoryFormState>(createEmptyCategoryForm())
+
+function resetCategoryForm() {
+  editingCategoryCode.value = null
+  Object.assign(categoryForm, createEmptyCategoryForm())
+}
+
+function openCategoryManager() {
+  showCategoryModal.value = true
+  resetCategoryForm()
+  void loadCategories().catch(() => undefined)
+}
+
+function closeCategoryManager() {
+  showCategoryModal.value = false
+  resetCategoryForm()
+}
+
+function onEditCategory(record: HonorCategoryOut) {
+  editingCategoryCode.value = record.code
+  Object.assign(categoryForm, {
+    id: record.id,
+    code: record.code,
+    name: record.name,
+    description: record.description || '',
+    sort_order: record.sort_order,
+    is_active: record.is_active,
+  })
+}
+
+async function onSubmitCategory() {
+  const normalizedCode = categoryForm.code.trim().toUpperCase()
+  const normalizedName = categoryForm.name.trim()
+  if (!normalizedCode || !normalizedName) {
+    message.warning('请补全类别编码和类别名称')
+    return
+  }
+
+  categorySubmitting.value = true
+  try {
+    const resp = await adminUpsertCategory({
+      ...categoryForm,
+      code: normalizedCode,
+      name: normalizedName,
+      sort_order: Number(categoryForm.sort_order || 0),
+      description: categoryForm.description?.trim() || null,
+    })
+    lastTouchedCategory.value = resp.data
+    message.success(editingCategoryCode.value ? '类别已更新' : '类别已新增')
+    resetCategoryForm()
+    await loadCategories()
+  } finally {
+    categorySubmitting.value = false
+  }
+}
+
+function isHttpStatus(error: unknown, status: number) {
+  return (error as { response?: { status?: number } })?.response?.status === status
+}
+
+const showImportModal = ref(false)
+const importUnavailable = ref(false)
+const importLoading = ref(false)
+const importPreview = ref<HonorImportPreviewResult | null>(null)
+const importBatches = ref<HonorImportBatchBrief[]>([])
+const importBatchLoading = ref(false)
+const importBatchPagination = reactive({ current: 1, pageSize: 10, total: 0 })
+
+async function loadImportBatches() {
+  importBatchLoading.value = true
+  try {
+    const resp = await listHonorImports({
+      page: importBatchPagination.current,
+      size: importBatchPagination.pageSize,
+    })
+    importUnavailable.value = false
+    importBatches.value = resp.data.items
+    importBatchPagination.total = resp.data.meta.total
+  } catch (error) {
+    if (isHttpStatus(error, 404)) {
+      importUnavailable.value = true
+      importBatches.value = []
+      importBatchPagination.total = 0
+      return
+    }
+    throw error
+  } finally {
+    importBatchLoading.value = false
+  }
+}
+
+function openImportModal() {
+  showImportModal.value = true
+  importPreview.value = null
+  void loadImportBatches().catch(() => undefined)
+}
+
+function closeImportModal() {
+  showImportModal.value = false
+  importPreview.value = null
+}
+
+async function onBeforeHonorImport(file: File) {
+  importLoading.value = true
+  try {
+    const resp = await uploadHonorImport(file)
+    importUnavailable.value = false
+    importPreview.value = resp.data
+    message.success('荣誉导入校验完成')
+    await loadImportBatches()
+  } catch (error) {
+    if (isHttpStatus(error, 404)) {
+      importUnavailable.value = true
+    }
+    return false
+  } finally {
+    importLoading.value = false
+  }
+  return false
+}
+
+async function onCommitHonorImport() {
+  if (!importPreview.value) return
+  importLoading.value = true
+  try {
+    await commitHonorImport(importPreview.value.batch.id)
+    message.success('荣誉导入已提交')
+    importPreview.value = null
+    await Promise.all([loadImportBatches(), reload(true)])
+  } catch (error) {
+    if (isHttpStatus(error, 404)) {
+      importUnavailable.value = true
+    }
+    return
+  } finally {
+    importLoading.value = false
+  }
+}
+
+function onDownloadImportErrors(batchId: number) {
+  void downloadHonorImportErrorReport(batchId)
+}
+
+async function onOpenImportBatch(batchId: number) {
+  importLoading.value = true
+  try {
+    const resp = await getHonorImport(batchId)
+    importPreview.value = resp.data
+  } catch (error) {
+    if (isHttpStatus(error, 404)) {
+      importUnavailable.value = true
+    }
+    return
+  } finally {
+    importLoading.value = false
+  }
+}
+
+function onImportTableChange(p: { current?: number; pageSize?: number }) {
+  importBatchPagination.current = p.current ?? importBatchPagination.current
+  importBatchPagination.pageSize = p.pageSize ?? importBatchPagination.pageSize
+  void loadImportBatches().catch(() => undefined)
+}
+
+onMounted(() => {
+  void Promise.allSettled([loadCategories(), reload()])
+})
 </script>
 
 <style scoped>
 .mb16 { margin-bottom: 16px; }
+.mt4 { margin-top: 4px; }
+.mt8 { margin-top: 8px; }
+
+.title-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title-main {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.cell-subtle {
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.category-cell,
+.maintenance-cell,
+.status-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drawer-actions {
+  margin-top: 24px;
+}
+
+.section-title {
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.category-form-card {
+  background: #fafafa;
+}
 </style>

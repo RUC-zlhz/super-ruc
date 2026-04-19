@@ -17,12 +17,14 @@ from app.exchange.models import (
     IMPORT_TYPE_COURSE_EQUIV,
     IMPORT_TYPE_COURSE_OFFERING,
     IMPORT_TYPE_CURRICULUM_MODULE,
+    IMPORT_TYPE_HONOR,
     IMPORT_TYPE_STUDENT,
     IMPORT_TYPE_TRANSCRIPT,
 )
 from app.exchange.validators.course_equiv import validate_course_equiv_row
 from app.exchange.validators.course_offering import validate_course_offering_row
 from app.exchange.validators.curriculum_module import validate_curriculum_module_row
+from app.exchange.validators.honor import validate_honor_row
 from app.exchange.validators.students import validate_student_row
 from app.exchange.validators.transcript import validate_transcript_row
 
@@ -36,6 +38,7 @@ VALIDATORS: dict[str, RowValidator] = {
     IMPORT_TYPE_CURRICULUM_MODULE: validate_curriculum_module_row,
     IMPORT_TYPE_COURSE_EQUIV: validate_course_equiv_row,
     IMPORT_TYPE_COURSE_OFFERING: validate_course_offering_row,
+    IMPORT_TYPE_HONOR: validate_honor_row,
 }
 
 
@@ -50,6 +53,7 @@ __all__ = [
     "validate_course_equiv_row",
     "validate_course_offering_row",
     "validate_curriculum_module_row",
+    "validate_honor_row",
     "validate_student_row",
     "validate_transcript_row",
 ]

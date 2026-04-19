@@ -21,6 +21,9 @@ class StudentBasic(BaseModel):
     enrollment_year: int | None
     expected_graduation_year: int | None
     status: str
+    enrollment_status: str
+    enrollment_status_reason: str | None = None
+    enrollment_status_updated_at: datetime | None = None
 
 
 class ProfileFactIn(BaseModel):
@@ -40,8 +43,6 @@ class ProfileFactIn(BaseModel):
 
 
 class ProfileFactOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
     student_id: int
     fact_type: str
@@ -55,19 +56,20 @@ class ProfileFactOut(BaseModel):
     attachments: dict[str, Any] | None
     extra: dict[str, Any] | None
     source: str
+    source_label: str | None = None
     source_ref: str | None
     approval_status: str
     is_sensitive: bool
-    # 管理元数据（学生端按视图隐藏）
     created_by: int | None = None
     updated_by: int | None = None
+    created_by_name: str | None = None
+    updated_by_name: str | None = None
     updated_at: datetime
+    review_comment: str | None = None
 
 
 class ProfileFactStudentView(BaseModel):
     """学生侧视图：不暴露 created_by / source_ref / approved_by 等管理元数据。"""
-
-    model_config = ConfigDict(from_attributes=True)
 
     id: int
     fact_type: str
@@ -83,9 +85,23 @@ class ProfileFactStudentView(BaseModel):
     updated_at: datetime
 
 
-class ProfileSummary(BaseModel):
-    """画像聚合视图。"""
+class ProfileFactSubmissionOut(BaseModel):
+    id: int
+    fact_type: str
+    title: str
+    description: str | None
+    role_in_activity: str | None
+    started_on: date | None
+    ended_on: date | None
+    hours: float | None
+    rank_label: str | None
+    attachments: dict[str, Any] | None = None
+    approval_status: str
+    review_comment: str | None = None
+    updated_at: datetime
 
+
+class ProfileSummary(BaseModel):
     student: StudentBasic
     facts: list[ProfileFactOut] = []
     research_count: int = 0
@@ -135,3 +151,8 @@ class CorrectionDecisionIn(BaseModel):
     decision: str = Field(description="APPROVED/REJECTED")
     comment: str | None = None
     apply_to_fact: bool = True
+
+
+class ProfileFactDecisionIn(BaseModel):
+    decision: str = Field(description="APPROVED/REJECTED")
+    comment: str | None = None

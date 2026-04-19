@@ -2,7 +2,8 @@
 
 - 日期：`2026-04-18`
 - 关联主计划：`S2A.1, S2A.2, S2A.3, S2A.4, S2A.5, S2B.1, S2B.2, S2B.3, S2B.4, S2B.5, S2C.1, S2C.2, S2C.3, S2C.4, S2C.5`
-- 当前状态：`ACTIVE`
+- 当前状态：`SUPERSEDED`
+- 说明：本文件保留为 `S2` 的初版拆分记录；当前完成态与执行证据以 [2026-04-19-s2-current-state-closure-refinement.md](D:/Codes/super-ruc/docs/notes/refinements/2026-04-19-s2-current-state-closure-refinement.md) 为准。
 
 ## 范围
 

@@ -67,24 +67,27 @@ const loading = ref(false)
 const workflowId = ref<number | null>(null)
 
 const STATUS_LABELS: Record<string, string> = {
-  IN_PROGRESS: '进行中',
+  ACTIVE: '进行中',
   COMPLETED: '已完成',
+  SUSPENDED: '已暂停',
+  IN_PROGRESS: '进行中',
   CANCELLED: '已取消',
 }
 function statusLabel(s: string) { return STATUS_LABELS[s] || s }
 
 const NODE_STATUS_LABELS: Record<string, string> = {
   PENDING: '待开始',
-  IN_PROGRESS: '进行中',
-  COMPLETED: '已完成',
-  SKIPPED: '已跳过',
+  DONE: '已完成',
+  OVERDUE: '已逾期',
+  DEFERRED: '已延期',
+  MANUAL_FOLLOW_UP: '人工跟进',
 }
 function nodeStatusLabel(s: string) { return NODE_STATUS_LABELS[s] || s }
 
 function nodeDotClass(s: string) {
-  if (s === 'COMPLETED') return 'completed'
-  if (s === 'IN_PROGRESS') return 'in-progress'
-  if (s === 'SKIPPED') return 'skipped'
+  if (s === 'DONE') return 'completed'
+  if (s === 'OVERDUE') return 'overdue'
+  if (s === 'DEFERRED' || s === 'MANUAL_FOLLOW_UP') return 'manual'
   return 'pending'
 }
 
@@ -98,7 +101,7 @@ async function loadDetail() {
   loading.value = true
   try {
     const resp = await getWorkflowDetail(workflowId.value)
-    workflow.value = resp.data.workflow
+    workflow.value = resp.data
     nodes.value = resp.data.nodes || []
   } catch {
     workflow.value = null
@@ -129,9 +132,9 @@ onMounted(() => {
 .head-row { display: flex; justify-content: space-between; align-items: flex-start; }
 .title { font-size: 32rpx; font-weight: 600; flex: 1; }
 .status { font-size: 22rpx; padding: 4rpx 14rpx; border-radius: 4rpx; flex-shrink: 0; margin-left: 12rpx; }
-.status.in_progress { background: #e6f7ff; color: #1890ff; }
+.status.active, .status.in_progress { background: #e6f7ff; color: #1890ff; }
 .status.completed { background: #f6ffed; color: #52c41a; }
-.status.cancelled { background: #f5f5f5; color: #999; }
+.status.suspended, .status.cancelled { background: #f5f5f5; color: #999; }
 .meta { display: block; font-size: 24rpx; color: #999; margin-top: 6rpx; }
 
 .section {
@@ -154,8 +157,8 @@ onMounted(() => {
   background: #fff;
 }
 .node-dot.completed { background: #52c41a; border-color: #52c41a; }
-.node-dot.in-progress { background: #1890ff; border-color: #1890ff; }
-.node-dot.skipped { background: #bfbfbf; border-color: #bfbfbf; }
+.node-dot.overdue { background: #ff4d4f; border-color: #ff4d4f; }
+.node-dot.manual { background: #faad14; border-color: #faad14; }
 .node-dot.pending { background: #fff; border-color: #d9d9d9; }
 .node-line {
   width: 2rpx; flex: 1; background: #f0f0f0;
@@ -169,9 +172,9 @@ onMounted(() => {
 .node-status {
   font-size: 22rpx; padding: 4rpx 12rpx; border-radius: 4rpx;
 }
-.node-status.completed { background: #f6ffed; color: #52c41a; }
-.node-status.in_progress { background: #e6f7ff; color: #1890ff; }
-.node-status.skipped { background: #f5f5f5; color: #999; }
+.node-status.done { background: #f6ffed; color: #52c41a; }
+.node-status.overdue { background: #fff1f0; color: #cf1322; }
+.node-status.deferred, .node-status.manual_follow_up { background: #fff7e6; color: #d46b08; }
 .node-status.pending { background: #fafafa; color: #bfbfbf; }
 .node-code { display: block; font-size: 22rpx; color: #999; margin-top: 4rpx; }
 .node-time { display: block; font-size: 22rpx; color: #999; margin-top: 4rpx; }

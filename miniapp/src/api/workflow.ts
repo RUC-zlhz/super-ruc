@@ -1,20 +1,36 @@
-import { get, post } from '@/utils/request'
+import { download, get, post, request, type ApiEnvelope } from '@/utils/request'
+
+const REQUEST_API_BASE_URL = 'http://localhost:8080/api/v1'
+const ACCESS_TOKEN_KEY = 'sip.access_token'
+
+export interface StudentWorkflowNode {
+  id: number
+  node_id: number
+  node_code: string
+  node_name: string
+  sort_order: number
+  stage_group?: string | null
+  required_task?: string | null
+  status: string
+  triggered_at?: string | null
+  due_date?: string | null
+  completed_at?: string | null
+  evidence?: string | null
+  note?: string | null
+}
 
 export interface StudentWorkflow {
   id: number
   template_code: string
   template_name: string
-  current_node_name?: string | null
+  kind: string
   status: string
   started_at: string
-}
-
-export interface StudentWorkflowNode {
-  id: number
-  node_code: string
-  node_name: string
-  status: string
   completed_at?: string | null
+  current_node_id?: number | null
+  current_node_name?: string | null
+  next_action_hint?: string | null
+  nodes: StudentWorkflowNode[]
 }
 
 export function getMyWorkflows() {
@@ -22,7 +38,7 @@ export function getMyWorkflows() {
 }
 
 export function getWorkflowDetail(id: number) {
-  return get<{ workflow: StudentWorkflow; nodes: StudentWorkflowNode[] }>(`/workflow/${id}`)
+  return get<StudentWorkflow>(`/workflow/${id}`)
 }
 
 export interface RequestBrief {
@@ -30,7 +46,10 @@ export interface RequestBrief {
   request_no: string
   type_code: string
   title: string
-  status: string
+  status: RequestStatus
+  revision: number
+  applicant_user_id: number
+  applicant_student_id?: number | null
   submitted_at?: string | null
   updated_at: string
 }
@@ -46,25 +65,112 @@ export interface RequestType {
   allow_withdraw: boolean
   withdraw_hours_limit?: number | null
   approver_roles: string
+  is_active: boolean
+}
+
+export type RequestCategory =
+  | 'LEAVE'
+  | 'CERTIFICATE'
+  | 'STAMP'
+  | 'REGISTRATION'
+  | 'MATERIAL'
+  | 'OTHER'
+
+export type RequestStatus =
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'IN_REVIEW'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'WITHDRAWN'
+  | 'OFFLINE_HANDLED'
+
+export type RequestAction =
+  | 'CLAIM'
+  | 'SUBMIT'
+  | 'RESUBMIT'
+  | 'APPROVE'
+  | 'REJECT'
+  | 'WITHDRAW'
+  | 'OFFLINE_HANDLE'
+
+export const REQUEST_CATEGORY_LABELS: Record<string, string> = {
+  LEAVE: '请假',
+  CERTIFICATE: '证明',
+  STAMP: '盖章',
+  REGISTRATION: '报名',
+  MATERIAL: '材料提交',
+  OTHER: '其他',
+}
+
+export const REQUEST_STATUS_LABELS: Record<string, string> = {
+  DRAFT: '草稿',
+  SUBMITTED: '待受理',
+  IN_REVIEW: '审核中',
+  APPROVED: '已通过',
+  REJECTED: '已驳回',
+  WITHDRAWN: '已撤回',
+  OFFLINE_HANDLED: '转线下办理',
+}
+
+export const REQUEST_ACTION_LABELS: Record<string, string> = {
+  CLAIM: '受理',
+  SUBMIT: '提交申请',
+  RESUBMIT: '重新提交申请',
+  APPROVE: '审批通过',
+  REJECT: '驳回申请',
+  WITHDRAW: '撤回申请',
+  OFFLINE_HANDLE: '转线下办理',
+}
+
+export function getRequestCategoryLabel(category: string) {
+  return REQUEST_CATEGORY_LABELS[category] || category
+}
+
+export function getRequestStatusLabel(status: string) {
+  return REQUEST_STATUS_LABELS[status] || status
+}
+
+export function getRequestActionLabel(action: string) {
+  return REQUEST_ACTION_LABELS[action] || action
+}
+
+export function isEditableRequestStatus(status?: string | null) {
+  return status === 'DRAFT' || status === 'REJECTED'
 }
 
 export interface ApprovalRecord {
   id: number
-  action: string
-  operator_user_id: number
+  revision: number
+  action: RequestAction | string
+  status_before?: string | null
+  status_after?: string | null
+  operator_id?: number | null
+  operator_role?: string | null
   comment?: string | null
-  operated_at: string
+  occurred_at: string
+}
+
+export interface RequestAttachment {
+  id: number
+  filename: string
+  file_size?: number | null
+  mime_type?: string | null
+  uploaded_at: string
 }
 
 export interface RequestDetail extends RequestBrief {
   type_name: string
-  category: string
+  category: RequestCategory | string
   summary?: string | null
   form_data: Record<string, any>
+  decided_at?: string | null
+  decided_by?: number | null
   decision_comment?: string | null
+  withdrawn_at?: string | null
   revision: number
-  approval_records?: ApprovalRecord[]
-  attachments?: { id: number; file_name: string; file_size: number }[]
+  approval_records: ApprovalRecord[]
+  attachments: RequestAttachment[]
 }
 
 export function listRequestTypes() {
@@ -80,8 +186,17 @@ export function createRequest(payload: {
   title: string
   form_data: Record<string, any>
   summary?: string
+  attachment_ids?: number[]
 }) {
   return post<RequestDetail>('/requests', payload)
+}
+
+export function updateRequest(id: number, payload: {
+  title?: string
+  form_data?: Record<string, any>
+  summary?: string
+}) {
+  return request<RequestDetail>(`/requests/${id}`, 'PATCH', payload)
 }
 
 export function submitRequest(id: number) {
@@ -94,6 +209,50 @@ export function withdrawRequest(id: number, comment?: string) {
 
 export function getRequestDetail(id: number) {
   return get<RequestDetail>(`/requests/${id}`)
+}
+
+export function uploadRequestAttachment(requestId: number, filePath: string) {
+  return new Promise<RequestAttachment>((resolve, reject) => {
+    const token = uni.getStorageSync(ACCESS_TOKEN_KEY) || null
+    uni.uploadFile({
+      url: `${REQUEST_API_BASE_URL}/requests/${requestId}/attachments`,
+      filePath,
+      name: 'file',
+      header: token ? { Authorization: `Bearer ${token}` } : {},
+      success(res) {
+        let payload: ApiEnvelope<RequestAttachment> | null = null
+        try {
+          payload = typeof res.data === 'string'
+            ? JSON.parse(res.data)
+            : (res.data as ApiEnvelope<RequestAttachment>)
+        } catch {
+          uni.showToast({ title: '附件上传失败', icon: 'none' })
+          reject(new Error('invalid upload payload'))
+          return
+        }
+        if (res.statusCode === 401) {
+          uni.removeStorageSync(ACCESS_TOKEN_KEY)
+          uni.reLaunch({ url: '/pages/profile/index' })
+          reject(new Error('登录已失效'))
+          return
+        }
+        if (res.statusCode >= 200 && res.statusCode < 300 && payload?.code === 0) {
+          resolve(payload.data)
+          return
+        }
+        uni.showToast({ title: payload?.message || '附件上传失败', icon: 'none' })
+        reject(payload || res)
+      },
+      fail(err) {
+        uni.showToast({ title: '网络异常', icon: 'none' })
+        reject(err)
+      },
+    })
+  })
+}
+
+export function previewProof(id: number) {
+  return download(`/workflow/proof-preview/${id}`)
 }
 
 // =====================================================================

@@ -64,6 +64,9 @@ class NoticeBrief(BaseModel):
     summary: str | None
     category: str | None
     status: str
+    source_type: str
+    channels: str
+    target_summary: str | None
     is_pinned: bool
     published_at: datetime | None
     updated_at: datetime
@@ -92,6 +95,7 @@ class NoticeDeliveryOut(BaseModel):
     user_id: int | None
     channel: str
     status: str
+    target_handle: str | None
     sent_at: datetime | None
     read_at: datetime | None
     error_code: str | None

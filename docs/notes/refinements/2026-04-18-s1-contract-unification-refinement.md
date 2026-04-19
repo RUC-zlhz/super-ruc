@@ -2,7 +2,7 @@
 
 - 日期：`2026-04-18`
 - 关联主计划：`S1.1, S1.2, S1.3, S1.4, S1.5`
-- 当前状态：`ACTIVE`
+- 当前状态：`COMPLETED`
 - 关联主文件：`docs/notes/current-implementation-plan.md`
 
 ## 范围
@@ -15,30 +15,30 @@
 
 - 不新增 `S2` 级别业务能力，例如通知圈人增强、审批视图重做、完整证明预览页面扩展、运营看板图表增强。
 - 不做非契约导向的 UI 美化、文案重写、数据库结构重构。
-- 本轮不修改主计划文件；`docs/notes/current-implementation-plan.md` 中的细化登记需在允许修改主计划时补回写。
+- `2026-04-19` 已完成主计划回写；后续若继续拆分增量任务，仍需同步登记到 `docs/notes/current-implementation-plan.md`。
 
 ## 任务树总览
 
-- [ ] `S1.1.1` Notice 后端基准契约冻结
-- [ ] `S1.1.2` Notice Web 管理端契约对齐
-- [ ] `S1.1.3` Notice Miniapp 收件箱契约对齐
-- [ ] `S1.1.4` Notice 模块 smoke 回归
-- [ ] `S1.2.1` Report 后端基准契约冻结
-- [ ] `S1.2.2` Report Web 运营看板/学业缺口契约对齐
-- [ ] `S1.2.3` Report Miniapp 学业缺口契约对齐
-- [ ] `S1.3.1` Workflow / Request 后端基准契约冻结
-- [ ] `S1.3.2` Workflow / Request Web 管理端契约对齐
-- [ ] `S1.3.3` Workflow / Request / Proof-Preview Miniapp 契约对齐
-- [ ] `S1.4.1` Profile / Honor 后端基准契约冻结
-- [ ] `S1.4.2` Profile / Honor Web 管理端契约对齐
-- [ ] `S1.4.3` Profile / Honor Miniapp 契约对齐
-- [ ] `S1.5.1` 后端契约 smoke 套件补齐
-- [ ] `S1.5.2` 前端契约联调回归清单执行
-- [ ] `S1.5.3` S1 合并闸口与验收收口
+- [x] `S1.1.1` Notice 后端基准契约冻结
+- [x] `S1.1.2` Notice Web 管理端契约对齐
+- [x] `S1.1.3` Notice Miniapp 收件箱契约对齐
+- [x] `S1.1.4` Notice 模块 smoke 回归
+- [x] `S1.2.1` Report 后端基准契约冻结
+- [x] `S1.2.2` Report Web 运营看板/学业缺口契约对齐
+- [x] `S1.2.3` Report Miniapp 学业缺口契约对齐
+- [x] `S1.3.1` Workflow / Request 后端基准契约冻结
+- [x] `S1.3.2` Workflow / Request Web 管理端契约对齐
+- [x] `S1.3.3` Workflow / Request / Proof-Preview Miniapp 契约对齐
+- [x] `S1.4.1` Profile / Honor 后端基准契约冻结
+- [x] `S1.4.2` Profile / Honor Web 管理端契约对齐
+- [x] `S1.4.3` Profile / Honor Miniapp 契约对齐
+- [x] `S1.5.1` 后端契约 smoke 套件补齐
+- [x] `S1.5.2` 前端契约联调回归清单执行
+- [x] `S1.5.3` S1 合并闸口与验收收口
 
 ## 详细任务清单
 
-### [ ] `S1.1.1` Notice 后端基准契约冻结
+### [x] `S1.1.1` Notice 后端基准契约冻结
 
 - 推荐分支名：`codex/s1-1-notice-backend-contract`
 - 负责人：`Backend`
@@ -59,7 +59,7 @@
   - Notice 模块的路径、字段、分页、状态枚举形成单一后端基线。
   - 后端内不存在同一业务对象使用两套路径或两套字段命名的情况。
 
-### [ ] `S1.1.2` Notice Web 管理端契约对齐
+### [x] `S1.1.2` Notice Web 管理端契约对齐
 
 - 推荐分支名：`codex/s1-1-notice-web-contract`
 - 负责人：`Web`
@@ -78,7 +78,7 @@
   - Web 管理端不再调用 Notice 旧路径或旧字段。
   - Notice 列表、保存、发布、归档均能在统一契约下工作。
 
-### [ ] `S1.1.3` Notice Miniapp 收件箱契约对齐
+### [x] `S1.1.3` Notice Miniapp 收件箱契约对齐
 
 - 推荐分支名：`codex/s1-1-notice-miniapp-contract`
 - 负责人：`Miniapp`
@@ -98,7 +98,7 @@
   - Miniapp Notice 列表、详情、已读三条链路均命中统一契约。
   - 不再存在 `/notices/{id}/read` 与 `/notices/read/{id}` 之类的前后端路径偏差。
 
-### [ ] `S1.1.4` Notice 模块 smoke 回归
+### [x] `S1.1.4` Notice 模块 smoke 回归
 
 - 推荐分支名：`codex/s1-1-notice-smoke`
 - 负责人：`QA / Integration`
@@ -115,7 +115,7 @@
   - Notice 模块无已知契约漂移。
   - 后端集成测试与前端最小联调结论一致。
 
-### [ ] `S1.2.1` Report 后端基准契约冻结
+### [x] `S1.2.1` Report 后端基准契约冻结
 
 - 推荐分支名：`codex/s1-2-report-backend-contract`
 - 负责人：`Backend`
@@ -135,7 +135,7 @@
   - Report 只保留一套 `overview / academic-gap` 正式路径。
   - 后端 schema 名称与返回字段命名可直接作为前端对齐基准。
 
-### [ ] `S1.2.2` Report Web 运营看板/学业缺口契约对齐
+### [x] `S1.2.2` Report Web 运营看板/学业缺口契约对齐
 
 - 推荐分支名：`codex/s1-2-report-web-contract`
 - 负责人：`Web`
@@ -154,7 +154,7 @@
   - Web 不再请求 `/admin/report/dashboard`。
   - 运营看板接口消费路径、字段名与后端 `overview` 基线一致。
 
-### [ ] `S1.2.3` Report Miniapp 学业缺口契约对齐
+### [x] `S1.2.3` Report Miniapp 学业缺口契约对齐
 
 - 推荐分支名：`codex/s1-2-report-miniapp-contract`
 - 负责人：`Miniapp`
@@ -172,7 +172,7 @@
   - Miniapp 学业缺口页在统一字段下稳定出数。
   - 不再存在 report API wrapper 与页面字段映射不一致的问题。
 
-### [ ] `S1.3.1` Workflow / Request 后端基准契约冻结
+### [x] `S1.3.1` Workflow / Request 后端基准契约冻结
 
 - 推荐分支名：`codex/s1-3-workflow-backend-contract`
 - 负责人：`Backend`
@@ -194,7 +194,7 @@
   - Workflow / Request / Proof-Preview 的 path、状态枚举、字段边界明确且唯一。
   - 后端不再同时维护旧接口别名与新接口别名。
 
-### [ ] `S1.3.2` Workflow / Request Web 管理端契约对齐
+### [x] `S1.3.2` Workflow / Request Web 管理端契约对齐
 
 - 推荐分支名：`codex/s1-3-workflow-web-contract`
 - 负责人：`Web`
@@ -215,7 +215,7 @@
   - Web 管理端不再请求 Workflow / Request 旧路径。
   - 审批详情与流程相关页面均可在统一契约下正常加载和提交动作。
 
-### [ ] `S1.3.3` Workflow / Request / Proof-Preview Miniapp 契约对齐
+### [x] `S1.3.3` Workflow / Request / Proof-Preview Miniapp 契约对齐
 
 - 推荐分支名：`codex/s1-3-workflow-miniapp-contract`
 - 负责人：`Miniapp`
@@ -239,7 +239,7 @@
   - Miniapp 申请与流程页面不再调用旧路径或旧状态值。
   - Proof-preview 的接口语义在前端侧不再误判。
 
-### [ ] `S1.4.1` Profile / Honor 后端基准契约冻结
+### [x] `S1.4.1` Profile / Honor 后端基准契约冻结
 
 - 推荐分支名：`codex/s1-4-profile-honor-backend-contract`
 - 负责人：`Backend`
@@ -264,7 +264,7 @@
   - `profile`、`honor` 的 path、字段、分页、状态枚举有统一后端基线。
   - 公开侧与管理侧的字段裁剪边界明确、无二义性。
 
-### [ ] `S1.4.2` Profile / Honor Web 管理端契约对齐
+### [x] `S1.4.2` Profile / Honor Web 管理端契约对齐
 
 - 推荐分支名：`codex/s1-4-profile-honor-web-contract`
 - 负责人：`Web`
@@ -285,7 +285,7 @@
   - Web Profile / Honor 管理端只使用统一 contract。
   - 页面上不再出现“列表能显示、详情字段缺失”这类前后端半漂移。
 
-### [ ] `S1.4.3` Profile / Honor Miniapp 契约对齐
+### [x] `S1.4.3` Profile / Honor Miniapp 契约对齐
 
 - 推荐分支名：`codex/s1-4-profile-honor-miniapp-contract`
 - 负责人：`Miniapp`
@@ -306,7 +306,7 @@
   - Miniapp Profile / Honor 页面在统一 contract 下稳定展示。
   - 学生端不再依赖管理侧字段或旧字段别名。
 
-### [ ] `S1.5.1` 后端契约 smoke 套件补齐
+### [x] `S1.5.1` 后端契约 smoke 套件补齐
 
 - 推荐分支名：`codex/s1-5-contract-smoke-backend`
 - 负责人：`QA / Integration`
@@ -329,7 +329,7 @@
   - S1 覆盖模块均有可重复执行的后端 smoke 护栏。
   - 新增 smoke 只验证契约，不混入 S2/S3 增量需求。
 
-### [ ] `S1.5.2` 前端契约联调回归清单执行
+### [x] `S1.5.2` 前端契约联调回归清单执行
 
 - 推荐分支名：`codex/s1-5-contract-regression-frontend`
 - 负责人：`Web + Miniapp`
@@ -356,7 +356,7 @@
   - 所有 S1 范围内前端入口都通过一次最小联调回归。
   - 不再存在前端 wrapper 与页面消费字段不一致的问题。
 
-### [ ] `S1.5.3` S1 合并闸口与验收收口
+### [x] `S1.5.3` S1 合并闸口与验收收口
 
 - 推荐分支名：`codex/s1-5-contract-closeout`
 - 负责人：`S1 统筹`
@@ -369,8 +369,8 @@
   - 将本细化文件登记回主计划“细化文件登记”表。
 - 依赖顺序：`前置 S1.1.4、S1.5.1、S1.5.2；最后执行。`
 - 风险/阻塞：
-  - 本轮用户限制禁止修改主计划，因此该任务当前只能先保留，待允许时执行。
-  - 若缺少模块级证据，主计划回写会变成口头完成而非有据可查。
+  - 已完成 `docs/notes/current-implementation-plan.md` 与本文件的状态同步回写。
+  - 当前残留仅为 `backend/app/honor/repository.py` 中 `datetime.utcnow()` 的弃用警告，不影响 S1 契约闭合。
 - 验收条件：
   - 主计划与细化文件状态一致。
   - `S1` 的完成证据可追溯到测试或联调结论，而不是仅凭主观描述。
@@ -382,6 +382,14 @@
 3. 后端 smoke 护栏由 `S1.5.1` 补齐，并与 `S1.1.4` 共同形成契约回归基线。
 4. `S1.5.2` 负责做跨端联调清单收口。
 5. `S1.5.3` 最后回写主计划与验收证据。
+
+## 执行结果
+
+- [x] `S1.1.x`：`notice` 契约已冻结为 `GET /notices/inbox`、`GET /notices/{notice_id}`、`POST /notices/read/{delivery_id}` 与当前管理端 `/admin/notices/*`；`test_notice_flow.py` 已补 `delivery_id / read_at / body_md` 断言，Web 与 Miniapp 均已切换到 canonical path / fields。
+- [x] `S1.2.x`：新增 `backend/tests/integration/test_report_contract_flow.py` 固化 `overview / academic-gap`；Web 运营看板已改为消费 `/admin/report/overview`；Miniapp 学业页已统一 `total_credits_required / total_credits_earned / credits_gap` 并处理缺省总学分场景。
+- [x] `S1.3.x`：`test_request_flow.py` 已锁定 `filename / operator_id / occurred_at / OFFLINE_HANDLE` 与 proof-preview PDF stream；Web 审批详情和 Miniapp request/workflow 页面已同步当前字段；Miniapp API 层已补 `updateRequest` 与 proof-preview 下载 helper，完整预览页面仍留给 `S2B.2`。
+- [x] `S1.4.x`：新增 `backend/tests/integration/test_honor_flow.py`，并修复 `honor` 类别 upsert 入参与 public detail `MissingGreenlet` 缺陷；Web / Miniapp 的 `profile`、`honor` 页面已按当前学生侧、公开侧、管理侧 schema 分离消费。
+- [x] `S1.5.x`：`D:\Codes\super-ruc\web` 执行 `pnpm -C web build` 通过；`D:\Codes\super-ruc\miniapp` 执行 `pnpm -C miniapp build:mp-weixin` 通过；`D:\Codes\super-ruc\backend` 执行 `uv run pytest tests/integration -q` 结果 `45 passed, 1 warning in 114.20s`。
 
 ## 验收条件
 
@@ -395,8 +403,9 @@
 - `proof-preview` 若当前仅有后端流式返回而缺少稳定前端承载页，S1 只收口契约，不扩展成完整页面功能，完整预览体验放入 `S2B.2`。
 - `report` 的 `overview` 若仍被 Web 侧以 `dashboard` 旧命名消费，必须在 S1 明确“统一命名优先”，禁止双命名长期并存。
 - `profile` 与 `honor` 既有公开侧又有管理侧，字段裁剪边界一旦没定清，会在 S3 放大为权限与展示双重漂移。
-- 本轮只允许修改本细化文件，主计划登记与状态回写需在后续允许时补做。
+- 已知残留：`backend/app/honor/repository.py` 仍使用 `datetime.utcnow()`，当前全量集成测试仅产生 1 条弃用警告。
 
 ## 变更记录
 
 - `2026-04-18`：创建文件，基于主计划 `S1.1 ~ S1.5` 细化为可执行任务树。
+- `2026-04-19`：完成 `S1.1 ~ S1.5` 收口；后端新增 `report / honor` contract smoke，修复 `report` 聚合字段引用错误与 `honor` 类别/详情两处真实缺陷；Web 与 Miniapp 已切换到当前 canonical contract，并完成 `pnpm -C web build`、`pnpm -C miniapp build:mp-weixin`、`uv run pytest tests/integration -q` 的实跑回写。

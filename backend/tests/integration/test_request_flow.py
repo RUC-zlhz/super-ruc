@@ -17,6 +17,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import Student
+from app.workflow import pdf_generator
 
 
 async def _login_as_student(
@@ -281,6 +282,169 @@ async def test_request_submit_requires_attachment_when_declared(
         f"/api/v1/requests/{request_id}/submit", headers=stu_headers
     )
     assert submit.status_code == 400, submit.text
+
+
+async def test_request_detail_contract_uses_canonical_attachment_and_approval_fields(
+    client: AsyncClient,
+    db: AsyncSession,
+    counselor_headers: dict[str, str],
+) -> None:
+    token = await _login_as_student(
+        client, db, student_no="R510001", wx_code="wx_r510001"
+    )
+    stu_headers = {"Authorization": f"Bearer {token}"}
+
+    create = await client.post(
+        "/api/v1/requests",
+        headers=stu_headers,
+        json={
+            "type_code": "STAMP_OFFICIAL",
+            "title": "三方协议盖章",
+            "form_data": {
+                "purpose": "就业协议学院盖章",
+                "company_name": "OpenAI",
+            },
+            "summary": "S1 contract regression",
+        },
+    )
+    assert create.status_code == 200, create.text
+    request_id = create.json()["data"]["id"]
+
+    upload = await client.post(
+        f"/api/v1/requests/{request_id}/attachments",
+        headers=stu_headers,
+        files={"file": ("agreement.pdf", b"%PDF-1.4 test", "application/pdf")},
+    )
+    assert upload.status_code == 200, upload.text
+    attachment = upload.json()["data"]
+    assert attachment["filename"] == "agreement.pdf"
+    assert attachment["mime_type"] == "application/pdf"
+    assert "file_name" not in attachment
+
+    submit = await client.post(
+        f"/api/v1/requests/{request_id}/submit", headers=stu_headers
+    )
+    assert submit.status_code == 200, submit.text
+
+    offline = await client.post(
+        f"/api/v1/admin/requests/{request_id}/offline",
+        headers=counselor_headers,
+        json={
+            "contact_info": "李老师 010-88886666",
+            "note": "合同原件需线下核验",
+        },
+    )
+    assert offline.status_code == 200, offline.text
+    offline_data = offline.json()["data"]
+    assert offline_data["status"] == "OFFLINE_HANDLED"
+    assert any(r["action"] == "OFFLINE_HANDLE" for r in offline_data["approval_records"])
+
+    detail = await client.get(f"/api/v1/requests/{request_id}", headers=stu_headers)
+    assert detail.status_code == 200, detail.text
+    detail_data = detail.json()["data"]
+    assert detail_data["attachments"][0]["filename"] == "agreement.pdf"
+    assert "file_name" not in detail_data["attachments"][0]
+    assert any("operator_id" in row for row in detail_data["approval_records"])
+    assert all("operator_user_id" not in row for row in detail_data["approval_records"])
+    assert any("occurred_at" in row for row in detail_data["approval_records"])
+    assert all("operated_at" not in row for row in detail_data["approval_records"])
+    assert any(row["action"] == "OFFLINE_HANDLE" for row in detail_data["approval_records"])
+
+
+async def test_proof_preview_returns_pdf_stream(
+    client: AsyncClient,
+    db: AsyncSession,
+    counselor_headers: dict[str, str],
+    monkeypatch,
+) -> None:
+    token = await _login_as_student(
+        client, db, student_no="R520001", wx_code="wx_r520001"
+    )
+    stu_headers = {"Authorization": f"Bearer {token}"}
+
+    create = await client.post(
+        "/api/v1/requests",
+        headers=stu_headers,
+        json={
+            "type_code": "CERTIFICATE_IN_SCHOOL",
+            "title": "在读证明预览",
+            "form_data": {"purpose": "交换申请"},
+            "summary": "用于 S1 proof-preview contract",
+        },
+    )
+    assert create.status_code == 200, create.text
+    request_id = create.json()["data"]["id"]
+
+    submit = await client.post(
+        f"/api/v1/requests/{request_id}/submit", headers=stu_headers
+    )
+    assert submit.status_code == 200, submit.text
+
+    approve = await client.post(
+        f"/api/v1/admin/requests/{request_id}/approve",
+        headers=counselor_headers,
+        json={"comment": "通过，用于生成 PDF"},
+    )
+    assert approve.status_code == 200, approve.text
+
+    monkeypatch.setattr(pdf_generator, "_html_to_pdf_bytes", lambda _html: b"%PDF-1.4 mock")
+
+    resp = await client.get(
+        f"/api/v1/workflow/proof-preview/{request_id}",
+        headers=stu_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"].startswith("application/pdf")
+    assert "inline;" in resp.headers["content-disposition"]
+    assert resp.content.startswith(b"%PDF-1.4")
+
+
+async def test_proof_preview_rejects_other_student(
+    client: AsyncClient,
+    db: AsyncSession,
+    counselor_headers: dict[str, str],
+    monkeypatch,
+) -> None:
+    owner_token = await _login_as_student(
+        client, db, student_no="R520101", wx_code="wx_r520101"
+    )
+    owner_headers = {"Authorization": f"Bearer {owner_token}"}
+    other_token = await _login_as_student(
+        client, db, student_no="R520102", wx_code="wx_r520102"
+    )
+    other_headers = {"Authorization": f"Bearer {other_token}"}
+
+    create = await client.post(
+        "/api/v1/requests",
+        headers=owner_headers,
+        json={
+            "type_code": "CERTIFICATE_IN_SCHOOL",
+            "title": "在读证明权限测试",
+            "form_data": {"purpose": "签证"},
+        },
+    )
+    assert create.status_code == 200, create.text
+    request_id = create.json()["data"]["id"]
+
+    submit = await client.post(
+        f"/api/v1/requests/{request_id}/submit", headers=owner_headers
+    )
+    assert submit.status_code == 200, submit.text
+
+    approve = await client.post(
+        f"/api/v1/admin/requests/{request_id}/approve",
+        headers=counselor_headers,
+        json={"comment": "通过"},
+    )
+    assert approve.status_code == 200, approve.text
+
+    monkeypatch.setattr(pdf_generator, "_html_to_pdf_bytes", lambda _html: b"%PDF-1.4 mock")
+
+    resp = await client.get(
+        f"/api/v1/workflow/proof-preview/{request_id}",
+        headers=other_headers,
+    )
+    assert resp.status_code == 403, resp.text
 
 
 async def test_request_endpoints_reject_anonymous_and_student_role(

@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import Student
@@ -27,6 +27,7 @@ from app.exchange.models import (
 )
 from app.notice.models import Notice, NoticeDelivery, NoticeDeliveryBatch
 from app.report.schemas import (
+    AcademicGapAggregateItem,
     AcademicGapResult,
     AcademicModuleGap,
     KVMetric,
@@ -218,6 +219,87 @@ async def compute_academic_gap(
     )
 
 
+def _compute_gap_value(result: AcademicGapResult) -> float | None:
+    if result.total_credits_required is None:
+        return None
+    return round(
+        max(result.total_credits_required - result.total_credits_earned, 0.0),
+        2,
+    )
+
+
+def _derive_risk_level(result: AcademicGapResult) -> str:
+    gap = _compute_gap_value(result)
+    if gap is None:
+        return "HIGH" if result.data_warnings else "MEDIUM"
+    if gap <= 0 and not result.data_warnings:
+        return "LOW"
+    if result.total_credits_required and result.total_credits_required > 0:
+        ratio = gap / result.total_credits_required
+    else:
+        ratio = 1.0 if gap > 0 else 0.0
+    if gap >= 6 or ratio >= 0.3:
+        return "HIGH"
+    return "MEDIUM"
+
+
+async def list_academic_gap_overview(
+    db: AsyncSession,
+    *,
+    keyword: str | None,
+    grade_code: str | None,
+    major_code: str | None,
+    risk_level: str | None,
+    page: int,
+    page_size: int,
+) -> tuple[list[AcademicGapAggregateItem], int]:
+    stmt = select(Student).where(Student.deleted_at.is_(None))
+    if keyword:
+        like = f"%{keyword}%"
+        stmt = stmt.where(
+            or_(
+                Student.student_no.ilike(like),
+                Student.full_name.ilike(like),
+            )
+        )
+    if grade_code:
+        stmt = stmt.where(Student.grade_code == grade_code)
+    if major_code:
+        stmt = stmt.where(Student.major_code == major_code)
+    students = (await db.execute(stmt.order_by(Student.student_no.asc(), Student.id.asc()))).scalars().all()
+
+    desired_risk = risk_level.upper() if risk_level else None
+    rank_map = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+    items: list[tuple[int, float, AcademicGapAggregateItem]] = []
+    for student in students:
+        result = await compute_academic_gap(db, student.id)
+        current_risk = _derive_risk_level(result)
+        if desired_risk and current_risk != desired_risk:
+            continue
+        gap = _compute_gap_value(result)
+        item = AcademicGapAggregateItem(
+            student_id=student.id,
+            student_no=result.student_no,
+            student_name=result.student_name,
+            grade_code=result.grade_code,
+            major_code=result.major_code,
+            total_credits_required=result.total_credits_required,
+            total_credits_earned=result.total_credits_earned,
+            credits_gap=gap,
+            data_warnings=result.data_warnings,
+            generated_at=result.generated_at,
+        )
+        gap_sort = gap if gap is not None else float("inf")
+        items.append((rank_map.get(current_risk, 99), gap_sort, item))
+
+    items.sort(key=lambda row: (row[0], -row[1], row[2].student_no, row[2].student_id))
+    flattened = [item for _, _, item in items]
+    total = len(flattened)
+    start = max(page - 1, 0) * page_size
+    end = start + page_size
+    return flattened[start:end], total
+
+
 # ============================================================
 # FR-016 运营看板
 # ============================================================
@@ -301,7 +383,7 @@ async def build_overview(db: AsyncSession) -> OverviewResult:
         )).scalar_one()
         node_rows = (await db.execute(
             select(StudentWorkflowNode.status, func.count())
-            .join(StudentWorkflow, StudentWorkflow.id == StudentWorkflowNode.student_workflow_id)
+            .join(StudentWorkflow, StudentWorkflow.id == StudentWorkflowNode.workflow_id)
             .where(StudentWorkflow.template_id == t.id)
             .group_by(StudentWorkflowNode.status)
         )).all()

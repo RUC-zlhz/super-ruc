@@ -13,10 +13,11 @@
             {{ fmt(notice.published_at) }}
           </text>
         </view>
+        <text v-if="notice.summary" class="summary">{{ notice.summary }}</text>
       </view>
 
       <view class="body-card">
-        <text class="body-text" v-if="notice.body">{{ notice.body }}</text>
+        <text class="body-text" v-if="notice.body_md">{{ notice.body_md }}</text>
         <view v-else class="empty-tiny">暂无正文</view>
       </view>
     </template>
@@ -27,10 +28,11 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { getNoticeDetail, markRead, type StudentNoticeItem } from '@/api/notice'
+import { getNoticeDetail, markRead, type NoticeDetail } from '@/api/notice'
 
-const notice = ref<StudentNoticeItem | null>(null)
+const notice = ref<NoticeDetail | null>(null)
 const loading = ref(false)
+const noticeId = ref<number | null>(null)
 const deliveryId = ref<number | null>(null)
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -51,12 +53,12 @@ function fmt(s?: string | null) {
 }
 
 async function loadDetail() {
-  if (deliveryId.value == null) return
+  if (noticeId.value == null) return
   loading.value = true
   try {
-    const resp = await getNoticeDetail(deliveryId.value)
+    const resp = await getNoticeDetail(noticeId.value)
     notice.value = resp.data
-    if (notice.value && !notice.value.is_read) {
+    if (deliveryId.value != null) {
       try { await markRead(deliveryId.value) } catch { /* ok */ }
     }
   } catch {
@@ -70,7 +72,10 @@ onMounted(() => {
   const pages = getCurrentPages()
   const current = pages[pages.length - 1] as any
   const opts = current?.options || {}
-  deliveryId.value = Number(opts.id)
+  const parsedNoticeId = Number(opts.noticeId ?? opts.id)
+  const parsedDeliveryId = Number(opts.deliveryId)
+  noticeId.value = Number.isFinite(parsedNoticeId) && parsedNoticeId > 0 ? parsedNoticeId : null
+  deliveryId.value = Number.isFinite(parsedDeliveryId) && parsedDeliveryId > 0 ? parsedDeliveryId : null
   loadDetail()
 })
 </script>
@@ -87,6 +92,13 @@ onMounted(() => {
 .title {
   display: block; font-size: 34rpx; font-weight: 600;
   color: #333; line-height: 1.5;
+}
+.summary {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  color: #666;
+  line-height: 1.6;
 }
 .meta-row {
   display: flex; align-items: center; justify-content: space-between;

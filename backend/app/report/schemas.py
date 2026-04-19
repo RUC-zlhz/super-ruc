@@ -41,6 +41,19 @@ class AcademicGapResult(BaseModel):
     generated_at: datetime
 
 
+class AcademicGapAggregateItem(BaseModel):
+    student_id: int
+    student_no: str
+    student_name: str
+    grade_code: str | None
+    major_code: str | None
+    total_credits_required: float | None = None
+    total_credits_earned: float = 0
+    credits_gap: float | None = None
+    data_warnings: list[str] = []
+    generated_at: datetime
+
+
 # ============================================================
 # FR-016 运营看板
 # ============================================================

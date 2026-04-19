@@ -48,71 +48,106 @@
 
 ### S1 前后端契约统一层
 
-- [ ] `S1.1` 收口 `notice` 模块路径、字段名、分页结构、状态枚举
-- [ ] `S1.2` 收口 `report` 模块路径与字段名，统一 `overview / academic-gap`
-- [ ] `S1.3` 收口 `workflow / request / proof-preview` 相关 API 契约
-- [ ] `S1.4` 收口 `profile / honor` 相关 API 契约
-- [ ] `S1.5` 补最小契约 smoke tests，防止再次漂移
+- [x] `S1.1` 收口 `notice` 模块路径、字段名、分页结构、状态枚举
+- [x] `S1.2` 收口 `report` 模块路径与字段名，统一 `overview / academic-gap`
+- [x] `S1.3` 收口 `workflow / request / proof-preview` 相关 API 契约
+- [x] `S1.4` 收口 `profile / honor` 相关 API 契约
+- [x] `S1.5` 补最小契约 smoke tests，防止再次漂移
 
 出口条件：
 - 不再存在已知的“后端能跑、前端调错路径/字段”的问题
+
+证据：
+
+- `S1.1`：后端 `notice` 契约已以 `delivery_id / read_at / body_md` 为唯一口径补齐断言；`web/src/api/notice.ts`、`web/src/views/notice/NoticeList.vue`、`miniapp/src/api/notice.ts`、`miniapp/src/pages/notice/{index,detail}.vue` 已全部切到 canonical path / fields。
+- `S1.2`：后端已新增 `backend/tests/integration/test_report_contract_flow.py` 锁定 `overview / academic-gap`；`web` 已移除 `/admin/report/dashboard` 旧依赖并改用 `OverviewResult` adapter；`miniapp` 学业页已只消费 canonical totals / modules 并处理 `total_credits_required = null`。
+- `S1.3`：后端已补 request / proof-preview contract 断言；`web` 审批详情与 `miniapp` request/workflow 页面已统一 `filename / operator_id / occurred_at / OFFLINE_HANDLE`，且 `miniapp/src/api/workflow.ts` 已补 `updateRequest` 与 proof-preview PDF 下载 helper。
+- `S1.4`：后端已新增 `backend/tests/integration/test_honor_flow.py` 并修复 `honor` 类别 upsert / public detail 两处真实缺陷；`web` / `miniapp` 的 `profile`、`honor` 页面已统一当前 schema、分页与公开/管理字段边界。
+- `S1.5`：`D:\Codes\super-ruc\web` 执行 `pnpm -C web build` 通过；`D:\Codes\super-ruc\miniapp` 执行 `pnpm -C miniapp build:mp-weixin` 通过；`D:\Codes\super-ruc\backend` 执行 `uv run pytest tests/integration -q` 结果为 `45 passed, 1 warning in 114.20s`。
+
+当前结论：
+
+- `S1` 已完成；当前主线已无已知的 notice / report / workflow / profile / honor 前后端契约漂移。
 
 ### S2 核心用户闭环
 
 #### S2A 通知闭环（FR-010 / FR-011）
 
-- [ ] `S2A.1` 管理端支持标签、目标人群规则、命中预览
-- [ ] `S2A.2` 管理端支持通知发布、发送、批次查看、投递明细查看
-- [ ] `S2A.3` 后端收紧通知访问边界，学生只能查看投递给本人的通知
-- [ ] `S2A.4` 小程序通知列表、详情、已读状态按正确接口重接
-- [ ] `S2A.5` 保留来源、渠道、失败原因等治理信息
+- [x] `S2A.1` 管理端支持标签、目标人群规则、命中预览
+- [x] `S2A.2` 管理端支持通知发布、发送、批次查看、投递明细查看
+- [x] `S2A.3` 后端收紧通知访问边界，学生只能查看投递给本人的通知
+- [x] `S2A.4` 小程序通知列表、详情、已读状态按正确接口重接
+- [x] `S2A.5` 保留来源、渠道、失败原因等治理信息
 
 出口条件：
 - 可完成“圈人 -> 预览 -> 发布 -> 发送 -> 学生收件箱 -> 已读留痕 -> 管理端回看”
 
 #### S2B 事务申请与证明闭环（FR-006 / FR-007 / FR-008）
 
-- [ ] `S2B.1` 学生端补附件上传入口并接通后端
-- [ ] `S2B.2` 学生端补证明 PDF 预览入口
-- [ ] `S2B.3` 管理端审批详情升级为结构化审批视图
-- [ ] `S2B.4` 驳回重提、撤回、转线下文案与状态说明统一
-- [ ] `S2B.5` 请假、盖章、证明三类典型流程补 E2E 测试
+- [x] `S2B.1` 学生端补附件上传入口并接通后端
+- [x] `S2B.2` 学生端补证明 PDF 预览入口
+- [x] `S2B.3` 管理端审批详情升级为结构化审批视图
+- [x] `S2B.4` 驳回重提、撤回、转线下文案与状态说明统一
+- [x] `S2B.5` 请假、盖章、证明三类典型流程补 E2E 测试
 
 出口条件：
 - 三类典型申请至少各跑通一条完整端到端流程
 
 #### S2C 学业分析与运营看板闭环（FR-014 / FR-015 / FR-016）
 
-- [ ] `S2C.1` 统一 `overview` 与 `academic-gap` 的接口字段
-- [ ] `S2C.2` 修复学生端学业页字段漂移问题
-- [ ] `S2C.3` 新增管理端学业缺口聚合查询
-- [ ] `S2C.4` 完成运营看板图表与空态收口
-- [ ] `S2C.5` 固化“弱结论”边界文案与测试
+- [x] `S2C.1` 统一 `overview` 与 `academic-gap` 的接口字段
+- [x] `S2C.2` 修复学生端学业页字段漂移问题
+- [x] `S2C.3` 新增管理端学业缺口聚合查询
+- [x] `S2C.4` 完成运营看板图表与空态收口
+- [x] `S2C.5` 固化“弱结论”边界文案与测试
 
 出口条件：
 - 看板与学业页都基于真实接口稳定出数
 - 弱结论边界始终可见
 
+证据：
+
+- `S2A.1 ~ S2A.5`：`web/src/views/notice/NoticeList.vue` 已扩成“圈人规则 + 命中预览 + 发布/发送 + 批次/投递明细”单页闭环；`backend/app/notice/{router,service,repository,schemas}.py` 已收紧“本人有投递才可查看详情”的访问边界，并补齐管理端治理字段；`backend/tests/integration/test_notice_flow.py` 已新增本人越权失败与治理字段断言。
+- `S2B.1 ~ S2B.4`：`miniapp/src/pages/request/{create,detail,index}.vue` 与 `miniapp/src/api/workflow.ts` 已完成“两步式草稿 -> 附件上传 -> 提交/重提”、proof preview PDF 打开和 canonical 状态/动作文案收口；`web/src/views/approval/ApprovalDetail.vue` 与 `web/src/api/workflow.ts` 已升级为结构化审批页与共享文案映射。
+- `S2B.5`：`backend/tests/integration/test_request_flow.py` 已覆盖请假、盖章、证明三类典型流程的提交、驳回重提、撤回、转线下、附件、proof-preview 和越权失败路径。
+- `S2C.1 ~ S2C.5`：`backend/app/report/{router,service,schemas}.py` 已新增管理侧 academic-gap 聚合查询；`web/src/views/dashboard/OperationDashboard.vue` 与 `web/src/api/report.ts` 已接入 overview 图表、空态、弱结论提示和 academic-gap 聚合列表/明细抽屉；`backend/tests/integration/test_report_contract_flow.py` 已补 `items + meta`、风险过滤和 detail drilldown smoke。
+- 验证：`D:\Codes\super-ruc\backend` 执行 `uv run pytest tests/integration -q` 结果 `47 passed, 1 warning in 133.12s`；`D:\Codes\super-ruc\web` 执行 `pnpm -C web build` 通过；`D:\Codes\super-ruc\miniapp` 执行 `pnpm -C miniapp build:mp-weixin` 通过。
+
+当前结论：
+
+- `S2` 已完成，通知、事务申请/证明、学业分析/运营看板三条核心用户闭环均已在当前主线收口到 canonical contract，并留下自动化验证与计划回写证据。
+
 ### S3 荣誉与画像闭环
 
 #### S3A 荣誉展示（FR-017）
 
-- [ ] `S3A.1` 支持荣誉类别维护、类别筛选、学年筛选
-- [ ] `S3A.2` 支持批量导入荣誉记录
-- [ ] `S3A.3` 支持归档 / 撤销 / 历史荣誉展示
-- [ ] `S3A.4` 保留维护人与更新时间留痕
-- [ ] `S3A.5` 对齐补充文档中的代表用例与验收口径
+- [x] `S3A.1` 支持荣誉类别维护、类别筛选、学年筛选
+- [x] `S3A.2` 支持批量导入荣誉记录
+- [x] `S3A.3` 支持归档 / 撤销 / 历史荣誉展示
+- [x] `S3A.4` 保留维护人与更新时间留痕
+- [x] `S3A.5` 对齐补充文档中的代表用例与验收口径
 
 #### S3B 学生画像（FR-018）
 
-- [ ] `S3B.1` 管理端补来源、录入人、最后更新时间
-- [ ] `S3B.2` 管理端补导出画像快照
-- [ ] `S3B.3` 学生端保持仅本人可见且隐藏管理元数据
-- [ ] `S3B.4` 完成纠错申诉与成长补录闭环
-- [ ] `S3B.5` 非在读学生严格只读、越权访问留痕
+- [x] `S3B.1` 管理端补来源、录入人、最后更新时间
+- [x] `S3B.2` 管理端补导出画像快照
+- [x] `S3B.3` 学生端保持仅本人可见且隐藏管理元数据
+- [x] `S3B.4` 完成纠错申诉与成长补录闭环
+- [x] `S3B.5` 非在读学生严格只读、越权访问留痕
 
 出口条件：
 - 荣誉与画像均满足 `docs/source/additional-request.txt` 中的验收描述
+
+证据：
+
+- `S3A.1 ~ S3A.4`：后端 `honor` 已拆分 public/admin schema，补齐 `category_name / is_historical / history_reason / updated_by_name / updated_at`，管理侧类别列表返回全部类别，公共侧默认隐藏撤销与未授权条目；`exchange` 已新增 `honor` 两阶段导入并完成 canonical grouping；`web/src/views/honor/HonorList.vue` 与 `miniapp/src/pages/honor/index.vue` 已收口到“类别 + 学年 + 历史切换”交互及管理端导入/维护入口。
+- `S3A.5`：已新增 `docs/notes/refinements/2026-04-19-s3-additional-request-acceptance-checklist.md`，将 `additional-request` 中的模块说明、代表用例、页面要求和验收条目映射到当前实现与自动化证据。
+- `S3B.1 ~ S3B.5`：后端 `profile` 已补真实 `enrollment_status` 口径、治理元数据、学生补录待办与审批、`PDF/XLSX` 快照导出、班级/专业 scope 校验与越权审计；`web/src/views/profile/StudentProfile.vue`、`web/src/views/system/UserManage.vue`、`miniapp/src/pages/profile/index.vue` 已完成只读态、补录状态、快照下载与管理元数据隔离收口。
+- 自动化验证：`D:\Codes\super-ruc\backend` 执行 `uv run pytest tests/integration -q` -> `48 passed in 117.20s`；`D:\Codes\super-ruc\web` 执行 `pnpm -C web build` 通过；`D:\Codes\super-ruc\miniapp` 执行 `pnpm -C miniapp build:mp-weixin` 通过。
+
+当前结论：
+
+- `S3` 已完成；荣誉与画像闭环已按当前 `S1/S2` 基线完成二次收口、自动化回归和计划回写，字段级权限矩阵等扩展治理继续留给 `S4`。
 
 ### S4 权限、审计、性能、数据库兼容
 
@@ -166,8 +201,11 @@
 | 2026-04-18 | 细化规则模板 | `docs/notes/refinements/README.md` | ALL | `[x]` | 建立细化文件规范 |
 | 2026-04-18 | S0 基线冻结细化 | `docs/notes/refinements/2026-04-18-s0-baseline-freeze-refinement.md` | `S0.1, S0.2, S0.3, S0.4` | `[x]` | 已落盘可执行任务树；执行状态以主计划条目为准 |
 | 2026-04-18 | S1 前后端契约统一层可执行任务树 | `docs/notes/refinements/2026-04-18-s1-contract-unification-refinement.md` | `S1.1, S1.2, S1.3, S1.4, S1.5` | `[x]` | 已落盘可执行任务树；执行状态以主计划条目为准 |
-| 2026-04-18 | S2 核心用户闭环细化 | `docs/notes/refinements/2026-04-18-s2-core-user-loops-refinement.md` | `S2A.1, S2A.2, S2A.3, S2A.4, S2A.5, S2B.1, S2B.2, S2B.3, S2B.4, S2B.5, S2C.1, S2C.2, S2C.3, S2C.4, S2C.5` | `[x]` | 已落盘可执行任务树；执行状态以主计划条目为准 |
-| 2026-04-18 | S3 荣誉与画像闭环可执行任务树 | `docs/notes/refinements/2026-04-18-s3-honor-profile-refinement.md` | `S3A.1, S3A.2, S3A.3, S3A.4, S3A.5, S3B.1, S3B.2, S3B.3, S3B.4, S3B.5` | `[x]` | 已落盘可执行任务树；执行状态以主计划条目为准 |
+| 2026-04-18 | S2 核心用户闭环细化 | `docs/notes/refinements/2026-04-18-s2-core-user-loops-refinement.md` | `S2A.1, S2A.2, S2A.3, S2A.4, S2A.5, S2B.1, S2B.2, S2B.3, S2B.4, S2B.5, S2C.1, S2C.2, S2C.3, S2C.4, S2C.5` | `[x]` | 初版拆分已保留；当前完成态改由 `2026-04-19-s2-current-state-closure-refinement.md` 覆盖 |
+| 2026-04-19 | S2 核心用户闭环二次收口细化 | `docs/notes/refinements/2026-04-19-s2-current-state-closure-refinement.md` | `S2A.1, S2A.2, S2A.3, S2A.4, S2A.5, S2B.1, S2B.2, S2B.3, S2B.4, S2B.5, S2C.1, S2C.2, S2C.3, S2C.4, S2C.5` | `[x]` | 已按当前仓库状态完成二次收口、自动化验证与计划回写 |
+| 2026-04-18 | S3 荣誉与画像闭环可执行任务树 | `docs/notes/refinements/2026-04-18-s3-honor-profile-refinement.md` | `S3A.1, S3A.2, S3A.3, S3A.4, S3A.5, S3B.1, S3B.2, S3B.3, S3B.4, S3B.5` | `[x]` | 初版拆分已保留；当前完成态改由 `2026-04-19-s3-current-state-closure-refinement.md` 覆盖 |
+| 2026-04-19 | S3 荣誉与画像二次收口细化 | `docs/notes/refinements/2026-04-19-s3-current-state-closure-refinement.md` | `S3A.1, S3A.2, S3A.3, S3A.4, S3A.5, S3B.1, S3B.2, S3B.3, S3B.4, S3B.5` | `[x]` | 已按当前仓库状态完成 contract 收口、自动化验证与计划回写 |
+| 2026-04-19 | S3 additional-request 对照验收清单 | `docs/notes/refinements/2026-04-19-s3-additional-request-acceptance-checklist.md` | `S3A.5, S3B.5` | `[x]` | 已将补充文档条款、代表用例、页面要求与验证证据逐项映射 |
 | 2026-04-18 | S4 权限、审计、性能与 Kingbase 兼容执行细化 | `docs/notes/refinements/2026-04-18-s4-governance-performance-kingbase-refinement.md` | `S4A.1, S4A.2, S4A.3, S4B.1, S4B.2, S4B.3, S4C.1, S4C.2, S4C.3` | `[x]` | 已落盘可执行任务树；执行状态以主计划条目为准 |
 | 2026-04-18 | S5 文档与交付闭环细化 | `docs/notes/refinements/2026-04-18-s5-doc-delivery-refinement.md` | `S5A.1, S5A.2, S5A.3, S5A.4, S5B.1, S5B.2, S5B.3, S5B.4` | `[x]` | 已落盘可执行任务树；执行状态以主计划条目为准 |
 | 2026-04-18 | 全阶段并行 worktree / branch 编排 | `docs/notes/refinements/2026-04-18-worktree-branch-orchestration-refinement.md` | `S0 ~ S5` | `[x]` | 已落盘跨阶段并行编排、子分支后缀规则、阶段集成分支与 worktree 分派表 |
@@ -197,6 +235,9 @@
 - `2026-04-19`：新增仓库与工作树收拢细化文件，开始将根工作区改动、`S0` 临时分支与 baseline worktree 收口到单一开发主线。
 - `2026-04-19`：`codex/v1.6-integration` 重新验证通过 `pnpm -C web build`、`pnpm -C miniapp build:mp-weixin` 与 `backend` 下的 `uv run pytest tests/integration -v`（`41 passed in 89.29s`），并完成 `web/src/views/workflow/QuizBank.vue` 的类型收口。
 - `2026-04-19`：完成仓库/worktree 收拢；删除 `codex/int-s0`、`codex/s0-*`、`codex/repo-cleanup-snapshot` 及其物理 worktree，保留 `codex/v1.6-integration` 作为当前唯一开发主线，`main` 保持与 `origin/main` 对齐。
+- `2026-04-19`：完成 `S1` 契约统一层收口；后端新增 `report / honor` contract smoke，`web` 与 `miniapp` 均切到当前 canonical contract，并再次实跑 `pnpm -C web build`、`pnpm -C miniapp build:mp-weixin`、`uv run pytest tests/integration -q`（`45 passed, 1 warning in 114.20s`）。
+- `2026-04-19`：完成 `S2` 核心用户闭环二次收口；`notice` 已补单页管理闭环与学生详情访问边界，`request/workflow` 已补两步式附件上传、proof-preview 与结构化审批页，`report` 已新增管理侧 academic-gap 聚合查询并接入 Web 看板；随后实跑 `pnpm -C web build`、`pnpm -C miniapp build:mp-weixin`、`uv run pytest tests/integration -q`（`47 passed, 1 warning in 133.12s`）。
+- `2026-04-19`：完成 `S3` 荣誉与画像二次收口；`honor` 已补 public/admin schema 分离、类别/学年筛选、历史荣誉标记、`exchange` 两阶段导入与维护人留痕，`profile` 已补真实 `enrollment_status`、学生补录审批、班级/专业 scope 校验、快照导出与只读/越权审计；随后实跑 `pnpm -C web build`、`pnpm -C miniapp build:mp-weixin`、`uv run pytest tests/integration -q`（`48 passed in 117.20s`）。
 - `2026-04-19`：新增 `docs/notes/README.md` 与“文档资产与计划目录正规化”细化文件，明确 `docs/notes` 的权威入口、参考材料边界与 `tmp/docs` 资产后续正规化要求。
 - `2026-04-19`：新增受版本控制的 `scripts/srs/` 出件脚本入口与 `docs/source/diagrams/mermaid/` 正式图源目录，并完成首批脚本的 `py_compile` 静态验证。
 - `2026-04-19`：真实回跑当前 `v1.5` 文档出件链四段脚本，重新生成 `docx / pdf / emf / emf-inkscape` 6 个交付件；随后修正 `scripts/srs/v1_5/update_v15_docx_split_svg.py` 对 `tmp/docs/export_docx_pdf.py` 的遗留硬编码，并对 `v1.5.pdf` 第 `6 / 14 / 15 / 26 / 29` 页完成快速视觉抽检。

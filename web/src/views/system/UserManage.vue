@@ -28,8 +28,8 @@
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'enrollment_status'">
-              <a-tag :color="record.enrollment_status === 'ACTIVE' ? 'green' : 'default'">
-                {{ record.enrollment_status }}
+              <a-tag :color="enrollmentStatusColor(record.enrollment_status)">
+                {{ enrollmentStatusLabel(record.enrollment_status) }}
               </a-tag>
             </template>
             <template v-else-if="column.key === 'actions'">
@@ -63,7 +63,9 @@
           {{ selectedStudent?.full_name }} ({{ selectedStudent?.student_no }})
         </a-form-item>
         <a-form-item label="当前状态">
-          <a-tag>{{ selectedStudent?.enrollment_status }}</a-tag>
+          <a-tag :color="enrollmentStatusColor(selectedStudent?.enrollment_status)">
+            {{ enrollmentStatusLabel(selectedStudent?.enrollment_status) }}
+          </a-tag>
         </a-form-item>
         <a-form-item label="新状态">
           <a-select v-model:value="enrollForm.new_status" style="width: 100%">
@@ -86,12 +88,36 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { updateEnrollmentStatus } from '@/api/auth'
 import { adminSearchStudents, type StudentBasic } from '@/api/profile'
-import { get, post } from '@/utils/request'
+import { get } from '@/utils/request'
 import type { ApiEnvelope } from '@/utils/request'
 
 const router = useRouter()
 const activeTab = ref('students')
+
+const ENROLLMENT_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: '在读',
+  SUSPENDED: '休学',
+  TRANSFERRED: '转出',
+  GRADUATED: '毕业',
+  ARCHIVED: '归档',
+  IN_SCHOOL: '在校',
+  LEAVE: '离校',
+}
+
+function enrollmentStatusLabel(status?: string | null) {
+  if (!status) return '-'
+  return ENROLLMENT_STATUS_LABELS[status] || status
+}
+
+function enrollmentStatusColor(status?: string | null) {
+  if (status === 'ACTIVE' || status === 'IN_SCHOOL') return 'green'
+  if (status === 'SUSPENDED') return 'gold'
+  if (status === 'TRANSFERRED' || status === 'LEAVE') return 'orange'
+  if (status === 'GRADUATED') return 'blue'
+  return 'default'
+}
 
 // ---------- 学生列表 ----------
 const stuCols = [
@@ -102,7 +128,7 @@ const stuCols = [
   { title: '专业', dataIndex: 'major_code', key: 'major_code', width: 120 },
   { title: '班级', dataIndex: 'class_code', key: 'class_code', width: 100 },
   { title: '政治面貌', dataIndex: 'political_status', key: 'political_status', width: 110 },
-  { title: '学籍', key: 'enrollment_status', width: 100 },
+  { title: '学籍状态', key: 'enrollment_status', width: 110 },
   { title: '操作', key: 'actions', width: 140 },
 ]
 const stuFilters = reactive<{ q?: string; grade_code?: string; major_code?: string }>({})
@@ -153,7 +179,12 @@ function onEditEnrollment(stu: StudentBasic | Record<string, any>) {
     major_code: stu.major_code ?? null,
     class_code: stu.class_code ?? null,
     political_status: stu.political_status ?? null,
-    enrollment_status: stu.enrollment_status,
+    enrollment_year: stu.enrollment_year ?? null,
+    expected_graduation_year: stu.expected_graduation_year ?? null,
+    status: stu.status ?? stu.enrollment_status ?? 'ACTIVE',
+    enrollment_status: stu.enrollment_status ?? stu.status ?? 'ACTIVE',
+    enrollment_status_reason: stu.enrollment_status_reason ?? null,
+    enrollment_status_updated_at: stu.enrollment_status_updated_at ?? null,
   }
   selectedStudent.value = current
   enrollForm.new_status = current.enrollment_status
@@ -165,13 +196,13 @@ async function onSubmitEnrollment() {
   if (!selectedStudent.value) return
   enrollSubmitting.value = true
   try {
-    await post<ApiEnvelope<any>>(
-      `/admin/auth/students/${selectedStudent.value.id}/enrollment-status`,
-      enrollForm,
-    )
+    await updateEnrollmentStatus(selectedStudent.value.id, {
+      status: enrollForm.new_status as 'ACTIVE' | 'SUSPENDED' | 'TRANSFERRED' | 'GRADUATED' | 'ARCHIVED',
+      reason: enrollForm.reason || undefined,
+    })
     message.success('学籍状态更新成功')
     showEnrollmentModal.value = false
-    reloadStudents()
+    await reloadStudents()
   } finally {
     enrollSubmitting.value = false
   }

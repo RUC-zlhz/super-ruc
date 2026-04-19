@@ -83,16 +83,24 @@ async def mark_read(
 async def get_notice(
     notice_id: int, db: DBDep, user: CurrentUserDep
 ) -> ApiResponse[NoticeOut]:
-    # 学生只能看已发布且被投递到本人的通知；管理角色可直接看
     notice = await repo.get_notice(db, notice_id)
     if notice is None:
         raise NotFoundError("通知不存在")
     editor_roles = set(_NOTICE_EDITOR_ROLES)
     is_editor = bool(set(user.roles) & editor_roles)
     if not is_editor:
+        if user.student_id is None:
+            raise BizError("无权查看该通知", code=40301, http_status=403)
         if notice.status != "PUBLISHED":
             raise NotFoundError("通知不存在或未发布")
-        # TODO: 也可以进一步校验是否投递给本人；此处简化为允许所有已登录学生查看已发布通知
+        has_delivery = await repo.student_has_notice_delivery(
+            db,
+            notice_id,
+            user.student_id,
+            channel="IN_APP",
+        )
+        if not has_delivery:
+            raise NotFoundError("通知不存在或未投递给当前学生")
     return ok(service.notice_to_out(notice))
 
 

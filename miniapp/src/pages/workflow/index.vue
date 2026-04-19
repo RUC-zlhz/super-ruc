@@ -34,8 +34,10 @@ import { getMyWorkflows, type StudentWorkflow } from '@/api/workflow'
 const workflows = ref<StudentWorkflow[]>([])
 
 const STATUS_MAP: Record<string, string> = {
-  IN_PROGRESS: '进行中',
+  ACTIVE: '进行中',
   COMPLETED: '已完成',
+  SUSPENDED: '已暂停',
+  IN_PROGRESS: '进行中',
   CANCELLED: '已取消',
 }
 
@@ -72,8 +74,9 @@ onMounted(async () => {
 .flow-header { display: flex; justify-content: space-between; align-items: center; }
 .flow-name { font-size: 30rpx; font-weight: 600; }
 .flow-status { font-size: 24rpx; padding: 4rpx 12rpx; border-radius: 4rpx; }
-.flow-status.in_progress { background: #e6f7ff; color: #1890ff; }
+.flow-status.active, .flow-status.in_progress { background: #e6f7ff; color: #1890ff; }
 .flow-status.completed { background: #f6ffed; color: #52c41a; }
+.flow-status.suspended, .flow-status.cancelled { background: #f5f5f5; color: #999; }
 .flow-node { font-size: 26rpx; color: #666; display: block; margin-top: 8rpx; }
 .flow-date { font-size: 24rpx; color: #999; display: block; margin-top: 4rpx; }
 

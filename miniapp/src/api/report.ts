@@ -1,18 +1,30 @@
 import { get } from '@/utils/request'
 
+export interface AcademicModuleGap {
+  module_code: string
+  module_name: string
+  module_type: string
+  credits_required: number
+  credits_earned: number
+  credits_gap: number
+  passed_courses: string[]
+  note?: string | null
+}
+
 export interface AcademicGapResult {
-  plan_name: string
-  total_required_credits: number
-  total_earned_credits: number
-  gap_credits: number
-  modules: {
-    module_name: string
-    module_type: string
-    min_credits: number
-    earned_credits: number
-    gap: number
-    is_required: boolean
-  }[]
+  student_no: string
+  student_name: string
+  grade_code?: string | null
+  major_code?: string | null
+  plan_id?: number | null
+  plan_name?: string | null
+  total_credits_required?: number | null
+  total_credits_earned: number
+  modules: AcademicModuleGap[]
+  suggested_courses: Record<string, any>[]
+  disclaimer: string
+  data_warnings: string[]
+  generated_at: string
 }
 
 export function getMyAcademicGap() {

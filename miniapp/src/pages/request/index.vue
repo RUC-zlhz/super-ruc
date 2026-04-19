@@ -42,28 +42,25 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { getMyRequests, type RequestBrief } from '@/api/workflow'
+import {
+  getMyRequests,
+  getRequestStatusLabel,
+  type RequestBrief,
+} from '@/api/workflow'
 
 const STATUS_TABS = [
   { label: '全部', value: '' },
   { label: '草稿', value: 'DRAFT' },
-  { label: '审核中', value: 'SUBMITTED,IN_REVIEW' },
+  { label: '待处理', value: 'SUBMITTED,IN_REVIEW' },
   { label: '已通过', value: 'APPROVED' },
   { label: '已驳回', value: 'REJECTED' },
-  { label: '转线下', value: 'OFFLINE_HANDLED' },
+  { label: '转线下办理', value: 'OFFLINE_HANDLED' },
 ]
 const tab = ref('')
 
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: '草稿',
-  SUBMITTED: '已提交',
-  IN_REVIEW: '审核中',
-  APPROVED: '已通过',
-  REJECTED: '已驳回',
-  WITHDRAWN: '已撤回',
-  OFFLINE_HANDLED: '转线下',
+function statusLabel(status: string) {
+  return getRequestStatusLabel(status)
 }
-function statusLabel(s: string) { return STATUS_LABELS[s] || s }
 
 const requests = ref<RequestBrief[]>([])
 const loading = ref(false)

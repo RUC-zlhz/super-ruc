@@ -1,269 +1,549 @@
-"""profile 闭环 — FR-018 学生画像 + v1.5 账号生命周期。
-
-覆盖：
-- 学生本人 GET /profile/me：只返回非敏感 facts，敏感条目对学生端隐藏
-- 学生 POST /profile/me/corrections → admin 审批 APPROVED + apply_to_fact → 字段落库
-- 管理员 GET /admin/profile/students 搜索；POST /admin/profile/{id}/facts 录入事实
-- v1.5：enrollment_status=ARCHIVED 的学生写操作被拦截（提交申请 → 40311），
-  但 /profile/me 只读仍可访问
-- C-03：匿名访问 401
-"""
+"""profile S3 集成测试：学籍只读、补录审批、scope 收口与快照导出。"""
 from __future__ import annotations
 
+import io
+from datetime import datetime, timezone
+
 from httpx import AsyncClient
+from openpyxl import load_workbook
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.models import ENROLLMENT_ARCHIVED, Student
-from app.profile.models import ProfileFact
+from app.audit.models import AuditLog
+from app.auth.models import ENROLLMENT_ACTIVE, ENROLLMENT_GRADUATED, Student, User, UserRole
+from app.core.security import create_token
+from app.profile.models import (
+    PROFILE_APPROVAL_APPROVED,
+    PROFILE_APPROVAL_PENDING,
+    PROFILE_APPROVAL_REJECTED,
+    PROFILE_FACT_COMPETITION,
+    PROFILE_FACT_RESEARCH,
+    PROFILE_SOURCE_STUDENT_SELF,
+    PROFILE_SOURCE_TEACHER_ENTRY,
+    ProfileCorrection,
+    ProfileFact,
+)
 
 
-async def _login_as_student(
-    client: AsyncClient, db: AsyncSession, *, student_no: str, wx_code: str,
-) -> tuple[str, int]:
-    """创建学生 + 走 mock wx-login，返回 (access_token, student_id)。"""
-    stu = Student(
+async def _create_student(
+    db: AsyncSession,
+    *,
+    student_no: str,
+    full_name: str,
+    class_code: str,
+    major_code: str,
+    enrollment_status: str = ENROLLMENT_ACTIVE,
+    enrollment_status_reason: str | None = None,
+) -> Student:
+    row = Student(
         student_no=student_no,
-        full_name=f"p-{student_no}",
-        grade_code="2022",
-        major_code="CS",
-        class_code="CS2201",
+        full_name=full_name,
+        grade_code="2023",
+        major_code=major_code,
+        class_code=class_code,
+        enrollment_status=enrollment_status,
+        enrollment_status_reason=enrollment_status_reason,
+        enrollment_status_updated_at=datetime.now(timezone.utc),
     )
-    db.add(stu)
+    db.add(row)
     await db.commit()
-    await db.refresh(stu)
-    resp = await client.post(
-        "/api/v1/auth/wx-login",
-        json={"code": wx_code, "student_no": student_no},
+    await db.refresh(row)
+    return row
+
+
+async def _create_headers(
+    db: AsyncSession,
+    *,
+    work_no: str,
+    display_name: str,
+    student_id: int | None = None,
+    roles: list[tuple[str, str | None]] | None = None,
+) -> tuple[dict[str, str], User]:
+    user = User(
+        work_no=work_no,
+        display_name=display_name,
+        student_id=student_id,
+        is_active=True,
     )
-    assert resp.status_code == 200, resp.text
-    return resp.json()["data"]["access_token"], stu.id
+    db.add(user)
+    await db.flush()
+    role_codes: list[str] = []
+    for role_code, scope_code in roles or []:
+        db.add(UserRole(user_id=user.id, role_code=role_code, scope_code=scope_code))
+        if role_code not in role_codes:
+            role_codes.append(role_code)
+    await db.commit()
+    await db.refresh(user)
+    claims: dict[str, object] = {"roles": role_codes}
+    if student_id is not None:
+        claims["sid"] = student_id
+    token = create_token(str(user.id), "access", extra_claims=claims)
+    return {"Authorization": f"Bearer {token}"}, user
 
 
-async def test_my_profile_hides_sensitive_facts(
+async def _create_fact(
+    db: AsyncSession,
+    *,
+    student_id: int,
+    fact_type: str,
+    title: str,
+    source: str,
+    approval_status: str,
+    created_by: int | None,
+    updated_by: int | None,
+    is_sensitive: bool = False,
+    review_comment: str | None = None,
+) -> ProfileFact:
+    extra = {"review_comment": review_comment} if review_comment else None
+    row = ProfileFact(
+        student_id=student_id,
+        fact_type=fact_type,
+        title=title,
+        description=f"{title} description",
+        source=source,
+        approval_status=approval_status,
+        is_sensitive=is_sensitive,
+        created_by=created_by,
+        updated_by=updated_by,
+        approved_by=updated_by if approval_status == PROFILE_APPROVAL_APPROVED else None,
+        approved_at=datetime.now(timezone.utc) if approval_status == PROFILE_APPROVAL_APPROVED else None,
+        extra=extra,
+    )
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return row
+
+
+async def _create_correction(
+    db: AsyncSession,
+    *,
+    student_id: int,
+    fact_id: int | None = None,
+) -> ProfileCorrection:
+    row = ProfileCorrection(
+        student_id=student_id,
+        fact_id=fact_id,
+        field_name="description",
+        current_value="old",
+        proposed_value="new",
+        reason="需要修正",
+        status=PROFILE_APPROVAL_PENDING,
+    )
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return row
+
+
+async def _latest_audit(db: AsyncSession, *, action: str, entity_id: int) -> AuditLog | None:
+    stmt = (
+        select(AuditLog)
+        .where(AuditLog.action == action, AuditLog.entity_id == entity_id)
+        .order_by(AuditLog.id.desc())
+    )
+    return (await db.execute(stmt)).scalars().first()
+
+
+async def test_profile_self_view_submission_review_and_metadata_visibility(
     client: AsyncClient,
     db: AsyncSession,
-    admin_client: AsyncClient,
 ) -> None:
-    """FR-018 + C-04：学生端只能看到 is_sensitive=False 的事实。"""
-    token, student_id = await _login_as_student(
-        client, db, student_no="P100001", wx_code="wx_p100001"
+    student = await _create_student(
+        db,
+        student_no="P300001",
+        full_name="画像学生甲",
+        class_code="CS2301",
+        major_code="CS",
+        enrollment_status_reason="正常在读",
     )
-    stu_headers = {"Authorization": f"Bearer {token}"}
+    student_headers, student_user = await _create_headers(
+        db,
+        work_no="S500001",
+        display_name="Profile Student",
+        student_id=student.id,
+        roles=[("STUDENT", None)],
+    )
+    admin_headers, admin_user = await _create_headers(
+        db,
+        work_no="T500001",
+        display_name="Profile Admin",
+        roles=[("SUPER_ADMIN", None)],
+    )
 
-    # admin 录入两条事实：一条普通、一条敏感
-    r1 = await admin_client.post(
-        f"/api/v1/admin/profile/{student_id}/facts",
+    await _create_fact(
+        db,
+        student_id=student.id,
+        fact_type=PROFILE_FACT_RESEARCH,
+        title="科研项目 A",
+        source=PROFILE_SOURCE_TEACHER_ENTRY,
+        approval_status=PROFILE_APPROVAL_APPROVED,
+        created_by=admin_user.id,
+        updated_by=admin_user.id,
+    )
+    await _create_fact(
+        db,
+        student_id=student.id,
+        fact_type=PROFILE_FACT_COMPETITION,
+        title="敏感竞赛 B",
+        source=PROFILE_SOURCE_TEACHER_ENTRY,
+        approval_status=PROFILE_APPROVAL_APPROVED,
+        created_by=admin_user.id,
+        updated_by=admin_user.id,
+        is_sensitive=True,
+    )
+
+    self_profile = await client.get("/api/v1/profile/me", headers=student_headers)
+    assert self_profile.status_code == 200, self_profile.text
+    self_data = self_profile.json()["data"]
+    assert self_data["student"]["status"] == "IN_SCHOOL"
+    assert self_data["student"]["enrollment_status"] == ENROLLMENT_ACTIVE
+    assert self_data["student"]["enrollment_status_reason"] == "正常在读"
+    assert [fact["title"] for fact in self_data["facts"]] == ["科研项目 A"]
+    assert "created_by" not in self_data["facts"][0]
+    assert "source_label" not in self_data["facts"][0]
+
+    approve_submission = await client.post(
+        "/api/v1/profile/me/facts",
+        headers=student_headers,
         json={
-            "fact_type": "COMPETITION",
-            "title": "ACM-ICPC 省赛银奖",
-            "rank_label": "省级二等奖",
-            "source": "TEACHER_ENTRY",
+            "fact_type": PROFILE_FACT_COMPETITION,
+            "title": "学生补录通过项",
+            "description": "待审批",
         },
     )
-    assert r1.status_code == 200, r1.text
+    assert approve_submission.status_code == 200, approve_submission.text
+    approved_fact_id = approve_submission.json()["data"]["id"]
+    assert approve_submission.json()["data"]["approval_status"] == PROFILE_APPROVAL_PENDING
 
-    r2 = await admin_client.post(
-        f"/api/v1/admin/profile/{student_id}/facts",
+    pending = await client.get(
+        "/api/v1/admin/profile/facts/pending",
+        headers=admin_headers,
+    )
+    assert pending.status_code == 200, pending.text
+    pending_items = pending.json()["data"]["items"]
+    assert len(pending_items) == 1
+    assert pending_items[0]["id"] == approved_fact_id
+    assert pending_items[0]["source_label"] == "学生补录"
+    assert pending_items[0]["created_by_name"] == "Profile Student"
+    assert pending_items[0]["updated_by_name"] == "Profile Student"
+
+    approve = await client.post(
+        f"/api/v1/admin/profile/facts/{approved_fact_id}/decision",
+        headers=admin_headers,
+        json={"decision": PROFILE_APPROVAL_APPROVED, "comment": "通过"},
+    )
+    assert approve.status_code == 200, approve.text
+    assert approve.json()["data"]["approval_status"] == PROFILE_APPROVAL_APPROVED
+    assert approve.json()["data"]["updated_by_name"] == "Profile Admin"
+    assert approve.json()["data"]["review_comment"] == "通过"
+
+    reject_submission = await client.post(
+        "/api/v1/profile/me/facts",
+        headers=student_headers,
         json={
-            "fact_type": "CUSTOM",
-            "title": "心理辅导记录",
-            "description": "学期焦虑咨询两次",
-            "source": "TEACHER_ENTRY",
-            "is_sensitive": True,
+            "fact_type": PROFILE_FACT_RESEARCH,
+            "title": "学生补录驳回项",
+            "description": "待驳回",
         },
     )
-    assert r2.status_code == 200, r2.text
+    assert reject_submission.status_code == 200, reject_submission.text
+    rejected_fact_id = reject_submission.json()["data"]["id"]
 
-    # 学生端视图
-    mine = await client.get("/api/v1/profile/me", headers=stu_headers)
-    assert mine.status_code == 200, mine.text
-    data = mine.json()["data"]
-    assert data["student"]["student_no"] == "P100001"
-    titles = {f["title"] for f in data["facts"]}
-    assert "ACM-ICPC 省赛银奖" in titles
-    assert "心理辅导记录" not in titles  # 敏感条目对学生隐藏
-    assert data["competition_count"] == 1
+    reject = await client.post(
+        f"/api/v1/admin/profile/facts/{rejected_fact_id}/decision",
+        headers=admin_headers,
+        json={"decision": PROFILE_APPROVAL_REJECTED, "comment": "材料不足"},
+    )
+    assert reject.status_code == 200, reject.text
+    assert reject.json()["data"]["approval_status"] == PROFILE_APPROVAL_REJECTED
+    assert reject.json()["data"]["review_comment"] == "材料不足"
 
-    # 管理侧视图可以看到全部
-    admin_view = await admin_client.get(f"/api/v1/admin/profile/{student_id}")
-    assert admin_view.status_code == 200
-    admin_titles = {f["title"] for f in admin_view.json()["data"]["facts"]}
-    assert {"ACM-ICPC 省赛银奖", "心理辅导记录"}.issubset(admin_titles)
+    submissions = await client.get(
+        "/api/v1/profile/me/fact-submissions",
+        headers=student_headers,
+    )
+    assert submissions.status_code == 200, submissions.text
+    submissions_by_title = {
+        item["title"]: item for item in submissions.json()["data"]["items"]
+    }
+    assert submissions_by_title["学生补录通过项"]["approval_status"] == PROFILE_APPROVAL_APPROVED
+    assert submissions_by_title["学生补录通过项"]["review_comment"] == "通过"
+    assert submissions_by_title["学生补录驳回项"]["approval_status"] == PROFILE_APPROVAL_REJECTED
+    assert submissions_by_title["学生补录驳回项"]["review_comment"] == "材料不足"
+
+    self_profile_after = await client.get("/api/v1/profile/me", headers=student_headers)
+    assert self_profile_after.status_code == 200, self_profile_after.text
+    visible_titles = [fact["title"] for fact in self_profile_after.json()["data"]["facts"]]
+    assert "科研项目 A" in visible_titles
+    assert "学生补录通过项" in visible_titles
+    assert "学生补录驳回项" not in visible_titles
+    assert "敏感竞赛 B" not in visible_titles
+
+    admin_profile = await client.get(
+        f"/api/v1/admin/profile/{student.id}",
+        headers=admin_headers,
+    )
+    assert admin_profile.status_code == 200, admin_profile.text
+    admin_facts = {item["title"]: item for item in admin_profile.json()["data"]["facts"]}
+    assert admin_facts["学生补录通过项"]["source_label"] == "学生补录"
+    assert admin_facts["学生补录通过项"]["created_by_name"] == "Profile Student"
+    assert admin_facts["学生补录通过项"]["updated_by_name"] == "Profile Admin"
+    assert admin_facts["学生补录通过项"]["review_comment"] == "通过"
 
 
-async def test_correction_approve_applies_to_fact(
+async def test_profile_scope_controls_search_detail_decisions_and_audit(
     client: AsyncClient,
     db: AsyncSession,
-    admin_client: AsyncClient,
 ) -> None:
-    """学生提纠错 → admin 审批 APPROVED+apply_to_fact=True → fact 字段被更新。"""
-    token, student_id = await _login_as_student(
-        client, db, student_no="P200001", wx_code="wx_p200001"
+    in_scope_student = await _create_student(
+        db,
+        student_no="P300002",
+        full_name="班级命中学生",
+        class_code="CS2301",
+        major_code="CS",
     )
-    stu_headers = {"Authorization": f"Bearer {token}"}
-
-    create_fact = await admin_client.post(
-        f"/api/v1/admin/profile/{student_id}/facts",
-        json={
-            "fact_type": "PRACTICE",
-            "title": "支教活动",
-            "description": "山区小学支教一周",
-            "source": "TEACHER_ENTRY",
-        },
+    legacy_scope_student = await _create_student(
+        db,
+        student_no="P300003",
+        full_name="旧 scope 学生",
+        class_code="CS2302",
+        major_code="CS",
     )
-    fact_id = create_fact.json()["data"]["id"]
-
-    # 学生提交纠错：修正 description
-    corr = await client.post(
-        "/api/v1/profile/me/corrections",
-        headers=stu_headers,
-        json={
-            "fact_id": fact_id,
-            "field_name": "description",
-            "proposed_value": "山区支教两周（原记录有误）",
-            "reason": "实际参与两周，不是一周",
-        },
+    out_scope_student = await _create_student(
+        db,
+        student_no="P300004",
+        full_name="越权学生",
+        class_code="EE2301",
+        major_code="EE",
     )
-    assert corr.status_code == 200, corr.text
-    cor = corr.json()["data"]
-    assert cor["status"] == "PENDING"
-    assert cor["current_value"] == "山区小学支教一周"
-    correction_id = cor["id"]
 
-    # admin 审批通过，应用到 fact
-    decision = await admin_client.post(
-        f"/api/v1/admin/profile/corrections/{correction_id}/decision",
+    counselor_headers, _ = await _create_headers(
+        db,
+        work_no="T500002",
+        display_name="Class Counselor",
+        roles=[("COUNSELOR", "CLASS:CS2301")],
+    )
+    legacy_headers, _ = await _create_headers(
+        db,
+        work_no="T500003",
+        display_name="Legacy Counselor",
+        roles=[("COUNSELOR", "CS2302")],
+    )
+    major_headers, _ = await _create_headers(
+        db,
+        work_no="T500004",
+        display_name="Major Teacher",
+        roles=[("HEAD_TEACHER", "MAJOR:EE")],
+    )
+
+    counselor_search = await client.get(
+        "/api/v1/admin/profile/students",
+        headers=counselor_headers,
+    )
+    assert counselor_search.status_code == 200, counselor_search.text
+    assert [item["student_no"] for item in counselor_search.json()["data"]["items"]] == ["P300002"]
+
+    legacy_search = await client.get(
+        "/api/v1/admin/profile/students",
+        headers=legacy_headers,
+    )
+    assert legacy_search.status_code == 200, legacy_search.text
+    assert [item["student_no"] for item in legacy_search.json()["data"]["items"]] == ["P300003"]
+
+    major_search = await client.get(
+        "/api/v1/admin/profile/students",
+        headers=major_headers,
+    )
+    assert major_search.status_code == 200, major_search.text
+    assert [item["student_no"] for item in major_search.json()["data"]["items"]] == ["P300004"]
+
+    pending_fact = await _create_fact(
+        db,
+        student_id=out_scope_student.id,
+        fact_type=PROFILE_FACT_RESEARCH,
+        title="待审批越权补录",
+        source=PROFILE_SOURCE_STUDENT_SELF,
+        approval_status=PROFILE_APPROVAL_PENDING,
+        created_by=None,
+        updated_by=None,
+    )
+    correction = await _create_correction(
+        db,
+        student_id=out_scope_student.id,
+        fact_id=pending_fact.id,
+    )
+
+    pending_list = await client.get(
+        "/api/v1/admin/profile/facts/pending",
+        headers=counselor_headers,
+    )
+    assert pending_list.status_code == 200, pending_list.text
+    assert pending_list.json()["data"]["meta"]["total"] == 0
+
+    detail_forbidden = await client.get(
+        f"/api/v1/admin/profile/{out_scope_student.id}",
+        headers=counselor_headers,
+    )
+    assert detail_forbidden.status_code == 403
+    assert detail_forbidden.json()["code"] == 40321
+
+    fact_decision_forbidden = await client.post(
+        f"/api/v1/admin/profile/facts/{pending_fact.id}/decision",
+        headers=counselor_headers,
+        json={"decision": PROFILE_APPROVAL_APPROVED, "comment": "不应通过"},
+    )
+    assert fact_decision_forbidden.status_code == 403
+    assert fact_decision_forbidden.json()["code"] == 40321
+
+    correction_decision_forbidden = await client.post(
+        f"/api/v1/admin/profile/corrections/{correction.id}/decision",
+        headers=counselor_headers,
         json={
-            "decision": "APPROVED",
-            "comment": "属实，核销原记录",
+            "decision": PROFILE_APPROVAL_APPROVED,
+            "comment": "不应处理",
             "apply_to_fact": True,
         },
     )
-    assert decision.status_code == 200, decision.text
-    assert decision.json()["data"]["status"] == "APPROVED"
+    assert correction_decision_forbidden.status_code == 403
+    assert correction_decision_forbidden.json()["code"] == 40321
 
-    # 直接查 DB 验证 fact.description 被更新
-    fact = (
-        await db.execute(select(ProfileFact).where(ProfileFact.id == fact_id))
-    ).scalar_one()
-    await db.refresh(fact)
-    assert fact.description == "山区支教两周（原记录有误）"
-
-
-async def test_admin_search_students(
-    db: AsyncSession,
-    admin_client: AsyncClient,
-) -> None:
-    """管理员按 grade/major 搜索学生列表。"""
-    db.add_all([
-        Student(
-            student_no="P310001", full_name="张三",
-            grade_code="2023", major_code="CS", class_code="CS2301",
-        ),
-        Student(
-            student_no="P310002", full_name="李四",
-            grade_code="2023", major_code="CS", class_code="CS2301",
-        ),
-        Student(
-            student_no="P310099", full_name="王五",
-            grade_code="2024", major_code="SE", class_code="SE2401",
-        ),
-    ])
-    await db.commit()
-
-    resp = await admin_client.get(
-        "/api/v1/admin/profile/students",
-        params={"grade_code": "2023", "major_code": "CS"},
+    snapshot_forbidden = await client.get(
+        f"/api/v1/admin/profile/{out_scope_student.id}/snapshot.xlsx",
+        headers=counselor_headers,
     )
-    assert resp.status_code == 200, resp.text
-    items = resp.json()["data"]["items"]
-    nos = {i["student_no"] for i in items}
-    assert {"P310001", "P310002"}.issubset(nos)
-    assert "P310099" not in nos
+    assert snapshot_forbidden.status_code == 403
+    assert snapshot_forbidden.json()["code"] == 40321
 
-    # 关键字搜索姓名
-    resp2 = await admin_client.get(
-        "/api/v1/admin/profile/students", params={"q": "王五"},
+    read_log = await _latest_audit(
+        db,
+        action="READ_ADMIN_DENIED",
+        entity_id=out_scope_student.id,
     )
-    items2 = resp2.json()["data"]["items"]
-    assert any(i["student_no"] == "P310099" for i in items2)
+    assert read_log is not None
+    assert read_log.result_code == "FORBIDDEN"
+
+    fact_log = await _latest_audit(
+        db,
+        action="DECIDE_FACT_DENIED",
+        entity_id=out_scope_student.id,
+    )
+    assert fact_log is not None
+    assert fact_log.result_code == "FORBIDDEN"
+
+    correction_log = await _latest_audit(
+        db,
+        action="DECIDE_CORRECTION_DENIED",
+        entity_id=out_scope_student.id,
+    )
+    assert correction_log is not None
+    assert correction_log.result_code == "FORBIDDEN"
+
+    snapshot_log = await _latest_audit(
+        db,
+        action="EXPORT_SNAPSHOT_DENIED",
+        entity_id=out_scope_student.id,
+    )
+    assert snapshot_log is not None
+    assert snapshot_log.result_code == "FORBIDDEN"
 
 
-async def test_archived_student_cannot_submit_request_but_can_read_profile(
+async def test_profile_read_only_student_and_snapshot_exports(
     client: AsyncClient,
     db: AsyncSession,
 ) -> None:
-    """v1.5：enrollment_status=ARCHIVED 只读降级。
-    - 画像只读接口仍可调用
-    - 事务申请创建（require_active_enrollment）→ 40311 / 403
-    """
-    token, student_id = await _login_as_student(
-        client, db, student_no="P400001", wx_code="wx_p400001"
+    student = await _create_student(
+        db,
+        student_no="P300005",
+        full_name="非在读学生",
+        class_code="CS2305",
+        major_code="CS",
+        enrollment_status=ENROLLMENT_GRADUATED,
+        enrollment_status_reason="已毕业",
     )
-    stu_headers = {"Authorization": f"Bearer {token}"}
-
-    # 降级为 ARCHIVED
-    stu = await db.get(Student, student_id)
-    assert stu is not None
-    stu.enrollment_status = ENROLLMENT_ARCHIVED
-    await db.commit()
-
-    # 只读仍可
-    mine = await client.get("/api/v1/profile/me", headers=stu_headers)
-    assert mine.status_code == 200, mine.text
-
-    # 写操作拦截：创建申请 → 403 + 40311
-    create = await client.post(
-        "/api/v1/requests",
-        headers=stu_headers,
-        json={
-            "type_code": "LEAVE_PERSONAL",
-            "title": "毕业后补请假",
-            "form_data": {"reason": "测试"},
-        },
+    student_headers, _ = await _create_headers(
+        db,
+        work_no="S500005",
+        display_name="Readonly Student",
+        student_id=student.id,
+        roles=[("STUDENT", None)],
     )
-    assert create.status_code == 403, create.text
-    body = create.json()
-    assert body["code"] == 40311
-
-
-async def test_archived_student_cannot_submit_correction(
-    client: AsyncClient,
-    db: AsyncSession,
-) -> None:
-    """v1.5 生命周期漏口回归：非在读学生提交画像纠错 → 403 / 40311。"""
-    token, student_id = await _login_as_student(
-        client, db, student_no="P500001", wx_code="wx_p500001"
+    admin_headers, admin_user = await _create_headers(
+        db,
+        work_no="T500005",
+        display_name="Snapshot Admin",
+        roles=[("SUPER_ADMIN", None)],
     )
-    stu_headers = {"Authorization": f"Bearer {token}"}
+    await _create_fact(
+        db,
+        student_id=student.id,
+        fact_type=PROFILE_FACT_RESEARCH,
+        title="已归档科研记录",
+        source=PROFILE_SOURCE_TEACHER_ENTRY,
+        approval_status=PROFILE_APPROVAL_APPROVED,
+        created_by=admin_user.id,
+        updated_by=admin_user.id,
+    )
 
-    stu = await db.get(Student, student_id)
-    assert stu is not None
-    stu.enrollment_status = ENROLLMENT_ARCHIVED
-    await db.commit()
+    read_only_profile = await client.get("/api/v1/profile/me", headers=student_headers)
+    assert read_only_profile.status_code == 200, read_only_profile.text
+    assert read_only_profile.json()["data"]["student"]["enrollment_status"] == ENROLLMENT_GRADUATED
+    assert read_only_profile.json()["data"]["student"]["enrollment_status_reason"] == "已毕业"
 
-    # 只读仍通过
-    mine = await client.get("/api/v1/profile/me", headers=stu_headers)
-    assert mine.status_code == 200
-
-    # 纠错申诉写操作被拦截
-    resp = await client.post(
+    correction_blocked = await client.post(
         "/api/v1/profile/me/corrections",
-        headers=stu_headers,
+        headers=student_headers,
         json={
-            "fact_id": None,
             "field_name": "description",
-            "proposed_value": "归档后补申诉",
-            "reason": "测试",
+            "proposed_value": "申请修改",
+            "reason": "测试只读限制",
         },
     )
-    assert resp.status_code == 403, resp.text
-    assert resp.json()["code"] == 40311
+    assert correction_blocked.status_code == 403
+    assert correction_blocked.json()["code"] == 40311
+
+    fact_blocked = await client.post(
+        "/api/v1/profile/me/facts",
+        headers=student_headers,
+        json={
+            "fact_type": PROFILE_FACT_RESEARCH,
+            "title": "只读补录",
+            "description": "不应允许",
+        },
+    )
+    assert fact_blocked.status_code == 403
+    assert fact_blocked.json()["code"] == 40311
+
+    pdf_resp = await client.get(
+        f"/api/v1/admin/profile/{student.id}/snapshot.pdf",
+        headers=admin_headers,
+    )
+    assert pdf_resp.status_code == 200, pdf_resp.text
+    assert pdf_resp.headers["content-type"].startswith("application/pdf")
+    assert pdf_resp.content.startswith(b"%PDF")
+
+    xlsx_resp = await client.get(
+        f"/api/v1/admin/profile/{student.id}/snapshot.xlsx",
+        headers=admin_headers,
+    )
+    assert xlsx_resp.status_code == 200, xlsx_resp.text
+    assert xlsx_resp.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    workbook = load_workbook(io.BytesIO(xlsx_resp.content), read_only=True)
+    rows = list(workbook.active.iter_rows(values_only=True))
+    assert rows[0][:3] == ("student_no", "full_name", "fact_type")
+    assert rows[1][0] == "P300005"
+    assert rows[1][1] == "非在读学生"
 
 
-async def test_profile_endpoints_reject_anonymous(client: AsyncClient) -> None:
-    resp = await client.get("/api/v1/profile/me")
-    assert resp.status_code == 401
-    resp2 = await client.get("/api/v1/admin/profile/students")
-    assert resp2.status_code == 401
+async def test_profile_new_endpoints_require_auth(client: AsyncClient) -> None:
+    assert (await client.get("/api/v1/profile/me/fact-submissions")).status_code == 401
+    assert (
+        await client.post(
+            "/api/v1/profile/me/facts",
+            json={"fact_type": PROFILE_FACT_RESEARCH, "title": "匿名补录"},
+        )
+    ).status_code == 401
+    assert (await client.get("/api/v1/admin/profile/facts/pending")).status_code == 401
+    assert (await client.get("/api/v1/admin/profile/1/snapshot.pdf")).status_code == 401
