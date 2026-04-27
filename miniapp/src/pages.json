@@ -12,7 +12,7 @@
     { "path": "pages/notice/detail", "style": { "navigationBarTitleText": "通知详情", "navigationBarBackgroundColor": "#b70f24", "navigationBarTextStyle": "white" } },
     { "path": "pages/academic/index", "style": { "navigationBarTitleText": "学业查看", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black" } },
     { "path": "pages/honor/index", "style": { "navigationBarTitleText": "荣誉榜", "navigationBarBackgroundColor": "#fff4f5", "navigationBarTextStyle": "black" } },
-    { "path": "pages/profile/index", "style": { "navigationBarTitleText": "我的/画像", "navigationBarBackgroundColor": "#b70f24", "navigationBarTextStyle": "white" } }
+    { "path": "pages/profile/index", "style": { "navigationBarTitleText": "我的画像", "navigationBarBackgroundColor": "#b70f24", "navigationBarTextStyle": "white" } }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "white",

@@ -239,6 +239,7 @@
 - [x] `S6.7` Miniapp JPG 视觉对齐优化
 - [x] `S6.8` Miniapp JPG 视觉对齐 Round 2 收口
 - [x] `S6.9` Web 管理端 JPG 视觉复刻优化
+- [x] `S6.10` Miniapp JPG 视觉对齐 Round 3 骨架收口
 
 出口条件：
 
@@ -247,6 +248,7 @@
 - `miniapp` 首页、申请、党团进度等高频路径具备更强的任务导向与行动提示
 - `miniapp` 主要学生端页面以 `design/miniapp/` JPG 稿为视觉基准，形成一致的红色品牌头图、柔和卡片、状态胶囊、底部操作栏和详情抽屉观感
 - `miniapp` 在用户复核后继续对齐 JPG 基准的 Round 2 视觉收口，补足上一轮仍存在的页面骨架与密度差距
+- `miniapp` 在再次复核后继续对齐 JPG 基准的 Round 3 视觉收口，纠正通用大红 Hero 误用，回到白色原生导航、浅粉纹理背景、紧凑白卡和红色关键 CTA 的页面骨架
 - `data/` 政策/流程 PDF 可转换为 JSON / Markdown，并显式暴露需 OCR 的页面
 - `web build`、`miniapp mp-weixin build` 继续可验证
 
@@ -261,11 +263,13 @@
 - `S6.7`：已新增 `docs/notes/refinements/2026-04-27-s6-miniapp-jpg-visual-alignment.md`，并以 `design/miniapp/` 13 张 JPG 为视觉基准更新 `miniapp` 全局色板、页面级导航色、首页、知识查询、通知、学业、荣誉、画像、事务申请、党团进度与理论自测页面；页面结构继续沿用当前接口与业务契约。
 - `S6.8`：用户复核反馈上一轮 JPG 对齐仍存在明显差距，已新增并完成 `docs/notes/refinements/2026-04-27-s6-miniapp-jpg-visual-alignment-round2.md`；本轮继续收紧全局视觉变量、首页/通知/知识/学业/荣誉/画像/申请/党团页面骨架、层级、密度、底部操作区与抽屉观感。
 - `S6.9`：已新增并完成 `docs/notes/refinements/2026-04-28-s6-web-jpg-visual-replication.md`；以 `design/web/` 下登录页、全局框架、运营看板、审批、通知、知识库、用户、流程、题库、培养方案、荣誉、审计、导入导出、个人信息、403 与学生画像设计稿为基准，重做 `web/src/styles/theme.scss`、`web/src/App.vue`、`web/src/layouts/MainLayout.vue`、`web/src/views/Login.vue`、`web/src/views/error/Forbidden.vue` 及主要管理页面的 KPI 卡、筛选卡、表格、抽屉和红色品牌视觉。
+- `S6.10`：用户再次指出小程序仍与 JPG 设计截图差距明显，已新增并完成 `docs/notes/refinements/2026-04-28-s6-miniapp-jpg-visual-alignment-round3.md`；本轮重点纠正通知中心、知识查询、学业查看、事务申请、发起申请、申请详情等页面的通用大红 Hero 误用，统一回到白色原生导航、浅粉纹理背景、紧凑白卡、圆角浅粉表单和固定底部 CTA，并补充首页学生形象视觉资源。
 - 验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p web\tsconfig.json` 与 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 均通过；执行 `uv run --extra dev python -m py_compile app\knowledge\router.py app\knowledge\service.py tests\integration\test_knowledge_flow.py` 通过；本轮 `pytest tests\integration\test_knowledge_flow.py -q` 因本地测试数据库拒连未进入断言阶段。
 - `2026-04-27` 补充验证：执行 `UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache uv run --project backend --no-sync --with pypdf --with pdfplumber --with rapidocr-onnxruntime --with pillow python -m py_compile scripts\knowledge\extract_pdf_documents.py` 通过；执行 `UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache uv run --project backend --no-sync --with pypdf --with pdfplumber --with rapidocr-onnxruntime --with pillow python scripts\knowledge\extract_pdf_documents.py data --output-dir output\pdf\extracted --ocr` 通过，生成 4 份 JSON、4 份 Markdown 与 `manifest.json`；团员发展流程 PDF OCR 后正文字符数 `8925`、OCR 字符数 `3366`、chunk 数 `8`。
 - `2026-04-27` Miniapp JPG 视觉对齐验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；沙箱内 `pnpm -C miniapp build:mp-weixin` 因 esbuild `spawn EPERM` 失败，提权环境下重跑通过并输出 `dist\build\mp-weixin`；复核 `miniapp/dist/build/mp-weixin/app.json`、`project.config.json` 及页面级 JSON 存在。
 - `2026-04-28` Miniapp JPG 视觉对齐 Round 2 验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；执行 `pnpm -C miniapp build:mp-weixin` 通过，输出 `miniapp/dist/build/mp-weixin`。
 - `2026-04-28` Web JPG 视觉复刻验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p web\tsconfig.json` 通过；执行 `pnpm -C web build` 通过并输出 `web/dist/`，仅出现 Dart Sass legacy JS API deprecation warning。
+- `2026-04-28` Miniapp JPG 视觉对齐 Round 3 验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；执行 `pnpm -C miniapp build:mp-weixin` 通过，输出 `miniapp/dist/build/mp-weixin`，且 `static/hero-student.png` 已随产物带出。
 
 当前结论：
 
@@ -273,6 +277,7 @@
 - `S6.7` 已将小程序学生端主要页面按 JPG 设计稿做统一视觉对齐；当前仍以微信小程序出包结果作为交付验收入口。
 - `S6.8` 已按用户复核反馈完成 Miniapp JPG 视觉对齐 Round 2 收口，重点补足上一轮在知识查询、学业查看、通知详情等页面上的红色主视觉、浮动指标卡、内容卡层级和底部操作区差距。
 - `S6.9` 已完成 Web 管理端按 `design/web/` JPG / PNG 的视觉复刻优化，当前管理端壳层、登录页、错误页和主要业务页已统一到同一套红色品牌后台视觉系统。
+- `S6.10` 已按用户再次复核反馈完成 Miniapp JPG 视觉对齐 Round 3 骨架收口，重点将不应使用大红 Hero 的知识、学业、通知、事务页面改回 JPG 中的白色导航、浅粉底、紧凑白卡与红色关键动作。
 - `S6.6` 已证明 3 份文字型校级 PDF 可以直接结构化抽取，团员发展流程 PDF 的图片化页面可通过 `--ocr` 自动补齐；OCR 结果仍需人工校对后才能作为权威知识库条目。
 - 后续若继续推进，优先做知识库管理端真实数据走查、PDF OCR / 知识库草稿导入映射、短信 provider 适配或申请流程小程序真机验收。
 
@@ -310,6 +315,7 @@
 | 2026-04-27 | Miniapp JPG 视觉对齐优化 | `docs/notes/refinements/2026-04-27-s6-miniapp-jpg-visual-alignment.md` | `S6.3, S6.4, S6.7` | `[x]` | 已按 `design/miniapp/` JPG 稿统一学生端主要页面观感，并通过 `miniapp vue-tsc` 与 `mp-weixin` 出包 |
 | 2026-04-28 | Miniapp JPG 视觉对齐 Round 2 | `docs/notes/refinements/2026-04-27-s6-miniapp-jpg-visual-alignment-round2.md` | `S6.3, S6.4, S6.7, S6.8` | `[x]` | 已按用户复核反馈继续收紧学生端页面骨架、层级、密度与底部操作区，并通过 `miniapp vue-tsc` 与 `mp-weixin` 出包 |
 | 2026-04-28 | Web JPG 视觉复刻优化 | `docs/notes/refinements/2026-04-28-s6-web-jpg-visual-replication.md` | `S6.1, S6.2, S6.5, S6.9` | `[x]` | 已按 `design/web/` JPG / PNG 稿统一管理端全局壳层、登录页、错误页和主要业务页观感，并通过 `web vue-tsc` 与 `pnpm -C web build` |
+| 2026-04-28 | Miniapp JPG 视觉对齐 Round 3 | `docs/notes/refinements/2026-04-28-s6-miniapp-jpg-visual-alignment-round3.md` | `S6.3, S6.4, S6.7, S6.8, S6.10` | `[x]` | 已按用户再次复核反馈纠正小程序页面骨架、表单与底部操作区，并通过 `miniapp vue-tsc` 与 `mp-weixin` 出包 |
 
 ## 会话更新要求
 
@@ -358,3 +364,4 @@
 - `2026-04-27`：基于用户复核反馈，新增 `S6.8` Round 2 视觉收口细化，继续修正上一轮 JPG 对齐后仍偏弱的页面骨架与信息密度。
 - `2026-04-28`：完成 `S6.8` Round 2 视觉收口；重点补齐知识查询、学业查看、通知详情等薄弱页面，并重新通过 `miniapp vue-tsc` 与 `pnpm -C miniapp build:mp-weixin`。
 - `2026-04-28`：新增并完成 `S6.9` Web 管理端 JPG 视觉复刻优化；以 `design/web/` 设计稿统一红色品牌顶栏、深色侧栏、白底卡片、KPI、筛选、表格、抽屉与登录/错误页观感，并通过 `web vue-tsc` 与 `pnpm -C web build`。
+- `2026-04-28`：新增并完成 `S6.10` Miniapp JPG 视觉对齐 Round 3 骨架收口；纠正不应使用大红 Hero 的知识、学业、通知和事务页面，统一浅粉白页面骨架、紧凑卡片、圆角表单与底部 CTA，并通过 `miniapp vue-tsc` 与 `pnpm -C miniapp build:mp-weixin`。

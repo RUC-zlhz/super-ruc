@@ -200,34 +200,57 @@ defineExpose({ validate })
 </script>
 
 <style scoped>
-.dynamic-form {}
-.df-row { margin-bottom: 20rpx; }
-.df-label { display: flex; align-items: center; margin-bottom: 6rpx; }
-.df-label-text { font-size: 26rpx; color: #333; }
-.df-required { color: #ff4d4f; margin-left: 6rpx; font-size: 26rpx; }
-.df-desc { display: block; font-size: 22rpx; color: #999; margin-bottom: 6rpx; }
+.dynamic-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+}
+.df-row {
+  padding: 18rpx 0;
+  border-bottom: 1rpx solid #f4e9ec;
+}
+.df-row:last-child {
+  border-bottom: none;
+}
+.df-label { display: flex; align-items: center; margin-bottom: 10rpx; }
+.df-label-text { font-size: 25rpx; color: #3b3134; font-weight: 700; }
+.df-required { color: #c8142f; margin-left: 6rpx; font-size: 26rpx; }
+.df-desc { display: block; font-size: 22rpx; color: #9a8f92; margin-bottom: 10rpx; line-height: 1.55; }
 
 .df-input, .df-textarea, .df-picker {
-  background: #f7f7f7;
-  border-radius: 8rpx;
-  padding: 14rpx 16rpx;
+  width: 100%;
+  box-sizing: border-box;
+  background: #fffafa;
+  border: 1rpx solid #f0dfe3;
+  border-radius: 18rpx;
+  padding: 18rpx 20rpx;
   font-size: 26rpx;
-  color: #333;
+  color: #2f2a2b;
+  box-shadow: inset 0 2rpx 8rpx rgba(82, 28, 38, 0.03);
 }
-.df-textarea { min-height: 140rpx; }
+.df-textarea { min-height: 168rpx; }
 .df-picker {
-  min-height: 56rpx;
+  min-height: 78rpx;
   line-height: 1.5;
   display: flex;
   align-items: center;
 }
-.df-placeholder { color: #bbb; }
-.df-error { display: block; font-size: 22rpx; color: #ff4d4f; margin-top: 4rpx; }
+.df-placeholder { color: #b7a8ac; }
+.df-error {
+  display: block;
+  margin-top: 10rpx;
+  padding-left: 4rpx;
+  font-size: 22rpx;
+  color: #c8142f;
+}
 
 .df-empty {
-  padding: 24rpx 0;
+  padding: 30rpx 0;
   text-align: center;
   font-size: 24rpx;
-  color: #999;
+  color: #9a8f92;
+  border-radius: 18rpx;
+  background: #fffafa;
+  border: 1rpx dashed #f0dfe3;
 }
 </style>

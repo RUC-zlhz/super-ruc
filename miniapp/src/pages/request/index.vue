@@ -317,9 +317,10 @@ onPullDownRefresh(async () => {
 <style scoped>
 .container {
   min-height: 100vh;
-  padding: 24rpx;
+  padding: 28rpx 36rpx 36rpx;
   background:
-    linear-gradient(180deg, #fff6f7 0, #f7f1f2 220rpx, #f6f0f1 100%),
+    radial-gradient(circle at 100% 12%, rgba(183, 15, 36, 0.08), transparent 180rpx),
+    linear-gradient(180deg, #fff 0, #fff5f6 260rpx, #f7f1f2 100%),
     #f6f0f1;
   display: flex;
   flex-direction: column;
@@ -329,17 +330,17 @@ onPullDownRefresh(async () => {
 .hero-card {
   position: relative;
   overflow: hidden;
-  padding: 26rpx;
-  border-radius: 28rpx;
+  padding: 28rpx 30rpx;
+  border-radius: 20rpx;
   background:
-    linear-gradient(135deg, rgba(183, 15, 36, 0.95), rgba(216, 36, 56, 0.88) 58%, rgba(255, 238, 241, 0.92) 100%);
-  box-shadow: 0 18rpx 42rpx rgba(146, 18, 36, 0.22);
+    radial-gradient(circle at 100% 100%, rgba(183, 15, 36, 0.12), transparent 180rpx),
+    linear-gradient(135deg, rgba(255, 250, 251, 0.98), rgba(255, 245, 247, 0.98));
+  border: 1rpx solid #f0c9cf;
+  box-shadow: 0 12rpx 30rpx rgba(146, 18, 36, 0.08);
 }
 
 .hero-orb {
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
+  display: none;
 }
 
 .hero-orb-left {
@@ -377,8 +378,8 @@ onPullDownRefresh(async () => {
   width: 92rpx;
   height: 92rpx;
   border-radius: 26rpx;
-  background: rgba(255, 255, 255, 0.18);
-  box-shadow: inset 0 0 0 1rpx rgba(255, 255, 255, 0.18);
+  background: #fff1f2;
+  box-shadow: inset 0 0 0 1rpx rgba(183, 15, 36, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -386,7 +387,7 @@ onPullDownRefresh(async () => {
 }
 
 .hero-icon {
-  font-size: 46rpx;
+  font-size: 44rpx;
   line-height: 1;
 }
 
@@ -398,8 +399,8 @@ onPullDownRefresh(async () => {
   display: inline-flex;
   padding: 6rpx 16rpx;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.16);
-  color: rgba(255, 255, 255, 0.92);
+  background: #fff1f2;
+  color: #b70f24;
   font-size: 20rpx;
   letter-spacing: 1rpx;
 }
@@ -407,10 +408,10 @@ onPullDownRefresh(async () => {
 .hero-title {
   display: block;
   margin-top: 12rpx;
-  font-size: 32rpx;
+  font-size: 31rpx;
   font-weight: 800;
   line-height: 1.45;
-  color: #fff;
+  color: #1f2937;
 }
 
 .hero-desc {
@@ -418,16 +419,11 @@ onPullDownRefresh(async () => {
   margin-top: 10rpx;
   font-size: 22rpx;
   line-height: 1.7;
-  color: rgba(255, 244, 246, 0.84);
+  color: #8a7278;
 }
 
 .hero-side {
-  min-width: 150rpx;
-  padding: 18rpx 16rpx;
-  border-radius: 22rpx;
-  background: rgba(255, 255, 255, 0.15);
-  box-shadow: inset 0 0 0 1rpx rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(8rpx);
+  display: none;
 }
 
 .hero-side-label {
@@ -453,12 +449,7 @@ onPullDownRefresh(async () => {
 }
 
 .hero-tags {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-  margin-top: 20rpx;
+  display: none;
 }
 
 .hero-tag {
@@ -475,8 +466,8 @@ onPullDownRefresh(async () => {
 }
 
 .launch-btn {
-  padding: 18rpx 24rpx;
-  border-radius: 24rpx;
+  padding: 20rpx 24rpx;
+  border-radius: 20rpx;
   background: linear-gradient(135deg, #df1832, #b70f24);
   color: #fff;
   box-shadow: 0 16rpx 34rpx rgba(183, 15, 36, 0.28);
@@ -509,11 +500,7 @@ onPullDownRefresh(async () => {
 }
 
 .launch-note {
-  display: block;
-  margin-top: 8rpx;
-  text-align: center;
-  font-size: 22rpx;
-  color: rgba(255, 245, 246, 0.82);
+  display: none;
 }
 
 .metric-row {
@@ -523,7 +510,7 @@ onPullDownRefresh(async () => {
 }
 
 .metric-card {
-  min-height: 176rpx;
+  min-height: 142rpx;
   padding: 22rpx 18rpx;
   border-radius: 24rpx;
   background: rgba(255, 255, 255, 0.94);
@@ -587,23 +574,19 @@ onPullDownRefresh(async () => {
 }
 
 .metric-note {
-  display: block;
-  margin-top: 12rpx;
-  font-size: 20rpx;
-  line-height: 1.6;
-  color: #94a3b8;
+  display: none;
 }
 
 .filter-panel {
-  padding: 22rpx 22rpx 18rpx;
-  border-radius: 24rpx;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1rpx solid rgba(240, 226, 229, 0.88);
-  box-shadow: var(--shadow-soft);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .filter-head {
-  display: flex;
+  display: none;
   justify-content: space-between;
   align-items: flex-start;
   gap: 16rpx;
@@ -670,6 +653,7 @@ onPullDownRefresh(async () => {
   justify-content: space-between;
   align-items: center;
   gap: 20rpx;
+  display: none;
 }
 
 .create-copy {
@@ -716,8 +700,8 @@ onPullDownRefresh(async () => {
 .req-card {
   position: relative;
   overflow: hidden;
-  padding: 24rpx;
-  border-radius: 26rpx;
+  padding: 26rpx;
+  border-radius: 24rpx;
   background: rgba(255, 255, 255, 0.96);
   border: 1rpx solid rgba(240, 226, 229, 0.9);
   box-shadow: 0 16rpx 34rpx rgba(41, 18, 23, 0.08);

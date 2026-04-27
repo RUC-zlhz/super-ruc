@@ -1,15 +1,16 @@
 <template>
   <view class="container">
-    <view class="academic-hero">
-      <text class="hero-kicker">学业查看</text>
-      <text class="hero-title">{{ result?.plan_name || '培养方案进度' }}</text>
-      <text class="hero-desc">学分完成情况仅作过程参考，请以学校正式审核为准</text>
-      <view class="hero-badge">参考</view>
-    </view>
-
     <view v-if="loading" class="loading">加载中...</view>
 
     <template v-else-if="result">
+      <view class="weak-hint">
+        <text class="weak-icon">i</text>
+        <view class="weak-copy">
+          <text class="weak-title">弱结论免责声明</text>
+          <text class="weak-text">{{ result?.disclaimer || defaultDisclaimer }}</text>
+        </view>
+      </view>
+
       <view class="summary-card">
         <view class="credit-row">
           <view class="credit-col">
@@ -26,14 +27,6 @@
             </text>
             <text class="lbl">差额参考</text>
           </view>
-        </view>
-      </view>
-
-      <view class="weak-hint">
-        <text class="weak-icon">i</text>
-        <view class="weak-copy">
-          <text class="weak-title">弱结论免责声明</text>
-          <text class="weak-text">{{ result?.disclaimer || defaultDisclaimer }}</text>
         </view>
       </view>
 
@@ -154,80 +147,22 @@ onMounted(reload)
 <style scoped>
 .container {
   min-height: 100vh;
-  padding: 0 24rpx 36rpx;
+  padding: 28rpx 36rpx 36rpx;
   background:
-    linear-gradient(180deg, #b70f24 0, #b70f24 250rpx, #f7f1f2 520rpx),
+    radial-gradient(circle at 100% 22%, rgba(183, 15, 36, 0.08), transparent 180rpx),
+    linear-gradient(180deg, #fff 0, #fff 120rpx, #f7f1f2 420rpx),
     #f7f1f2;
-}
-
-.academic-hero {
-  position: relative;
-  margin: 0 -24rpx;
-  min-height: 270rpx;
-  padding: 54rpx 42rpx 88rpx;
-  color: #fff;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 82% 28%, rgba(255,255,255,0.2), transparent 150rpx),
-    linear-gradient(135deg, #c9152b, #9f1021 62%, #7f1722);
-}
-
-.academic-hero::after {
-  content: "";
-  position: absolute;
-  right: -60rpx;
-  bottom: -40rpx;
-  width: 320rpx;
-  height: 180rpx;
-  border-radius: 180rpx 0 0 0;
-  background: rgba(255,255,255,0.12);
-}
-
-.hero-kicker {
-  display: block;
-  font-size: 23rpx;
-  opacity: 0.86;
-}
-
-.hero-title {
-  display: block;
-  margin-top: 14rpx;
-  width: 500rpx;
-  font-size: 42rpx;
-  font-weight: 900;
-  line-height: 1.28;
-}
-
-.hero-desc {
-  display: block;
-  margin-top: 16rpx;
-  width: 520rpx;
-  font-size: 25rpx;
-  line-height: 1.55;
-  opacity: 0.9;
-}
-
-.hero-badge {
-  position: absolute;
-  right: 42rpx;
-  top: 62rpx;
-  padding: 10rpx 22rpx;
-  border-radius: 999rpx;
-  background: rgba(255,241,242,0.95);
-  color: #9f1021;
-  font-size: 23rpx;
-  font-weight: 800;
 }
 
 .weak-hint {
   display: flex;
   gap: 18rpx;
-  background: #fffdfd;
+  background: #fff6f7;
   color: #b70f24;
-  padding: 24rpx;
-  border-radius: 24rpx;
-  border: 1rpx solid #f0c9cf;
-  margin-bottom: 20rpx;
+  padding: 28rpx;
+  border-radius: 18rpx;
+  border: 2rpx solid #d13b4b;
+  margin-bottom: 28rpx;
   box-shadow: var(--shadow-soft);
 }
 .weak-icon {
@@ -261,11 +196,11 @@ onMounted(reload)
 .summary-card {
   position: relative;
   z-index: 2;
-  margin-top: -58rpx;
+  margin-top: 0;
   background: rgba(255,255,255,0.97);
   border-radius: 28rpx;
-  padding: 34rpx 24rpx;
-  margin-bottom: 22rpx;
+  padding: 36rpx 24rpx;
+  margin-bottom: 28rpx;
   box-shadow: var(--shadow-float);
   border: 1rpx solid rgba(240,226,229,0.92);
 }
@@ -278,7 +213,7 @@ onMounted(reload)
   border-right: 1rpx solid #f0e2e5;
 }
 .credit-col:last-child { border-right: none; }
-.num { font-size: 56rpx; font-weight: 900; color: #b70f24; }
+.num { font-size: 64rpx; font-weight: 900; color: #b70f24; }
 .num.gap { color: #16a34a; }
 .num.gap.positive { color: #b70f24; }
 .lbl { font-size: 25rpx; color: #6b7280; margin-top: 6rpx; }
@@ -289,7 +224,7 @@ onMounted(reload)
   background: #fff9ec;
   border-radius: 22rpx;
   padding: 22rpx;
-  margin-bottom: 24rpx;
+  margin-bottom: 28rpx;
   border: 1rpx solid #f6df9f;
   box-shadow: var(--shadow-soft);
 }

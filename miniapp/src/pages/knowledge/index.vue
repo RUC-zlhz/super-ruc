@@ -1,12 +1,5 @@
 <template>
   <view class="container">
-    <view class="page-hero">
-      <text class="hero-kicker">政策制度</text>
-      <text class="hero-title">知识查询</text>
-      <text class="hero-desc">按标题、正文与标签快速定位学院服务政策</text>
-      <view class="hero-seal">RUC</view>
-    </view>
-
     <view class="search-panel">
       <view class="search-bar">
         <text class="search-icon">⌕</text>
@@ -58,6 +51,10 @@
     <uni-popup ref="detailPopup" type="bottom">
       <view class="detail-panel" v-if="selected">
         <view class="sheet-handle" />
+        <view class="detail-sheet-head">
+          <text class="detail-sheet-label">知识详情</text>
+          <view class="detail-sheet-close" @tap="closeDetail">×</view>
+        </view>
         <view class="detail-head">
           <view class="detail-icon">{{ resultIcon(selected.category) }}</view>
           <view class="detail-head-main">
@@ -113,6 +110,11 @@ function onDetail(item: KnowledgeEntry) {
   detailPopup.value?.open()
 }
 
+function closeDetail() {
+  detailPopup.value?.close()
+  selected.value = null
+}
+
 function resultIcon(category?: string | null) {
   if (!category) return '册'
   if (category.includes('奖')) return '奖'
@@ -125,82 +127,21 @@ function resultIcon(category?: string | null) {
 <style scoped>
 .container {
   min-height: 100vh;
-  padding: 0 24rpx 36rpx;
+  padding: 36rpx 36rpx 36rpx;
   background:
-    linear-gradient(180deg, #b70f24 0, #b70f24 260rpx, #f7f1f2 520rpx),
+    radial-gradient(circle at 100% 8%, rgba(183, 15, 36, 0.08), transparent 180rpx),
+    linear-gradient(180deg, #fff 0, #fff6f7 220rpx, #f7f1f2 100%),
     #f7f1f2;
-}
-
-.page-hero {
-  position: relative;
-  margin: 0 -24rpx;
-  min-height: 256rpx;
-  padding: 54rpx 42rpx 84rpx;
-  color: #fff;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 88% 28%, rgba(255,255,255,0.2), transparent 150rpx),
-    linear-gradient(135deg, #c9152b, #9f1021 62%, #7f1722);
-}
-
-.page-hero::after {
-  content: "";
-  position: absolute;
-  left: 240rpx;
-  right: -70rpx;
-  bottom: -24rpx;
-  height: 156rpx;
-  border-radius: 120rpx 0 0 0;
-  background: rgba(255,255,255,0.12);
-}
-
-.hero-kicker {
-  display: block;
-  font-size: 23rpx;
-  opacity: 0.86;
-}
-
-.hero-title {
-  display: block;
-  margin-top: 14rpx;
-  font-size: 46rpx;
-  font-weight: 900;
-}
-
-.hero-desc {
-  display: block;
-  margin-top: 14rpx;
-  width: 470rpx;
-  font-size: 25rpx;
-  line-height: 1.55;
-  opacity: 0.9;
-}
-
-.hero-seal {
-  position: absolute;
-  right: 42rpx;
-  top: 58rpx;
-  width: 112rpx;
-  height: 112rpx;
-  border-radius: 50%;
-  border: 4rpx solid rgba(255,255,255,0.32);
-  color: rgba(255,255,255,0.78);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24rpx;
-  font-weight: 900;
 }
 
 .search-panel {
   position: relative;
   z-index: 2;
-  margin-top: -54rpx;
-  padding: 22rpx 20rpx;
-  border-radius: 28rpx;
-  background: rgba(255,255,255,0.96);
-  border: 1rpx solid rgba(240,226,229,0.9);
-  box-shadow: var(--shadow-float);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 .search-bar {
   display: flex;
@@ -216,7 +157,7 @@ function resultIcon(category?: string | null) {
 }
 .search-input {
   flex: 1;
-  height: 88rpx;
+  height: 92rpx;
   border: 1rpx solid #eadde0;
   border-radius: 999rpx;
   padding: 0 28rpx 0 76rpx;
@@ -226,9 +167,9 @@ function resultIcon(category?: string | null) {
 .search-btn {
   flex-shrink: 0;
   width: 128rpx;
-  height: 86rpx;
-  line-height: 86rpx;
-  border-radius: 24rpx;
+  height: 92rpx;
+  line-height: 92rpx;
+  border-radius: 18rpx;
   background: linear-gradient(135deg, #b70f24, #8b1020);
   color: #fff;
   font-size: 28rpx;
@@ -240,7 +181,7 @@ function resultIcon(category?: string | null) {
   align-items: center;
   gap: 12rpx;
   flex-wrap: wrap;
-  margin-top: 18rpx;
+  margin-top: 22rpx;
   font-size: 24rpx;
 }
 .hint-label {
@@ -250,39 +191,29 @@ function resultIcon(category?: string | null) {
   padding: 8rpx 20rpx;
   border-radius: 999rpx;
   color: #b70f24;
-  background: #fff1f2;
+  background: rgba(255, 241, 242, 0.9);
 }
 .hint-chip.active {
   background: #b70f24;
   color: #fff;
 }
 
-.result-list { margin-top: 22rpx; }
+.result-list { margin-top: 24rpx; }
 .result-item {
   position: relative;
   display: flex;
   gap: 20rpx;
   background: #fff;
-  padding: 30rpx 24rpx;
-  border-radius: 26rpx;
-  margin-bottom: 18rpx;
+  padding: 32rpx 26rpx;
+  border-radius: 24rpx;
+  margin-bottom: 20rpx;
   border: 1rpx solid #f0e2e5;
   box-shadow: var(--shadow-card);
   overflow: hidden;
 }
-.result-item::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 28rpx;
-  bottom: 28rpx;
-  width: 6rpx;
-  border-radius: 0 999rpx 999rpx 0;
-  background: #b70f24;
-}
 .result-icon {
-  width: 84rpx;
-  height: 84rpx;
+  width: 86rpx;
+  height: 86rpx;
   border-radius: 50%;
   background: #fff1f2;
   color: #b70f24;
@@ -300,7 +231,7 @@ function resultIcon(category?: string | null) {
 }
 .result-title {
   flex: 1;
-  font-size: 30rpx;
+  font-size: 32rpx;
   line-height: 1.45;
   font-weight: 800;
   color: #202124;
@@ -359,6 +290,29 @@ function resultIcon(category?: string | null) {
   border-radius: 999rpx;
   background: #d9d9d9;
   margin: 0 auto 24rpx;
+}
+.detail-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18rpx;
+}
+.detail-sheet-label {
+  font-size: 32rpx;
+  font-weight: 900;
+  color: #1f2937;
+}
+.detail-sheet-close {
+  width: 58rpx;
+  height: 58rpx;
+  border-radius: 50%;
+  background: #f8f3f4;
+  color: #6b6365;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  line-height: 1;
 }
 .detail-head {
   display: flex;

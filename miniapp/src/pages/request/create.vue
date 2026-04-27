@@ -674,9 +674,10 @@ onMounted(async () => {
 <style scoped>
 .container {
   min-height: 100vh;
-  padding: 24rpx;
+  padding: 28rpx 24rpx;
   background:
-    linear-gradient(180deg, #fff7f8 0, #f7f1f2 240rpx, #f6f0f1 100%),
+    radial-gradient(circle at 100% 8%, rgba(183, 15, 36, 0.08), transparent 180rpx),
+    linear-gradient(180deg, #fff 0, #fff6f7 240rpx, #f7f1f2 100%),
     #f6f0f1;
 }
 
@@ -690,17 +691,17 @@ onMounted(async () => {
 .hero-card {
   position: relative;
   overflow: hidden;
-  padding: 26rpx;
-  border-radius: 28rpx;
+  padding: 24rpx;
+  border-radius: 22rpx;
   background:
-    linear-gradient(135deg, rgba(183, 15, 36, 0.95), rgba(216, 36, 56, 0.88) 58%, rgba(255, 236, 240, 0.92) 100%);
-  box-shadow: 0 18rpx 42rpx rgba(146, 18, 36, 0.22);
+    radial-gradient(circle at 100% 100%, rgba(183, 15, 36, 0.1), transparent 180rpx),
+    linear-gradient(135deg, rgba(255, 250, 251, 0.98), rgba(255, 246, 247, 0.98));
+  border: 1rpx solid #f0c9cf;
+  box-shadow: 0 12rpx 30rpx rgba(146, 18, 36, 0.08);
 }
 
 .hero-orb {
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
+  display: none;
 }
 
 .hero-orb-left {
@@ -738,8 +739,8 @@ onMounted(async () => {
   width: 92rpx;
   height: 92rpx;
   border-radius: 26rpx;
-  background: rgba(255, 255, 255, 0.18);
-  box-shadow: inset 0 0 0 1rpx rgba(255, 255, 255, 0.18);
+  background: #fff1f2;
+  box-shadow: inset 0 0 0 1rpx rgba(183, 15, 36, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -754,7 +755,7 @@ onMounted(async () => {
 .hero-icon {
   font-size: 46rpx;
   line-height: 1;
-  color: #fff;
+  color: #b70f24;
 }
 
 .hero-text {
@@ -765,8 +766,8 @@ onMounted(async () => {
   display: inline-flex;
   padding: 6rpx 16rpx;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.16);
-  color: rgba(255, 255, 255, 0.92);
+  background: #fff1f2;
+  color: #b70f24;
   font-size: 20rpx;
   letter-spacing: 1rpx;
 }
@@ -777,7 +778,7 @@ onMounted(async () => {
   font-size: 32rpx;
   font-weight: 800;
   line-height: 1.45;
-  color: #fff;
+  color: #1f2937;
 }
 
 .hero-desc {
@@ -785,15 +786,15 @@ onMounted(async () => {
   margin-top: 10rpx;
   font-size: 22rpx;
   line-height: 1.7;
-  color: rgba(255, 245, 246, 0.82);
+  color: #8a7278;
 }
 
 .hero-side {
-  min-width: 140rpx;
+  min-width: 120rpx;
   padding: 18rpx 16rpx;
   border-radius: 22rpx;
-  background: rgba(255, 255, 255, 0.14);
-  box-shadow: inset 0 0 0 1rpx rgba(255, 255, 255, 0.12);
+  background: #fff8f9;
+  box-shadow: inset 0 0 0 1rpx rgba(183, 15, 36, 0.08);
   text-align: center;
 }
 
@@ -801,7 +802,7 @@ onMounted(async () => {
 .hero-side-note {
   display: block;
   font-size: 20rpx;
-  color: rgba(255, 244, 246, 0.76);
+  color: #a88890;
 }
 
 .hero-side-value {
@@ -809,15 +810,15 @@ onMounted(async () => {
   margin-top: 8rpx;
   font-size: 34rpx;
   font-weight: 800;
-  color: #fff;
+  color: #b70f24;
 }
 
 .hero-status {
   flex-shrink: 0;
   padding: 10rpx 18rpx;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
+  background: #fff1f2;
+  color: #b70f24;
   font-size: 22rpx;
   font-weight: 700;
 }
@@ -839,14 +840,14 @@ onMounted(async () => {
 .hero-strip-item {
   padding: 18rpx 16rpx;
   border-radius: 20rpx;
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 0 0 1rpx rgba(255, 255, 255, 0.1);
+  background: #fff8f9;
+  box-shadow: inset 0 0 0 1rpx rgba(183, 15, 36, 0.08);
 }
 
 .hero-strip-label {
   display: block;
   font-size: 20rpx;
-  color: rgba(255, 244, 246, 0.72);
+  color: #a88890;
 }
 
 .hero-strip-value {
@@ -854,7 +855,7 @@ onMounted(async () => {
   margin-top: 8rpx;
   font-size: 26rpx;
   font-weight: 800;
-  color: #fff;
+  color: #b70f24;
 }
 
 .type-panel,
@@ -919,13 +920,14 @@ onMounted(async () => {
 
 .type-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16rpx;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14rpx;
 }
 
 .type-item {
-  padding: 22rpx 18rpx;
-  border-radius: 22rpx;
+  min-height: 150rpx;
+  padding: 20rpx 12rpx;
+  border-radius: 14rpx;
   background: linear-gradient(180deg, #fffefe, #fff7f8);
   border: 1rpx solid rgba(239, 221, 225, 0.96);
   box-shadow: 0 12rpx 28rpx rgba(41, 18, 23, 0.06);
@@ -933,15 +935,15 @@ onMounted(async () => {
 
 .type-item-top {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   gap: 12rpx;
 }
 
 .type-icon {
-  width: 68rpx;
-  height: 68rpx;
-  border-radius: 20rpx;
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 16rpx;
   background: linear-gradient(135deg, #fff1f2, #ffe7ea);
   color: #b70f24;
   display: flex;
@@ -953,24 +955,21 @@ onMounted(async () => {
 }
 
 .type-cat {
-  padding: 6rpx 12rpx;
-  border-radius: 999rpx;
-  background: #fff1f2;
-  font-size: 20rpx;
-  color: #b70f24;
+  display: none;
 }
 
 .type-name {
   display: block;
-  margin-top: 16rpx;
-  font-size: 28rpx;
+  margin-top: 14rpx;
+  font-size: 24rpx;
   font-weight: 800;
   color: #1f2937;
   line-height: 1.5;
+  text-align: center;
 }
 
 .type-desc {
-  display: block;
+  display: none;
   margin-top: 10rpx;
   font-size: 22rpx;
   color: #64748b;
@@ -978,7 +977,7 @@ onMounted(async () => {
 }
 
 .type-meta {
-  display: block;
+  display: none;
   margin-top: 12rpx;
   font-size: 20rpx;
   line-height: 1.6;
@@ -986,7 +985,7 @@ onMounted(async () => {
 }
 
 .type-cta {
-  display: flex;
+  display: none;
   justify-content: space-between;
   align-items: center;
   margin-top: 18rpx;
@@ -1369,6 +1368,7 @@ onMounted(async () => {
 }
 
 .footer-meta {
+  display: none;
   flex: 1;
   min-width: 0;
 }
@@ -1392,11 +1392,12 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 10rpx;
-  flex-shrink: 0;
+  flex: 1;
 }
 
 .action-btn {
-  min-width: 144rpx;
+  min-width: 0;
+  flex: 1;
   font-size: 24rpx;
   font-weight: 700;
 }

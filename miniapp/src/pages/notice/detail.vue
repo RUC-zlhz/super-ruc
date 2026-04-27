@@ -306,36 +306,39 @@ onMounted(() => {
   right: 0;
   bottom: 0;
   min-height: calc(112rpx + env(safe-area-inset-bottom));
-  padding: 18rpx 24rpx calc(18rpx + env(safe-area-inset-bottom));
+  padding: 14rpx 76rpx calc(14rpx + env(safe-area-inset-bottom));
   background: rgba(255,255,255,0.98);
   border-top: 1rpx solid #f0e2e5;
   display: flex;
-  gap: 18rpx;
+  justify-content: space-between;
+  gap: 72rpx;
   box-shadow: 0 -8rpx 28rpx rgba(82,28,38,0.08);
 }
 .bottom-action {
-  flex: 1;
-  height: 78rpx;
-  border-radius: 999rpx;
+  width: 128rpx;
+  height: 88rpx;
+  border-radius: 0;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10rpx;
-  font-size: 30rpx;
+  gap: 6rpx;
+  font-size: 38rpx;
   font-weight: 800;
 }
 .bottom-action.secondary {
   color: #9f1021;
-  background: #fff8f9;
-  border: 1rpx solid #f0c9cf;
+  background: transparent;
+  border: none;
 }
 .bottom-action.primary {
-  color: #fff;
-  background: linear-gradient(135deg, #d51f35, #9f1021);
-  box-shadow: 0 12rpx 28rpx rgba(183,15,36,0.2);
+  color: #9f1021;
+  background: transparent;
+  box-shadow: none;
 }
 .bottom-action text {
-  font-size: 23rpx;
+  font-size: 24rpx;
+  color: #1f2937;
+  font-weight: 500;
 }
 </style>

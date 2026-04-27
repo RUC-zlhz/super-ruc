@@ -434,9 +434,10 @@ onMounted(() => {
 <style scoped>
 .container {
   min-height: 100vh;
-  padding: 24rpx;
+  padding: 28rpx 24rpx;
   background:
-    linear-gradient(180deg, #fff7f8 0, #f7f1f2 240rpx, #f6f0f1 100%),
+    radial-gradient(circle at 100% 8%, rgba(183, 15, 36, 0.08), transparent 180rpx),
+    linear-gradient(180deg, #fff 0, #fff6f7 220rpx, #f7f1f2 100%),
     #f6f0f1;
 }
 
@@ -458,17 +459,17 @@ onMounted(() => {
 .hero-card {
   position: relative;
   overflow: hidden;
-  padding: 26rpx;
-  border-radius: 28rpx;
+  padding: 24rpx;
+  border-radius: 20rpx;
   background:
-    linear-gradient(135deg, rgba(183, 15, 36, 0.95), rgba(216, 36, 56, 0.88) 58%, rgba(255, 236, 240, 0.92) 100%);
-  box-shadow: 0 18rpx 42rpx rgba(146, 18, 36, 0.22);
+    linear-gradient(180deg, rgba(255, 253, 253, 0.98), rgba(255, 248, 249, 0.98));
+  border: 1rpx solid #f0c9cf;
+  border-top: 6rpx solid #b70f24;
+  box-shadow: 0 12rpx 30rpx rgba(146, 18, 36, 0.08);
 }
 
 .hero-orb {
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
+  display: none;
 }
 
 .hero-orb-left {
@@ -506,8 +507,8 @@ onMounted(() => {
   width: 92rpx;
   height: 92rpx;
   border-radius: 26rpx;
-  background: rgba(255, 255, 255, 0.18);
-  box-shadow: inset 0 0 0 1rpx rgba(255, 255, 255, 0.18);
+  background: linear-gradient(135deg, #d51f35, #9f1021);
+  box-shadow: 0 10rpx 20rpx rgba(183, 15, 36, 0.16);
   color: #fff;
   display: flex;
   align-items: center;
@@ -525,8 +526,8 @@ onMounted(() => {
   display: inline-flex;
   padding: 6rpx 16rpx;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.16);
-  color: rgba(255, 255, 255, 0.92);
+  background: #fff1f2;
+  color: #b70f24;
   font-size: 20rpx;
   letter-spacing: 1rpx;
 }
@@ -537,7 +538,7 @@ onMounted(() => {
   font-size: 32rpx;
   font-weight: 800;
   line-height: 1.45;
-  color: #fff;
+  color: #1f2937;
 }
 
 .hero-desc {
@@ -545,15 +546,15 @@ onMounted(() => {
   margin-top: 10rpx;
   font-size: 22rpx;
   line-height: 1.7;
-  color: rgba(255, 245, 246, 0.82);
+  color: #8a7278;
 }
 
 .status {
   flex-shrink: 0;
   padding: 10rpx 18rpx;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
+  background: #fff1f2;
+  color: #b70f24;
   font-size: 22rpx;
   font-weight: 700;
 }
@@ -595,14 +596,14 @@ onMounted(() => {
 .summary-item {
   padding: 18rpx 16rpx;
   border-radius: 20rpx;
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 0 0 1rpx rgba(255, 255, 255, 0.1);
+  background: #fff8f9;
+  box-shadow: inset 0 0 0 1rpx rgba(183, 15, 36, 0.08);
 }
 
 .summary-label {
   display: block;
   font-size: 20rpx;
-  color: rgba(255, 244, 246, 0.72);
+  color: #a88890;
 }
 
 .summary-value {
@@ -611,7 +612,7 @@ onMounted(() => {
   font-size: 24rpx;
   line-height: 1.6;
   font-weight: 700;
-  color: #fff;
+  color: #334155;
   word-break: break-all;
 }
 
@@ -988,15 +989,16 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18rpx;
+  gap: 16rpx;
   padding: 18rpx;
-  border-radius: 28rpx 28rpx 0 0;
+  border-radius: 0;
   background: rgba(255, 255, 255, 0.98);
   border-top: 1rpx solid rgba(240, 226, 229, 0.94);
   box-shadow: 0 -12rpx 30rpx rgba(41, 18, 23, 0.1);
 }
 
 .actions-meta {
+  display: none;
   flex: 1;
   min-width: 0;
 }
@@ -1019,11 +1021,12 @@ onMounted(() => {
 .actions-row {
   display: flex;
   gap: 10rpx;
-  flex-shrink: 0;
+  flex: 1;
 }
 
 .action-btn {
-  min-width: 168rpx;
+  min-width: 0;
+  flex: 1;
   font-size: 24rpx;
   font-weight: 700;
 }

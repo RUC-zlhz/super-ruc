@@ -1,21 +1,5 @@
 <template>
   <view class="container">
-    <view class="page-head">
-      <text class="page-back">‹</text>
-      <text class="page-title">通知中心</text>
-      <view class="page-actions">
-        <view class="page-action">⌕</view>
-        <view class="page-action more">•••</view>
-      </view>
-    </view>
-
-    <view class="search-shell">
-      <view class="fake-search">
-        <text class="search-icon">⌕</text>
-        <text>搜索通知标题或来源</text>
-      </view>
-    </view>
-
     <view class="tab-row">
       <view
         v-for="t in TABS"
@@ -153,96 +137,20 @@ onShow(() => reload())
 <style scoped>
 .container {
   min-height: 100vh;
-  padding: 24rpx;
+  padding: 24rpx 40rpx 36rpx;
   background:
-    radial-gradient(circle at 92% 34rpx, rgba(183, 15, 36, 0.08), transparent 180rpx),
-    linear-gradient(180deg, #fff 0, #fff 210rpx, var(--bg-color) 520rpx),
+    linear-gradient(0deg, rgba(183, 15, 36, 0.04) 0 2rpx, transparent 2rpx 100%),
+    radial-gradient(circle at 50% 100%, rgba(183, 15, 36, 0.1), transparent 260rpx),
+    linear-gradient(180deg, #fff 0, #fff 130rpx, #fbf6f7 360rpx, var(--bg-color) 100%),
     var(--bg-color);
-}
-
-.page-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18rpx;
-  margin-bottom: 20rpx;
-}
-
-.page-back {
-  width: 60rpx;
-  height: 60rpx;
-  border-radius: 50%;
-  color: #111827;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 44rpx;
-  line-height: 1;
-}
-
-.page-title {
-  flex: 1;
-  text-align: center;
-  font-size: 40rpx;
-  font-weight: 800;
-  color: #111827;
-  margin-left: -60rpx;
-}
-
-.page-actions {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-
-.page-action {
-  width: 60rpx;
-  height: 60rpx;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1rpx solid #efe3e6;
-  color: #111827;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28rpx;
-  box-shadow: var(--shadow-soft);
-}
-
-.page-action.more {
-  width: 84rpx;
-  border-radius: 999rpx;
-  letter-spacing: 4rpx;
-}
-
-.search-shell {
-  margin-bottom: 18rpx;
-}
-
-.fake-search {
-  height: 76rpx;
-  border-radius: 26rpx;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1rpx solid #f0e2e5;
-  color: #9aa0a6;
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  padding: 0 22rpx;
-  font-size: 24rpx;
-  box-shadow: var(--shadow-soft);
-}
-
-.search-icon {
-  font-size: 34rpx;
 }
 
 .tab-row {
   display: flex;
   background: #f5f2f3;
   border-radius: 999rpx;
-  padding: 10rpx;
-  margin-bottom: 24rpx;
+  padding: 8rpx;
+  margin: 0 28rpx 28rpx;
   box-shadow: inset 0 0 0 1rpx rgba(183, 15, 36, 0.04);
 }
 .tab {
@@ -263,11 +171,11 @@ onShow(() => reload())
 
 .notice-card {
   display: flex;
-  gap: 22rpx;
+  gap: 24rpx;
   background: var(--card-elevated);
   padding: 30rpx 28rpx;
   border-radius: 28rpx;
-  margin-bottom: 20rpx;
+  margin-bottom: 22rpx;
   border: 1rpx solid #f0e2e5;
   box-shadow: var(--shadow-card);
   position: relative;
@@ -296,8 +204,8 @@ onShow(() => reload())
 }
 .notice-icon {
   flex-shrink: 0;
-  width: 92rpx;
-  height: 92rpx;
+  width: 94rpx;
+  height: 94rpx;
   border-radius: 50%;
   background: linear-gradient(135deg, #c83045, #a20e20);
   color: #fff;
@@ -327,7 +235,7 @@ onShow(() => reload())
   gap: 12rpx;
 }
 .notice-title {
-  font-size: 31rpx;
+  font-size: 33rpx;
   line-height: 1.45;
   font-weight: 800;
   color: #202124;
@@ -352,7 +260,7 @@ onShow(() => reload())
 }
 .notice-preview {
   display: block;
-  font-size: 26rpx;
+  font-size: 27rpx;
   line-height: 1.72;
   color: #5f6368;
   margin-top: 16rpx;

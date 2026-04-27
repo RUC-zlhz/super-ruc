@@ -101,7 +101,7 @@
         <view class="sheet-handle" />
         <view class="detail-sheet-head">
           <text class="detail-sheet-title">荣誉详情</text>
-          <view class="detail-sheet-close">×</view>
+          <view class="detail-sheet-close" @tap="closeDetail">×</view>
         </view>
         <view class="detail-summary-card">
           <view class="detail-visual" :class="`lv-${String(selected.level).toLowerCase()}`">

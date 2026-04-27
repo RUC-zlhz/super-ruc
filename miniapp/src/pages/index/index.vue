@@ -15,14 +15,13 @@
             <view class="hero-seal">RUC</view>
             <text class="hero-eyebrow">中国人民大学</text>
           </view>
-          <text class="hero-title">你好，{{ displayName }}</text>
+          <text class="hero-title">{{ greeting }}，{{ displayName }}</text>
           <text class="hero-subtitle">祝你今天学习顺利</text>
           <view class="hero-line" />
         </view>
 
         <view class="hero-figure">
-          <view class="hero-face">RUC</view>
-          <text class="hero-figure-note">学生端</text>
+          <image class="hero-student" src="/static/hero-student.png" mode="aspectFit" />
         </view>
       </view>
 
@@ -46,9 +45,10 @@
         :class="metric.key"
         @tap="goTo(metric.path)"
       >
-        <view class="metric-icon">{{ metric.icon }}</view>
-        <text class="metric-value">{{ metric.value }}</text>
         <text class="metric-label">{{ metric.label }}</text>
+        <text class="metric-value">{{ metric.value }}</text>
+        <view class="metric-line" />
+        <view class="metric-icon">{{ metric.icon }}</view>
         <text class="metric-helper">{{ metric.helper }}</text>
       </view>
     </view>
@@ -220,6 +220,13 @@ const loading = ref(false);
 const latestSyncText = ref("");
 
 const displayName = computed(() => auth.user?.display_name || "同学");
+const greeting = computed(() => {
+  const hour = new Date().getHours();
+  if (hour < 11) return "上午好";
+  if (hour < 14) return "中午好";
+  if (hour < 19) return "下午好";
+  return "晚上好";
+});
 const unreadNoticeCount = computed(
   () => recentNotices.value.filter((item) => !item.read_at).length,
 );
@@ -393,7 +400,7 @@ onPullDownRefresh(async () => {
   min-height: 100vh;
   padding: 0 24rpx 28rpx;
   background:
-    linear-gradient(180deg, #b70f24 0, #b70f24 318rpx, var(--bg-color) 600rpx),
+    linear-gradient(180deg, #b70f24 0, #b70f24 372rpx, #fbf6f7 620rpx, #f8f2f3 100%),
     var(--bg-color);
   display: flex;
   flex-direction: column;
@@ -402,13 +409,14 @@ onPullDownRefresh(async () => {
 
 .hero-card {
   position: relative;
-  min-height: 328rpx;
-  padding: 36rpx 28rpx 76rpx;
+  min-height: 430rpx;
+  padding: 42rpx 32rpx 104rpx;
   border-radius: 0 0 42rpx 42rpx;
   background:
-    radial-gradient(circle at 18% 18%, rgba(255,255,255,0.16), transparent 34%),
-    radial-gradient(circle at 86% 16%, rgba(255,255,255,0.12), transparent 28%),
-    linear-gradient(135deg, #b70f24 0%, #a80d21 52%, #7f1722 100%);
+    linear-gradient(90deg, rgba(127, 23, 34, 0.18), transparent 42%),
+    radial-gradient(circle at 16% 18%, rgba(255,255,255,0.18), transparent 34%),
+    radial-gradient(circle at 92% 8%, rgba(255,255,255,0.14), transparent 30%),
+    linear-gradient(150deg, #c40e25 0%, #b70f24 48%, #8b1020 100%);
   color: #fff;
   box-shadow: 0 24rpx 56rpx rgba(127, 23, 34, 0.22);
   overflow: hidden;
@@ -420,8 +428,8 @@ onPullDownRefresh(async () => {
   content: '';
   position: absolute;
   inset: auto auto 26rpx 34rpx;
-  width: 280rpx;
-  height: 280rpx;
+  width: 360rpx;
+  height: 360rpx;
   border-radius: 50%;
   border: 1rpx solid rgba(255, 255, 255, 0.1);
   opacity: 0.45;
@@ -482,7 +490,7 @@ onPullDownRefresh(async () => {
   display: flex;
   justify-content: space-between;
   gap: 24rpx;
-  margin-top: 30rpx;
+  margin-top: 34rpx;
 }
 
 .hero-copy {
@@ -519,7 +527,7 @@ onPullDownRefresh(async () => {
 .hero-title {
   display: block;
   margin-top: 26rpx;
-  font-size: 54rpx;
+  font-size: 52rpx;
   font-weight: 800;
   line-height: 1.2;
 }
@@ -541,46 +549,27 @@ onPullDownRefresh(async () => {
 }
 
 .hero-figure {
-  position: relative;
+  position: absolute;
   z-index: 1;
-  width: 196rpx;
-  align-self: flex-end;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12rpx;
+  right: 18rpx;
+  bottom: 26rpx;
+  width: 286rpx;
+  height: 282rpx;
+  pointer-events: none;
 }
 
-.hero-face {
-  width: 168rpx;
-  height: 168rpx;
-  border-radius: 56rpx;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 222, 209, 0.96)),
-    #fff;
-  box-shadow:
-    inset 0 -10rpx 18rpx rgba(127, 23, 34, 0.12),
-    0 18rpx 38rpx rgba(89, 16, 26, 0.16);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #b70f24;
-  font-size: 34rpx;
-  font-weight: 800;
-}
-
-.hero-figure-note {
-  font-size: 22rpx;
-  opacity: 0.88;
+.hero-student {
+  width: 100%;
+  height: 100%;
 }
 
 .hero-building {
   position: absolute;
   right: 160rpx;
-  bottom: 22rpx;
-  width: 260rpx;
-  height: 112rpx;
-  opacity: 0.18;
+  bottom: 34rpx;
+  width: 360rpx;
+  height: 150rpx;
+  opacity: 0.24;
   background:
     linear-gradient(180deg, transparent 0, transparent 48rpx, rgba(255, 255, 255, 0.4) 48rpx, rgba(255, 255, 255, 0.4) 52rpx, transparent 52rpx),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.3) 0 12rpx, transparent 12rpx 26rpx),
@@ -591,7 +580,7 @@ onPullDownRefresh(async () => {
 .sync-card {
   position: relative;
   z-index: 2;
-  margin-top: -54rpx;
+  margin-top: -70rpx;
   padding: 24rpx 24rpx;
   border-radius: 28rpx;
   background: rgba(255, 255, 255, 0.97);
@@ -652,8 +641,8 @@ onPullDownRefresh(async () => {
 
 .metric-card {
   position: relative;
-  min-height: 176rpx;
-  padding: 24rpx 18rpx 20rpx;
+  min-height: 158rpx;
+  padding: 24rpx 18rpx 18rpx;
   border-radius: 24rpx;
   background: rgba(255, 255, 255, 0.94);
   border: 1rpx solid #f0e2e5;
@@ -688,7 +677,7 @@ onPullDownRefresh(async () => {
 
 .metric-value {
   display: block;
-  margin-top: 42rpx;
+  margin-top: 12rpx;
   font-size: 42rpx;
   font-weight: 800;
   color: #b70f24;
@@ -696,17 +685,21 @@ onPullDownRefresh(async () => {
 
 .metric-label {
   display: block;
-  margin-top: 8rpx;
   font-size: 24rpx;
   color: #6a4b55;
 }
 
+.metric-line {
+  width: 42rpx;
+  height: 5rpx;
+  margin-top: 14rpx;
+  border-radius: 999rpx;
+  background: currentColor;
+  opacity: 0.28;
+}
+
 .metric-helper {
-  display: block;
-  margin-top: 12rpx;
-  font-size: 20rpx;
-  line-height: 1.5;
-  color: #9c8b90;
+  display: none;
 }
 
 .section-card {
