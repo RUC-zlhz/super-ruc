@@ -1,14 +1,32 @@
 <template>
   <view class="container">
     <view class="hero-card">
-      <view class="hero-copy">
-        <text class="hero-eyebrow">中国人民大学</text>
-        <text class="hero-title">你好，{{ displayName }}</text>
-        <text class="hero-subtitle">祝你今天学习顺利</text>
+      <view class="hero-topbar">
+        <text class="hero-page-title">首页</text>
+        <view class="hero-top-actions">
+          <text class="hero-top-action">•••</text>
+          <text class="hero-top-action ring">◎</text>
+        </view>
       </view>
-      <view class="hero-figure">
-        <view class="hero-face">RUC</view>
+
+      <view class="hero-main">
+        <view class="hero-copy">
+          <view class="hero-brand">
+            <view class="hero-seal">RUC</view>
+            <text class="hero-eyebrow">中国人民大学</text>
+          </view>
+          <text class="hero-title">你好，{{ displayName }}</text>
+          <text class="hero-subtitle">祝你今天学习顺利</text>
+          <view class="hero-line" />
+        </view>
+
+        <view class="hero-figure">
+          <view class="hero-face">RUC</view>
+          <text class="hero-figure-note">学生端</text>
+        </view>
       </view>
+
+      <view class="hero-building" />
     </view>
 
     <view class="sync-card">
@@ -31,6 +49,7 @@
         <view class="metric-icon">{{ metric.icon }}</view>
         <text class="metric-value">{{ metric.value }}</text>
         <text class="metric-label">{{ metric.label }}</text>
+        <text class="metric-helper">{{ metric.helper }}</text>
       </view>
     </view>
 
@@ -99,12 +118,17 @@
           @tap="openNotice(notice)"
         >
           <view class="notice-top">
-            <text class="notice-chip" :class="{ pinned: notice.is_pinned }">
-              {{ noticeCategoryLabel(notice) }}
-            </text>
-            <text class="notice-date">{{ formatDate(notice.published_at) }}</text>
+            <view class="notice-top-main">
+              <text class="notice-chip" :class="{ pinned: notice.is_pinned }">
+                {{ noticeCategoryLabel(notice) }}
+              </text>
+              <text class="notice-title">{{ notice.title }}</text>
+            </view>
+            <view class="notice-side">
+              <text class="notice-date">{{ formatDate(notice.published_at) }}</text>
+              <view class="notice-dot" :class="{ unread: isUnread(notice) }" />
+            </view>
           </view>
-          <text class="notice-title">{{ notice.title }}</text>
           <text v-if="notice.summary" class="notice-summary">{{ notice.summary }}</text>
           <view class="notice-bottom">
             <text class="notice-state" :class="{ unread: isUnread(notice) }">
@@ -369,8 +393,8 @@ onPullDownRefresh(async () => {
   min-height: 100vh;
   padding: 0 24rpx 28rpx;
   background:
-    linear-gradient(180deg, #b70f24 0, #b70f24 260rpx, #f8f3f4 520rpx),
-    #f8f3f4;
+    linear-gradient(180deg, #b70f24 0, #b70f24 318rpx, var(--bg-color) 600rpx),
+    var(--bg-color);
   display: flex;
   flex-direction: column;
   gap: 20rpx;
@@ -378,97 +402,200 @@ onPullDownRefresh(async () => {
 
 .hero-card {
   position: relative;
-  min-height: 270rpx;
-  padding: 44rpx 28rpx 64rpx;
-  border-radius: 0 0 34rpx 34rpx;
+  min-height: 328rpx;
+  padding: 36rpx 28rpx 76rpx;
+  border-radius: 0 0 42rpx 42rpx;
   background:
     radial-gradient(circle at 18% 18%, rgba(255,255,255,0.16), transparent 34%),
     radial-gradient(circle at 86% 16%, rgba(255,255,255,0.12), transparent 28%),
     linear-gradient(135deg, #b70f24 0%, #a80d21 52%, #7f1722 100%);
   color: #fff;
-  box-shadow: 0 20rpx 45rpx rgba(127, 23, 34, 0.18);
-  display: flex;
-  justify-content: space-between;
-  gap: 20rpx;
+  box-shadow: 0 24rpx 56rpx rgba(127, 23, 34, 0.22);
   overflow: hidden;
   margin: 0 -24rpx;
 }
 
+.hero-card::before,
 .hero-card::after {
-  content: "";
+  content: '';
   position: absolute;
-  left: 260rpx;
-  right: -40rpx;
-  bottom: 0;
-  height: 150rpx;
-  border-radius: 140rpx 0 0 0;
-  background: linear-gradient(135deg, transparent, rgba(255,255,255,0.16));
+  inset: auto auto 26rpx 34rpx;
+  width: 280rpx;
+  height: 280rpx;
+  border-radius: 50%;
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+  opacity: 0.45;
+}
+
+.hero-card::after {
+  inset: 108rpx -24rpx auto auto;
+  width: 360rpx;
+  height: 190rpx;
+  border-radius: 190rpx 0 0 0;
+  background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.16));
+  border: none;
+}
+
+.hero-topbar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hero-page-title {
+  font-size: 48rpx;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.hero-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+}
+
+.hero-top-action {
+  min-width: 76rpx;
+  height: 56rpx;
+  padding: 0 18rpx;
+  border-radius: var(--radius-pill);
+  border: 1rpx solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.hero-top-action.ring {
+  min-width: 58rpx;
+  padding: 0;
+  font-size: 24rpx;
+}
+
+.hero-main {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 24rpx;
+  margin-top: 30rpx;
 }
 
 .hero-copy {
-  position: relative;
-  z-index: 1;
   flex: 1;
   min-width: 0;
+}
+
+.hero-brand {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.hero-seal {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  border: 1rpx solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
 }
 
 .hero-eyebrow {
   display: block;
   font-size: 24rpx;
-  opacity: 0.9;
+  opacity: 0.92;
 }
 
 .hero-title {
   display: block;
-  margin-top: 34rpx;
-  font-size: 44rpx;
+  margin-top: 26rpx;
+  font-size: 54rpx;
   font-weight: 800;
-  line-height: 1.25;
+  line-height: 1.2;
 }
 
 .hero-subtitle {
   display: block;
-  margin-top: 14rpx;
-  font-size: 28rpx;
+  margin-top: 12rpx;
+  font-size: 30rpx;
   line-height: 1.7;
   opacity: 0.88;
+}
+
+.hero-line {
+  width: 68rpx;
+  height: 8rpx;
+  margin-top: 20rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 241, 242, 0.95);
 }
 
 .hero-figure {
   position: relative;
   z-index: 1;
-  width: 168rpx;
-  height: 168rpx;
+  width: 196rpx;
   align-self: flex-end;
-  border-radius: 50%;
-  background: linear-gradient(180deg, #fff9f0, #f7ded1);
-  box-shadow: inset 0 -8rpx 16rpx rgba(127, 23, 34, 0.12);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  gap: 12rpx;
 }
 
 .hero-face {
-  width: 112rpx;
-  height: 112rpx;
-  border-radius: 36rpx;
-  background: #fff;
-  color: #b70f24;
-  font-size: 30rpx;
-  font-weight: 800;
+  width: 168rpx;
+  height: 168rpx;
+  border-radius: 56rpx;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 222, 209, 0.96)),
+    #fff;
+  box-shadow:
+    inset 0 -10rpx 18rpx rgba(127, 23, 34, 0.12),
+    0 18rpx 38rpx rgba(89, 16, 26, 0.16);
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #b70f24;
+  font-size: 34rpx;
+  font-weight: 800;
+}
+
+.hero-figure-note {
+  font-size: 22rpx;
+  opacity: 0.88;
+}
+
+.hero-building {
+  position: absolute;
+  right: 160rpx;
+  bottom: 22rpx;
+  width: 260rpx;
+  height: 112rpx;
+  opacity: 0.18;
+  background:
+    linear-gradient(180deg, transparent 0, transparent 48rpx, rgba(255, 255, 255, 0.4) 48rpx, rgba(255, 255, 255, 0.4) 52rpx, transparent 52rpx),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.3) 0 12rpx, transparent 12rpx 26rpx),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.12));
+  clip-path: polygon(0 100%, 0 56%, 10% 44%, 18% 50%, 28% 36%, 40% 44%, 52% 30%, 64% 40%, 72% 28%, 82% 34%, 92% 20%, 100% 24%, 100% 100%);
 }
 
 .sync-card {
   position: relative;
   z-index: 2;
-  margin-top: -42rpx;
-  padding: 20rpx 22rpx;
-  border-radius: 22rpx;
-  background: rgba(255,255,255,0.96);
-  box-shadow: 0 16rpx 38rpx rgba(127, 23, 34, 0.14);
+  margin-top: -54rpx;
+  padding: 24rpx 24rpx;
+  border-radius: 28rpx;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: var(--shadow-float);
   display: flex;
   align-items: center;
   gap: 18rpx;
@@ -507,28 +634,28 @@ onPullDownRefresh(async () => {
 }
 
 .sync-action {
-  width: 74rpx;
-  height: 74rpx;
+  width: 84rpx;
+  height: 84rpx;
   border-left: 1rpx solid #f0e1e4;
   color: #b70f24;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  font-size: 46rpx;
+  font-size: 44rpx;
 }
 
 .metric-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16rpx;
+  gap: 18rpx;
 }
 
 .metric-card {
   position: relative;
-  min-height: 150rpx;
-  padding: 22rpx 18rpx;
-  border-radius: 20rpx;
-  background: rgba(255,255,255,0.94);
+  min-height: 176rpx;
+  padding: 24rpx 18rpx 20rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 255, 255, 0.94);
   border: 1rpx solid #f0e2e5;
   box-shadow: var(--shadow-soft);
   overflow: hidden;
@@ -561,7 +688,7 @@ onPullDownRefresh(async () => {
 
 .metric-value {
   display: block;
-  margin-top: 36rpx;
+  margin-top: 42rpx;
   font-size: 42rpx;
   font-weight: 800;
   color: #b70f24;
@@ -574,10 +701,18 @@ onPullDownRefresh(async () => {
   color: #6a4b55;
 }
 
+.metric-helper {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 20rpx;
+  line-height: 1.5;
+  color: #9c8b90;
+}
+
 .section-card {
-  padding: 28rpx 24rpx;
-  border-radius: 22rpx;
-  background: #fff;
+  padding: 30rpx 24rpx;
+  border-radius: 26rpx;
+  background: var(--card-elevated);
   border: 1rpx solid #f0e2e5;
   box-shadow: var(--shadow-card);
 }
@@ -600,18 +735,18 @@ onPullDownRefresh(async () => {
 .section-link {
   flex-shrink: 0;
   font-size: 24rpx;
-  color: #a98a90;
+  color: #b2959e;
 }
 
 .entry-grid {
   display: flex;
   flex-wrap: wrap;
-  row-gap: 28rpx;
+  row-gap: 30rpx;
 }
 
 .entry-card {
   width: 25%;
-  padding: 4rpx 4rpx;
+  padding: 4rpx 8rpx;
   background: transparent;
   border: none;
   display: flex;
@@ -620,31 +755,35 @@ onPullDownRefresh(async () => {
 }
 
 .entry-mark {
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: 22rpx;
-  background: rgba(166, 30, 45, 0.1);
+  width: 84rpx;
+  height: 84rpx;
+  border-radius: 28rpx;
+  background:
+    linear-gradient(180deg, #fff7f8, #fff0f2),
+    #fff;
   color: #a61e2d;
+  box-shadow: inset 0 0 0 1rpx rgba(183, 15, 36, 0.06);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26rpx;
-  font-weight: 600;
+  font-size: 28rpx;
+  font-weight: 700;
 }
 
 .entry-label {
   display: block;
   margin-top: 12rpx;
   font-size: 24rpx;
-  color: #4b5563;
+  color: #374151;
   text-align: center;
+  line-height: 1.45;
 }
 
 .focus-item {
   display: flex;
   align-items: center;
   gap: 16rpx;
-  padding: 20rpx 0;
+  padding: 24rpx 0;
   border-bottom: 1rpx solid #eef2f6;
 }
 
@@ -654,9 +793,10 @@ onPullDownRefresh(async () => {
 }
 
 .focus-leading {
-  width: 74rpx;
-  height: 52rpx;
-  border-radius: 12rpx;
+  min-width: 86rpx;
+  height: 56rpx;
+  padding: 0 16rpx;
+  border-radius: 16rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -706,7 +846,7 @@ onPullDownRefresh(async () => {
 }
 
 .notice-row {
-  padding: 20rpx 0;
+  padding: 22rpx 0;
   border-bottom: 1rpx solid #eef2f6;
 }
 
@@ -715,17 +855,23 @@ onPullDownRefresh(async () => {
   padding-bottom: 0;
 }
 
-.notice-top,
-.notice-bottom {
+.notice-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12rpx;
+  gap: 16rpx;
+}
+
+.notice-top-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .notice-chip {
-  padding: 6rpx 14rpx;
-  border-radius: 10rpx;
+  display: inline-flex;
+  align-items: center;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
   font-size: 20rpx;
   color: #7f1722;
   background: #fff1f2;
@@ -736,10 +882,30 @@ onPullDownRefresh(async () => {
   background: #fff7ed;
 }
 
+.notice-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12rpx;
+  flex-shrink: 0;
+}
+
 .notice-date,
 .notice-state {
   font-size: 22rpx;
   color: #94a3b8;
+}
+
+.notice-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  background: rgba(148, 163, 184, 0.38);
+}
+
+.notice-dot.unread {
+  background: #c8142f;
+  box-shadow: 0 0 0 8rpx rgba(200, 20, 47, 0.1);
 }
 
 .notice-state.unread {
@@ -765,6 +931,8 @@ onPullDownRefresh(async () => {
 }
 
 .notice-bottom {
+  display: flex;
+  align-items: center;
   margin-top: 12rpx;
   justify-content: flex-end;
   gap: 12rpx;
@@ -777,7 +945,7 @@ onPullDownRefresh(async () => {
 
 .empty-panel {
   padding: 28rpx 20rpx;
-  border-radius: 20rpx;
+  border-radius: 24rpx;
   background: #f8fafc;
   color: #64748b;
   font-size: 24rpx;

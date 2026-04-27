@@ -11,23 +11,29 @@ page {
   --primary-color: #b70f24;
   --primary-dark: #7f1722;
   --primary-soft: #fff1f2;
+  --primary-veil: rgba(183, 15, 36, 0.08);
   --accent-gold: #d89b2b;
   --accent-blue: #2563eb;
   --accent-green: #16a34a;
   --accent-orange: #ea7a22;
   --secondary-color: #334155;
-  --bg-color: #f8f3f4;
+  --bg-color: #f7f1f2;
+  --bg-soft: #fff9fa;
   --card-bg: #ffffff;
+  --card-elevated: #fffdfd;
   --success-color: #15803d;
   --warning-color: #d97706;
   --error-color: #dc2626;
   --border-color: #eee3e6;
   --text-main: #1e293b;
   --text-muted: #667085;
-  --shadow-card: 0 12rpx 34rpx rgba(82, 28, 38, 0.08);
-  --shadow-soft: 0 8rpx 24rpx rgba(82, 28, 38, 0.06);
+  --shadow-card: 0 16rpx 40rpx rgba(82, 28, 38, 0.1);
+  --shadow-soft: 0 10rpx 28rpx rgba(82, 28, 38, 0.08);
+  --shadow-float: 0 22rpx 52rpx rgba(103, 26, 40, 0.16);
   --radius-card: 24rpx;
   --radius-panel: 18rpx;
+  --radius-hero: 36rpx;
+  --radius-pill: 999rpx;
 
   --font-base: 14px;
   --font-large: 16px;
@@ -53,7 +59,7 @@ button {
 }
 
 button {
-  border-radius: 999rpx;
+  border-radius: var(--radius-pill);
 }
 
 button::after {
@@ -63,7 +69,9 @@ button::after {
 @media (prefers-color-scheme: dark) {
   page {
     --bg-color: #121018;
+    --bg-soft: #1b1620;
     --card-bg: #1f1b24;
+    --card-elevated: #241f2a;
     --secondary-color: #cbd5e1;
     --text-main: #f8fafc;
     --text-muted: #a8b0bd;
@@ -71,6 +79,7 @@ button::after {
     --primary-color: #e2384f;
     --primary-dark: #a61e2d;
     --primary-soft: rgba(226, 56, 79, 0.14);
+    --primary-veil: rgba(226, 56, 79, 0.18);
   }
 }
 

@@ -3,8 +3,16 @@
     <view v-if="loading" class="loading">加载中...</view>
 
     <template v-else-if="notice">
+      <view class="notice-hero">
+        <text class="hero-kicker">通知详情</text>
+        <text class="hero-date" v-if="notice.published_at">{{ fmt(notice.published_at) }}</text>
+      </view>
+
       <view class="head-card">
+        <view class="title-row">
+          <view class="title-icon">告</view>
         <text class="title">{{ notice.title }}</text>
+        </view>
         <view class="meta-row">
           <text class="source-icon">源</text>
           <text class="source" :class="sourceClass(notice.source_type)">
@@ -26,7 +34,7 @@
         </view>
       </view>
 
-      <view v-if="notice.summary" class="section-card">
+      <view v-if="notice.summary" class="section-card summary-card">
         <view class="section-title-row">
           <text class="section-icon">摘</text>
           <text class="section-title">摘要</text>
@@ -45,8 +53,8 @@
 
       <view class="bottom-spacer" />
       <view class="bottom-actions safe-area-inset-bottom">
-        <view class="bottom-action">☆<text>收藏</text></view>
-        <view class="bottom-action">↗<text>分享</text></view>
+        <view class="bottom-action secondary">☆<text>收藏</text></view>
+        <view class="bottom-action primary">↗<text>分享</text></view>
       </view>
     </template>
 
@@ -125,33 +133,92 @@ onMounted(() => {
 <style scoped>
 .container {
   min-height: 100vh;
-  padding: 28rpx 24rpx 0;
+  padding: 0 24rpx 0;
   background:
-    linear-gradient(180deg, #b70f24 0, #b70f24 230rpx, #f8f3f4 430rpx),
-    #f8f3f4;
+    linear-gradient(180deg, #b70f24 0, #b70f24 250rpx, #f7f1f2 500rpx),
+    #f7f1f2;
 }
 .loading, .empty { text-align: center; padding: 80rpx 0; color: #999; font-size: 28rpx; }
 .empty-tiny { text-align: center; padding: 16rpx 0; color: #bbb; font-size: 24rpx; }
 
+.notice-hero {
+  position: relative;
+  margin: 0 -24rpx;
+  min-height: 220rpx;
+  padding: 56rpx 42rpx 78rpx;
+  color: #fff;
+  background:
+    radial-gradient(circle at 86% 28%, rgba(255,255,255,0.2), transparent 150rpx),
+    linear-gradient(135deg, #c9152b, #9f1021 62%, #7f1722);
+  overflow: hidden;
+}
+
+.notice-hero::after {
+  content: "";
+  position: absolute;
+  right: -74rpx;
+  bottom: -58rpx;
+  width: 350rpx;
+  height: 180rpx;
+  border-radius: 180rpx 0 0 0;
+  background: rgba(255,255,255,0.12);
+}
+
+.hero-kicker {
+  display: block;
+  font-size: 42rpx;
+  font-weight: 900;
+}
+
+.hero-date {
+  display: block;
+  margin-top: 14rpx;
+  font-size: 25rpx;
+  opacity: 0.88;
+}
+
 .head-card {
-  background: #fff;
+  position: relative;
+  z-index: 2;
+  margin-top: -56rpx;
+  background: rgba(255,255,255,0.98);
   padding: 34rpx 30rpx;
-  border-radius: 22rpx;
+  border-radius: 28rpx;
   margin-bottom: 18rpx;
-  box-shadow: 0 16rpx 40rpx rgba(82, 28, 38, 0.14);
+  box-shadow: var(--shadow-float);
+  border: 1rpx solid rgba(240,226,229,0.9);
+}
+.title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 18rpx;
+}
+.title-icon {
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: 18rpx;
+  background: linear-gradient(135deg, #d51f35, #9f1021);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  font-weight: 900;
+  flex-shrink: 0;
 }
 .title {
   display: block;
-  font-size: 40rpx;
-  font-weight: 800;
+  flex: 1;
+  font-size: 38rpx;
+  font-weight: 900;
   color: #202124;
   line-height: 1.42;
 }
 .summary {
   display: block;
-  padding: 22rpx;
-  border-radius: 14rpx;
-  background: #fff6f7;
+  padding: 24rpx;
+  border-radius: 20rpx;
+  background: #fff8f9;
   font-size: 28rpx;
   color: #333;
   line-height: 1.8;
@@ -163,8 +230,8 @@ onMounted(() => {
   margin-top: 18rpx;
 }
 .source-icon {
-  width: 38rpx;
-  height: 38rpx;
+  width: 42rpx;
+  height: 42rpx;
   border-radius: 50%;
   background: #fff1f2;
   color: #b70f24;
@@ -197,10 +264,13 @@ onMounted(() => {
 .section-card {
   background: #fff;
   padding: 28rpx;
-  border-radius: 22rpx;
+  border-radius: 28rpx;
   margin-bottom: 18rpx;
   box-shadow: var(--shadow-card);
   border: 1rpx solid #f0e2e5;
+}
+.summary-card {
+  border-color: #f0c9cf;
 }
 .section-title-row {
   display: flex;
@@ -235,26 +305,37 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  height: calc(104rpx + env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
+  min-height: calc(112rpx + env(safe-area-inset-bottom));
+  padding: 18rpx 24rpx calc(18rpx + env(safe-area-inset-bottom));
   background: rgba(255,255,255,0.98);
   border-top: 1rpx solid #f0e2e5;
   display: flex;
-  justify-content: center;
-  gap: 130rpx;
+  gap: 18rpx;
   box-shadow: 0 -8rpx 28rpx rgba(82,28,38,0.08);
 }
 .bottom-action {
-  height: 104rpx;
+  flex: 1;
+  height: 78rpx;
+  border-radius: 999rpx;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  color: #202124;
-  font-size: 34rpx;
+  gap: 10rpx;
+  font-size: 30rpx;
+  font-weight: 800;
+}
+.bottom-action.secondary {
+  color: #9f1021;
+  background: #fff8f9;
+  border: 1rpx solid #f0c9cf;
+}
+.bottom-action.primary {
+  color: #fff;
+  background: linear-gradient(135deg, #d51f35, #9f1021);
+  box-shadow: 0 12rpx 28rpx rgba(183,15,36,0.2);
 }
 .bottom-action text {
-  margin-top: 4rpx;
   font-size: 23rpx;
 }
 </style>

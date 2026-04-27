@@ -1,11 +1,19 @@
 <template>
   <view class="container">
-    <view class="top-tools">
+    <view class="page-head">
+      <text class="page-back">‹</text>
+      <text class="page-title">通知中心</text>
+      <view class="page-actions">
+        <view class="page-action">⌕</view>
+        <view class="page-action more">•••</view>
+      </view>
+    </view>
+
+    <view class="search-shell">
       <view class="fake-search">
         <text class="search-icon">⌕</text>
         <text>搜索通知标题或来源</text>
       </view>
-      <text class="more-dot">•••</text>
     </view>
 
     <view class="tab-row">
@@ -29,14 +37,20 @@
         <view class="notice-icon" :class="{ muted: !isUnread(n) }">{{ noticeIcon(n) }}</view>
         <view class="notice-main">
           <view class="notice-head">
-            <text class="notice-title">{{ n.title }}</text>
-            <text class="pin-corner" v-if="n.is_pinned">置顶</text>
+            <view class="notice-title-wrap">
+              <text class="notice-title">{{ n.title }}</text>
+              <text class="pin-corner" v-if="n.is_pinned">置顶</text>
+            </view>
+            <view class="notice-state-flag">
+              <view v-if="isUnread(n)" class="state-dot unread" />
+              <text v-else class="read-mark">✓</text>
+            </view>
           </view>
           <text class="notice-source">{{ noticeTag(n) }}</text>
           <text class="notice-preview" v-if="n.summary">{{ n.summary.slice(0, 80) }}</text>
           <view class="notice-footer">
             <text class="notice-date">◷ {{ n.published_at?.slice(0, 16).replace('T', ' ') }}</text>
-            <text class="read-mark" v-if="!isUnread(n)">✓</text>
+            <text class="notice-arrow">›</text>
           </view>
         </view>
       </view>
@@ -45,6 +59,7 @@
     <view v-else-if="!loading" class="empty">暂无通知</view>
 
     <view v-if="hasMore" class="load-more" @tap="loadMore">加载更多</view>
+    <view v-else-if="!loading && notices.length" class="load-end">没有更多了</view>
   </view>
 </template>
 
@@ -140,22 +155,74 @@ onShow(() => reload())
   min-height: 100vh;
   padding: 24rpx;
   background:
-    linear-gradient(180deg, #fff 0, #fff 150rpx, #f8f3f4 420rpx),
-    #f8f3f4;
+    radial-gradient(circle at 92% 34rpx, rgba(183, 15, 36, 0.08), transparent 180rpx),
+    linear-gradient(180deg, #fff 0, #fff 210rpx, var(--bg-color) 520rpx),
+    var(--bg-color);
 }
 
-.top-tools {
+.page-head {
   display: flex;
   align-items: center;
-  gap: 16rpx;
-  margin-bottom: 22rpx;
+  justify-content: space-between;
+  gap: 18rpx;
+  margin-bottom: 20rpx;
+}
+
+.page-back {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 50%;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44rpx;
+  line-height: 1;
+}
+
+.page-title {
+  flex: 1;
+  text-align: center;
+  font-size: 40rpx;
+  font-weight: 800;
+  color: #111827;
+  margin-left: -60rpx;
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.page-action {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1rpx solid #efe3e6;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  box-shadow: var(--shadow-soft);
+}
+
+.page-action.more {
+  width: 84rpx;
+  border-radius: 999rpx;
+  letter-spacing: 4rpx;
+}
+
+.search-shell {
+  margin-bottom: 18rpx;
 }
 
 .fake-search {
-  flex: 1;
-  height: 72rpx;
-  border-radius: 24rpx;
-  background: #fff;
+  height: 76rpx;
+  border-radius: 26rpx;
+  background: rgba(255, 255, 255, 0.96);
   border: 1rpx solid #f0e2e5;
   color: #9aa0a6;
   display: flex;
@@ -166,15 +233,17 @@ onShow(() => reload())
   box-shadow: var(--shadow-soft);
 }
 
-.search-icon { font-size: 34rpx; }
-.more-dot { color: #1f2937; font-size: 32rpx; letter-spacing: 4rpx; }
+.search-icon {
+  font-size: 34rpx;
+}
 
 .tab-row {
   display: flex;
-  background: #f3f1f2;
+  background: #f5f2f3;
   border-radius: 999rpx;
-  padding: 8rpx;
-  margin-bottom: 22rpx;
+  padding: 10rpx;
+  margin-bottom: 24rpx;
+  box-shadow: inset 0 0 0 1rpx rgba(183, 15, 36, 0.04);
 }
 .tab {
   flex: 1;
@@ -182,46 +251,53 @@ onShow(() => reload())
   padding: 18rpx 0;
   border-radius: 999rpx;
   font-size: 28rpx;
-  color: #222;
+  color: #4b5563;
+  font-weight: 600;
 }
 .tab.active {
   color: #fff;
-  background: #b70f24;
+  background: linear-gradient(135deg, #c8142f, #a20e20);
   font-weight: 800;
-  box-shadow: 0 8rpx 18rpx rgba(183,15,36,0.18);
+  box-shadow: 0 10rpx 22rpx rgba(183, 15, 36, 0.22);
 }
 
-.list {}
 .notice-card {
   display: flex;
   gap: 22rpx;
-  background: #fff;
-  padding: 26rpx;
-  border-radius: 24rpx;
-  margin-bottom: 18rpx;
+  background: var(--card-elevated);
+  padding: 30rpx 28rpx;
+  border-radius: 28rpx;
+  margin-bottom: 20rpx;
   border: 1rpx solid #f0e2e5;
   box-shadow: var(--shadow-card);
   position: relative;
   overflow: hidden;
 }
 .notice-card.unread::before {
-  content: ''; position: absolute; top: 32rpx; right: 24rpx;
-  width: 16rpx; height: 16rpx; border-radius: 50%; background: #ff4d4f;
+  content: '';
+  position: absolute;
+  top: 30rpx;
+  right: 28rpx;
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  background: #ff4d4f;
+  box-shadow: 0 0 0 8rpx rgba(255, 77, 79, 0.1);
 }
 .notice-card.pinned::after {
-  content: "";
+  content: '';
   position: absolute;
-  right: -34rpx;
-  top: -34rpx;
-  width: 88rpx;
-  height: 88rpx;
-  background: #b70f24;
+  right: -38rpx;
+  top: -38rpx;
+  width: 96rpx;
+  height: 96rpx;
+  background: linear-gradient(135deg, #c8142f, #a20e20);
   transform: rotate(45deg);
 }
 .notice-icon {
   flex-shrink: 0;
-  width: 86rpx;
-  height: 86rpx;
+  width: 92rpx;
+  height: 92rpx;
   border-radius: 50%;
   background: linear-gradient(135deg, #c83045, #a20e20);
   color: #fff;
@@ -230,12 +306,26 @@ onShow(() => reload())
   justify-content: center;
   font-size: 30rpx;
   font-weight: 800;
+  box-shadow: 0 14rpx 28rpx rgba(200, 48, 69, 0.2);
 }
 .notice-icon.muted {
-  background: #d1d5db;
+  background: linear-gradient(135deg, #d7dbe1, #bcc3cd);
+  box-shadow: none;
 }
 .notice-main { flex: 1; min-width: 0; }
-.notice-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 18rpx; }
+.notice-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18rpx;
+}
+.notice-title-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+}
 .notice-title {
   font-size: 31rpx;
   line-height: 1.45;
@@ -245,42 +335,86 @@ onShow(() => reload())
 }
 .notice-source {
   display: inline-block;
-  margin-top: 10rpx;
+  margin-top: 12rpx;
   font-size: 23rpx;
   color: #b70f24;
   background: #fff1f2;
-  padding: 4rpx 14rpx;
-  border-radius: 10rpx;
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
 }
 .pin-corner {
   color: #b70f24;
   background: #fff1f2;
-  padding: 4rpx 12rpx;
-  border-radius: 8rpx;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
   font-size: 22rpx;
-  margin-right: 20rpx;
+  flex-shrink: 0;
 }
 .notice-preview {
   display: block;
   font-size: 26rpx;
-  line-height: 1.7;
+  line-height: 1.72;
   color: #5f6368;
-  margin-top: 14rpx;
+  margin-top: 16rpx;
 }
-.notice-footer { display: flex; justify-content: space-between; margin-top: 16rpx; }
-.notice-date { font-size: 22rpx; color: #999; }
-.read-mark { font-size: 24rpx; color: #b8bdc5; }
+.notice-state-flag {
+  width: 42rpx;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+.state-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  background: #d4dae2;
+}
+.state-dot.unread {
+  background: #c8142f;
+}
+.notice-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 18rpx;
+}
+.notice-date {
+  font-size: 22rpx;
+  color: #999;
+}
+.read-mark {
+  font-size: 24rpx;
+  color: #b8bdc5;
+}
+.notice-arrow {
+  font-size: 30rpx;
+  color: #c0a7ae;
+}
 
-.empty { text-align: center; padding: 80rpx 0; color: #999; font-size: 28rpx; }
+.empty {
+  text-align: center;
+  padding: 96rpx 0;
+  color: #999;
+  font-size: 28rpx;
+}
 .load-more {
   width: 300rpx;
-  margin: 16rpx auto 0;
+  margin: 18rpx auto 0;
   text-align: center;
-  padding: 18rpx 0;
+  padding: 20rpx 0;
   border-radius: 999rpx;
   color: #b70f24;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.96);
   font-size: 26rpx;
+  font-weight: 700;
   box-shadow: var(--shadow-soft);
+}
+
+.load-end {
+  margin: 20rpx auto 0;
+  text-align: center;
+  color: #c1a6ac;
+  font-size: 24rpx;
 }
 </style>

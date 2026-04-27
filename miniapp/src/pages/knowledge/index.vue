@@ -1,24 +1,33 @@
 <template>
   <view class="container">
-    <view class="search-bar">
-      <text class="search-icon">⌕</text>
-      <input
-        class="search-input"
-        v-model="query"
-        placeholder="请输入关键词/政策/制度名称"
-        confirm-type="search"
-        @confirm="onSearch"
-      />
-      <button class="search-btn" @tap="onSearch" size="mini" :type="UNI_BUTTON_TYPE.primary">搜索</button>
+    <view class="page-hero">
+      <text class="hero-kicker">政策制度</text>
+      <text class="hero-title">知识查询</text>
+      <text class="hero-desc">按标题、正文与标签快速定位学院服务政策</text>
+      <view class="hero-seal">RUC</view>
     </view>
 
-    <view class="match-hint">
-      <text class="hint-label">匹配方式提示：</text>
-      <text class="hint-chip" :class="{ active: matchedBy }">
-        {{ matchedBy === 'ai' ? '智能匹配' : '标题匹配' }}
-      </text>
-      <text class="hint-chip">全文匹配</text>
-      <text class="hint-chip">标签匹配</text>
+    <view class="search-panel">
+      <view class="search-bar">
+        <text class="search-icon">⌕</text>
+        <input
+          class="search-input"
+          v-model="query"
+          placeholder="请输入关键词/政策/制度名称"
+          confirm-type="search"
+          @confirm="onSearch"
+        />
+        <button class="search-btn" @tap="onSearch" size="mini" :type="UNI_BUTTON_TYPE.primary">搜索</button>
+      </view>
+
+      <view class="match-hint">
+        <text class="hint-label">匹配方式提示：</text>
+        <text class="hint-chip" :class="{ active: matchedBy }">
+          {{ matchedBy === 'ai' ? '智能匹配' : '标题匹配' }}
+        </text>
+        <text class="hint-chip">全文匹配</text>
+        <text class="hint-chip">标签匹配</text>
+      </view>
     </view>
 
     <view v-if="results.length" class="result-list">
@@ -49,10 +58,15 @@
     <uni-popup ref="detailPopup" type="bottom">
       <view class="detail-panel" v-if="selected">
         <view class="sheet-handle" />
+        <view class="detail-head">
+          <view class="detail-icon">{{ resultIcon(selected.category) }}</view>
+          <view class="detail-head-main">
         <text class="detail-title">{{ selected.title }}</text>
         <view class="detail-meta-row">
           <text class="detail-tag" v-if="selected.category">{{ selected.category }}</text>
           <text class="detail-date">知识库条目</text>
+        </view>
+          </view>
         </view>
         <view class="detail-section">
           <text class="detail-section-title">正文内容</text>
@@ -111,16 +125,87 @@ function resultIcon(category?: string | null) {
 <style scoped>
 .container {
   min-height: 100vh;
-  padding: 28rpx 24rpx 36rpx;
+  padding: 0 24rpx 36rpx;
   background:
-    radial-gradient(circle at 92% 30rpx, rgba(183,15,36,0.08), transparent 160rpx),
-    #f8f3f4;
+    linear-gradient(180deg, #b70f24 0, #b70f24 260rpx, #f7f1f2 520rpx),
+    #f7f1f2;
+}
+
+.page-hero {
+  position: relative;
+  margin: 0 -24rpx;
+  min-height: 256rpx;
+  padding: 54rpx 42rpx 84rpx;
+  color: #fff;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 88% 28%, rgba(255,255,255,0.2), transparent 150rpx),
+    linear-gradient(135deg, #c9152b, #9f1021 62%, #7f1722);
+}
+
+.page-hero::after {
+  content: "";
+  position: absolute;
+  left: 240rpx;
+  right: -70rpx;
+  bottom: -24rpx;
+  height: 156rpx;
+  border-radius: 120rpx 0 0 0;
+  background: rgba(255,255,255,0.12);
+}
+
+.hero-kicker {
+  display: block;
+  font-size: 23rpx;
+  opacity: 0.86;
+}
+
+.hero-title {
+  display: block;
+  margin-top: 14rpx;
+  font-size: 46rpx;
+  font-weight: 900;
+}
+
+.hero-desc {
+  display: block;
+  margin-top: 14rpx;
+  width: 470rpx;
+  font-size: 25rpx;
+  line-height: 1.55;
+  opacity: 0.9;
+}
+
+.hero-seal {
+  position: absolute;
+  right: 42rpx;
+  top: 58rpx;
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 50%;
+  border: 4rpx solid rgba(255,255,255,0.32);
+  color: rgba(255,255,255,0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  font-weight: 900;
+}
+
+.search-panel {
+  position: relative;
+  z-index: 2;
+  margin-top: -54rpx;
+  padding: 22rpx 20rpx;
+  border-radius: 28rpx;
+  background: rgba(255,255,255,0.96);
+  border: 1rpx solid rgba(240,226,229,0.9);
+  box-shadow: var(--shadow-float);
 }
 .search-bar {
   display: flex;
   align-items: center;
   gap: 16rpx;
-  margin-bottom: 24rpx;
 }
 .search-icon {
   position: absolute;
@@ -132,19 +217,18 @@ function resultIcon(category?: string | null) {
 .search-input {
   flex: 1;
   height: 88rpx;
-  border: 1rpx solid #f0e2e5;
-  border-radius: 26rpx;
+  border: 1rpx solid #eadde0;
+  border-radius: 999rpx;
   padding: 0 28rpx 0 76rpx;
   font-size: 28rpx;
   background: #fff;
-  box-shadow: var(--shadow-soft);
 }
 .search-btn {
   flex-shrink: 0;
   width: 128rpx;
   height: 86rpx;
   line-height: 86rpx;
-  border-radius: 20rpx;
+  border-radius: 24rpx;
   background: linear-gradient(135deg, #b70f24, #8b1020);
   color: #fff;
   font-size: 28rpx;
@@ -156,7 +240,7 @@ function resultIcon(category?: string | null) {
   align-items: center;
   gap: 12rpx;
   flex-wrap: wrap;
-  margin-bottom: 24rpx;
+  margin-top: 18rpx;
   font-size: 24rpx;
 }
 .hint-label {
@@ -173,20 +257,32 @@ function resultIcon(category?: string | null) {
   color: #fff;
 }
 
-.result-list { margin-top: 8rpx; }
+.result-list { margin-top: 22rpx; }
 .result-item {
+  position: relative;
   display: flex;
   gap: 20rpx;
   background: #fff;
-  padding: 26rpx 24rpx;
-  border-radius: 22rpx;
+  padding: 30rpx 24rpx;
+  border-radius: 26rpx;
   margin-bottom: 18rpx;
   border: 1rpx solid #f0e2e5;
   box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.result-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 28rpx;
+  bottom: 28rpx;
+  width: 6rpx;
+  border-radius: 0 999rpx 999rpx 0;
+  background: #b70f24;
 }
 .result-icon {
-  width: 74rpx;
-  height: 74rpx;
+  width: 84rpx;
+  height: 84rpx;
   border-radius: 50%;
   background: #fff1f2;
   color: #b70f24;
@@ -238,14 +334,24 @@ function resultIcon(category?: string | null) {
   color: #b70f24;
 }
 
-.empty { text-align: center; padding: 80rpx 0; color: #999; font-size: 28rpx; }
+.empty {
+  margin-top: 28rpx;
+  padding: 76rpx 28rpx;
+  border-radius: 26rpx;
+  background: #fff;
+  text-align: center;
+  color: #999;
+  font-size: 28rpx;
+  box-shadow: var(--shadow-soft);
+}
 
 .detail-panel {
   background: #fff;
-  padding: 18rpx 32rpx 34rpx;
+  padding: 18rpx 32rpx calc(34rpx + env(safe-area-inset-bottom));
   border-radius: 34rpx 34rpx 0 0;
-  max-height: 70vh;
+  max-height: 78vh;
   overflow-y: auto;
+  box-shadow: 0 -14rpx 40rpx rgba(82,28,38,0.12);
 }
 .sheet-handle {
   width: 72rpx;
@@ -254,7 +360,26 @@ function resultIcon(category?: string | null) {
   background: #d9d9d9;
   margin: 0 auto 24rpx;
 }
-.detail-title { font-size: 34rpx; font-weight: 800; display: block; margin-bottom: 16rpx; }
+.detail-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 18rpx;
+}
+.detail-icon {
+  width: 82rpx;
+  height: 82rpx;
+  border-radius: 50%;
+  background: #fff1f2;
+  color: #b70f24;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+.detail-head-main { flex: 1; min-width: 0; }
+.detail-title { font-size: 34rpx; line-height: 1.45; font-weight: 900; display: block; margin-bottom: 16rpx; }
 .detail-meta-row {
   display: flex;
   gap: 16rpx;
@@ -270,7 +395,10 @@ function resultIcon(category?: string | null) {
 }
 .detail-date { color: #8a8f98; font-size: 23rpx; }
 .detail-section {
-  padding-top: 4rpx;
+  margin-top: 8rpx;
+  padding: 22rpx;
+  border-radius: 22rpx;
+  background: #fff8f9;
 }
 .detail-section-title {
   display: block;
@@ -284,8 +412,8 @@ function resultIcon(category?: string | null) {
 .detail-source { font-size: 24rpx; color: #7f1722; margin-top: 16rpx; }
 .detail-action {
   margin-top: 26rpx;
-  height: 80rpx;
-  border-radius: 18rpx;
+  height: 86rpx;
+  border-radius: 22rpx;
   background: linear-gradient(135deg, #b70f24, #8b1020);
   color: #fff;
   display: flex;

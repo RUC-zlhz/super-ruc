@@ -3,39 +3,65 @@
     <view v-if="loading" class="loading">加载中...</view>
 
     <template v-else-if="detail">
-      <view class="head-card">
-        <view class="head-row">
-          <view class="head-icon">文</view>
-          <view class="head-main">
-          <text class="title">{{ detail.title }}</text>
-          <text class="meta">编号：{{ detail.request_no }}</text>
+      <view class="hero-card">
+        <view class="hero-orb hero-orb-left" />
+        <view class="hero-orb hero-orb-right" />
+        <view class="hero-main">
+          <view class="hero-copy">
+            <view class="head-icon">{{ detailIcon(detail.category) }}</view>
+            <view class="hero-text">
+              <text class="hero-eyebrow">申请详情</text>
+              <text class="title">{{ detail.title }}</text>
+              <text class="hero-desc">{{ statusNarrative(detail.status) }}</text>
+            </view>
           </view>
           <text class="status" :class="detail.status.toLowerCase()">
             {{ statusLabel(detail.status) }}
           </text>
         </view>
-        <text class="meta">类型：{{ detail.type_name }} · {{ categoryLabel(detail.category) }}</text>
-        <text v-if="detail.submitted_at" class="meta">
-          提交时间：{{ fmt(detail.submitted_at) }}
-        </text>
-        <text class="meta">版本：v{{ detail.revision }}</text>
+
+        <view class="summary-grid">
+          <view class="summary-item">
+            <text class="summary-label">编号</text>
+            <text class="summary-value">{{ detail.request_no }}</text>
+          </view>
+          <view class="summary-item">
+            <text class="summary-label">类型</text>
+            <text class="summary-value">{{ detail.type_name }}</text>
+          </view>
+          <view class="summary-item">
+            <text class="summary-label">提交时间</text>
+            <text class="summary-value">{{ detail.submitted_at ? fmt(detail.submitted_at) : "未提交" }}</text>
+          </view>
+          <view class="summary-item">
+            <text class="summary-label">版本</text>
+            <text class="summary-value">V{{ detail.revision }}</text>
+          </view>
+        </view>
       </view>
 
-      <view v-if="detail.status === 'OFFLINE_HANDLED'" class="offline-card">
-        <text class="offline-title">该事项已转线下办理</text>
-        <text v-if="detail.decision_comment" class="offline-body">
+      <view v-if="detail.status === 'OFFLINE_HANDLED'" class="highlight-card offline-card">
+        <view class="section-title-row compact">
+          <view>
+            <text class="section-kicker">转线下说明</text>
+            <text class="section-title">请按线下指引继续办理</text>
+          </view>
+        </view>
+        <text v-if="detail.decision_comment" class="highlight-body">
           {{ detail.decision_comment }}
         </text>
-        <text class="offline-hint">如需进一步确认，请联系负责老师获取后续指导。</text>
+        <text class="highlight-hint">如需进一步确认，请联系负责老师获取后续指导。</text>
       </view>
 
-      <view v-if="isCertificateRequest" class="section">
-        <view class="section-head">
-          <text class="section-title">证明文件</text>
+      <view v-if="isCertificateRequest" class="section proof-section">
+        <view class="section-title-row">
+          <view>
+            <text class="section-kicker">证明文件</text>
+            <text class="section-title">PDF 预览</text>
+          </view>
           <button
+            class="ghost-btn"
             size="mini"
-            :type="UNI_BUTTON_TYPE.primary"
-            plain
             :disabled="!canPreviewProof"
             :loading="previewing"
             @tap="onPreviewProof"
@@ -47,336 +73,638 @@
           <view class="pdf-cover">PDF</view>
           <view class="pdf-copy">
             <text class="pdf-title">证明材料 PDF 预览</text>
-            <text class="pdf-meta">{{ canPreviewProof ? '审批通过，可在线预览' : '审批通过后开放预览' }}</text>
+            <text class="pdf-meta">
+              {{ canPreviewProof ? "审批通过，可在线预览" : "审批通过后开放预览" }}
+            </text>
           </view>
+          <text class="pdf-state">{{ canPreviewProof ? "可查看" : "待开放" }}</text>
         </view>
         <text class="section-hint">{{ proofHint }}</text>
       </view>
 
       <view class="section">
-        <text class="section-title">申请内容</text>
-        <view v-if="detail.summary" class="summary">
-          <text>{{ detail.summary }}</text>
+        <view class="section-title-row">
+          <view>
+            <text class="section-kicker">申请内容</text>
+            <text class="section-title">表单与说明</text>
+          </view>
         </view>
-        <view v-for="row in formRows" :key="row.key" class="info-row">
-          <text class="info-key">{{ row.key }}</text>
-          <text class="info-val">{{ row.value }}</text>
+
+        <view v-if="detail.summary" class="summary-box">
+          <text class="summary-box-label">补充说明</text>
+          <text class="summary-box-text">{{ detail.summary }}</text>
         </view>
-        <view v-if="!formRows.length" class="empty-tiny">无填写内容</view>
+
+        <view class="info-list">
+          <view v-for="row in formRows" :key="row.key" class="info-row">
+            <text class="info-key">{{ row.key }}</text>
+            <text class="info-val">{{ row.value }}</text>
+          </view>
+          <view v-if="!formRows.length" class="empty-tiny">无填写内容</view>
+        </view>
       </view>
 
       <view v-if="detail.attachments?.length" class="section">
-        <text class="section-title">附件</text>
-        <view v-for="attachment in detail.attachments" :key="attachment.id" class="attachment-row">
-          <text class="att-name">{{ attachment.filename }}</text>
-          <text class="att-size">{{ formatSize(attachment.file_size) }}</text>
+        <view class="section-title-row">
+          <view>
+            <text class="section-kicker">附件</text>
+            <text class="section-title">已上传 {{ detail.attachments.length }} 份材料</text>
+          </view>
+        </view>
+        <view class="attachment-list">
+          <view
+            v-for="attachment in detail.attachments"
+            :key="attachment.id"
+            class="attachment-card"
+          >
+            <view class="attachment-icon">📄</view>
+            <view class="attachment-main">
+              <text class="att-name">{{ attachment.filename }}</text>
+              <text class="att-meta">
+                {{ formatSize(attachment.file_size) }} · {{ fmt(attachment.uploaded_at) }}
+              </text>
+            </view>
+            <text class="attachment-tag">{{ attachmentTag(attachment.mime_type) }}</text>
+          </view>
         </view>
       </view>
 
       <view class="section">
-        <text class="section-title">审批记录</text>
-        <view v-if="!detail.approval_records?.length" class="empty-tiny">暂无审批记录</view>
-        <view v-for="record in detail.approval_records" :key="record.id" class="record-row">
-          <view class="record-head">
-            <text class="record-action" :class="actionClass(record.action)">
-              {{ actionLabel(record.action) }}
-            </text>
-            <text class="record-time">{{ fmt(record.occurred_at) }}</text>
+        <view class="section-title-row">
+          <view>
+            <text class="section-kicker">审批记录</text>
+            <text class="section-title">当前流转轨迹</text>
           </view>
-          <text v-if="record.comment" class="record-comment">{{ record.comment }}</text>
-          <text class="record-operator">操作人 ID：{{ record.operator_id ?? '-' }}</text>
+        </view>
+        <view v-if="!detail.approval_records?.length" class="empty-tiny">暂无审批记录</view>
+        <view v-else class="timeline">
+          <view
+            v-for="(record, index) in detail.approval_records"
+            :key="record.id"
+            class="timeline-item"
+          >
+            <view class="timeline-marker">
+              <view class="timeline-dot" :class="actionClass(record.action)" />
+              <view
+                v-if="index !== detail.approval_records.length - 1"
+                class="timeline-line"
+              />
+            </view>
+            <view class="record-card">
+              <view class="record-head">
+                <text class="record-action" :class="actionClass(record.action)">
+                  {{ actionLabel(record.action) }}
+                </text>
+                <text class="record-time">{{ fmt(record.occurred_at) }}</text>
+              </view>
+              <text class="record-role">
+                {{ record.operator_role || "待分配审批人" }}
+              </text>
+              <text v-if="record.comment" class="record-comment">{{ record.comment }}</text>
+              <text class="record-operator">操作人 ID：{{ record.operator_id ?? "-" }}</text>
+            </view>
+          </view>
         </view>
       </view>
 
-      <view v-if="canEdit || canWithdraw" class="actions">
-        <button v-if="canEdit" size="mini" :type="UNI_BUTTON_TYPE.primary" plain @tap="onEdit">
-          {{ editButtonText }}
-        </button>
-        <button
-          v-if="canWithdraw"
-          :type="UNI_BUTTON_TYPE.warn"
-          size="mini"
-          :loading="withdrawing"
-          @tap="onWithdraw"
-        >
-          撤回申请
-        </button>
+      <view v-if="canEdit || canWithdraw" class="actions safe-area-inset-bottom">
+        <view class="actions-shell">
+          <view class="actions-meta">
+            <text class="actions-title">{{ footerTitle }}</text>
+            <text class="actions-desc">{{ footerDesc }}</text>
+          </view>
+          <view class="actions-row">
+            <button
+              v-if="canWithdraw"
+              class="action-btn outline"
+              size="mini"
+              :loading="withdrawing"
+              @tap="onWithdraw"
+            >
+              撤回申请
+            </button>
+            <button
+              v-if="canEdit"
+              class="action-btn primary"
+              size="mini"
+              @tap="onEdit"
+            >
+              {{ editButtonText }}
+            </button>
+          </view>
+        </view>
       </view>
       <view v-if="canEdit || canWithdraw" class="bottom-spacer" />
     </template>
 
     <view v-else class="empty">未找到申请记录</view>
+
+    <view v-if="withdrawDialogVisible" class="dialog-mask" @tap="resolveWithdrawDialog(false)">
+      <view class="dialog-card" @tap.stop>
+        <view class="dialog-icon-wrap warning">
+          <text class="dialog-icon warning">!</text>
+        </view>
+        <text class="dialog-title">确认撤回申请？</text>
+        <text class="dialog-desc">
+          撤回后当前审批流将终止，已提交内容可在草稿中修改后重新提交。
+        </text>
+        <view class="dialog-actions">
+          <button class="dialog-btn secondary" size="mini" @tap="resolveWithdrawDialog(false)">
+            取消
+          </button>
+          <button class="dialog-btn primary" size="mini" @tap="resolveWithdrawDialog(true)">
+            确认撤回
+          </button>
+        </view>
+      </view>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { UNI_BUTTON_TYPE } from '@/utils/uni-button'
+import { computed, onMounted, ref } from "vue";
 import {
   getRequestActionLabel,
-  getRequestCategoryLabel,
   getRequestDetail,
   getRequestStatusLabel,
   isEditableRequestStatus,
   previewProof,
   withdrawRequest,
   type RequestDetail,
-} from '@/api/workflow'
+} from "@/api/workflow";
 
-const detail = ref<RequestDetail | null>(null)
-const loading = ref(false)
-const withdrawing = ref(false)
-const previewing = ref(false)
-const requestId = ref<number | null>(null)
+const detail = ref<RequestDetail | null>(null);
+const loading = ref(false);
+const withdrawing = ref(false);
+const previewing = ref(false);
+const requestId = ref<number | null>(null);
+const withdrawDialogVisible = ref(false);
+
+let withdrawDialogResolver: ((value: boolean) => void) | null = null;
 
 function statusLabel(status: string) {
-  return getRequestStatusLabel(status)
-}
-
-function categoryLabel(category: string) {
-  return getRequestCategoryLabel(category)
+  return getRequestStatusLabel(status);
 }
 
 function actionLabel(action: string) {
-  return getRequestActionLabel(action)
+  return getRequestActionLabel(action);
 }
 
 function actionClass(action: string) {
-  if (action === 'APPROVE') return 'approve'
-  if (action === 'REJECT') return 'reject'
-  if (action === 'OFFLINE_HANDLE') return 'offline'
-  return 'info'
+  if (action === "APPROVE") return "approve";
+  if (action === "REJECT") return "reject";
+  if (action === "OFFLINE_HANDLE") return "offline";
+  return "info";
+}
+
+function detailIcon(category: string) {
+  if (category === "CERTIFICATE") return "证";
+  if (category === "LEAVE") return "假";
+  if (category === "STAMP") return "章";
+  if (category === "REGISTRATION") return "报";
+  if (category === "MATERIAL") return "材";
+  return "事";
+}
+
+function statusNarrative(status: string) {
+  if (status === "DRAFT") return "当前仍为草稿状态，可继续完善内容后再提交。";
+  if (status === "SUBMITTED" || status === "IN_REVIEW") {
+    return "申请已进入审批流，请留意后续审核结果与通知提醒。";
+  }
+  if (status === "APPROVED") return "申请已审批通过，可查看材料留档与后续结果。";
+  if (status === "REJECTED") return "申请已被驳回，请根据意见修改后重新提交。";
+  if (status === "WITHDRAWN") return "申请已撤回，如需继续办理可修改后重新提交。";
+  if (status === "OFFLINE_HANDLED") return "该事项已转线下办理，请按指引提交纸质或现场材料。";
+  return "可查看当前申请的完整流转记录。";
+}
+
+function attachmentTag(mimeType?: string | null) {
+  if (!mimeType) return "文件";
+  if (mimeType.includes("pdf")) return "PDF";
+  if (mimeType.includes("image")) return "图片";
+  if (mimeType.includes("word") || mimeType.includes("document")) return "DOC";
+  return "文件";
 }
 
 function fmt(value?: string | null) {
-  if (!value) return '-'
-  return value.slice(0, 16).replace('T', ' ')
+  if (!value) return "-";
+  return value.slice(0, 16).replace("T", " ");
 }
 
 function formatSize(bytes?: number | null) {
-  if (!bytes) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB']
-  let index = 0
-  let size = bytes
+  if (!bytes) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let index = 0;
+  let size = bytes;
   while (size >= 1024 && index < units.length - 1) {
-    size /= 1024
-    index += 1
+    size /= 1024;
+    index += 1;
   }
-  return `${size.toFixed(index ? 1 : 0)} ${units[index]}`
+  return `${size.toFixed(index ? 1 : 0)} ${units[index]}`;
 }
 
 const formRows = computed(() => {
-  if (!detail.value?.form_data) return []
+  if (!detail.value?.form_data) return [];
   return Object.entries(detail.value.form_data).map(([key, value]) => ({
     key,
-    value: typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''),
-  }))
-})
+    value: typeof value === "object" ? JSON.stringify(value) : String(value ?? ""),
+  }));
+});
 
-const isCertificateRequest = computed(() => detail.value?.category === 'CERTIFICATE')
+const isCertificateRequest = computed(() => detail.value?.category === "CERTIFICATE");
 const canPreviewProof = computed(() =>
-  !!detail.value && isCertificateRequest.value && detail.value.status === 'APPROVED'
-)
+  !!detail.value && isCertificateRequest.value && detail.value.status === "APPROVED",
+);
 const proofHint = computed(() => {
-  if (!detail.value) return ''
-  if (detail.value.status === 'OFFLINE_HANDLED') {
-    return '该证明已转线下办理，不再生成线上 PDF。'
+  if (!detail.value) return "";
+  if (detail.value.status === "OFFLINE_HANDLED") {
+    return "该证明已转线下办理，不再生成线上 PDF。";
   }
-  if (detail.value.status === 'APPROVED') {
-    return '审批通过后可直接预览系统生成的证明 PDF。'
+  if (detail.value.status === "APPROVED") {
+    return "审批通过后可直接预览系统生成的证明 PDF。";
   }
-  return '证明 PDF 将在审批通过后开放预览。'
-})
+  return "证明 PDF 将在审批通过后开放预览。";
+});
 
-const canEdit = computed(() => isEditableRequestStatus(detail.value?.status))
+const canEdit = computed(() => isEditableRequestStatus(detail.value?.status));
 const editButtonText = computed(() =>
-  detail.value?.status === 'REJECTED' ? '修改并重新提交' : '继续完善草稿'
-)
+  detail.value?.status === "REJECTED" ? "修改并重新提交" : "继续完善草稿",
+);
 const canWithdraw = computed(() =>
-  !!detail.value && ['SUBMITTED', 'IN_REVIEW'].includes(detail.value.status)
-)
+  !!detail.value && ["SUBMITTED", "IN_REVIEW"].includes(detail.value.status),
+);
+const footerTitle = computed(() => {
+  if (detail.value?.status === "REJECTED") return "当前申请可修改后重新提交";
+  if (canWithdraw.value) return "当前审批流仍在进行中";
+  return "当前申请支持继续完善";
+});
+const footerDesc = computed(() => {
+  if (detail.value?.status === "REJECTED") {
+    return "建议先根据驳回意见调整内容与附件，再重新提交。";
+  }
+  if (canWithdraw.value) return "撤回后将回到草稿态，可修改后再次提交。";
+  return "可继续补充草稿内容并在准备好后提交。";
+});
 
 async function loadDetail() {
-  if (requestId.value == null) return
-  loading.value = true
+  if (requestId.value == null) return;
+  loading.value = true;
   try {
-    const resp = await getRequestDetail(requestId.value)
-    detail.value = resp.data
+    const resp = await getRequestDetail(requestId.value);
+    detail.value = resp.data;
   } catch {
-    detail.value = null
+    detail.value = null;
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 function onEdit() {
-  if (requestId.value == null) return
-  uni.navigateTo({ url: `/pages/request/create?id=${requestId.value}` })
+  if (requestId.value == null) return;
+  uni.navigateTo({ url: `/pages/request/create?id=${requestId.value}` });
 }
 
 function openPdf(filePath: string) {
   return new Promise<void>((resolve, reject) => {
     uni.openDocument({
       filePath,
-      fileType: 'pdf',
+      fileType: "pdf",
       showMenu: true,
       success: () => resolve(),
       fail: reject,
-    })
-  })
+    });
+  });
 }
 
 async function onPreviewProof() {
-  if (!canPreviewProof.value || requestId.value == null) return
-  previewing.value = true
+  if (!canPreviewProof.value || requestId.value == null) return;
+  previewing.value = true;
   try {
-    const { tempFilePath } = await previewProof(requestId.value)
+    const { tempFilePath } = await previewProof(requestId.value);
     try {
-      await openPdf(tempFilePath)
+      await openPdf(tempFilePath);
     } catch {
-      uni.showToast({ title: '无法打开 PDF', icon: 'none' })
+      uni.showToast({ title: "无法打开 PDF", icon: "none" });
     }
   } catch {
     // 下载失败的提示已由现有 helper 处理
   } finally {
-    previewing.value = false
+    previewing.value = false;
   }
 }
 
-async function onWithdraw() {
-  if (requestId.value == null) return
-  const confirm = await new Promise<boolean>((resolve) => {
-    uni.showModal({
-      title: '撤回申请',
-      content: '撤回后可继续修改，并在准备好后重新提交。确定继续吗？',
-      success: (result) => resolve(result.confirm),
-      fail: () => resolve(false),
-    })
-  })
-  if (!confirm) return
+function resolveWithdrawDialog(value: boolean) {
+  withdrawDialogVisible.value = false;
+  const resolver = withdrawDialogResolver;
+  withdrawDialogResolver = null;
+  resolver?.(value);
+}
 
-  withdrawing.value = true
+function confirmWithdraw() {
+  withdrawDialogVisible.value = true;
+  return new Promise<boolean>((resolve) => {
+    withdrawDialogResolver = resolve;
+  });
+}
+
+async function onWithdraw() {
+  if (requestId.value == null) return;
+  if (!(await confirmWithdraw())) return;
+
+  withdrawing.value = true;
   try {
-    await withdrawRequest(requestId.value, '学生端主动撤回')
-    uni.showToast({ title: '已撤回', icon: 'none' })
-    await loadDetail()
+    await withdrawRequest(requestId.value, "学生端主动撤回");
+    uni.showToast({ title: "已撤回", icon: "none" });
+    await loadDetail();
   } finally {
-    withdrawing.value = false
+    withdrawing.value = false;
   }
 }
 
 onMounted(() => {
-  const pages = getCurrentPages()
-  const current = pages[pages.length - 1] as any
-  const options = current?.options || {}
-  requestId.value = Number(options.id)
-  loadDetail()
-})
+  const pages = getCurrentPages();
+  const current = pages[pages.length - 1] as any;
+  const options = current?.options || {};
+  const parsedId = Number(options.id);
+  requestId.value = Number.isFinite(parsedId) ? parsedId : null;
+  void loadDetail();
+});
 </script>
 
 <style scoped>
-.container { padding: 24rpx; }
-.loading,
-.empty { text-align: center; padding: 80rpx 0; color: #999; font-size: 28rpx; }
-.empty-tiny { text-align: center; padding: 16rpx 0; color: #bbb; font-size: 24rpx; }
-
-.head-card {
-  background: #fff;
-  padding: 26rpx;
-  border-radius: 22rpx;
-  margin-bottom: 18rpx;
-  border: 1rpx solid #f0e2e5;
-  box-shadow: var(--shadow-card);
+.container {
+  min-height: 100vh;
+  padding: 24rpx;
+  background:
+    linear-gradient(180deg, #fff7f8 0, #f7f1f2 240rpx, #f6f0f1 100%),
+    #f6f0f1;
 }
-.head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 18rpx; }
+
+.loading,
+.empty {
+  text-align: center;
+  padding: 80rpx 0;
+  color: #94a3b8;
+  font-size: 28rpx;
+}
+
+.empty-tiny {
+  text-align: center;
+  padding: 28rpx 0;
+  color: #94a3b8;
+  font-size: 24rpx;
+}
+
+.hero-card {
+  position: relative;
+  overflow: hidden;
+  padding: 26rpx;
+  border-radius: 28rpx;
+  background:
+    linear-gradient(135deg, rgba(183, 15, 36, 0.95), rgba(216, 36, 56, 0.88) 58%, rgba(255, 236, 240, 0.92) 100%);
+  box-shadow: 0 18rpx 42rpx rgba(146, 18, 36, 0.22);
+}
+
+.hero-orb {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.hero-orb-left {
+  width: 180rpx;
+  height: 180rpx;
+  left: -58rpx;
+  top: -60rpx;
+}
+
+.hero-orb-right {
+  width: 220rpx;
+  height: 220rpx;
+  right: -74rpx;
+  bottom: -96rpx;
+}
+
+.hero-main {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18rpx;
+}
+
+.hero-copy {
+  display: flex;
+  gap: 18rpx;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
 .head-icon {
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 16rpx;
-  background: #b70f24;
+  width: 92rpx;
+  height: 92rpx;
+  border-radius: 26rpx;
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 1rpx rgba(255, 255, 255, 0.18);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26rpx;
+  font-size: 34rpx;
   font-weight: 800;
-}
-.head-main { flex: 1; min-width: 0; }
-.title { display: block; font-size: 33rpx; font-weight: 800; flex: 1; line-height: 1.45; }
-.status {
-  font-size: 22rpx;
-  padding: 4rpx 14rpx;
-  border-radius: 999rpx;
   flex-shrink: 0;
-  margin-left: 12rpx;
 }
-.status.draft { background: #f5f5f5; color: #666; }
+
+.hero-text {
+  min-width: 0;
+}
+
+.hero-eyebrow {
+  display: inline-flex;
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 20rpx;
+  letter-spacing: 1rpx;
+}
+
+.title {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 32rpx;
+  font-weight: 800;
+  line-height: 1.45;
+  color: #fff;
+}
+
+.hero-desc {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  line-height: 1.7;
+  color: rgba(255, 245, 246, 0.82);
+}
+
+.status {
+  flex-shrink: 0;
+  padding: 10rpx 18rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.status.draft {
+  background: rgba(241, 245, 249, 0.18);
+}
+
 .status.submitted,
-.status.in_review { background: #e6f7ff; color: #1890ff; }
-.status.approved { background: #f6ffed; color: #52c41a; }
-.status.rejected { background: #fff1f0; color: #cf1322; }
-.status.withdrawn { background: #f5f5f5; color: #999; }
-.status.offline_handled { background: #fff7e6; color: #d46b08; }
-.meta { display: block; font-size: 24rpx; color: #8a8f98; margin-top: 8rpx; }
+.status.in_review {
+  background: rgba(255, 247, 237, 0.18);
+}
+
+.status.approved {
+  background: rgba(240, 253, 244, 0.18);
+}
+
+.status.rejected {
+  background: rgba(255, 241, 242, 0.18);
+}
+
+.status.withdrawn {
+  background: rgba(248, 250, 252, 0.16);
+}
+
+.status.offline_handled {
+  background: rgba(255, 247, 237, 0.2);
+}
+
+.summary-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14rpx;
+  margin-top: 22rpx;
+}
+
+.summary-item {
+  padding: 18rpx 16rpx;
+  border-radius: 20rpx;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 1rpx rgba(255, 255, 255, 0.1);
+}
+
+.summary-label {
+  display: block;
+  font-size: 20rpx;
+  color: rgba(255, 244, 246, 0.72);
+}
+
+.summary-value {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  font-weight: 700;
+  color: #fff;
+  word-break: break-all;
+}
+
+.highlight-card,
+.section {
+  margin-top: 18rpx;
+  padding: 24rpx;
+  border-radius: 26rpx;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1rpx solid rgba(240, 226, 229, 0.94);
+  box-shadow: 0 16rpx 36rpx rgba(41, 18, 23, 0.08);
+}
 
 .offline-card {
-  background: #fff7ed;
-  border: 1rpx solid #f6d7aa;
-  border-left: 8rpx solid #d46b08;
-  border-radius: 18rpx;
-  padding: 22rpx;
-  margin-bottom: 18rpx;
+  background: linear-gradient(180deg, #fff8ef, #fffdf9);
+  border-color: rgba(245, 158, 11, 0.22);
 }
-.offline-title { display: block; font-size: 28rpx; font-weight: 600; color: #ad6800; }
-.offline-body { display: block; font-size: 26rpx; color: #333; margin-top: 8rpx; line-height: 1.6; }
-.offline-hint { display: block; font-size: 24rpx; color: #999; margin-top: 8rpx; }
 
-.section {
-  background: #fff;
-  padding: 24rpx;
-  border-radius: 22rpx;
-  margin-bottom: 18rpx;
-  border: 1rpx solid #f0e2e5;
-  box-shadow: var(--shadow-soft);
-}
-.section-head {
+.section-title-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 16rpx;
 }
-.section-title { display: block; font-size: 30rpx; font-weight: 800; margin-bottom: 16rpx; color: #b70f24; }
-.section-hint {
-  display: block;
-  font-size: 24rpx;
-  color: #999;
-  line-height: 1.6;
+
+.section-title-row.compact {
+  margin-bottom: 8rpx;
 }
 
-.summary {
-  background: #fff8f9;
-  padding: 16rpx;
-  border-radius: 14rpx;
-  font-size: 26rpx;
-  color: #333;
+.section-kicker {
+  display: inline-flex;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  background: #fff1f2;
+  color: #b70f24;
+  font-size: 20rpx;
+}
+
+.section-title {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #1f2937;
+}
+
+.highlight-body {
+  display: block;
+  margin-top: 14rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #92400e;
+}
+
+.highlight-hint {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 22rpx;
   line-height: 1.6;
-  margin-bottom: 16rpx;
+  color: #b45309;
+}
+
+.ghost-btn,
+.ghost-btn::after,
+.action-btn,
+.action-btn::after,
+.dialog-btn,
+.dialog-btn::after {
+  border-radius: 999rpx;
+}
+
+.ghost-btn {
+  min-width: 160rpx;
+  color: #b70f24;
+  background: #fff1f2;
+  border: 1rpx solid rgba(183, 15, 36, 0.16);
 }
 
 .pdf-card {
   display: flex;
   align-items: center;
-  gap: 18rpx;
+  gap: 16rpx;
+  margin-top: 18rpx;
   padding: 18rpx;
-  border: 1rpx solid #f0e2e5;
-  border-radius: 16rpx;
-  margin-bottom: 16rpx;
+  border-radius: 22rpx;
+  background: linear-gradient(135deg, #fffafa, #fbfcfd);
+  box-shadow: inset 0 0 0 1rpx rgba(240, 226, 229, 0.9);
 }
 
 .pdf-cover {
   width: 96rpx;
-  height: 112rpx;
-  border-radius: 12rpx;
+  height: 116rpx;
+  border-radius: 18rpx;
   background: linear-gradient(135deg, #ef4444, #b70f24);
   color: #fff;
   display: flex;
@@ -384,51 +712,267 @@ onMounted(() => {
   justify-content: center;
   font-size: 24rpx;
   font-weight: 800;
+  flex-shrink: 0;
 }
 
-.pdf-copy { flex: 1; }
-.pdf-title { display: block; font-size: 28rpx; font-weight: 800; color: #202124; }
-.pdf-meta { display: block; margin-top: 8rpx; font-size: 23rpx; color: #8a8f98; }
+.pdf-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.pdf-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 800;
+  color: #1f2937;
+}
+
+.pdf-meta,
+.section-hint {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: #94a3b8;
+}
+
+.pdf-state {
+  flex-shrink: 0;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  background: #fff1f2;
+  color: #b70f24;
+  font-size: 20rpx;
+}
+
+.summary-box {
+  margin-top: 18rpx;
+  padding: 18rpx;
+  border-radius: 20rpx;
+  background: linear-gradient(180deg, #fff8f9, #fffdfd);
+  box-shadow: inset 0 0 0 1rpx rgba(240, 226, 229, 0.84);
+}
+
+.summary-box-label {
+  display: block;
+  font-size: 22rpx;
+  color: #b70f24;
+}
+
+.summary-box-text {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #334155;
+}
+
+.info-list {
+  margin-top: 18rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+}
 
 .info-row {
   display: flex;
   justify-content: space-between;
-  padding: 10rpx 0;
-  font-size: 26rpx;
-  border-bottom: 1rpx solid #f0f0f0;
+  gap: 18rpx;
+  padding: 18rpx;
+  border-radius: 20rpx;
+  background: #fbfcfd;
+  box-shadow: inset 0 0 0 1rpx rgba(226, 232, 240, 0.68);
 }
-.info-row:last-child { border-bottom: none; }
-.info-key { color: #666; flex-shrink: 0; margin-right: 16rpx; }
-.info-val { color: #333; text-align: right; word-break: break-all; }
 
-.attachment-row {
+.info-key {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.info-val {
+  flex: 1;
+  text-align: right;
+  font-size: 22rpx;
+  line-height: 1.7;
+  color: #1f2937;
+  word-break: break-all;
+}
+
+.attachment-list {
+  margin-top: 18rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+}
+
+.attachment-card {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  padding: 18rpx;
+  border-radius: 20rpx;
+  background: #fbfcfd;
+  box-shadow: inset 0 0 0 1rpx rgba(226, 232, 240, 0.68);
+}
+
+.attachment-icon {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 18rpx;
+  background: #fff1f2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  flex-shrink: 0;
+}
+
+.attachment-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.att-name {
+  display: block;
+  font-size: 24rpx;
+  color: #1f2937;
+  word-break: break-all;
+}
+
+.att-meta {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 20rpx;
+  color: #94a3b8;
+}
+
+.attachment-tag {
+  flex-shrink: 0;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  background: #fff1f2;
+  color: #b70f24;
+  font-size: 20rpx;
+}
+
+.timeline {
+  margin-top: 18rpx;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 16rpx;
+}
+
+.timeline-marker {
+  width: 28rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.timeline-dot {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  background: #94a3b8;
+  margin-top: 12rpx;
+}
+
+.timeline-dot.approve {
+  background: #16a34a;
+}
+
+.timeline-dot.reject {
+  background: #e11d48;
+}
+
+.timeline-dot.offline {
+  background: #d97706;
+}
+
+.timeline-dot.info {
+  background: #b70f24;
+}
+
+.timeline-line {
+  width: 4rpx;
+  flex: 1;
+  margin-top: 8rpx;
+  background: rgba(226, 232, 240, 0.92);
+  border-radius: 999rpx;
+}
+
+.record-card {
+  flex: 1;
+  min-width: 0;
+  padding: 18rpx;
+  border-radius: 20rpx;
+  background: #fbfcfd;
+  box-shadow: inset 0 0 0 1rpx rgba(226, 232, 240, 0.68);
+  margin-bottom: 14rpx;
+}
+
+.record-head {
   display: flex;
   justify-content: space-between;
-  padding: 12rpx 0;
-  font-size: 26rpx;
-  border-bottom: 1rpx solid #f0f0f0;
+  align-items: center;
+  gap: 14rpx;
 }
-.attachment-row:last-child { border-bottom: none; }
-.att-name { color: #333; flex: 1; }
-.att-size { color: #999; font-size: 22rpx; }
 
-.record-row { padding: 12rpx 0; border-bottom: 1rpx solid #f0f0f0; }
-.record-row:last-child { border-bottom: none; }
-.record-head { display: flex; justify-content: space-between; align-items: center; }
-.record-action { font-size: 26rpx; padding: 4rpx 14rpx; border-radius: 4rpx; }
-.record-action.approve { background: #f6ffed; color: #52c41a; }
-.record-action.reject { background: #fff1f0; color: #cf1322; }
-.record-action.offline { background: #fff7e6; color: #d46b08; }
-.record-action.info { background: #e6f7ff; color: #1890ff; }
-.record-time { font-size: 22rpx; color: #999; }
+.record-action {
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.record-action.approve {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.record-action.reject {
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.record-action.offline {
+  background: #fff7ed;
+  color: #b45309;
+}
+
+.record-action.info {
+  background: #fff1f2;
+  color: #b70f24;
+}
+
+.record-time,
+.record-role,
+.record-operator {
+  display: block;
+  font-size: 20rpx;
+  line-height: 1.6;
+  color: #94a3b8;
+}
+
+.record-role {
+  margin-top: 10rpx;
+}
+
 .record-comment {
   display: block;
-  font-size: 26rpx;
-  color: #333;
-  margin-top: 8rpx;
-  line-height: 1.6;
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #334155;
 }
-.record-operator { display: block; font-size: 22rpx; color: #999; margin-top: 4rpx; }
+
+.record-operator {
+  margin-top: 8rpx;
+}
 
 .actions {
   position: fixed;
@@ -436,22 +980,158 @@ onMounted(() => {
   right: 0;
   bottom: 0;
   z-index: 20;
-  margin-top: 0;
-  padding: 18rpx 24rpx calc(18rpx + env(safe-area-inset-bottom));
-  background: rgba(255,255,255,0.98);
-  border-top: 1rpx solid #f0e2e5;
+  padding: 0 20rpx calc(20rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.actions-shell {
   display: flex;
-  justify-content: center;
-  gap: 16rpx;
-  flex-wrap: wrap;
-  box-shadow: 0 -8rpx 28rpx rgba(82,28,38,0.08);
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+  padding: 18rpx;
+  border-radius: 28rpx 28rpx 0 0;
+  background: rgba(255, 255, 255, 0.98);
+  border-top: 1rpx solid rgba(240, 226, 229, 0.94);
+  box-shadow: 0 -12rpx 30rpx rgba(41, 18, 23, 0.1);
 }
 
-.actions button {
+.actions-meta {
   flex: 1;
-  min-width: 220rpx;
-  border-radius: 999rpx;
+  min-width: 0;
 }
 
-.bottom-spacer { height: 132rpx; }
+.actions-title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.actions-desc {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: #94a3b8;
+}
+
+.actions-row {
+  display: flex;
+  gap: 10rpx;
+  flex-shrink: 0;
+}
+
+.action-btn {
+  min-width: 168rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.action-btn.outline {
+  color: #b70f24;
+  background: #fff;
+  border: 1rpx solid rgba(183, 15, 36, 0.18);
+}
+
+.action-btn.primary {
+  color: #fff;
+  background: linear-gradient(135deg, #d51f35, #b70f24);
+  box-shadow: 0 12rpx 24rpx rgba(183, 15, 36, 0.22);
+}
+
+.bottom-spacer {
+  height: 188rpx;
+}
+
+.dialog-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 36rpx;
+  background: rgba(17, 24, 39, 0.48);
+}
+
+.dialog-card {
+  width: 100%;
+  max-width: 620rpx;
+  position: relative;
+  overflow: visible;
+  padding: 76rpx 28rpx 28rpx;
+  border-radius: 28rpx;
+  background: #fff;
+  box-shadow: 0 24rpx 48rpx rgba(15, 23, 42, 0.24);
+}
+
+.dialog-icon-wrap {
+  position: absolute;
+  top: -42rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 104rpx;
+  height: 104rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fff5f6, #ffe8eb);
+  box-shadow: 0 12rpx 26rpx rgba(183, 15, 36, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialog-icon-wrap.warning {
+  background: linear-gradient(135deg, #fff7ed, #ffedd5);
+  box-shadow: 0 12rpx 26rpx rgba(217, 119, 6, 0.16);
+}
+
+.dialog-icon {
+  color: #b70f24;
+  font-size: 42rpx;
+  font-weight: 800;
+}
+
+.dialog-icon.warning {
+  color: #d97706;
+}
+
+.dialog-title {
+  display: block;
+  text-align: center;
+  font-size: 34rpx;
+  font-weight: 800;
+  color: #1f2937;
+}
+
+.dialog-desc {
+  display: block;
+  margin-top: 12rpx;
+  text-align: center;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #64748b;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 28rpx;
+}
+
+.dialog-btn {
+  flex: 1;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.dialog-btn.secondary {
+  color: #475569;
+  background: #f8fafc;
+}
+
+.dialog-btn.primary {
+  color: #fff;
+  background: linear-gradient(135deg, #d51f35, #b70f24);
+}
 </style>
