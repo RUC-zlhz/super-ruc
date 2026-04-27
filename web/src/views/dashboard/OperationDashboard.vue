@@ -1,6 +1,6 @@
 <template>
   <div class="operation-dashboard">
-    <a-page-header title="运营看板" sub-title="FR-016" />
+    <a-page-header title="运营看板" sub-title="学院事务运营、通知触达与学业缺口弱提示" />
 
     <a-alert
       type="info"
@@ -43,20 +43,14 @@
     />
 
     <a-spin :spinning="loadingOverview || loadingAcademicGap">
-      <a-row :gutter="[16, 16]" class="mb16">
-        <a-col
-          v-for="metric in dashboard.metrics"
-          :key="metric.key"
-          :xs="24"
-          :sm="12"
-          :xl="4"
-        >
-          <a-card :bordered="false" class="metric-card">
-            <a-statistic :title="metric.label" :value="metric.value" />
-            <div class="metric-sub">{{ metric.sub_label || 'overview 汇总指标' }}</div>
-          </a-card>
-        </a-col>
-      </a-row>
+      <div class="metric-grid five">
+        <div v-for="metric in dashboard.metrics" :key="metric.key" class="metric-tile">
+          <span class="metric-icon"><component :is="metricIcon(metric.key)" /></span>
+          <div class="metric-label">{{ metric.label }}</div>
+          <div class="metric-value">{{ metric.value }}</div>
+          <div class="metric-sub">{{ metric.sub_label || 'overview 汇总指标' }}</div>
+        </div>
+      </div>
 
       <a-card
         v-if="!dashboard.hasData"
@@ -69,7 +63,7 @@
 
       <a-row :gutter="[16, 16]" class="mb16">
         <a-col :xs="24" :xl="14">
-          <a-card title="事务申请分布" :bordered="false">
+          <a-card title="事务申请分布" :bordered="false" class="visual-card">
             <template v-if="dashboard.requestDistribution.length">
               <div class="chart-stack">
                 <div
@@ -95,7 +89,7 @@
         </a-col>
 
         <a-col :xs="24" :xl="10">
-          <a-card title="通知触达概况" :bordered="false">
+          <a-card title="通知触达概况" :bordered="false" class="visual-card">
             <template v-if="dashboard.noticeDelivery.length">
               <div class="notice-grid">
                 <div
@@ -116,7 +110,7 @@
 
       <a-row :gutter="[16, 16]">
         <a-col :xs="24" :xl="14">
-          <a-card title="流程节点负载" :bordered="false">
+          <a-card title="流程节点负载" :bordered="false" class="visual-card">
             <template v-if="dashboard.workflowLoad.length">
               <div class="chart-stack">
                 <div
@@ -142,9 +136,12 @@
           </a-card>
         </a-col>
         <a-col :xs="24" :xl="10">
-          <a-card title="弱结论边界" :bordered="false">
+          <a-card title="弱结论边界" :bordered="false" class="visual-card risk-card">
             <div class="academic-gap-intro">
               {{ dashboard.academicGap.description }}
+            </div>
+            <div class="academic-gap-intro subtle">
+              当前分布仅基于“当前筛选 + 当前页列表”生成，不代表本次筛选下的全量统计结果。
             </div>
             <template v-if="dashboard.academicGap.items.length">
               <div
@@ -165,7 +162,7 @@
       </a-row>
 
       <a-card class="mt16" :title="dashboard.academicGap.title" :bordered="false">
-        <a-form layout="inline" :model="academicGapFilters" class="mb16" @finish="onAcademicGapSearch">
+        <a-form layout="inline" :model="academicGapFilters" class="filter-card compact" @finish="onAcademicGapSearch">
           <a-form-item label="关键字">
             <a-input
               v-model:value="academicGapFilters.keyword"
@@ -213,7 +210,7 @@
         </a-form>
 
         <div class="academic-gap-intro mb16">
-          当前列表仅作学业缺口弱提示，不输出毕业、预警等强结论。点击“查看明细”可下钻到单学生 canonical academic-gap 详情。
+          当前列表仅作学业缺口弱提示，不输出毕业、预警等强结论。上方右侧卡片与下方表格摘要都只基于“当前筛选 + 当前页”可见数据生成。点击“查看明细”可下钻到单学生 canonical academic-gap 详情。
         </div>
 
         <a-table
@@ -356,6 +353,13 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import {
+  AlertOutlined,
+  BellOutlined,
+  FileDoneOutlined,
+  FormOutlined,
+  TeamOutlined,
+} from '@ant-design/icons-vue'
+import {
   buildDashboardViewModel,
   deriveAcademicRiskLevel,
   fetchAcademicGap,
@@ -412,6 +416,19 @@ const academicGapDetailColumns = [
 ]
 
 const dashboard = computed(() => buildDashboardViewModel(overview.value, academicGapRows.value))
+
+const METRIC_ICON: Record<string, unknown> = {
+  students: TeamOutlined,
+  requests: FormOutlined,
+  pending_approvals: FileDoneOutlined,
+  notices: BellOutlined,
+  deliveries: BellOutlined,
+  overdue_nodes: AlertOutlined,
+}
+
+function metricIcon(key: string) {
+  return METRIC_ICON[key] || FormOutlined
+}
 
 function formatDateTime(value?: string | null) {
   if (!value) return '-'
@@ -531,20 +548,6 @@ onMounted(async () => {
   font-size: 12px;
 }
 
-.metric-card {
-  min-height: 124px;
-  background:
-    linear-gradient(135deg, rgba(139, 58, 46, 0.08), rgba(194, 65, 12, 0.02)),
-    #fff;
-}
-
-.metric-sub {
-  margin-top: 8px;
-  color: #8c8c8c;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
 .chart-stack {
   display: grid;
   gap: 18px;
@@ -592,12 +595,12 @@ onMounted(async () => {
 .notice-item {
   padding: 14px 16px;
   border-radius: 10px;
-  background: #faf7f2;
-  border: 1px solid #f3e5d8;
+  background: #fff7f8;
+  border: 1px solid #ffe3e8;
 }
 
 .notice-value {
-  color: #8b3a2e;
+  color: var(--ruc-red);
   font-size: 28px;
   font-weight: 700;
   line-height: 1;
@@ -613,6 +616,11 @@ onMounted(async () => {
   margin-bottom: 12px;
   color: #8c8c8c;
   line-height: 1.6;
+}
+
+.academic-gap-intro.subtle {
+  margin-top: -4px;
+  font-size: 12px;
 }
 
 .gap-title-row {
@@ -637,7 +645,7 @@ onMounted(async () => {
 }
 
 .gap-count {
-  color: #8b3a2e;
+  color: var(--ruc-red);
   font-size: 20px;
   font-weight: 700;
   line-height: 1;
@@ -648,7 +656,7 @@ onMounted(async () => {
 }
 
 .gap-student-name {
-  color: #262626;
+  color: var(--text);
   font-weight: 600;
 }
 

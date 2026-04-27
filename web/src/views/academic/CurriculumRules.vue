@@ -1,10 +1,19 @@
 <template>
-  <div>
-    <a-page-header title="培养方案管理" sub-title="FR-015" />
+  <div class="curriculum-page">
+    <a-page-header title="培养方案管理" sub-title="培养方案、开课记录与课程等价关系维护" />
+
+    <div class="metric-grid">
+      <div v-for="metric in metrics" :key="metric.key" class="metric-tile">
+        <span class="metric-icon"><component :is="metric.icon" /></span>
+        <div class="metric-label">{{ metric.label }}</div>
+        <div class="metric-value">{{ metric.value }}</div>
+        <div class="metric-sub">{{ metric.sub }}</div>
+      </div>
+    </div>
 
     <a-tabs v-model:activeKey="activeTab">
       <a-tab-pane key="plans" tab="培养方案">
-        <a-form layout="inline" class="mb16" @finish="loadPlans">
+        <a-form layout="inline" class="filter-card" @finish="loadPlans">
           <a-form-item label="年级">
             <a-input v-model:value="planFilters.grade_code" placeholder="年级代码" allow-clear />
           </a-form-item>
@@ -30,7 +39,7 @@
       </a-tab-pane>
 
       <a-tab-pane key="offerings" tab="开课记录">
-        <a-form layout="inline" class="mb16" @finish="loadOfferings">
+        <a-form layout="inline" class="filter-card" @finish="loadOfferings">
           <a-form-item label="学期">
             <a-input v-model:value="offeringFilters.semester" placeholder="如 2025-2026-1" allow-clear />
           </a-form-item>
@@ -77,12 +86,48 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import {
+  BookOutlined,
+  ClusterOutlined,
+  NodeIndexOutlined,
+  ReadOutlined,
+} from '@ant-design/icons-vue'
 import { get } from '@/utils/request'
 import type { ApiEnvelope } from '@/utils/request'
 import type { Paginated } from '@/api/types'
 
 const activeTab = ref('plans')
+const metrics = computed(() => [
+  {
+    key: 'plans',
+    label: '培养方案数',
+    value: plans.value.length,
+    sub: '当前筛选结果',
+    icon: BookOutlined,
+  },
+  {
+    key: 'modules',
+    label: '模块数',
+    value: modules.value.length,
+    sub: selectedPlan.value ? selectedPlan.value.name : '最近查看方案',
+    icon: ClusterOutlined,
+  },
+  {
+    key: 'offerings',
+    label: '课程数',
+    value: offeringPagination.total || offerings.value.length,
+    sub: '开课记录',
+    icon: ReadOutlined,
+  },
+  {
+    key: 'equivalences',
+    label: '等价关系数',
+    value: equivalences.value.length,
+    sub: '课程替代规则',
+    icon: NodeIndexOutlined,
+  },
+])
 
 // ---------- 培养方案 ----------
 const planCols = [
@@ -188,6 +233,4 @@ onMounted(() => {
 })
 </script>
 
-<style scoped>
-.mb16 { margin-bottom: 16px; }
-</style>
+<style scoped></style>

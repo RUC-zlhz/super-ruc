@@ -8,7 +8,15 @@
 
     <a-spin :spinning="loading">
       <template v-if="detail">
-        <a-card title="一、申请信息" :bordered="false" size="small" class="mb16">
+        <div class="detail-status-bar">
+          <div>
+            <div class="detail-no">{{ detail.request_no }}</div>
+            <div class="detail-title">{{ detail.title }}</div>
+          </div>
+          <a-tag :color="statusMeta.color">{{ statusMeta.label }}</a-tag>
+        </div>
+
+        <a-card title="申请基础信息" :bordered="false" size="small" class="mb16 visual-card">
           <a-alert
             type="info"
             show-icon
@@ -54,7 +62,7 @@
             </a-descriptions-item>
           </a-descriptions>
 
-          <div class="section-subtitle">结构化表单字段</div>
+          <div class="section-subtitle">申请事项详情</div>
           <template v-if="formEntries.length">
             <a-descriptions :column="2" bordered size="small">
               <a-descriptions-item
@@ -69,7 +77,7 @@
           <a-empty v-else description="当前申请未返回结构化表单字段" />
         </a-card>
 
-        <a-card title="二、附件" :bordered="false" size="small" class="mb16">
+        <a-card title="附件列表" :bordered="false" size="small" class="mb16 visual-card">
           <div v-if="detail.attachments.length" class="attachment-list">
             <div
               v-for="attachment in detail.attachments"
@@ -87,7 +95,7 @@
           <a-empty v-else description="当前申请没有附件材料" />
         </a-card>
 
-        <a-card title="三、历史流转" :bordered="false" size="small" class="mb16">
+        <a-card title="审批流程时间线" :bordered="false" size="small" class="mb16 visual-card">
           <a-timeline v-if="approvalTimeline.length">
             <a-timeline-item
               v-for="record in approvalTimeline"
@@ -114,7 +122,7 @@
           <a-empty v-else description="暂无审批流转记录" />
         </a-card>
 
-        <a-card title="四、当前可执行动作" :bordered="false" size="small">
+        <a-card title="当前可执行动作" :bordered="false" size="small" class="visual-card action-panel">
           <a-row :gutter="[16, 16]">
             <a-col :xs="24" :lg="14">
               <a-alert
@@ -399,6 +407,33 @@ onMounted(loadDetail)
   margin-bottom: 16px;
 }
 
+.detail-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 18px 22px;
+  background:
+    linear-gradient(135deg, rgba(176, 0, 24, 0.08), transparent 60%),
+    #fff;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.detail-no {
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.detail-title {
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 800;
+}
+
 .pre-like {
   margin: 0;
   white-space: pre-wrap;
@@ -407,10 +442,10 @@ onMounted(loadDetail)
 }
 
 .section-subtitle {
-  margin-bottom: 12px;
-  color: #4b5563;
-  font-size: 13px;
-  font-weight: 600;
+  margin: 18px 0 12px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
 }
 
 .detail-muted {
@@ -425,9 +460,9 @@ onMounted(loadDetail)
 
 .attachment-item {
   padding: 12px 14px;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  background: #fafafa;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: #fafbfc;
 }
 
 .attachment-title {
@@ -452,8 +487,8 @@ onMounted(loadDetail)
 .timeline-comment {
   margin-top: 8px;
   padding: 8px 12px;
-  border-left: 3px solid #d9d9d9;
-  background: #fafafa;
+  border-left: 3px solid var(--ruc-red);
+  background: #fff7f8;
   white-space: pre-wrap;
   line-height: 1.6;
 }
@@ -461,5 +496,9 @@ onMounted(loadDetail)
 .action-buttons {
   display: grid;
   gap: 12px;
+}
+
+.action-panel {
+  margin-bottom: 18px;
 }
 </style>

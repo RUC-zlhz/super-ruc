@@ -1,7 +1,17 @@
 <template>
-  <div>
-    <a-page-header title="审批工作台" sub-title="FR-007 / FR-008" />
-    <a-form layout="inline" :model="filters" class="mb16" @finish="reload">
+  <div class="workbench-page">
+    <a-page-header title="审批工作台" sub-title="教师业务申请审批与进度管理" />
+
+    <div class="metric-grid">
+      <div v-for="metric in metrics" :key="metric.key" class="metric-tile">
+        <span class="metric-icon"><component :is="metric.icon" /></span>
+        <div class="metric-label">{{ metric.label }}</div>
+        <div class="metric-value">{{ metric.value }}</div>
+        <div class="metric-sub">{{ metric.sub }}</div>
+      </div>
+    </div>
+
+    <a-form layout="inline" :model="filters" class="filter-card" @finish="onSearch">
       <a-form-item label="关键字">
         <a-input v-model:value="filters.q" placeholder="单号 / 申请人 / 标题" allow-clear />
       </a-form-item>
@@ -28,6 +38,7 @@
       :loading="loading"
       :pagination="pagination"
       row-key="id"
+      class="visual-table"
       @change="onTableChange"
     >
       <template #bodyCell="{ column, record }">
@@ -35,7 +46,7 @@
           <StatusTag :status="record.status" />
         </template>
         <template v-else-if="column.key === 'actions'">
-          <router-link :to="`/approval/${record.id}`">查看</router-link>
+          <router-link class="action-link" :to="`/approval/${record.id}`">查看详情</router-link>
         </template>
       </template>
     </a-table>
@@ -43,7 +54,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  FileDoneOutlined,
+  InboxOutlined,
+} from '@ant-design/icons-vue'
 import { listAdminRequests, type RequestBrief, type RequestStatus } from '@/api/workflow'
 import StatusTag from '@/components/StatusTag.vue'
 
@@ -67,6 +84,42 @@ const rows = ref<RequestBrief[]>([])
 const loading = ref(false)
 const pagination = reactive({ current: 1, pageSize: 20, total: 0 })
 
+const metrics = computed(() => {
+  const pending = rows.value.filter((item) => item.status === 'SUBMITTED').length
+  const reviewing = rows.value.filter((item) => item.status === 'IN_REVIEW').length
+  const approved = rows.value.filter((item) => item.status === 'APPROVED').length
+  return [
+    {
+      key: 'total',
+      label: '申请总数',
+      value: pagination.total || rows.value.length,
+      sub: '当前筛选结果',
+      icon: FileDoneOutlined,
+    },
+    {
+      key: 'pending',
+      label: '待审批',
+      value: pending,
+      sub: '当前页待处理',
+      icon: InboxOutlined,
+    },
+    {
+      key: 'reviewing',
+      label: '审核中',
+      value: reviewing,
+      sub: '已进入审批链路',
+      icon: ClockCircleOutlined,
+    },
+    {
+      key: 'approved',
+      label: '已通过',
+      value: approved,
+      sub: '当前页通过数',
+      icon: CheckCircleOutlined,
+    },
+  ]
+})
+
 async function reload() {
   loading.value = true
   try {
@@ -84,6 +137,11 @@ async function reload() {
   }
 }
 
+function onSearch() {
+  pagination.current = 1
+  void reload()
+}
+
 function onTableChange(p: any) {
   pagination.current = p.current
   pagination.pageSize = p.pageSize
@@ -94,5 +152,8 @@ onMounted(reload)
 </script>
 
 <style scoped>
-.mb16 { margin-bottom: 16px; }
+.action-link {
+  color: var(--ruc-red);
+  font-weight: 600;
+}
 </style>

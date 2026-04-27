@@ -1,10 +1,19 @@
 <template>
-  <div>
-    <a-page-header title="党团流程管理" sub-title="FR-004 / FR-005" />
+  <div class="party-stage-page">
+    <a-page-header title="党团流程管理" sub-title="党团相关流程模板、节点、学生流程及提醒规则" />
+
+    <div class="metric-grid">
+      <div v-for="metric in metrics" :key="metric.key" class="metric-tile">
+        <span class="metric-icon"><component :is="metric.icon" /></span>
+        <div class="metric-label">{{ metric.label }}</div>
+        <div class="metric-value">{{ metric.value }}</div>
+        <div class="metric-sub">{{ metric.sub }}</div>
+      </div>
+    </div>
 
     <a-tabs v-model:activeKey="activeTab">
       <a-tab-pane key="templates" tab="流程模板">
-        <a-form layout="inline" class="mb16">
+        <a-form layout="inline" class="filter-card">
           <a-form-item>
             <a-button type="primary" @click="showTemplateDrawer = true">新建模板</a-button>
           </a-form-item>
@@ -29,7 +38,7 @@
       </a-tab-pane>
 
       <a-tab-pane key="students" tab="学生流程">
-        <a-form layout="inline" class="mb16" @finish="reloadStudentFlows">
+        <a-form layout="inline" class="filter-card" @finish="reloadStudentFlows">
           <a-form-item label="学号">
             <a-input v-model:value="flowFilters.student_no" placeholder="学号" allow-clear />
           </a-form-item>
@@ -117,14 +126,50 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
+import {
+  BellOutlined,
+  BranchesOutlined,
+  NodeIndexOutlined,
+  TeamOutlined,
+} from '@ant-design/icons-vue'
 import { get, post } from '@/utils/request'
 import type { ApiEnvelope } from '@/utils/request'
 import type { Paginated } from '@/api/types'
 import StatusTag from '@/components/StatusTag.vue'
 
 const activeTab = ref('templates')
+const metrics = computed(() => [
+  {
+    key: 'templates',
+    label: '流程模板数',
+    value: templates.value.length,
+    sub: '当前模板配置',
+    icon: BranchesOutlined,
+  },
+  {
+    key: 'nodes',
+    label: '节点总数',
+    value: nodes.value.length,
+    sub: selectedTemplate.value ? selectedTemplate.value.name : '最近查看模板',
+    icon: NodeIndexOutlined,
+  },
+  {
+    key: 'flows',
+    label: '学生流程',
+    value: flowPagination.total || flows.value.length,
+    sub: '当前筛选结果',
+    icon: TeamOutlined,
+  },
+  {
+    key: 'reminders',
+    label: '提醒规则数',
+    value: reminders.value.length,
+    sub: '节点提醒配置',
+    icon: BellOutlined,
+  },
+])
 
 // ---------- 模板 ----------
 const templateCols = [

@@ -1,8 +1,17 @@
 <template>
-  <div>
-    <a-page-header title="通知中心" sub-title="FR-010 / FR-011" />
+  <div class="notice-page">
+    <a-page-header title="通知中心" sub-title="统一管理通知发布、投递与触达情况" />
 
-    <a-form layout="inline" :model="filters" class="mb16" @finish="onFilterSubmit">
+    <div class="metric-grid">
+      <div v-for="metric in metrics" :key="metric.key" class="metric-tile">
+        <span class="metric-icon"><component :is="metric.icon" /></span>
+        <div class="metric-label">{{ metric.label }}</div>
+        <div class="metric-value">{{ metric.value }}</div>
+        <div class="metric-sub">{{ metric.sub }}</div>
+      </div>
+    </div>
+
+    <a-form layout="inline" :model="filters" class="filter-card" @finish="onFilterSubmit">
       <a-form-item label="关键字">
         <a-input v-model:value="filters.q" placeholder="标题" allow-clear style="width: 200px" />
       </a-form-item>
@@ -269,7 +278,7 @@
 
             <a-row :gutter="16">
               <a-col :span="12">
-                <a-form-item label="role_codes（保留字段）">
+                <a-form-item label="role_codes">
                   <a-select
                     v-model:value="form.target_rule.role_codes"
                     mode="tags"
@@ -278,7 +287,7 @@
                     :disabled="editorStatus === 'ARCHIVED'"
                   />
                   <div class="muted mt8">
-                    当前后端 contract 保留该字段，但 target-preview 暂未按 role_codes 命中。
+                    按绑定用户角色进一步过滤命中对象；为空时不按角色筛选。
                   </div>
                 </a-form-item>
               </a-col>
@@ -598,8 +607,14 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
+import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  NotificationOutlined,
+  SendOutlined,
+} from '@ant-design/icons-vue'
 import {
   archiveNotice,
   createNotice,
@@ -862,6 +877,37 @@ const filters = reactive<{ q?: string; status?: NoticeStatus }>({})
 const rows = ref<NoticeBrief[]>([])
 const loading = ref(false)
 const pagination = reactive({ current: 1, pageSize: 20, total: 0 })
+
+const metrics = computed(() => [
+  {
+    key: 'total',
+    label: '通知总数',
+    value: pagination.total || rows.value.length,
+    sub: '当前筛选结果',
+    icon: NotificationOutlined,
+  },
+  {
+    key: 'draft',
+    label: '待发布',
+    value: rows.value.filter((item) => item.status === 'DRAFT').length,
+    sub: '草稿通知',
+    icon: ClockCircleOutlined,
+  },
+  {
+    key: 'published',
+    label: '发送中',
+    value: rows.value.filter((item) => item.status === 'PUBLISHED').length,
+    sub: '可投递通知',
+    icon: SendOutlined,
+  },
+  {
+    key: 'archived',
+    label: '已完成',
+    value: rows.value.filter((item) => item.status === 'ARCHIVED').length,
+    sub: '归档通知',
+    icon: CheckCircleOutlined,
+  },
+])
 
 async function reload() {
   loading.value = true

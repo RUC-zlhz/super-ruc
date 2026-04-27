@@ -1,6 +1,15 @@
 <template>
-  <div>
-    <a-page-header title="荣誉公示管理" sub-title="FR-017" />
+  <div class="honor-page">
+    <a-page-header title="荣誉公示管理" sub-title="维护教师荣誉信息、公示状态与历史记录" />
+
+    <div class="metric-grid">
+      <div v-for="metric in metrics" :key="metric.key" class="metric-tile">
+        <span class="metric-icon"><component :is="metric.icon" /></span>
+        <div class="metric-label">{{ metric.label }}</div>
+        <div class="metric-value">{{ metric.value }}</div>
+        <div class="metric-sub">{{ metric.sub }}</div>
+      </div>
+    </div>
 
     <a-card :bordered="false" class="mb16">
       <a-form layout="inline" :model="filters" @finish="onSearch">
@@ -476,6 +485,12 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  InboxOutlined,
+  TrophyOutlined,
+} from '@ant-design/icons-vue'
+import {
   adminArchiveRecord,
   adminCreateRecord,
   adminGetRecord,
@@ -556,6 +571,36 @@ const filters = reactive<{
 const rows = ref<HonorRecordBrief[]>([])
 const loading = ref(false)
 const pagination = reactive({ current: 1, pageSize: 20, total: 0 })
+const metrics = computed(() => [
+  {
+    key: 'total',
+    label: '总数',
+    value: pagination.total || rows.value.length,
+    sub: '当前筛选结果',
+    icon: TrophyOutlined,
+  },
+  {
+    key: 'active',
+    label: '待公示/生效',
+    value: rows.value.filter((item) => item.status === 'ACTIVE').length,
+    sub: '当前页生效',
+    icon: CheckCircleOutlined,
+  },
+  {
+    key: 'archived',
+    label: '已归档',
+    value: rows.value.filter((item) => item.status === 'ARCHIVED').length,
+    sub: '历史荣誉',
+    icon: InboxOutlined,
+  },
+  {
+    key: 'categories',
+    label: '类别数',
+    value: categoryRows.value.length,
+    sub: '类别维护',
+    icon: ClockCircleOutlined,
+  },
+])
 
 const categoryRows = ref<HonorCategoryOut[]>([])
 const categoryLoading = ref(false)

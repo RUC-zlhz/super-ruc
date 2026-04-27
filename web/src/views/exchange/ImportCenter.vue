@@ -1,11 +1,27 @@
 <template>
-  <div>
-    <a-page-header title="导入导出中心" sub-title="FR-009" />
+  <div class="exchange-page">
+    <a-page-header title="导入导出中心" sub-title="教师数据批量导入、模板下载与结果追踪" />
+
+    <div class="metric-grid">
+      <div v-for="metric in metrics" :key="metric.key" class="metric-tile">
+        <span class="metric-icon"><component :is="metric.icon" /></span>
+        <div class="metric-label">{{ metric.label }}</div>
+        <div class="metric-value">{{ metric.value }}</div>
+        <div class="metric-sub">{{ metric.sub }}</div>
+      </div>
+    </div>
 
     <a-tabs v-model:activeKey="activeTab">
       <!-- 导入 -->
       <a-tab-pane key="import" tab="数据导入">
-        <a-card :bordered="false" class="mb16">
+        <a-card :bordered="false" class="mb16 import-hero">
+          <div class="upload-zone">
+            <div class="upload-icon"><CloudUploadOutlined /></div>
+            <div>
+              <div class="upload-title">将文件拖拽到此处，或点击上传</div>
+              <div class="upload-sub">支持 .xlsx / .csv 格式，单批次导入前会先完成校验预览。</div>
+            </div>
+          </div>
           <a-space>
             <a-select v-model:value="importType" style="width: 180px">
               <a-select-option value="student">学生主档</a-select-option>
@@ -109,8 +125,15 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
+import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  CloudUploadOutlined,
+  ExclamationCircleOutlined,
+  FileTextOutlined,
+} from '@ant-design/icons-vue'
 import {
   uploadImport, commitImport, listImports,
   downloadErrorReport, downloadStudents, downloadTranscripts, downloadCurriculum,
@@ -121,6 +144,41 @@ import StatusTag from '@/components/StatusTag.vue'
 const activeTab = ref('import')
 const importType = ref<ImportType>('student')
 const preview = ref<ImportPreviewResult | null>(null)
+const metrics = computed(() => {
+  const ok = batches.value.reduce((sum, item) => sum + item.ok_rows, 0)
+  const fatal = batches.value.reduce((sum, item) => sum + item.fatal_rows, 0)
+  const pending = batches.value.filter((item) => !['COMPLETED', 'COMMITTED', 'FAILED'].includes(item.status)).length
+  return [
+    {
+      key: 'total',
+      label: '总记录数',
+      value: batches.value.reduce((sum, item) => sum + item.total_rows, 0),
+      sub: '历史批次累计',
+      icon: FileTextOutlined,
+    },
+    {
+      key: 'ok',
+      label: '校验通过',
+      value: ok,
+      sub: '可提交记录',
+      icon: CheckCircleOutlined,
+    },
+    {
+      key: 'fatal',
+      label: '校验失败',
+      value: fatal,
+      sub: '需修正记录',
+      icon: ExclamationCircleOutlined,
+    },
+    {
+      key: 'pending',
+      label: '待处理批次',
+      value: pending,
+      sub: '当前批次队列',
+      icon: ClockCircleOutlined,
+    },
+  ]
+})
 
 const rowCols = [
   { title: '行号', dataIndex: 'row_no', key: 'row_no', width: 70 },
@@ -208,4 +266,44 @@ onMounted(loadBatches)
 <style scoped>
 .mb16 { margin-bottom: 16px; }
 .mt8 { margin-top: 8px; }
+
+.import-hero :deep(.ant-card-body) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.upload-zone {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-height: 88px;
+  padding: 18px 24px;
+  border: 1px dashed rgba(176, 0, 24, 0.42);
+  border-radius: 14px;
+  background: #fff7f8;
+}
+
+.upload-icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  color: var(--ruc-red);
+  font-size: 30px;
+}
+
+.upload-title {
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.upload-sub {
+  margin-top: 6px;
+  color: var(--text-3);
+  font-size: 13px;
+}
 </style>

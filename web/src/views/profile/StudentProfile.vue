@@ -1,6 +1,6 @@
 <template>
-  <div>
-    <a-page-header title="学生画像" sub-title="FR-018" @back="$router.back()">
+  <div class="student-profile-page">
+    <a-page-header title="学生画像" sub-title="学生成长事实、学籍状态与治理留痕" @back="$router.back()">
       <template #extra>
         <a-space>
           <a-button :loading="snapshotLoading === 'pdf'" @click="onDownloadSnapshot('pdf')">
@@ -23,7 +23,7 @@
           :message="readonlyMessage"
         />
 
-        <a-card title="学籍信息" :bordered="false" size="small" class="mb16">
+        <a-card title="学籍信息" :bordered="false" size="small" class="mb16 student-hero-card">
           <a-descriptions :column="3" size="small">
             <a-descriptions-item label="学号">{{ profile.student.student_no }}</a-descriptions-item>
             <a-descriptions-item label="姓名">{{ profile.student.full_name }}</a-descriptions-item>
@@ -48,18 +48,20 @@
           </a-descriptions>
         </a-card>
 
-        <a-row :gutter="16" class="mb16">
-          <a-col :span="4" v-for="metric in factMetrics" :key="metric.key">
-            <a-card :bordered="false" size="small">
-              <a-statistic :title="metric.label" :value="metric.value" />
-            </a-card>
-          </a-col>
-          <a-col :span="4">
-            <a-card :bordered="false" size="small">
-              <a-statistic title="待处理申诉" :value="pendingCorrectionCount" />
-            </a-card>
-          </a-col>
-        </a-row>
+        <div class="metric-grid">
+          <div v-for="metric in factMetrics" :key="metric.key" class="metric-tile">
+            <span class="metric-icon"><component :is="factMetricIcon(metric.key)" /></span>
+            <div class="metric-label">{{ metric.label }}</div>
+            <div class="metric-value">{{ metric.value }}</div>
+            <div class="metric-sub">成长画像事实</div>
+          </div>
+          <div class="metric-tile">
+            <span class="metric-icon"><ExclamationCircleOutlined /></span>
+            <div class="metric-label">待处理申诉</div>
+            <div class="metric-value">{{ pendingCorrectionCount }}</div>
+            <div class="metric-sub">学生补录/纠错</div>
+          </div>
+        </div>
 
         <a-card title="成长事实" :bordered="false" size="small" class="mb16">
           <template #extra>
@@ -258,6 +260,14 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import {
+  ExperimentOutlined,
+  ExclamationCircleOutlined,
+  FlagOutlined,
+  HeartOutlined,
+  TeamOutlined,
+  TrophyOutlined,
+} from '@ant-design/icons-vue'
+import {
   adminAddFact,
   adminDecideFact,
   adminDeleteFact,
@@ -381,6 +391,18 @@ const factMetrics = computed(() => {
     { key: 'leadership_count', label: '学生骨干', value: profile.value.leadership_count },
   ]
 })
+
+const FACT_METRIC_ICON: Record<string, unknown> = {
+  research_count: ExperimentOutlined,
+  competition_count: TrophyOutlined,
+  practice_count: FlagOutlined,
+  volunteer_hours: HeartOutlined,
+  leadership_count: TeamOutlined,
+}
+
+function factMetricIcon(key: string) {
+  return FACT_METRIC_ICON[key] || FlagOutlined
+}
 
 async function loadPendingFacts() {
   try {
@@ -606,5 +628,11 @@ onMounted(loadProfile)
   flex-direction: column;
   gap: 4px;
   line-height: 1.4;
+}
+
+.student-hero-card {
+  background:
+    linear-gradient(135deg, rgba(176, 0, 24, 0.08), rgba(255, 255, 255, 0) 55%),
+    #fff;
 }
 </style>

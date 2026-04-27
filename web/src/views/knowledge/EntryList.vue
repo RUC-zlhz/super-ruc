@@ -1,172 +1,679 @@
 <template>
-  <div>
-    <a-page-header title="知识库管理" sub-title="FR-001 / FR-002 / FR-003" />
+  <div class="knowledge-page">
+    <a-page-header title="知识库管理" sub-title="知识条目、模板与版本治理" />
 
-    <a-form layout="inline" :model="filters" class="mb16" @finish="reload">
-      <a-form-item label="关键字">
-        <a-input v-model:value="filters.q" placeholder="标题 / 编码" allow-clear style="width: 200px" />
-      </a-form-item>
-      <a-form-item label="分类">
-        <a-input v-model:value="filters.category" placeholder="分类编码" allow-clear style="width: 160px" />
-      </a-form-item>
-      <a-form-item>
-        <a-button type="primary" html-type="submit">查询</a-button>
-      </a-form-item>
-      <a-form-item>
-        <a-button type="primary" @click="showDrawer = true">新增条目</a-button>
-      </a-form-item>
-    </a-form>
+    <div class="metric-grid">
+      <div v-for="metric in metrics" :key="metric.key" class="metric-tile">
+        <span class="metric-icon"><component :is="metric.icon" /></span>
+        <div class="metric-label">{{ metric.label }}</div>
+        <div class="metric-value">{{ metric.value }}</div>
+        <div class="metric-sub">{{ metric.sub }}</div>
+      </div>
+    </div>
 
-    <a-table
-      :columns="columns"
-      :data-source="rows"
-      :loading="loading"
-      :pagination="pagination"
-      row-key="id"
-      @change="onTableChange"
-    >
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'is_active'">
-          <a-tag :color="record.is_active ? 'green' : 'default'">
-            {{ record.is_active ? '生效' : '停用' }}
-          </a-tag>
-        </template>
-        <template v-else-if="column.key === 'tags'">
-          <a-tag v-for="t in (record.tags || [])" :key="t" size="small">{{ t }}</a-tag>
-        </template>
-        <template v-else-if="column.key === 'actions'">
-          <a-button type="link" size="small" @click="onEdit(record)">编辑</a-button>
-          <a-popconfirm title="确定删除该条目？" @confirm="onDelete(record.id)">
-            <a-button type="link" size="small" danger>删除</a-button>
-          </a-popconfirm>
-        </template>
-      </template>
-    </a-table>
+    <a-tabs v-model:active-key="activeTab">
+      <a-tab-pane key="entries" tab="知识条目">
+        <a-alert
+          class="mb16"
+          type="info"
+          show-icon
+          message="知识条目需先保存为草稿，再发布到学生端。"
+          description="来源、版本、模糊场景人工兜底和关联模板会一并进入权威答复治理链路。"
+        />
+
+        <a-form layout="inline" :model="filters" class="filter-card" @finish="onFilterSubmit">
+          <a-form-item label="关键字">
+            <a-input v-model:value="filters.q" placeholder="标题 / slug" allow-clear style="width: 220px" />
+          </a-form-item>
+          <a-form-item label="状态">
+            <a-select v-model:value="filters.status" style="width: 150px" allow-clear>
+              <a-select-option value="DRAFT">草稿</a-select-option>
+              <a-select-option value="PUBLISHED">已发布</a-select-option>
+              <a-select-option value="DEPRECATED">已停用</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item>
+            <a-button type="primary" html-type="submit">查询</a-button>
+          </a-form-item>
+          <a-form-item>
+            <a-button type="primary" @click="openEntryEditor()">新增条目</a-button>
+          </a-form-item>
+        </a-form>
+
+        <a-table
+          :columns="entryColumns"
+          :data-source="entries"
+          :loading="entryLoading"
+          :pagination="entryPagination"
+          row-key="id"
+          @change="onEntryTableChange"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'title'">
+              <div class="table-title">{{ record.title }}</div>
+              <div class="table-secondary">
+                <span>{{ record.slug }}</span>
+                <a-tag v-if="record.category_code" size="small">{{ record.category_code }}</a-tag>
+                <a-tag v-if="record.ambiguity_flag" color="orange" size="small">需人工兜底</a-tag>
+              </div>
+            </template>
+            <template v-else-if="column.key === 'status'">
+              <a-tag :color="entryStatusColor(record.status)">{{ entryStatusLabel(record.status) }}</a-tag>
+            </template>
+            <template v-else-if="column.key === 'tags'">
+              <a-tag v-for="tag in record.tags" :key="tag" size="small">{{ tag }}</a-tag>
+              <span v-if="!record.tags.length" class="muted">-</span>
+            </template>
+            <template v-else-if="column.key === 'updated_at'">
+              {{ formatDateTime(record.updated_at) }}
+            </template>
+            <template v-else-if="column.key === 'actions'">
+              <a-space size="small" wrap>
+                <a-button type="link" size="small" @click="openEntryEditor(record.id)">编辑</a-button>
+                <a-button
+                  v-if="record.status !== 'PUBLISHED'"
+                  type="link"
+                  size="small"
+                  @click="onPublishEntry(record.id)"
+                >
+                  发布
+                </a-button>
+                <a-button
+                  v-if="record.status !== 'DEPRECATED'"
+                  type="link"
+                  size="small"
+                  danger
+                  @click="onDeprecateEntry(record.id)"
+                >
+                  停用
+                </a-button>
+                <a-button type="link" size="small" @click="openRevisions(record.id)">版本</a-button>
+              </a-space>
+            </template>
+          </template>
+        </a-table>
+      </a-tab-pane>
+
+      <a-tab-pane key="templates" tab="模板文件">
+        <a-form layout="inline" :model="templateFilters" class="filter-card" @finish="reloadTemplates">
+          <a-form-item label="关键字">
+            <a-input v-model:value="templateFilters.q" placeholder="模板名称" allow-clear style="width: 220px" />
+          </a-form-item>
+          <a-form-item label="分类">
+            <a-input v-model:value="templateFilters.category" placeholder="分类编码" allow-clear style="width: 160px" />
+          </a-form-item>
+          <a-form-item>
+            <a-checkbox v-model:checked="templateFilters.include_deprecated">含停用</a-checkbox>
+          </a-form-item>
+          <a-form-item>
+            <a-button type="primary" html-type="submit">查询</a-button>
+          </a-form-item>
+          <a-form-item>
+            <a-button type="primary" @click="openTemplateDrawer">上传模板</a-button>
+          </a-form-item>
+        </a-form>
+
+        <a-table
+          :columns="templateColumns"
+          :data-source="templates"
+          :loading="templateLoading"
+          :pagination="templatePagination"
+          row-key="id"
+          @change="onTemplateTableChange"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'template_name'">
+              <div class="table-title">{{ record.template_name }}</div>
+              <div class="table-secondary">
+                <span>{{ record.applicable_scenario || '未填写适用场景' }}</span>
+              </div>
+            </template>
+            <template v-else-if="column.key === 'status'">
+              <a-tag :color="record.status === 'ACTIVE' ? 'green' : 'default'">
+                {{ record.status === 'ACTIVE' ? '可用' : '已停用' }}
+              </a-tag>
+            </template>
+            <template v-else-if="column.key === 'file_size'">
+              {{ formatSize(record.file_size) }}
+            </template>
+            <template v-else-if="column.key === 'uploaded_at'">
+              {{ formatDateTime(record.uploaded_at) }}
+            </template>
+            <template v-else-if="column.key === 'actions'">
+              <a-popconfirm title="确定停用该模板？" @confirm="onDeprecateTemplate(record.id)">
+                <a-button v-if="record.status === 'ACTIVE'" type="link" size="small" danger>停用</a-button>
+              </a-popconfirm>
+            </template>
+          </template>
+        </a-table>
+      </a-tab-pane>
+    </a-tabs>
 
     <a-drawer
-      :open="showDrawer"
-      :title="editingId ? '编辑知识条目' : '新增知识条目'"
-      width="520"
-      @close="resetForm"
+      :open="entryDrawerOpen"
+      :title="editingEntryId ? '编辑知识条目' : '新增知识条目'"
+      width="760"
+      @close="resetEntryForm"
     >
-      <a-form layout="vertical" :model="form" @finish="onSubmit">
-        <a-form-item label="编码" name="code" :rules="[{ required: true, message: '请输入编码' }]">
-          <a-input v-model:value="form.code" />
+      <a-spin :spinning="entryDrawerLoading">
+      <a-form layout="vertical" :model="entryForm" @finish="onSubmitEntry">
+        <a-row :gutter="16">
+          <a-col :span="10">
+            <a-form-item label="Slug" name="slug" :rules="[{ required: !editingEntryId, message: '请输入 slug' }]">
+              <a-input v-model:value="entryForm.slug" :disabled="!!editingEntryId" placeholder="sick-leave-procedure" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="14">
+            <a-form-item label="标题" name="title" :rules="[{ required: true, message: '请输入标题' }]">
+              <a-input v-model:value="entryForm.title" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="8"><a-form-item label="分类"><a-input v-model:value="entryForm.category_code" /></a-form-item></a-col>
+          <a-col :span="8"><a-form-item label="版本"><a-input v-model:value="entryForm.version_label" /></a-form-item></a-col>
+          <a-col :span="8">
+            <a-form-item label="官方来源">
+              <a-select v-model:value="entryForm.source_id" allow-clear show-search option-filter-prop="label">
+                <a-select-option v-for="source in sources" :key="source.id" :value="source.id" :label="source.source_name">
+                  {{ source.source_name }}
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="摘要"><a-textarea v-model:value="entryForm.summary" :rows="2" /></a-form-item>
+        <a-form-item label="适用条件"><a-textarea v-model:value="entryForm.applicable_condition" :rows="2" /></a-form-item>
+        <a-form-item label="所需材料"><a-textarea v-model:value="entryForm.required_materials" :rows="2" /></a-form-item>
+        <a-form-item label="办理步骤"><a-textarea v-model:value="entryForm.process_steps" :rows="3" /></a-form-item>
+        <a-form-item label="正文"><a-textarea v-model:value="entryForm.body_md" :rows="6" /></a-form-item>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="标签">
+              <a-select v-model:value="entryForm.tags" mode="tags" style="width: 100%" placeholder="输入后回车" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="关联模板">
+              <a-select v-model:value="entryForm.template_ids" mode="multiple" style="width: 100%" option-filter-prop="label">
+                <a-select-option v-for="template in activeTemplates" :key="template.id" :value="template.id" :label="template.template_name">
+                  {{ template.template_name }}
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item>
+          <a-checkbox v-model:checked="entryForm.ambiguity_flag">模糊 / 高风险内容，学生侧提示转人工</a-checkbox>
         </a-form-item>
-        <a-form-item label="标题" name="title" :rules="[{ required: true, message: '请输入标题' }]">
-          <a-input v-model:value="form.title" />
-        </a-form-item>
-        <a-form-item label="分类">
-          <a-input v-model:value="form.category" />
-        </a-form-item>
-        <a-form-item label="内容" name="body">
-          <a-textarea v-model:value="form.body" :rows="6" />
-        </a-form-item>
-        <a-form-item label="来源链接">
-          <a-input v-model:value="form.source_url" />
+        <a-form-item label="人工咨询提示">
+          <a-textarea v-model:value="entryForm.manual_consult_hint" :rows="2" />
         </a-form-item>
         <a-form-item>
-          <a-button type="primary" html-type="submit" :loading="submitting">保存</a-button>
+          <a-space>
+            <a-button type="primary" html-type="submit" :loading="entrySubmitting">保存</a-button>
+            <a-button @click="resetEntryForm">取消</a-button>
+          </a-space>
+        </a-form-item>
+      </a-form>
+      </a-spin>
+    </a-drawer>
+
+    <a-drawer :open="templateDrawerOpen" title="上传模板文件" width="520" @close="resetTemplateForm">
+      <a-form layout="vertical" :model="templateForm" @finish="onSubmitTemplate">
+        <a-form-item label="模板名称" name="template_name" :rules="[{ required: true, message: '请输入模板名称' }]">
+          <a-input v-model:value="templateForm.template_name" />
+        </a-form-item>
+        <a-row :gutter="16">
+          <a-col :span="12"><a-form-item label="类型"><a-select v-model:value="templateForm.template_type"><a-select-option value="DOCX">DOCX</a-select-option><a-select-option value="XLSX">XLSX</a-select-option><a-select-option value="PDF">PDF</a-select-option><a-select-option value="OTHER">OTHER</a-select-option></a-select></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="分类"><a-input v-model:value="templateForm.category_code" /></a-form-item></a-col>
+        </a-row>
+        <a-form-item label="版本"><a-input v-model:value="templateForm.version_label" /></a-form-item>
+        <a-form-item label="适用场景"><a-textarea v-model:value="templateForm.applicable_scenario" :rows="3" /></a-form-item>
+        <a-form-item label="文件" required>
+          <a-upload :show-upload-list="false" :before-upload="onBeforeTemplateUpload">
+            <a-button>选择文件</a-button>
+          </a-upload>
+          <span class="upload-name">{{ templateFile?.name || '未选择文件' }}</span>
+        </a-form-item>
+        <a-form-item>
+          <a-button type="primary" html-type="submit" :loading="templateSubmitting">上传</a-button>
         </a-form-item>
       </a-form>
     </a-drawer>
+
+    <a-modal v-model:open="revisionModalOpen" title="版本记录" :footer="null" width="720">
+      <a-table :columns="revisionColumns" :data-source="revisions" row-key="id" size="small" :pagination="false">
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'occurred_at'">{{ formatDateTime(record.occurred_at) }}</template>
+          <template v-else-if="column.key === 'status'">
+            {{ record.status_before || '-' }} -> {{ record.status_after || '-' }}
+          </template>
+        </template>
+      </a-table>
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
-import { message } from 'ant-design-vue'
-import { listEntries, upsertEntry, deleteEntry, type KnowledgeEntry } from '@/api/knowledge'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { message, Modal } from 'ant-design-vue'
+import {
+  BookOutlined,
+  CheckCircleOutlined,
+  FileTextOutlined,
+  HistoryOutlined,
+} from '@ant-design/icons-vue'
+import {
+  createEntry,
+  createSource,
+  deprecateEntry,
+  deprecateTemplate,
+  getEntry,
+  listEntries,
+  listEntryRevisions,
+  listSources,
+  listTemplates,
+  publishEntry,
+  updateEntry,
+  uploadTemplate,
+  type EntryPayload,
+  type KnowledgeEntryBrief,
+  type KnowledgeRevision,
+  type KnowledgeSource,
+  type KnowledgeTemplate,
+} from '@/api/knowledge'
 
-const columns = [
-  { title: '编码', dataIndex: 'code', key: 'code', width: 120 },
-  { title: '标题', dataIndex: 'title', key: 'title' },
-  { title: '分类', dataIndex: 'category', key: 'category', width: 120 },
-  { title: '标签', key: 'tags', width: 200 },
-  { title: '状态', key: 'is_active', width: 80 },
-  { title: '更新时间', dataIndex: 'updated_at', key: 'updated_at', width: 180 },
-  { title: '操作', key: 'actions', width: 140 },
+const activeTab = ref('entries')
+
+const entryColumns = [
+  { title: '条目', key: 'title' },
+  { title: '状态', key: 'status', width: 100 },
+  { title: '标签', key: 'tags', width: 180 },
+  { title: '版本', dataIndex: 'version_label', key: 'version_label', width: 120 },
+  { title: '更新时间', key: 'updated_at', width: 180 },
+  { title: '操作', key: 'actions', width: 210 },
 ]
 
-const filters = reactive<{ q?: string; category?: string }>({})
-const rows = ref<KnowledgeEntry[]>([])
-const loading = ref(false)
-const pagination = reactive({ current: 1, pageSize: 20, total: 0 })
+const templateColumns = [
+  { title: '模板', key: 'template_name' },
+  { title: '类型', dataIndex: 'template_type', key: 'template_type', width: 100 },
+  { title: '分类', dataIndex: 'category_code', key: 'category_code', width: 120 },
+  { title: '版本', dataIndex: 'version_label', key: 'version_label', width: 120 },
+  { title: '大小', key: 'file_size', width: 100 },
+  { title: '状态', key: 'status', width: 100 },
+  { title: '上传时间', key: 'uploaded_at', width: 180 },
+  { title: '操作', key: 'actions', width: 90 },
+]
 
-const showDrawer = ref(false)
-const submitting = ref(false)
-const editingId = ref<number | null>(null)
-const form = reactive({
-  code: '',
-  title: '',
-  category: '',
-  body: '',
-  source_url: '',
+const revisionColumns = [
+  { title: '动作', dataIndex: 'action', key: 'action', width: 120 },
+  { title: '状态变化', key: 'status', width: 160 },
+  { title: '版本', dataIndex: 'version_label', key: 'version_label', width: 120 },
+  { title: '操作者', dataIndex: 'operator_id', key: 'operator_id', width: 100 },
+  { title: '说明', dataIndex: 'note', key: 'note' },
+  { title: '时间', key: 'occurred_at', width: 180 },
+]
+
+const filters = reactive<{ q?: string; status?: string }>({})
+const entries = ref<KnowledgeEntryBrief[]>([])
+const entryLoading = ref(false)
+const entrySubmitting = ref(false)
+const entryPagination = reactive({ current: 1, pageSize: 20, total: 0 })
+
+const sources = ref<KnowledgeSource[]>([])
+const templates = ref<KnowledgeTemplate[]>([])
+const templateLoading = ref(false)
+const templateSubmitting = ref(false)
+const templatePagination = reactive({ current: 1, pageSize: 20, total: 0 })
+const templateFilters = reactive<{ q?: string; category?: string; include_deprecated: boolean }>({ include_deprecated: false })
+
+const entryDrawerOpen = ref(false)
+const entryDrawerLoading = ref(false)
+const editingEntryId = ref<number | null>(null)
+const entryForm = reactive<EditableEntryForm>({
+  slug: undefined,
+  title: undefined,
+  summary: undefined,
+  category_code: undefined,
+  applicable_condition: undefined,
+  required_materials: undefined,
+  process_steps: undefined,
+  body_md: undefined,
+  source_id: undefined,
+  version_label: undefined,
+  ambiguity_flag: false,
+  manual_consult_hint: undefined,
+  tags: [],
+  template_ids: [],
 })
 
-async function reload() {
-  loading.value = true
+interface EditableEntryForm {
+  slug?: string
+  title?: string
+  summary?: string
+  category_code?: string
+  applicable_condition?: string
+  required_materials?: string
+  process_steps?: string
+  body_md?: string
+  source_id?: number
+  version_label?: string
+  ambiguity_flag: boolean
+  manual_consult_hint?: string
+  tags: string[]
+  template_ids: number[]
+}
+
+const templateDrawerOpen = ref(false)
+const templateFile = ref<File | null>(null)
+const templateForm = reactive({
+  template_name: '',
+  template_type: 'DOCX',
+  category_code: '',
+  applicable_scenario: '',
+  version_label: '',
+})
+
+const revisionModalOpen = ref(false)
+const revisions = ref<KnowledgeRevision[]>([])
+
+const activeTemplates = computed(() => templates.value.filter((item) => item.status === 'ACTIVE'))
+
+const metrics = computed(() => [
+  {
+    key: 'entries',
+    label: '知识条目',
+    value: entryPagination.total || entries.value.length,
+    sub: '当前筛选结果',
+    icon: BookOutlined,
+  },
+  {
+    key: 'published',
+    label: '已发布',
+    value: entries.value.filter((item) => item.status === 'PUBLISHED').length,
+    sub: '当前页发布态',
+    icon: CheckCircleOutlined,
+  },
+  {
+    key: 'templates',
+    label: '模板文件',
+    value: templatePagination.total || templates.value.length,
+    sub: '治理附件模板',
+    icon: FileTextOutlined,
+  },
+  {
+    key: 'versions',
+    label: '版本记录',
+    value: revisions.value.length,
+    sub: '最近打开条目',
+    icon: HistoryOutlined,
+  },
+])
+
+function entryStatusLabel(status: string) {
+  return ({ DRAFT: '草稿', PUBLISHED: '已发布', DEPRECATED: '已停用' } as Record<string, string>)[status] || status
+}
+
+function entryStatusColor(status: string) {
+  return ({ DRAFT: 'default', PUBLISHED: 'green', DEPRECATED: 'red' } as Record<string, string>)[status] || 'default'
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return '-'
+  return value.replace('T', ' ').slice(0, 16)
+}
+
+function formatSize(bytes?: number | null) {
+  if (!bytes) return '-'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+async function reloadEntries() {
+  entryLoading.value = true
   try {
     const resp = await listEntries({
       q: filters.q,
-      category: filters.category,
-      page: pagination.current,
-      size: pagination.pageSize,
+      status: filters.status,
+      page: entryPagination.current,
+      size: entryPagination.pageSize,
     })
-    rows.value = resp.data.items
-    pagination.total = resp.data.meta.total
+    entries.value = resp.data.items
+    entryPagination.total = resp.data.meta.total
   } finally {
-    loading.value = false
+    entryLoading.value = false
   }
 }
 
-function onTableChange(p: any) {
-  pagination.current = p.current
-  pagination.pageSize = p.pageSize
-  reload()
+async function reloadSources() {
+  const resp = await listSources(false)
+  sources.value = resp.data
 }
 
-function onEdit(record: KnowledgeEntry | Record<string, any>) {
-  editingId.value = record.id
-  Object.assign(form, {
-    code: record.code,
-    title: record.title,
-    category: record.category || '',
-    body: record.body || '',
-    source_url: record.source_url || '',
-  })
-  showDrawer.value = true
-}
-
-function resetForm() {
-  showDrawer.value = false
-  editingId.value = null
-  Object.assign(form, { code: '', title: '', category: '', body: '', source_url: '' })
-}
-
-async function onSubmit() {
-  submitting.value = true
+async function reloadTemplates() {
+  templateLoading.value = true
   try {
-    const payload: any = { ...form }
-    if (editingId.value) payload.id = editingId.value
-    await upsertEntry(payload)
-    message.success(editingId.value ? '更新成功' : '创建成功')
-    resetForm()
-    reload()
+    const resp = await listTemplates({
+      q: templateFilters.q,
+      category: templateFilters.category,
+      include_deprecated: templateFilters.include_deprecated,
+      page: templatePagination.current,
+      size: templatePagination.pageSize,
+    })
+    templates.value = resp.data.items
+    templatePagination.total = resp.data.meta.total
   } finally {
-    submitting.value = false
+    templateLoading.value = false
   }
 }
 
-async function onDelete(id: number) {
-  await deleteEntry(id)
-  message.success('已删除')
-  reload()
+function onFilterSubmit() {
+  entryPagination.current = 1
+  reloadEntries()
 }
 
-onMounted(reload)
+function onEntryTableChange(pagination: any) {
+  entryPagination.current = pagination.current
+  entryPagination.pageSize = pagination.pageSize
+  reloadEntries()
+}
+
+function onTemplateTableChange(pagination: any) {
+  templatePagination.current = pagination.current
+  templatePagination.pageSize = pagination.pageSize
+  reloadTemplates()
+}
+
+function resetEntryForm() {
+  entryDrawerOpen.value = false
+  editingEntryId.value = null
+  Object.assign(entryForm, {
+    slug: undefined,
+    title: undefined,
+    summary: undefined,
+    category_code: undefined,
+    applicable_condition: undefined,
+    required_materials: undefined,
+    process_steps: undefined,
+    body_md: undefined,
+    source_id: undefined,
+    version_label: undefined,
+    ambiguity_flag: false,
+    manual_consult_hint: undefined,
+    tags: [],
+    template_ids: [],
+  })
+}
+
+async function openEntryEditor(id?: number) {
+  resetEntryForm()
+  if (id) {
+    editingEntryId.value = id
+    entryDrawerOpen.value = true
+    entryDrawerLoading.value = true
+    try {
+      const resp = await getEntry(id)
+      const detail = resp.data
+      Object.assign(entryForm, {
+        title: detail.title,
+        summary: detail.summary || undefined,
+        category_code: detail.category_code || undefined,
+        applicable_condition: detail.applicable_condition || undefined,
+        required_materials: detail.required_materials || undefined,
+        process_steps: detail.process_steps || undefined,
+        body_md: detail.body_md || undefined,
+        source_id: detail.source?.id,
+        version_label: detail.version_label || undefined,
+        ambiguity_flag: detail.ambiguity_flag,
+        manual_consult_hint: detail.manual_consult_hint || undefined,
+        tags: [...detail.tags],
+        template_ids: detail.templates.map((item) => item.template_id),
+      })
+    } finally {
+      entryDrawerLoading.value = false
+    }
+    return
+  }
+  entryDrawerOpen.value = true
+}
+
+async function onSubmitEntry() {
+  entrySubmitting.value = true
+  try {
+    const payload = normalizeEntryPayload(entryForm)
+    if (!payload.source_id) {
+      const source = await ensureDefaultSource()
+      payload.source_id = source.id
+    }
+    if (editingEntryId.value) {
+      await updateEntry(editingEntryId.value, payload)
+      message.success('知识条目已更新')
+    } else {
+      await createEntry(payload)
+      message.success('知识条目已创建')
+    }
+    resetEntryForm()
+    reloadEntries()
+  } finally {
+    entrySubmitting.value = false
+  }
+}
+
+function normalizeEntryPayload(form: EditableEntryForm): EntryPayload {
+  const payload: EntryPayload = {
+    ...form,
+    tags: form.tags || [],
+    template_ids: form.template_ids || [],
+  }
+  if (!editingEntryId.value && !payload.slug) {
+    message.warning('请输入 slug')
+    throw new Error('请输入 slug')
+  }
+  return payload
+}
+
+async function ensureDefaultSource() {
+  const existing = sources.value[0]
+  if (existing) return existing
+  const resp = await createSource({ source_name: '学院官方材料', version_label: '默认来源' })
+  sources.value = [resp.data]
+  return resp.data
+}
+
+function onPublishEntry(id: number) {
+  Modal.confirm({
+    title: '发布知识条目',
+    content: '发布后学生端可检索该条目，请确认来源、版本与人工兜底提示已检查。',
+    onOk: async () => {
+      await publishEntry(id, '管理端发布')
+      message.success('已发布')
+      reloadEntries()
+    },
+  })
+}
+
+function onDeprecateEntry(id: number) {
+  Modal.confirm({
+    title: '停用知识条目',
+    content: '停用后学生端不可再检索该条目。',
+    okType: 'danger',
+    onOk: async () => {
+      await deprecateEntry(id, '管理端停用')
+      message.success('已停用')
+      reloadEntries()
+    },
+  })
+}
+
+async function openRevisions(id: number) {
+  const resp = await listEntryRevisions(id)
+  revisions.value = resp.data
+  revisionModalOpen.value = true
+}
+
+function openTemplateDrawer() {
+  resetTemplateForm()
+  templateDrawerOpen.value = true
+}
+
+function resetTemplateForm() {
+  templateDrawerOpen.value = false
+  templateFile.value = null
+  Object.assign(templateForm, {
+    template_name: '',
+    template_type: 'DOCX',
+    category_code: '',
+    applicable_scenario: '',
+    version_label: '',
+  })
+}
+
+function onBeforeTemplateUpload(file: File) {
+  templateFile.value = file
+  if (!templateForm.template_name) templateForm.template_name = file.name.replace(/\.[^.]+$/, '')
+  return false
+}
+
+async function onSubmitTemplate() {
+  if (!templateFile.value) {
+    message.warning('请先选择模板文件')
+    return
+  }
+  templateSubmitting.value = true
+  try {
+    await uploadTemplate({
+      file: templateFile.value,
+      template_name: templateForm.template_name,
+      template_type: templateForm.template_type,
+      category_code: templateForm.category_code || undefined,
+      applicable_scenario: templateForm.applicable_scenario || undefined,
+      version_label: templateForm.version_label || undefined,
+    })
+    message.success('模板已上传')
+    resetTemplateForm()
+    reloadTemplates()
+  } finally {
+    templateSubmitting.value = false
+  }
+}
+
+async function onDeprecateTemplate(id: number) {
+  await deprecateTemplate(id)
+  message.success('模板已停用')
+  reloadTemplates()
+}
+
+onMounted(async () => {
+  await Promise.all([reloadEntries(), reloadSources(), reloadTemplates()])
+})
 </script>
 
 <style scoped>
 .mb16 { margin-bottom: 16px; }
+.table-title { font-weight: 600; color: #1f1f1f; }
+.table-secondary { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: #8c8c8c; font-size: 12px; margin-top: 4px; }
+.muted { color: #bfbfbf; }
+.upload-name { margin-left: 12px; color: #595959; }
 </style>

@@ -1,8 +1,17 @@
 <template>
-  <div>
-    <a-page-header title="理论自测题库" sub-title="FR-005" />
+  <div class="quiz-page">
+    <a-page-header title="理论自测题库" sub-title="题库维护、题目管理与启停控制" />
 
-    <a-form layout="inline" class="mb16" @finish="reload">
+    <div class="metric-grid five">
+      <div v-for="metric in metrics" :key="metric.key" class="metric-tile">
+        <span class="metric-icon"><component :is="metric.icon" /></span>
+        <div class="metric-label">{{ metric.label }}</div>
+        <div class="metric-value">{{ metric.value }}</div>
+        <div class="metric-sub">{{ metric.sub }}</div>
+      </div>
+    </div>
+
+    <a-form layout="inline" class="filter-card" @finish="onSearch">
       <a-form-item label="主题">
         <a-input v-model:value="filters.topic" allow-clear placeholder="党史 / 团章…" />
       </a-form-item>
@@ -167,8 +176,15 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
+import {
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  PlusCircleOutlined,
+  ReadOutlined,
+  TagsOutlined,
+} from '@ant-design/icons-vue'
 import {
   listQuizQuestions,
   createQuizQuestion,
@@ -199,6 +215,43 @@ const filters = reactive<{
 const rows = ref<QuizQuestion[]>([])
 const loading = ref(false)
 const pagination = reactive({ current: 1, pageSize: 20, total: 0 })
+const metrics = computed(() => [
+  {
+    key: 'total',
+    label: '题目总数',
+    value: pagination.total || rows.value.length,
+    sub: '当前筛选结果',
+    icon: ReadOutlined,
+  },
+  {
+    key: 'active',
+    label: '启用题目',
+    value: rows.value.filter((item) => item.is_active).length,
+    sub: '当前页可抽题',
+    icon: CheckCircleOutlined,
+  },
+  {
+    key: 'disabled',
+    label: '停用题目',
+    value: rows.value.filter((item) => !item.is_active).length,
+    sub: '当前页停用',
+    icon: CloseCircleOutlined,
+  },
+  {
+    key: 'topics',
+    label: '题库主题数',
+    value: new Set(rows.value.map((item) => item.topic)).size,
+    sub: '当前页主题',
+    icon: TagsOutlined,
+  },
+  {
+    key: 'today',
+    label: '今日新增',
+    value: rows.value.filter((item) => item.created_at?.slice(0, 10) === new Date().toISOString().slice(0, 10)).length,
+    sub: '本地日期估算',
+    icon: PlusCircleOutlined,
+  },
+])
 
 function qtypeLabel(t: QuizType) {
   return t === 'SINGLE' ? '单选' : t === 'MULTI' ? '多选' : '判断'
@@ -225,6 +278,11 @@ async function reload() {
   } finally {
     loading.value = false
   }
+}
+
+function onSearch() {
+  pagination.current = 1
+  void reload()
 }
 
 function onTableChange(p: any) {
@@ -362,6 +420,5 @@ onMounted(() => reload())
 </script>
 
 <style scoped>
-.mb16 { margin-bottom: 16px; }
 .opt-row { display: flex; align-items: center; margin-bottom: 8px; }
 </style>
