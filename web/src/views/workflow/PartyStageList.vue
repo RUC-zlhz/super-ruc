@@ -83,6 +83,63 @@
       </a-tab-pane>
     </a-tabs>
 
+    <aside class="stage-side-panel">
+      <div class="side-panel-head">
+        <strong>流程配置面板</strong>
+        <span>×</span>
+      </div>
+
+      <div class="stage-type-card">
+        <BranchesOutlined />
+        <div>
+          <p>当前模板</p>
+          <h3>{{ selectedTemplatePreview?.name || '暂无模板' }}</h3>
+          <span>{{ selectedTemplatePreview?.code || '请先新建或选择流程模板' }}</span>
+        </div>
+      </div>
+
+      <section class="side-section">
+        <h3>流程概览</h3>
+        <div class="stage-progress-row">
+          <span>模板状态</span>
+          <a-tag :color="selectedTemplatePreview?.is_active ? 'green' : 'default'">
+            {{ selectedTemplatePreview?.is_active ? '生效' : '未生效' }}
+          </a-tag>
+        </div>
+        <div class="stage-progress-row">
+          <span>学生流程</span>
+          <strong>{{ flowPagination.total || flows.length }}</strong>
+        </div>
+        <div class="stage-progress-row">
+          <span>提醒规则</span>
+          <strong>{{ reminders.length }}</strong>
+        </div>
+      </section>
+
+      <section class="side-section">
+        <h3>节点预览</h3>
+        <div v-if="nodes.length" class="node-timeline">
+          <div v-for="node in nodes.slice(0, 5)" :key="node.id">
+            <i />
+            <span>{{ node.name }}</span>
+            <em>{{ node.expected_days || 0 }} 天</em>
+          </div>
+        </div>
+        <p v-else class="side-muted">点击“查看节点”后展示模板节点结构。</p>
+      </section>
+
+      <div class="side-actions">
+        <a-button @click="showTemplateDrawer = true">新建模板</a-button>
+        <a-button
+          type="primary"
+          :disabled="!selectedTemplatePreview"
+          @click="selectedTemplatePreview && viewNodes(selectedTemplatePreview)"
+        >
+          查看节点
+        </a-button>
+      </div>
+    </aside>
+
     <!-- 模板新建/编辑抽屉 -->
     <a-drawer :open="showTemplateDrawer" title="流程模板" width="480" @close="showTemplateDrawer = false">
       <a-form layout="vertical" :model="tplForm" @finish="onSubmitTemplate">
@@ -140,6 +197,7 @@ import type { Paginated } from '@/api/types'
 import StatusTag from '@/components/StatusTag.vue'
 
 const activeTab = ref('templates')
+const selectedTemplatePreview = computed(() => selectedTemplate.value || templates.value[0] || null)
 const metrics = computed(() => [
   {
     key: 'templates',
@@ -283,5 +341,161 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.party-stage-page {
+  padding-right: 364px;
+}
+
 .mb16 { margin-bottom: 16px; }
+
+.stage-side-panel {
+  position: fixed;
+  top: 58px;
+  right: 0;
+  bottom: 0;
+  z-index: 12;
+  width: 350px;
+  overflow-y: auto;
+  padding: 18px;
+  background: #fff;
+  border-left: 1px solid var(--line-soft);
+  box-shadow: var(--shadow-card);
+}
+
+.side-panel-head,
+.stage-progress-row,
+.side-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.side-panel-head {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.side-panel-head strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.side-panel-head span {
+  color: var(--text-3);
+  font-size: 18px;
+}
+
+.stage-type-card {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  background: linear-gradient(135deg, #fff7f8, #fff);
+  border: 1px solid #ffe0e5;
+  border-radius: 12px;
+}
+
+.stage-type-card > .anticon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  color: var(--ruc-red);
+  background: #ffe4e8;
+  border-radius: 999px;
+  font-size: 22px;
+}
+
+.stage-type-card p,
+.side-muted {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.stage-type-card h3 {
+  margin: 4px 0;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.stage-type-card span {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.side-section {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.side-section h3 {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.stage-progress-row {
+  min-height: 32px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.stage-progress-row strong {
+  color: var(--ruc-red);
+  font-family: var(--font-number);
+  font-size: 18px;
+}
+
+.node-timeline {
+  display: grid;
+  gap: 10px;
+}
+
+.node-timeline div {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.node-timeline i {
+  width: 9px;
+  height: 9px;
+  background: var(--ruc-red);
+  border-radius: 999px;
+  box-shadow: 0 0 0 4px #ffe4e8;
+}
+
+.node-timeline em {
+  color: var(--text-3);
+  font-style: normal;
+}
+
+.side-actions {
+  margin-top: 16px;
+}
+
+.side-actions .ant-btn {
+  flex: 1;
+}
+
+@media (max-width: 1320px) {
+  .party-stage-page {
+    padding-right: 0;
+  }
+
+  .stage-side-panel {
+    position: static;
+    width: auto;
+    margin-top: 14px;
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+  }
+}
 </style>

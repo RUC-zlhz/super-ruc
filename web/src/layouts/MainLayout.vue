@@ -348,13 +348,13 @@ const NavItem = defineComponent({
 <style lang="scss" scoped>
 .app-shell {
   display: grid;
-  grid-template-columns: 232px minmax(0, 1fr);
+  grid-template-columns: 204px minmax(0, 1fr);
   min-height: 100vh;
   background: var(--bg);
   transition: grid-template-columns 0.22s ease;
 
   &.collapsed {
-    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-columns: 64px minmax(0, 1fr);
   }
 }
 
@@ -376,9 +376,9 @@ const NavItem = defineComponent({
 .sider-brand {
   display: flex;
   align-items: center;
-  gap: 11px;
-  height: 64px;
-  padding: 0 18px;
+  gap: 10px;
+  height: 58px;
+  padding: 0 16px;
   background: linear-gradient(135deg, var(--ruc-red-dark), var(--ruc-red));
   color: #fff;
 }
@@ -393,10 +393,10 @@ const NavItem = defineComponent({
 }
 
 .logo-mark {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   border: 2px solid rgba(255, 255, 255, 0.72);
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .logo-text {
@@ -405,7 +405,7 @@ const NavItem = defineComponent({
 
 .logo-text .t1 {
   color: #fff;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 800;
   line-height: 1.2;
   white-space: nowrap;
@@ -421,11 +421,11 @@ const NavItem = defineComponent({
 .sider-nav {
   flex: 1;
   overflow-y: auto;
-  padding: 18px 10px 16px;
+  padding: 14px 8px 14px;
 }
 
 .sider-group {
-  margin: 16px 10px 8px;
+  margin: 14px 8px 6px;
   color: var(--nav-muted);
   font-size: 12px;
   font-weight: 700;
@@ -454,10 +454,10 @@ const NavItem = defineComponent({
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 44px;
-  margin-bottom: 4px;
-  padding: 0 12px;
+  gap: 10px;
+  height: 38px;
+  margin-bottom: 3px;
+  padding: 0 10px;
   color: var(--nav-ink);
   border-radius: 8px;
   cursor: pointer;
@@ -479,9 +479,9 @@ const NavItem = defineComponent({
     &::before {
       content: "";
       position: absolute;
-      left: -10px;
-      top: 8px;
-      bottom: 8px;
+      left: -8px;
+      top: 7px;
+      bottom: 7px;
       width: 4px;
       border-radius: 0 6px 6px 0;
       background: #fff;
@@ -501,6 +501,7 @@ const NavItem = defineComponent({
     flex: 1;
     min-width: 0;
     overflow: hidden;
+    font-size: 13px;
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -536,9 +537,9 @@ const NavItem = defineComponent({
 }
 
 .sider-watermark {
-  height: 116px;
-  margin: 0 16px 8px;
-  opacity: 0.2;
+  height: 88px;
+  margin: 0 14px 6px;
+  opacity: 0.16;
   background:
     linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.06)),
     repeating-linear-gradient(90deg, transparent 0 12px, rgba(255, 255, 255, 0.24) 12px 13px);
@@ -549,8 +550,8 @@ const NavItem = defineComponent({
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 52px;
-  padding: 0 18px 16px;
+  min-height: 44px;
+  padding: 0 16px 13px;
   color: var(--nav-muted);
   font-size: 12px;
 }
@@ -573,39 +574,39 @@ const NavItem = defineComponent({
   z-index: 15;
   display: flex;
   align-items: center;
-  gap: 16px;
-  height: 64px;
-  padding: 0 22px;
+  gap: 12px;
+  height: 58px;
+  padding: 0 18px;
   color: #fff;
   background:
     radial-gradient(circle at 28% 10%, rgba(255, 255, 255, 0.16), transparent 16rem),
     linear-gradient(90deg, var(--ruc-red-dark), var(--ruc-red));
-  box-shadow: 0 8px 18px rgba(176, 0, 24, 0.16);
+  box-shadow: 0 6px 16px rgba(176, 0, 24, 0.14);
 }
 
 .topbar-title {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 210px;
-  font-size: 18px;
+  min-width: 190px;
+  font-size: 17px;
   font-weight: 800;
   white-space: nowrap;
 }
 
 .topbar-seal {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border: 2px solid rgba(255, 255, 255, 0.72);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .topbar-search {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: min(430px, 34vw);
-  height: 38px;
+  width: min(410px, 34vw);
+  height: 34px;
   padding: 0 12px;
   color: rgba(255, 255, 255, 0.74);
   background: rgba(255, 255, 255, 0.12);
@@ -643,8 +644,8 @@ const NavItem = defineComponent({
 .icon-btn {
   position: relative;
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   place-items: center;
   color: var(--text-2);
   background: transparent;
@@ -680,9 +681,9 @@ const NavItem = defineComponent({
 .user-chip {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 150px;
-  padding: 4px 10px 4px 4px;
+  gap: 8px;
+  min-width: 140px;
+  padding: 3px 8px 3px 4px;
   color: #fff;
   border-left: 1px solid rgba(255, 255, 255, 0.18);
   cursor: pointer;
@@ -690,8 +691,8 @@ const NavItem = defineComponent({
 
 .avatar {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   place-items: center;
   color: var(--ruc-red);
   background: #fff;
@@ -728,13 +729,13 @@ const NavItem = defineComponent({
 .content {
   width: 100%;
   min-width: 0;
-  max-width: 1680px;
+  max-width: none;
   flex: 1;
-  padding: 22px 32px 40px;
+  padding: 26px 26px 36px;
 }
 
 .crumbs {
-  display: flex;
+  display: none;
   align-items: center;
   gap: 8px;
   margin-bottom: 16px;

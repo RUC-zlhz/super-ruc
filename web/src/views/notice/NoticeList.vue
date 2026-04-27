@@ -100,6 +100,69 @@
       </template>
     </a-table>
 
+    <aside class="notice-side-panel">
+      <div class="side-panel-head">
+        <strong>通知编辑器</strong>
+        <span>×</span>
+      </div>
+
+      <div class="side-mini-stats">
+        <div v-for="metric in metrics" :key="metric.key">
+          <component :is="metric.icon" />
+          <strong>{{ metric.value }}</strong>
+          <span>{{ metric.label }}</span>
+        </div>
+      </div>
+
+      <template v-if="primaryNotice">
+        <section class="side-section notice-preview">
+          <div>
+            <p>当前选中通知</p>
+            <h3>{{ primaryNotice.title }}</h3>
+          </div>
+          <a-tag :color="statusColor(primaryNotice.status)">{{ primaryNotice.status }}</a-tag>
+        </section>
+
+        <section class="side-section">
+          <h3>发布信息</h3>
+          <div class="side-kv">
+            <span>分类</span>
+            <strong>{{ primaryNotice.category || '-' }}</strong>
+          </div>
+          <div class="side-kv">
+            <span>更新时间</span>
+            <strong>{{ formatDateTime(primaryNotice.updated_at) }}</strong>
+          </div>
+          <div class="tag-strip">
+            <a-tag v-for="tag in primaryNotice.tags" :key="tag">{{ tag }}</a-tag>
+            <span v-if="!primaryNotice.tags.length" class="muted">暂无标签</span>
+          </div>
+        </section>
+
+        <section class="side-section">
+          <h3>投递闭环</h3>
+          <div class="delivery-ring" :style="{ '--notice-progress': `${noticeProgress}%` }">
+            <div>{{ noticeProgress }}%</div>
+          </div>
+          <p class="side-muted">
+            依据当前筛选页状态估算发布完成度；批次与投递明细仍通过原有“批次 / 投递明细”抽屉查看。
+          </p>
+        </section>
+
+        <div class="side-actions">
+          <a-button @click="openEditor(primaryNotice)">编辑内容</a-button>
+          <a-button
+            type="primary"
+            :disabled="primaryNotice.status !== 'PUBLISHED'"
+            @click="openDispatch(primaryNotice)"
+          >
+            发送通知
+          </a-button>
+        </div>
+      </template>
+      <a-empty v-else description="暂无通知可预览" />
+    </aside>
+
     <a-drawer
       :open="showDrawer"
       :title="editingId ? '通知详情 / 编辑' : '新建通知'"
@@ -877,6 +940,12 @@ const filters = reactive<{ q?: string; status?: NoticeStatus }>({})
 const rows = ref<NoticeBrief[]>([])
 const loading = ref(false)
 const pagination = reactive({ current: 1, pageSize: 20, total: 0 })
+const primaryNotice = computed(() => rows.value[0] ?? null)
+const noticeProgress = computed(() => {
+  if (!rows.value.length) return 0
+  const done = rows.value.filter((item) => item.status === 'PUBLISHED' || item.status === 'ARCHIVED').length
+  return Math.round((done / rows.value.length) * 100)
+})
 
 const metrics = computed(() => [
   {
@@ -1213,6 +1282,10 @@ onMounted(reload)
 </script>
 
 <style scoped>
+.notice-page {
+  padding-right: 364px;
+}
+
 .mb16 {
   margin-bottom: 16px;
 }
@@ -1254,5 +1327,172 @@ onMounted(reload)
 
 .muted {
   color: rgba(0, 0, 0, 0.45);
+}
+
+.notice-side-panel {
+  position: fixed;
+  top: 58px;
+  right: 0;
+  bottom: 0;
+  z-index: 12;
+  width: 350px;
+  overflow-y: auto;
+  padding: 18px;
+  background: #fff;
+  border-left: 1px solid var(--line-soft);
+  box-shadow: var(--shadow-card);
+}
+
+.side-panel-head,
+.notice-preview,
+.side-actions,
+.side-kv {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.side-panel-head {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.side-panel-head strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.side-panel-head span {
+  color: var(--text-3);
+  font-size: 18px;
+}
+
+.side-mini-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.side-mini-stats div {
+  min-height: 70px;
+  padding: 10px;
+  background: #fff7f8;
+  border: 1px solid #ffe4e8;
+  border-radius: 10px;
+}
+
+.side-mini-stats :deep(.anticon) {
+  color: var(--ruc-red);
+  font-size: 14px;
+}
+
+.side-mini-stats strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--ruc-red);
+  font-family: var(--font-number);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.side-mini-stats span {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.side-section {
+  padding: 14px 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.side-section h3 {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.notice-preview {
+  align-items: flex-start;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.notice-preview p,
+.side-muted {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.notice-preview h3 {
+  margin: 6px 0 0;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.side-kv {
+  min-height: 30px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.side-kv strong {
+  color: var(--text-2);
+  font-weight: 600;
+}
+
+.tag-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.delivery-ring {
+  display: grid;
+  width: 118px;
+  height: 118px;
+  place-items: center;
+  margin: 8px auto 12px;
+  color: var(--ruc-red);
+  background:
+    radial-gradient(circle, #fff 0 52%, transparent 53%),
+    conic-gradient(var(--ruc-red) var(--notice-progress), #edf0f5 0);
+  border-radius: 999px;
+}
+
+.delivery-ring div {
+  font-family: var(--font-number);
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.side-actions {
+  margin-top: 16px;
+}
+
+.side-actions .ant-btn {
+  flex: 1;
+}
+
+@media (max-width: 1320px) {
+  .notice-page {
+    padding-right: 0;
+  }
+
+  .notice-side-panel {
+    position: static;
+    width: auto;
+    margin-top: 14px;
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+  }
 }
 </style>

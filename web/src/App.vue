@@ -30,8 +30,8 @@ const themeConfig = computed(() => {
       borderRadiusSM: 6,
       fontFamily:
         "'Alibaba PuHuiTi', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif",
-      fontSize: 14,
-      controlHeight: 36,
+      fontSize: 13,
+      controlHeight: 34,
     },
   }
 })

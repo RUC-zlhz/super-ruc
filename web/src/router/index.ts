@@ -8,7 +8,6 @@ import { getDefaultRouteForRoles } from "@/config/navigation";
 import { hasAnyRole } from "@/utils/permission";
 
 const MainLayout = () => import("@/layouts/MainLayout.vue");
-const BlankLayout = () => import("@/layouts/BlankLayout.vue");
 
 const routes: RouteRecordRaw[] = [
   {
@@ -127,7 +126,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: "/error",
-    component: BlankLayout,
+    component: MainLayout,
     children: [
       {
         path: "403",
@@ -147,7 +146,16 @@ export const router = createRouter({
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
-  if (to.meta.public) return true;
+  if (to.meta.public) {
+    if (to.path === "/error/403" && auth.isAuthenticated && !auth.user) {
+      try {
+        await auth.fetchMe();
+      } catch {
+        auth.logout();
+      }
+    }
+    return true;
+  }
 
   if (!auth.isAuthenticated) {
     return { path: "/login", query: { redirect: to.fullPath } };

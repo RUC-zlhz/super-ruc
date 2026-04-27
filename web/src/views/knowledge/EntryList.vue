@@ -2,96 +2,171 @@
   <div class="knowledge-page">
     <a-page-header title="知识库管理" sub-title="知识条目、模板与版本治理" />
 
-    <div class="metric-grid">
-      <div v-for="metric in metrics" :key="metric.key" class="metric-tile">
-        <span class="metric-icon"><component :is="metric.icon" /></span>
-        <div class="metric-label">{{ metric.label }}</div>
-        <div class="metric-value">{{ metric.value }}</div>
-        <div class="metric-sub">{{ metric.sub }}</div>
-      </div>
-    </div>
-
     <a-tabs v-model:active-key="activeTab">
       <a-tab-pane key="entries" tab="知识条目">
-        <a-alert
-          class="mb16"
-          type="info"
-          show-icon
-          message="知识条目需先保存为草稿，再发布到学生端。"
-          description="来源、版本、模糊场景人工兜底和关联模板会一并进入权威答复治理链路。"
-        />
+        <div class="knowledge-workspace">
+          <section class="knowledge-main">
+            <a-form layout="inline" :model="filters" class="filter-card knowledge-filter" @finish="onFilterSubmit">
+              <a-form-item label="关键字">
+                <a-input v-model:value="filters.q" placeholder="搜索知识条目标题、标签、内容摘要..." allow-clear style="width: 320px" />
+              </a-form-item>
+              <a-form-item label="状态">
+                <a-select v-model:value="filters.status" style="width: 120px" allow-clear>
+                  <a-select-option value="DRAFT">草稿</a-select-option>
+                  <a-select-option value="PUBLISHED">已发布</a-select-option>
+                  <a-select-option value="DEPRECATED">已停用</a-select-option>
+                </a-select>
+              </a-form-item>
+              <a-form-item>
+                <a-button html-type="submit">筛选</a-button>
+              </a-form-item>
+              <a-form-item>
+                <a-button type="primary" @click="openEntryEditor()">新增知识条目</a-button>
+              </a-form-item>
+            </a-form>
 
-        <a-form layout="inline" :model="filters" class="filter-card" @finish="onFilterSubmit">
-          <a-form-item label="关键字">
-            <a-input v-model:value="filters.q" placeholder="标题 / slug" allow-clear style="width: 220px" />
-          </a-form-item>
-          <a-form-item label="状态">
-            <a-select v-model:value="filters.status" style="width: 150px" allow-clear>
-              <a-select-option value="DRAFT">草稿</a-select-option>
-              <a-select-option value="PUBLISHED">已发布</a-select-option>
-              <a-select-option value="DEPRECATED">已停用</a-select-option>
-            </a-select>
-          </a-form-item>
-          <a-form-item>
-            <a-button type="primary" html-type="submit">查询</a-button>
-          </a-form-item>
-          <a-form-item>
-            <a-button type="primary" @click="openEntryEditor()">新增条目</a-button>
-          </a-form-item>
-        </a-form>
+            <a-alert
+              class="mb16 compact-alert"
+              type="info"
+              show-icon
+              message="知识条目需先保存为草稿，再发布到学生端。来源、版本、模糊场景人工兜底和关联模板会一并进入治理链路。"
+            />
 
-        <a-table
-          :columns="entryColumns"
-          :data-source="entries"
-          :loading="entryLoading"
-          :pagination="entryPagination"
-          row-key="id"
-          @change="onEntryTableChange"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'title'">
-              <div class="table-title">{{ record.title }}</div>
-              <div class="table-secondary">
-                <span>{{ record.slug }}</span>
-                <a-tag v-if="record.category_code" size="small">{{ record.category_code }}</a-tag>
-                <a-tag v-if="record.ambiguity_flag" color="orange" size="small">需人工兜底</a-tag>
+            <a-table
+              :columns="entryColumns"
+              :data-source="entries"
+              :loading="entryLoading"
+              :pagination="entryPagination"
+              row-key="id"
+              size="small"
+              @change="onEntryTableChange"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'title'">
+                  <div class="table-title">{{ record.title }}</div>
+                  <div class="table-secondary">
+                    <span>{{ record.slug }}</span>
+                    <a-tag v-if="record.category_code" size="small">{{ record.category_code }}</a-tag>
+                    <a-tag v-if="record.ambiguity_flag" color="orange" size="small">需人工兜底</a-tag>
+                  </div>
+                </template>
+                <template v-else-if="column.key === 'status'">
+                  <a-tag :color="entryStatusColor(record.status)">{{ entryStatusLabel(record.status) }}</a-tag>
+                </template>
+                <template v-else-if="column.key === 'tags'">
+                  <a-tag v-for="tag in record.tags" :key="tag" size="small">{{ tag }}</a-tag>
+                  <span v-if="!record.tags.length" class="muted">-</span>
+                </template>
+                <template v-else-if="column.key === 'updated_at'">
+                  {{ formatDateTime(record.updated_at) }}
+                </template>
+                <template v-else-if="column.key === 'actions'">
+                  <a-space size="small" wrap>
+                    <a-button type="link" size="small" @click="openEntryEditor(record.id)">编辑</a-button>
+                    <a-button
+                      v-if="record.status !== 'PUBLISHED'"
+                      type="link"
+                      size="small"
+                      @click="onPublishEntry(record.id)"
+                    >
+                      发布
+                    </a-button>
+                    <a-button
+                      v-if="record.status !== 'DEPRECATED'"
+                      type="link"
+                      size="small"
+                      danger
+                      @click="onDeprecateEntry(record.id)"
+                    >
+                      停用
+                    </a-button>
+                    <a-button type="link" size="small" @click="openRevisions(record.id)">版本</a-button>
+                  </a-space>
+                </template>
+              </template>
+            </a-table>
+
+            <a-card class="template-preview-card" title="模板文件列表" :bordered="false">
+              <a-table
+                :columns="templatePreviewColumns"
+                :data-source="visibleTemplates"
+                :loading="templateLoading"
+                row-key="id"
+                size="small"
+                :pagination="false"
+              >
+                <template #bodyCell="{ column, record }">
+                  <template v-if="column.key === 'template_name'">
+                    <div class="table-title">{{ record.template_name }}</div>
+                    <div class="table-secondary">{{ record.applicable_scenario || '未填写适用场景' }}</div>
+                  </template>
+                  <template v-else-if="column.key === 'status'">
+                    <a-tag :color="record.status === 'ACTIVE' ? 'green' : 'default'">
+                      {{ record.status === 'ACTIVE' ? '可用' : '已停用' }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'file_size'">
+                    {{ formatSize(record.file_size) }}
+                  </template>
+                </template>
+              </a-table>
+            </a-card>
+          </section>
+
+          <aside class="knowledge-editor-panel">
+            <div class="editor-panel-head">
+              <strong>编辑知识条目</strong>
+              <span>×</span>
+            </div>
+            <div class="mini-metrics">
+              <div v-for="metric in metrics" :key="metric.key">
+                <component :is="metric.icon" />
+                <strong>{{ metric.value }}</strong>
+                <span>{{ metric.label }}</span>
+              </div>
+            </div>
+            <template v-if="previewEntry">
+              <label class="panel-field">
+                <span>标题</span>
+                <div>{{ previewEntry.title }}</div>
+              </label>
+              <label class="panel-field">
+                <span>分类</span>
+                <div>{{ previewEntry.category_code || '-' }}</div>
+              </label>
+              <label class="panel-field">
+                <span>标签</span>
+                <div class="panel-tags">
+                  <a-tag v-for="tag in previewEntry.tags" :key="tag">{{ tag }}</a-tag>
+                  <span v-if="!previewEntry.tags.length" class="muted">-</span>
+                </div>
+              </label>
+              <label class="panel-field">
+                <span>摘要</span>
+                <p>{{ previewEntry.summary || '暂无摘要' }}</p>
+              </label>
+              <label class="panel-field">
+                <span>状态</span>
+                <a-switch :checked="previewEntry.status === 'PUBLISHED'" disabled />
+                <em>{{ entryStatusLabel(previewEntry.status) }}</em>
+              </label>
+              <div class="cover-uploader">
+                <FileTextOutlined />
+                <span>点击上传或拖拽文件到此处</span>
+                <small>支持 JPG、PNG 格式，大小不超过 5MB</small>
+              </div>
+              <label class="panel-field">
+                <span>备注</span>
+                <p>版本 {{ previewEntry.version_label || '-' }} · {{ formatDateTime(previewEntry.updated_at) }}</p>
+              </label>
+              <div class="panel-actions">
+                <a-button @click="openEntryEditor(previewEntry.id)">保存草稿</a-button>
+                <a-button type="primary" @click="onPublishEntry(previewEntry.id)">保存并发布</a-button>
               </div>
             </template>
-            <template v-else-if="column.key === 'status'">
-              <a-tag :color="entryStatusColor(record.status)">{{ entryStatusLabel(record.status) }}</a-tag>
-            </template>
-            <template v-else-if="column.key === 'tags'">
-              <a-tag v-for="tag in record.tags" :key="tag" size="small">{{ tag }}</a-tag>
-              <span v-if="!record.tags.length" class="muted">-</span>
-            </template>
-            <template v-else-if="column.key === 'updated_at'">
-              {{ formatDateTime(record.updated_at) }}
-            </template>
-            <template v-else-if="column.key === 'actions'">
-              <a-space size="small" wrap>
-                <a-button type="link" size="small" @click="openEntryEditor(record.id)">编辑</a-button>
-                <a-button
-                  v-if="record.status !== 'PUBLISHED'"
-                  type="link"
-                  size="small"
-                  @click="onPublishEntry(record.id)"
-                >
-                  发布
-                </a-button>
-                <a-button
-                  v-if="record.status !== 'DEPRECATED'"
-                  type="link"
-                  size="small"
-                  danger
-                  @click="onDeprecateEntry(record.id)"
-                >
-                  停用
-                </a-button>
-                <a-button type="link" size="small" @click="openRevisions(record.id)">版本</a-button>
-              </a-space>
-            </template>
-          </template>
-        </a-table>
+            <a-empty v-else description="暂无条目可预览" />
+          </aside>
+        </div>
       </a-tab-pane>
 
       <a-tab-pane key="templates" tab="模板文件">
@@ -306,6 +381,13 @@ const templateColumns = [
   { title: '操作', key: 'actions', width: 90 },
 ]
 
+const templatePreviewColumns = [
+  { title: '模板名称', key: 'template_name' },
+  { title: '类型', dataIndex: 'template_type', key: 'template_type', width: 110 },
+  { title: '大小', key: 'file_size', width: 100 },
+  { title: '状态', key: 'status', width: 100 },
+]
+
 const revisionColumns = [
   { title: '动作', dataIndex: 'action', key: 'action', width: 120 },
   { title: '状态变化', key: 'status', width: 160 },
@@ -379,6 +461,8 @@ const revisionModalOpen = ref(false)
 const revisions = ref<KnowledgeRevision[]>([])
 
 const activeTemplates = computed(() => templates.value.filter((item) => item.status === 'ACTIVE'))
+const visibleTemplates = computed(() => templates.value.slice(0, 5))
+const previewEntry = computed(() => entries.value[0] ?? null)
 
 const metrics = computed(() => [
   {
@@ -672,8 +756,195 @@ onMounted(async () => {
 
 <style scoped>
 .mb16 { margin-bottom: 16px; }
+
+.knowledge-page {
+  padding-right: 394px;
+}
+
+.knowledge-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.knowledge-main {
+  min-width: 0;
+}
+
+.knowledge-filter {
+  margin-bottom: 12px;
+}
+
+.compact-alert {
+  padding: 10px 14px !important;
+}
+
+.template-preview-card {
+  margin-top: 14px;
+}
+
+.knowledge-editor-panel {
+  position: fixed;
+  top: 58px;
+  right: 0;
+  bottom: 0;
+  z-index: 12;
+  width: 380px;
+  overflow-y: auto;
+  padding: 18px;
+  background: #fff;
+  border: 1px solid var(--line-soft);
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  box-shadow: var(--shadow-card);
+}
+
+.editor-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.editor-panel-head strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.editor-panel-head span {
+  color: var(--text-3);
+  font-size: 18px;
+}
+
+.mini-metrics {
+  display: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.mini-metrics div {
+  min-height: 64px;
+  padding: 10px;
+  background: #fff7f8;
+  border: 1px solid #ffe4e8;
+  border-radius: 10px;
+}
+
+.mini-metrics :deep(.anticon) {
+  color: var(--ruc-red);
+  font-size: 14px;
+}
+
+.mini-metrics strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--ruc-red);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.mini-metrics span {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.panel-field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.panel-field > span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.panel-field > div,
+.panel-field > p {
+  margin: 0;
+  padding: 9px 10px;
+  color: var(--text-2);
+  background: #fbfcfe;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.panel-field em {
+  margin-left: 10px;
+  color: var(--text-2);
+  font-style: normal;
+  font-size: 12px;
+}
+
+.panel-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cover-uploader {
+  display: grid;
+  min-height: 112px;
+  place-items: center;
+  margin: 4px 0 14px;
+  padding: 18px;
+  color: var(--text-3);
+  border: 1px dashed #d8dce3;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.cover-uploader :deep(.anticon) {
+  color: var(--text-3);
+  font-size: 24px;
+}
+
+.cover-uploader span {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.cover-uploader small {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.panel-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 18px;
+}
+
 .table-title { font-weight: 600; color: #1f1f1f; }
 .table-secondary { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: #8c8c8c; font-size: 12px; margin-top: 4px; }
 .muted { color: #bfbfbf; }
 .upload-name { margin-left: 12px; color: #595959; }
+
+@media (max-width: 1320px) {
+  .knowledge-page {
+    padding-right: 0;
+  }
+
+  .knowledge-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .knowledge-editor-panel {
+    position: static;
+    width: auto;
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+  }
+}
 </style>

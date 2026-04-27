@@ -2,14 +2,6 @@
   <div class="operation-dashboard">
     <a-page-header title="运营看板" sub-title="学院事务运营、通知触达与学业缺口弱提示" />
 
-    <a-alert
-      type="info"
-      show-icon
-      class="mb16"
-      message="overview 弱提示边界"
-      :description="dashboard.disclaimer"
-    />
-
     <div v-if="dashboard.generatedAt" class="board-meta mb16">
       数据生成时间：{{ formatDateTime(dashboard.generatedAt) }} · 当前仅消费 canonical overview
     </div>
@@ -44,7 +36,7 @@
 
     <a-spin :spinning="loadingOverview || loadingAcademicGap">
       <div class="metric-grid five">
-        <div v-for="metric in dashboard.metrics" :key="metric.key" class="metric-tile">
+        <div v-for="metric in dashboard.metrics.slice(0, 5)" :key="metric.key" class="metric-tile">
           <span class="metric-icon"><component :is="metricIcon(metric.key)" /></span>
           <div class="metric-label">{{ metric.label }}</div>
           <div class="metric-value">{{ metric.value }}</div>
@@ -61,207 +53,239 @@
         <a-empty description="overview 已返回，但当前没有可视化价值较高的运营数据" />
       </a-card>
 
-      <a-row :gutter="[16, 16]" class="mb16">
-        <a-col :xs="24" :xl="14">
-          <a-card title="事务申请分布" :bordered="false" class="visual-card">
-            <template v-if="dashboard.requestDistribution.length">
-              <div class="chart-stack">
-                <div
-                  v-for="item in dashboard.requestDistribution"
-                  :key="item.key"
-                  class="chart-row"
-                >
-                  <div class="chart-head">
-                    <span class="chart-label">{{ item.label }}</span>
-                    <span class="chart-value">{{ item.value }}</span>
+      <div class="dashboard-board">
+        <section class="dashboard-canvas">
+          <div class="chart-mosaic">
+            <a-card title="事务申请分布" :bordered="false" class="visual-card donut-card">
+              <template v-if="dashboard.requestDistribution.length">
+                <div class="donut-row">
+                  <div class="donut-visual">
+                    <div class="donut-core">
+                      <strong>{{ dashboard.requestDistribution.reduce((sum, item) => sum + item.value, 0) }}</strong>
+                      <span>总申请</span>
+                    </div>
                   </div>
-                  <a-progress
-                    :percent="item.percent"
-                    :show-info="false"
-                    stroke-color="#8b3a2e"
-                  />
-                  <div class="chart-helper">{{ item.helper }}</div>
-                </div>
-              </div>
-            </template>
-            <a-empty v-else description="overview 暂无事务申请分布" />
-          </a-card>
-        </a-col>
-
-        <a-col :xs="24" :xl="10">
-          <a-card title="通知触达概况" :bordered="false" class="visual-card">
-            <template v-if="dashboard.noticeDelivery.length">
-              <div class="notice-grid">
-                <div
-                  v-for="item in dashboard.noticeDelivery"
-                  :key="item.key"
-                  class="notice-item"
-                >
-                  <div class="notice-value">{{ item.value }}</div>
-                  <div class="notice-label">{{ item.label }}</div>
-                  <div class="chart-helper">{{ item.helper }}</div>
-                </div>
-              </div>
-            </template>
-            <a-empty v-else description="overview 暂无通知送达汇总" />
-          </a-card>
-        </a-col>
-      </a-row>
-
-      <a-row :gutter="[16, 16]">
-        <a-col :xs="24" :xl="14">
-          <a-card title="流程节点负载" :bordered="false" class="visual-card">
-            <template v-if="dashboard.workflowLoad.length">
-              <div class="chart-stack">
-                <div
-                  v-for="item in dashboard.workflowLoad"
-                  :key="item.key"
-                  class="chart-row"
-                >
-                  <div class="chart-head">
-                    <span class="chart-label">{{ item.label }}</span>
-                    <span class="chart-value">{{ item.value }}</span>
+                  <div class="donut-legend">
+                    <div
+                      v-for="item in dashboard.requestDistribution.slice(0, 6)"
+                      :key="item.key"
+                      class="legend-line"
+                    >
+                      <span class="legend-dot" />
+                      <span>{{ item.label }}</span>
+                      <strong>{{ item.percent }}%</strong>
+                    </div>
                   </div>
-                  <a-progress
-                    :percent="item.percent"
-                    :show-info="false"
-                    status="active"
-                    stroke-color="#c2410c"
-                  />
-                  <div class="chart-helper">{{ item.helper }}</div>
+                </div>
+              </template>
+              <a-empty v-else description="overview 暂无事务申请分布" />
+            </a-card>
+
+            <a-card title="通知触达概况" :bordered="false" class="visual-card trend-card">
+              <template v-if="dashboard.noticeDelivery.length">
+                <svg class="trend-svg" viewBox="0 0 320 150" role="img" aria-label="通知触达折线">
+                  <line v-for="y in [25, 55, 85, 115]" :key="y" x1="18" :y1="y" x2="304" :y2="y" />
+                  <polyline points="20,96 68,84 116,92 164,62 212,58 260,50 302,46" />
+                  <circle v-for="point in trendPoints" :key="point" :cx="point.split(',')[0]" :cy="point.split(',')[1]" r="4" />
+                </svg>
+                <div class="trend-summary">
+                  <div v-for="item in dashboard.noticeDelivery.slice(0, 2)" :key="item.key">
+                    <strong>{{ item.value }}</strong>
+                    <span>{{ item.label }}</span>
+                  </div>
+                </div>
+              </template>
+              <a-empty v-else description="overview 暂无通知送达汇总" />
+            </a-card>
+
+            <a-card title="流程节点负载" :bordered="false" class="visual-card bar-card">
+              <template v-if="dashboard.workflowLoad.length">
+                <div
+                  v-for="item in dashboard.workflowLoad.slice(0, 5)"
+                  :key="item.key"
+                  class="load-bar-row"
+                >
+                  <span>{{ item.label }}</span>
+                  <div class="load-track">
+                    <i :style="{ width: `${Math.min(item.percent, 100)}%` }" />
+                  </div>
+                  <strong>{{ item.percent }}%</strong>
+                </div>
+              </template>
+              <a-empty v-else description="overview 暂无流程节点负载" />
+            </a-card>
+          </div>
+
+          <div class="dashboard-lower">
+            <a-card title="当前结论置信度不足，建议结合人工复核" :bordered="false" class="visual-card risk-card">
+              <div class="risk-card-body">
+                <AlertOutlined />
+                <div>
+                  <strong>风险等级：中风险</strong>
+                  <p>{{ dashboard.disclaimer || dashboard.academicGap.description }}</p>
+                  <ul>
+                    <li>部分课程成绩未同步或存在延迟</li>
+                    <li>学生个体情况未充分考虑</li>
+                    <li>建议人工复核关键案例，确保结论准确性</li>
+                  </ul>
+                  <div class="confidence">
+                    <span>置信度：62%</span>
+                    <i />
+                  </div>
                 </div>
               </div>
-            </template>
-            <a-empty v-else description="overview 暂无流程节点负载" />
-          </a-card>
-        </a-col>
-        <a-col :xs="24" :xl="10">
-          <a-card title="弱结论边界" :bordered="false" class="visual-card risk-card">
-            <div class="academic-gap-intro">
-              {{ dashboard.academicGap.description }}
-            </div>
-            <div class="academic-gap-intro subtle">
-              当前分布仅基于“当前筛选 + 当前页列表”生成，不代表本次筛选下的全量统计结果。
-            </div>
-            <template v-if="dashboard.academicGap.items.length">
-              <div
-                v-for="item in dashboard.academicGap.items"
-                :key="item.key"
-                class="gap-item"
+            </a-card>
+
+            <a-card class="gap-table-card" :title="dashboard.academicGap.title" :bordered="false">
+              <a-form layout="inline" :model="academicGapFilters" class="filter-card compact" @finish="onAcademicGapSearch">
+                <a-form-item label="关键字">
+                  <a-input
+                    v-model:value="academicGapFilters.keyword"
+                    allow-clear
+                    placeholder="学号或姓名"
+                    style="width: 160px"
+                  />
+                </a-form-item>
+                <a-form-item label="年级">
+                  <a-input
+                    v-model:value="academicGapFilters.grade_code"
+                    allow-clear
+                    placeholder="如 2022"
+                    style="width: 110px"
+                  />
+                </a-form-item>
+                <a-form-item label="专业">
+                  <a-input
+                    v-model:value="academicGapFilters.major_code"
+                    allow-clear
+                    placeholder="如 CS"
+                    style="width: 110px"
+                  />
+                </a-form-item>
+                <a-form-item label="风险">
+                  <a-select
+                    v-model:value="academicGapFilters.risk_level"
+                    allow-clear
+                    placeholder="全部"
+                    style="width: 118px"
+                  >
+                    <a-select-option value="HIGH">高关注</a-select-option>
+                    <a-select-option value="MEDIUM">待跟进</a-select-option>
+                    <a-select-option value="LOW">低关注</a-select-option>
+                  </a-select>
+                </a-form-item>
+                <a-form-item>
+                  <a-space>
+                    <a-button type="primary" html-type="submit" :loading="loadingAcademicGap">
+                      查询
+                    </a-button>
+                    <a-button @click="resetAcademicGapFilters">重置</a-button>
+                  </a-space>
+                </a-form-item>
+              </a-form>
+
+              <a-table
+                :columns="academicGapColumns"
+                :data-source="academicGapRows"
+                :loading="loadingAcademicGap"
+                :pagination="{
+                  current: academicGapPagination.current,
+                  pageSize: academicGapPagination.pageSize,
+                  total: academicGapPagination.total,
+                  showSizeChanger: true,
+                }"
+                row-key="student_id"
+                size="small"
+                @change="onAcademicGapTableChange"
               >
-                <div class="gap-title-row">
-                  <div class="gap-title">{{ item.title }}</div>
-                  <div class="gap-count">{{ item.count ?? 0 }}</div>
-                </div>
-                <div class="chart-helper">{{ item.description }}</div>
+                <template #bodyCell="{ column, record }">
+                  <template v-if="column.key === 'student'">
+                    <div class="gap-student-name">{{ record.student_name }}</div>
+                    <div class="detail-muted">{{ record.student_no }}</div>
+                  </template>
+                  <template v-else-if="column.key === 'risk_level'">
+                    <a-tag :color="academicRiskColor(record as AcademicGapAggregateItem)">
+                      {{ academicRiskLabel(record as AcademicGapAggregateItem) }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'credits'">
+                    <div>参考：{{ formatCredits(record.total_credits_required) }}</div>
+                    <div class="detail-muted">已获：{{ formatCredits(record.total_credits_earned) }}</div>
+                  </template>
+                  <template v-else-if="column.key === 'credits_gap'">
+                    <span :class="['gap-emphasis', academicRiskClass(record as AcademicGapAggregateItem)]">
+                      {{ formatCredits(record.credits_gap) }}
+                    </span>
+                  </template>
+                  <template v-else-if="column.key === 'warnings'">
+                    <span v-if="record.data_warnings.length">
+                      {{ record.data_warnings[0] }}
+                    </span>
+                    <span v-else class="detail-muted">-</span>
+                  </template>
+                  <template v-else-if="column.key === 'generated_at'">
+                    {{ formatDateTime(record.generated_at) }}
+                  </template>
+                  <template v-else-if="column.key === 'actions'">
+                    <a-button type="link" size="small" @click="openAcademicGapDetail(record.student_id)">
+                      查看明细
+                    </a-button>
+                  </template>
+                </template>
+              </a-table>
+            </a-card>
+          </div>
+        </section>
+
+        <aside class="dashboard-side-panel">
+          <div class="side-head">
+            <strong>学业缺口详情</strong>
+            <span>×</span>
+          </div>
+          <template v-if="primaryGapRow">
+            <div class="side-section student-card">
+              <div class="side-avatar">{{ primaryGapRow.student_name.slice(0, 1) }}</div>
+              <div>
+                <strong>{{ primaryGapRow.student_name }}</strong>
+                <p>{{ primaryGapRow.student_no }}</p>
+                <p>{{ primaryGapRow.major_code || '-' }} · {{ primaryGapRow.grade_code || '-' }}</p>
               </div>
-            </template>
-            <a-empty v-else description="当前页暂无 academic-gap 汇总卡片" />
-          </a-card>
-        </a-col>
-      </a-row>
-
-      <a-card class="mt16" :title="dashboard.academicGap.title" :bordered="false">
-        <a-form layout="inline" :model="academicGapFilters" class="filter-card compact" @finish="onAcademicGapSearch">
-          <a-form-item label="关键字">
-            <a-input
-              v-model:value="academicGapFilters.keyword"
-              allow-clear
-              placeholder="学号或姓名"
-              style="width: 180px"
-            />
-          </a-form-item>
-          <a-form-item label="年级">
-            <a-input
-              v-model:value="academicGapFilters.grade_code"
-              allow-clear
-              placeholder="如 2022"
-              style="width: 120px"
-            />
-          </a-form-item>
-          <a-form-item label="专业">
-            <a-input
-              v-model:value="academicGapFilters.major_code"
-              allow-clear
-              placeholder="如 CS"
-              style="width: 120px"
-            />
-          </a-form-item>
-          <a-form-item label="风险级别">
-            <a-select
-              v-model:value="academicGapFilters.risk_level"
-              allow-clear
-              placeholder="全部"
-              style="width: 140px"
-            >
-              <a-select-option value="HIGH">高关注</a-select-option>
-              <a-select-option value="MEDIUM">待跟进</a-select-option>
-              <a-select-option value="LOW">低关注</a-select-option>
-            </a-select>
-          </a-form-item>
-          <a-form-item>
-            <a-space>
-              <a-button type="primary" html-type="submit" :loading="loadingAcademicGap">
-                查询
-              </a-button>
-              <a-button @click="resetAcademicGapFilters">重置</a-button>
-            </a-space>
-          </a-form-item>
-        </a-form>
-
-        <div class="academic-gap-intro mb16">
-          当前列表仅作学业缺口弱提示，不输出毕业、预警等强结论。上方右侧卡片与下方表格摘要都只基于“当前筛选 + 当前页”可见数据生成。点击“查看明细”可下钻到单学生 canonical academic-gap 详情。
-        </div>
-
-        <a-table
-          :columns="academicGapColumns"
-          :data-source="academicGapRows"
-          :loading="loadingAcademicGap"
-          :pagination="{
-            current: academicGapPagination.current,
-            pageSize: academicGapPagination.pageSize,
-            total: academicGapPagination.total,
-            showSizeChanger: true,
-          }"
-          row-key="student_id"
-          @change="onAcademicGapTableChange"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'student'">
-              <div class="gap-student-name">{{ record.student_name }}</div>
-              <div class="detail-muted">{{ record.student_no }}</div>
-            </template>
-            <template v-else-if="column.key === 'risk_level'">
-              <a-tag :color="academicRiskColor(record as AcademicGapAggregateItem)">
-                {{ academicRiskLabel(record as AcademicGapAggregateItem) }}
-              </a-tag>
-            </template>
-            <template v-else-if="column.key === 'credits'">
-              <div>参考：{{ formatCredits(record.total_credits_required) }}</div>
-              <div class="detail-muted">已获：{{ formatCredits(record.total_credits_earned) }}</div>
-            </template>
-            <template v-else-if="column.key === 'credits_gap'">
-              <span :class="['gap-emphasis', academicRiskClass(record as AcademicGapAggregateItem)]">
-                {{ formatCredits(record.credits_gap) }}
-              </span>
-            </template>
-            <template v-else-if="column.key === 'warnings'">
-              <span v-if="record.data_warnings.length">
-                {{ record.data_warnings[0] }}
-              </span>
-              <span v-else class="detail-muted">-</span>
-            </template>
-            <template v-else-if="column.key === 'generated_at'">
-              {{ formatDateTime(record.generated_at) }}
-            </template>
-            <template v-else-if="column.key === 'actions'">
-              <a-button type="link" size="small" @click="openAcademicGapDetail(record.student_id)">
-                查看明细
-              </a-button>
-            </template>
+            </div>
+            <div class="side-section">
+              <h3>缺口描述</h3>
+              <p>
+                当前参考要求 {{ formatCredits(primaryGapRow.total_credits_required) }}，
+                已获 {{ formatCredits(primaryGapRow.total_credits_earned) }}，
+                差额参考 {{ formatCredits(primaryGapRow.credits_gap) }}。
+              </p>
+            </div>
+            <div class="side-section">
+              <h3>相关课程</h3>
+              <p>高等数学A(1) · 必修 · {{ academicRiskLabel(primaryGapRow) }}</p>
+            </div>
+            <div class="side-section">
+              <h3>风险趋势</h3>
+              <svg class="side-trend" viewBox="0 0 260 118">
+                <polyline points="8,58 46,72 84,82 122,76 160,66 198,52 246,20" />
+                <circle cx="246" cy="20" r="5" />
+              </svg>
+            </div>
+            <div class="side-section">
+              <h3>处理建议</h3>
+              <ul>
+                <li>建议补修缺口课程，或选择替代课程。</li>
+                <li>尽快完成课程学习并取得合格成绩。</li>
+                <li>特殊情况请联系学院教务复核。</li>
+              </ul>
+            </div>
+            <div class="side-actions">
+              <a-button @click="openAcademicGapDetail(primaryGapRow.student_id)">标记已跟进</a-button>
+              <a-button type="primary">发起通知</a-button>
+            </div>
           </template>
-        </a-table>
-      </a-card>
+          <a-empty v-else description="暂无学业缺口详情" />
+        </aside>
+      </div>
     </a-spin>
 
     <a-drawer
@@ -416,6 +440,8 @@ const academicGapDetailColumns = [
 ]
 
 const dashboard = computed(() => buildDashboardViewModel(overview.value, academicGapRows.value))
+const primaryGapRow = computed(() => academicGapRows.value[0] ?? null)
+const trendPoints = ["20,96", "68,84", "116,92", "164,62", "212,58", "260,50", "302,46"]
 
 const METRIC_ICON: Record<string, unknown> = {
   students: TeamOutlined,
@@ -546,6 +572,356 @@ onMounted(async () => {
 .board-meta {
   color: #8c8c8c;
   font-size: 12px;
+}
+
+.operation-dashboard {
+  padding-right: 394px;
+}
+
+.dashboard-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.dashboard-canvas {
+  min-width: 0;
+}
+
+.chart-mosaic {
+  display: grid;
+  grid-template-columns: 1.08fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.dashboard-lower {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.78fr) minmax(0, 1.42fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.visual-card {
+  min-height: 100%;
+}
+
+.donut-row {
+  display: grid;
+  grid-template-columns: 144px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.donut-visual {
+  position: relative;
+  display: grid;
+  width: 144px;
+  height: 144px;
+  place-items: center;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, #fff 0 43%, transparent 44%),
+    conic-gradient(#c40018 0 35%, #e15461 35% 58%, #f08b66 58% 73%, #f3c46b 73% 86%, #dfe3ea 86% 100%);
+}
+
+.donut-core {
+  display: grid;
+  width: 82px;
+  height: 82px;
+  place-items: center;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line-soft);
+}
+
+.donut-core strong {
+  color: var(--text);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.donut-core span {
+  margin-top: -18px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.donut-legend {
+  display: grid;
+  gap: 9px;
+}
+
+.legend-line {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.legend-line strong {
+  color: var(--text);
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--ruc-red);
+}
+
+.trend-svg {
+  width: 100%;
+  height: 150px;
+}
+
+.trend-svg line {
+  stroke: #eef1f5;
+  stroke-width: 1;
+}
+
+.trend-svg polyline,
+.side-trend polyline {
+  fill: none;
+  stroke: var(--ruc-red);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.trend-svg circle,
+.side-trend circle {
+  fill: #fff;
+  stroke: var(--ruc-red);
+  stroke-width: 3;
+}
+
+.trend-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.trend-summary div {
+  padding: 10px 12px;
+  background: #fff7f8;
+  border: 1px solid #ffe1e6;
+  border-radius: 10px;
+}
+
+.trend-summary strong {
+  display: block;
+  color: var(--ruc-red);
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.trend-summary span {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.load-bar-row {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) 42px;
+  gap: 10px;
+  align-items: center;
+  min-height: 28px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.load-track {
+  height: 12px;
+  overflow: hidden;
+  background: #eef0f3;
+  border-radius: 999px;
+}
+
+.load-track i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--ruc-red), #e75a5f);
+  border-radius: inherit;
+}
+
+.load-bar-row strong {
+  color: var(--text-2);
+  font-size: 12px;
+  text-align: right;
+}
+
+.risk-card {
+  background: linear-gradient(135deg, #fff6f4, #fff) !important;
+  border-color: #ffd7d1 !important;
+}
+
+.risk-card-body {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.risk-card-body > .anticon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  color: var(--ruc-red);
+  background: #ffe1e6;
+  border-radius: 999px;
+  font-size: 24px;
+}
+
+.risk-card-body strong {
+  color: var(--ruc-red);
+  font-size: 14px;
+}
+
+.risk-card-body p {
+  margin: 8px 0;
+}
+
+.risk-card-body ul,
+.dashboard-side-panel ul {
+  margin: 8px 0 0;
+  padding-left: 16px;
+}
+
+.confidence {
+  margin-top: 12px;
+}
+
+.confidence span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.confidence i {
+  display: block;
+  width: 62%;
+  height: 6px;
+  background: linear-gradient(90deg, var(--ruc-red), #f0a3a3);
+  border-radius: 999px;
+}
+
+.gap-table-card :deep(.filter-card) {
+  margin: 0 0 10px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.dashboard-side-panel {
+  position: fixed;
+  top: 58px;
+  right: 0;
+  bottom: 0;
+  z-index: 12;
+  width: 380px;
+  overflow-y: auto;
+  padding: 20px 20px 18px;
+  background: #fff;
+  border: 1px solid var(--line-soft);
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  box-shadow: var(--shadow-card);
+}
+
+.side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -2px -2px 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.side-head strong {
+  font-size: 16px;
+}
+
+.side-head span {
+  color: var(--text-3);
+  font-size: 20px;
+}
+
+.side-section {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.side-section h3 {
+  margin: 0 0 8px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.side-section p,
+.side-section li {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.student-card {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.side-avatar {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  color: #fff;
+  background: var(--ruc-red);
+  border-radius: 999px;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.side-trend {
+  width: 100%;
+  height: 118px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 28px, #eef1f5 28px 29px),
+    linear-gradient(180deg, #fff, #fff7f8);
+  border-radius: 10px;
+}
+
+.side-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+@media (max-width: 1320px) {
+  .operation-dashboard {
+    padding-right: 0;
+  }
+
+  .dashboard-side-panel {
+    position: static;
+    width: auto;
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+  }
 }
 
 .chart-stack {

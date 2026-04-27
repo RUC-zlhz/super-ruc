@@ -121,6 +121,66 @@
         </a-card>
       </a-tab-pane>
     </a-tabs>
+
+    <aside class="exchange-side-panel">
+      <div class="side-panel-head">
+        <strong>导入任务面板</strong>
+        <span>×</span>
+      </div>
+
+      <section class="quality-card">
+        <ExclamationCircleOutlined />
+        <div>
+          <p>校验状态</p>
+          <h3>{{ preview ? preview.batch.status : latestBatch?.status || '等待上传' }}</h3>
+          <span>导入前先校验，致命错误为 0 后才允许正式提交。</span>
+        </div>
+      </section>
+
+      <section class="side-section">
+        <h3>最新批次</h3>
+        <template v-if="latestBatch">
+          <div class="side-kv">
+            <span>批次号</span>
+            <strong>{{ latestBatch.batch_no }}</strong>
+          </div>
+          <div class="side-kv">
+            <span>文件</span>
+            <strong>{{ latestBatch.filename }}</strong>
+          </div>
+          <div class="side-kv">
+            <span>正常 / 警告 / 致命</span>
+            <strong>{{ latestBatch.ok_rows }} / {{ latestBatch.warn_rows }} / {{ latestBatch.fatal_rows }}</strong>
+          </div>
+        </template>
+        <p v-else class="side-muted">暂无导入批次，上传文件后展示校验摘要。</p>
+      </section>
+
+      <section class="side-section">
+        <h3>数据质量</h3>
+        <div class="quality-bars">
+          <div>
+            <span>校验通过</span>
+            <i :style="{ width: `${qualityPercent.ok}%` }" />
+            <strong>{{ qualityPercent.ok }}%</strong>
+          </div>
+          <div>
+            <span>需修正</span>
+            <i class="warn" :style="{ width: `${qualityPercent.warn}%` }" />
+            <strong>{{ qualityPercent.warn }}%</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="side-section">
+        <h3>快捷导出</h3>
+        <div class="side-actions vertical">
+          <a-button @click="dlStudents">导出学生名册</a-button>
+          <a-button @click="dlTranscripts">导出成绩单</a-button>
+          <a-button type="primary" @click="dlCurriculum">导出培养方案</a-button>
+        </div>
+      </section>
+    </aside>
   </div>
 </template>
 
@@ -144,6 +204,15 @@ import StatusTag from '@/components/StatusTag.vue'
 const activeTab = ref('import')
 const importType = ref<ImportType>('student')
 const preview = ref<ImportPreviewResult | null>(null)
+const latestBatch = computed(() => preview.value?.batch || batches.value[0] || null)
+const qualityPercent = computed(() => {
+  const batch = latestBatch.value
+  if (!batch || !batch.total_rows) return { ok: 0, warn: 0 }
+  return {
+    ok: Math.round((batch.ok_rows / batch.total_rows) * 100),
+    warn: Math.round(((batch.warn_rows + batch.fatal_rows) / batch.total_rows) * 100),
+  }
+})
 const metrics = computed(() => {
   const ok = batches.value.reduce((sum, item) => sum + item.ok_rows, 0)
   const fatal = batches.value.reduce((sum, item) => sum + item.fatal_rows, 0)
@@ -264,6 +333,10 @@ onMounted(loadBatches)
 </script>
 
 <style scoped>
+.exchange-page {
+  padding-right: 364px;
+}
+
 .mb16 { margin-bottom: 16px; }
 .mt8 { margin-top: 8px; }
 
@@ -305,5 +378,160 @@ onMounted(loadBatches)
   margin-top: 6px;
   color: var(--text-3);
   font-size: 13px;
+}
+
+.exchange-side-panel {
+  position: fixed;
+  top: 58px;
+  right: 0;
+  bottom: 0;
+  z-index: 12;
+  width: 350px;
+  overflow-y: auto;
+  padding: 18px;
+  background: #fff;
+  border-left: 1px solid var(--line-soft);
+  box-shadow: var(--shadow-card);
+}
+
+.side-panel-head,
+.side-kv {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.side-panel-head {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.side-panel-head strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.side-panel-head span {
+  color: var(--text-3);
+  font-size: 18px;
+}
+
+.quality-card {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  background: linear-gradient(135deg, #fff7f8, #fff);
+  border: 1px solid #ffe0e5;
+  border-radius: 12px;
+}
+
+.quality-card > .anticon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  color: var(--ruc-red);
+  background: #ffe4e8;
+  border-radius: 999px;
+  font-size: 22px;
+}
+
+.quality-card p,
+.side-muted {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.quality-card h3 {
+  margin: 4px 0;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.quality-card span {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.side-section {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.side-section h3 {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.side-kv {
+  min-height: 32px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.side-kv strong {
+  max-width: 190px;
+  overflow: hidden;
+  color: var(--text-2);
+  font-weight: 600;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quality-bars {
+  display: grid;
+  gap: 12px;
+}
+
+.quality-bars div {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 44px;
+  gap: 10px;
+  align-items: center;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.quality-bars i {
+  display: block;
+  height: 10px;
+  background: linear-gradient(90deg, var(--ruc-red), #e65d69);
+  border-radius: 999px;
+}
+
+.quality-bars i.warn {
+  background: linear-gradient(90deg, #d8941f, #f4c46a);
+}
+
+.quality-bars strong {
+  color: var(--text);
+  text-align: right;
+}
+
+.side-actions.vertical {
+  display: grid;
+  gap: 10px;
+}
+
+@media (max-width: 1320px) {
+  .exchange-page {
+    padding-right: 0;
+  }
+
+  .exchange-side-panel {
+    position: static;
+    width: auto;
+    margin-top: 14px;
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+  }
 }
 </style>

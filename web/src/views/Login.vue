@@ -179,13 +179,14 @@ async function onSubmit() {
 
 .login-card {
   z-index: 1;
-  width: 520px;
-  padding: 54px 54px 40px;
+  width: 560px;
+  padding: 56px 56px 42px;
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(176, 0, 24, 0.16);
   border-radius: 18px;
   box-shadow: 0 26px 70px rgba(31, 35, 41, 0.13);
   backdrop-filter: blur(12px);
+  transform: translateY(-34px);
 }
 
 .card-heading {
@@ -236,10 +237,14 @@ async function onSubmit() {
 
 .student-tip {
   position: absolute;
-  z-index: 1;
-  bottom: 110px;
+  z-index: 2;
+  bottom: 146px;
+  padding: 8px 18px;
   color: var(--text-2);
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 999px;
   font-size: 18px;
+  backdrop-filter: blur(6px);
 }
 
 .student-tip :deep(.anticon) {

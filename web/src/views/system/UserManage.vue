@@ -4,16 +4,7 @@
 
     <a-tabs v-model:activeKey="activeTab">
       <a-tab-pane key="students" tab="学生管理">
-        <div class="metric-grid">
-          <div v-for="metric in metrics" :key="metric.key" class="metric-tile">
-            <span class="metric-icon"><component :is="metric.icon" /></span>
-            <div class="metric-label">{{ metric.label }}</div>
-            <div class="metric-value">{{ metric.value }}</div>
-            <div class="metric-sub">{{ metric.sub }}</div>
-          </div>
-        </div>
-
-        <a-form layout="inline" class="filter-card" @finish="onStudentSearch">
+        <a-form layout="inline" class="filter-card user-filter" @finish="onStudentSearch">
           <a-form-item label="搜索">
             <a-input
               v-model:value="stuFilters.q"
@@ -53,37 +44,92 @@
             <a-button @click="resetStudentFilters">重置</a-button>
           </a-form-item>
         </a-form>
-        <a-table
-          :columns="stuCols"
-          :data-source="students"
-          :loading="stuLoading"
-          :pagination="stuPagination"
-          row-key="id"
-          @change="onStuTableChange"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'enrollment_status'">
-              <a-tag :color="enrollmentStatusColor(record.enrollment_status)">
-                {{ enrollmentStatusLabel(record.enrollment_status) }}
-              </a-tag>
-            </template>
-            <template v-else-if="column.key === 'actions'">
-              <a-button
-                type="link"
-                size="small"
-                @click="onViewProfile(record.id)"
-                >画像</a-button
+
+        <div class="metric-grid user-metrics">
+          <div v-for="metric in metrics" :key="metric.key" class="metric-tile">
+            <span class="metric-icon"><component :is="metric.icon" /></span>
+            <div class="metric-label">{{ metric.label }}</div>
+            <div class="metric-value">{{ metric.value }}</div>
+            <div class="metric-sub">{{ metric.sub }}</div>
+          </div>
+        </div>
+
+        <div class="user-workspace">
+          <section class="user-main">
+            <a-table
+              :columns="stuCols"
+              :data-source="students"
+              :loading="stuLoading"
+              :pagination="stuPagination"
+              row-key="id"
+              size="small"
+              @change="onStuTableChange"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'enrollment_status'">
+                  <a-tag :color="enrollmentStatusColor(record.enrollment_status)">
+                    {{ enrollmentStatusLabel(record.enrollment_status) }}
+                  </a-tag>
+                </template>
+                <template v-else-if="column.key === 'actions'">
+                  <a-button
+                    type="link"
+                    size="small"
+                    @click="onViewProfile(record.id)"
+                    >画像</a-button
+                  >
+                  <a-button
+                    v-if="canEditEnrollment"
+                    type="link"
+                    size="small"
+                    @click="onEditEnrollment(record)"
+                    >学籍</a-button
+                  >
+                </template>
+              </template>
+            </a-table>
+          </section>
+
+          <aside v-if="canViewPolicies" class="policy-side-panel">
+            <div class="policy-title-row">
+              <strong>字段权限矩阵</strong>
+              <span>×</span>
+            </div>
+            <div class="policy-hint">
+              设置字段级权限，精细化控制数据的可见与操作范围
+            </div>
+            <div class="policy-matrix">
+              <div class="policy-grid policy-grid-head">
+                <span>字段名称</span>
+                <span>可见</span>
+                <span>可编辑</span>
+                <span>仅管理员</span>
+                <span>导出权限</span>
+              </div>
+              <div
+                v-for="policy in policyMatrixRows"
+                :key="policyRowKey(policy)"
+                class="policy-grid"
               >
-              <a-button
-                v-if="canEditEnrollment"
-                type="link"
-                size="small"
-                @click="onEditEnrollment(record)"
-                >学籍</a-button
-              >
-            </template>
-          </template>
-        </a-table>
+                <span>{{ policyFieldName(policy) }}</span>
+                <a-checkbox :checked="policyCanRead(policy)" disabled />
+                <a-checkbox :checked="policyCanWrite(policy)" disabled />
+                <a-checkbox :checked="policyAdminOnly(policy)" disabled />
+                <a-checkbox :checked="policyCanExport(policy)" disabled />
+              </div>
+            </div>
+            <div class="preset-block">
+              <div class="preset-title">预设模板</div>
+              <a-select :value="policyPresetName" style="width: 100%" disabled>
+                <a-select-option :value="policyPresetName">{{ policyPresetName }}</a-select-option>
+              </a-select>
+              <div class="preset-actions">
+                <a-button size="small">保存设置</a-button>
+                <a-button size="small">刷新</a-button>
+              </div>
+            </div>
+          </aside>
+        </div>
       </a-tab-pane>
 
       <a-tab-pane v-if="canViewPolicies" key="roles" tab="角色策略">
@@ -91,7 +137,7 @@
           :columns="policyCols"
           :data-source="policies"
           :loading="policyLoading"
-          row-key="id"
+          :row-key="policyRowKey"
           size="small"
         >
           <template #bodyCell="{ column, record }">
@@ -372,18 +418,58 @@ const policyCols = [
   },
 ];
 interface RoleFieldPolicy {
-  id: number;
-  role_code: string;
-  entity_code: string;
-  field_name: string;
-  can_read: boolean;
-  can_write: boolean;
+  id?: number;
+  role_code?: string;
+  entity_code?: string;
+  field_name?: string;
+  field?: string;
+  action?: string;
+  effect?: string;
+  can_read?: boolean;
+  can_write?: boolean;
+  can_export?: boolean;
   mask_strategy?: string | null;
 }
 
 const policies = ref<RoleFieldPolicy[]>([]);
 const policyLoading = ref(false);
 const policyLoaded = ref(false);
+const policyMatrixRows = computed(() => policies.value.slice(0, 6));
+const policyPresetName = computed(() =>
+  policyLoaded.value ? "学生信息管理（标准）" : "权限策略加载中",
+);
+
+function policyRowKey(record: RoleFieldPolicy) {
+  return (
+    record.id ??
+    `${record.role_code || "role"}-${record.entity_code || "entity"}-${policyFieldName(record)}-${record.action || "policy"}`
+  );
+}
+
+function policyFieldName(record: RoleFieldPolicy) {
+  return record.field_name || record.field || "-";
+}
+
+function policyCanRead(record: RoleFieldPolicy) {
+  if (typeof record.can_read === "boolean") return record.can_read;
+  if (record.action === "READ") return record.effect !== "DENY";
+  return record.effect === "ALLOW";
+}
+
+function policyCanWrite(record: RoleFieldPolicy) {
+  if (typeof record.can_write === "boolean") return record.can_write;
+  if (record.action === "WRITE") return record.effect === "ALLOW";
+  return false;
+}
+
+function policyAdminOnly(record: RoleFieldPolicy) {
+  return record.role_code === "SUPER_ADMIN" && !policyCanWrite(record);
+}
+
+function policyCanExport(record: RoleFieldPolicy) {
+  if (typeof record.can_export === "boolean") return record.can_export;
+  return record.role_code === "SUPER_ADMIN" && policyCanRead(record);
+}
 
 function maskStrategyLabel(maskStrategy?: string | null) {
   if (!maskStrategy) return "-";
@@ -409,6 +495,7 @@ async function loadPolicies() {
 
 onMounted(() => {
   reloadStudents();
+  void loadPolicies();
 });
 
 watch(activeTab, (tab) => {
@@ -418,4 +505,153 @@ watch(activeTab, (tab) => {
 });
 </script>
 
-<style scoped></style>
+<style scoped>
+.user-filter {
+  margin-bottom: 12px;
+}
+
+.user-page {
+  padding-right: 364px;
+}
+
+.user-metrics {
+  margin-bottom: 14px;
+}
+
+.user-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.user-main {
+  min-width: 0;
+}
+
+.policy-side-panel {
+  position: fixed;
+  top: 58px;
+  right: 0;
+  bottom: 0;
+  z-index: 12;
+  width: 350px;
+  overflow-y: auto;
+  padding: 18px;
+  background: #fff;
+  border: 1px solid var(--line-soft);
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  box-shadow: var(--shadow-card);
+}
+
+.policy-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.policy-title-row strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.policy-title-row span {
+  color: var(--text-3);
+  font-size: 18px;
+}
+
+.policy-hint {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  color: #9a6400;
+  background: #fff7e8;
+  border: 1px solid #ffe5b5;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.policy-matrix {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.policy-grid {
+  display: grid;
+  grid-template-columns: 1.35fr repeat(4, 0.82fr);
+  min-height: 54px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.policy-grid:first-child {
+  border-top: 0;
+}
+
+.policy-grid > span,
+.policy-grid > label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 8px;
+  border-left: 1px solid var(--line-soft);
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.policy-grid > span:first-child {
+  justify-content: flex-start;
+  border-left: 0;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.policy-grid-head {
+  min-height: 42px;
+  background: #f7f8fa;
+}
+
+.policy-grid-head > span {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.preset-block {
+  margin-top: 18px;
+}
+
+.preset-title {
+  margin-bottom: 10px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.preset-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+@media (max-width: 1320px) {
+  .user-page {
+    padding-right: 0;
+  }
+
+  .user-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .policy-side-panel {
+    position: static;
+    width: auto;
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+  }
+}
+</style>
