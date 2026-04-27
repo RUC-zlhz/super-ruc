@@ -1,12 +1,17 @@
 <template>
   <view class="container">
     <view v-if="!auth.isLoggedIn" class="login-card">
+      <view class="login-brand">中国人民大学</view>
+      <view class="login-illustration">
+        <text>画像</text>
+      </view>
       <text class="welcome">欢迎使用</text>
       <text class="desc">登录后查看您的画像与申请</text>
-      <button type="primary" size="default" @tap="onWxLogin">微信一键登录</button>
+      <button :type="UNI_BUTTON_TYPE.primary" size="default" @tap="onWxLogin">微信一键登录</button>
     </view>
 
     <template v-else>
+      <view class="profile-hero">
       <view class="summary-card">
         <view class="avatar-row">
           <image v-if="auth.user?.avatar_url" :src="auth.user.avatar_url" class="avatar" />
@@ -24,6 +29,7 @@
           </view>
         </view>
       </view>
+      </view>
 
       <view v-if="profile && !canEditProfile" class="readonly-card">
         <text class="readonly-title">当前仅支持只读查看</text>
@@ -32,13 +38,21 @@
 
       <view v-if="profile" class="stat-row">
         <view v-for="t in FACT_TYPES" :key="t.code" class="stat-cell">
+          <view class="stat-icon">{{ factShortLabel(t.code) }}</view>
           <text class="stat-num">{{ factMetricValue(t.code) }}</text>
           <text class="stat-label">{{ t.label }}</text>
         </view>
       </view>
 
       <view v-if="profile" class="section">
-        <text class="section-title">学籍信息</text>
+        <text class="section-title">功能与服务</text>
+        <view class="service-row">
+          <text class="service-icon">籍</text>
+          <view class="service-copy">
+            <text class="service-title">学籍信息</text>
+            <text class="service-desc">查看学籍基本信息、学籍异动记录</text>
+          </view>
+        </view>
         <view class="info-row"><text>姓名</text><text>{{ profile.student.full_name }}</text></view>
         <view class="info-row"><text>性别</text><text>{{ profile.student.gender || '-' }}</text></view>
         <view class="info-row"><text>年级</text><text>{{ profile.student.grade_code || '-' }}</text></view>
@@ -108,10 +122,10 @@
 
       <view class="action-list">
         <view class="action-btn" :class="{ disabled: !canEditProfile }" @tap="openAppeal">
-          信息纠错申诉
+          <text>信息纠错申诉</text><text>›</text>
         </view>
         <view class="action-btn" :class="{ disabled: !canEditProfile }" @tap="openGrowthSubmission">
-          成长补录
+          <text>成长补录</text><text>›</text>
         </view>
         <view class="action-btn" @tap="onLogout">退出登录</view>
       </view>
@@ -137,7 +151,7 @@
           </view>
           <view class="popup-footer">
             <button size="mini" @tap="closeAppeal">取消</button>
-            <button size="mini" type="primary" :loading="appealSubmitting" @tap="onSubmitAppeal">
+            <button size="mini" :type="UNI_BUTTON_TYPE.primary" :loading="appealSubmitting" @tap="onSubmitAppeal">
               提交
             </button>
           </view>
@@ -191,7 +205,7 @@
           </view>
           <view class="popup-footer">
             <button size="mini" @tap="closeGrowthSubmission">取消</button>
-            <button size="mini" type="primary" :loading="growthSubmitting" @tap="onSubmitGrowth">
+            <button size="mini" :type="UNI_BUTTON_TYPE.primary" :loading="growthSubmitting" @tap="onSubmitGrowth">
               提交
             </button>
           </view>
@@ -204,6 +218,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useAuthStore } from '@/store/auth'
+import { UNI_BUTTON_TYPE } from '@/utils/uni-button'
 import {
   getMyCorrections,
   getMyFactSubmissions,
@@ -254,6 +269,11 @@ const APPROVAL_LABELS: Record<string, string> = {
 
 function factLabel(type: string) {
   return FACT_TYPES.find((item) => item.code === type)?.label || type
+}
+
+function factShortLabel(type: string) {
+  const label = factLabel(type)
+  return label.slice(0, 1)
 }
 
 const factTypeLabels = FACT_TYPES.map((item) => item.label)
@@ -484,24 +504,66 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.container { padding: 24rpx; }
-
-.login-card {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 60rpx 40rpx;
-  text-align: center;
+.container {
+  min-height: 100vh;
+  padding: 0 24rpx 36rpx;
+  background:
+    linear-gradient(180deg, #b70f24 0, #b70f24 260rpx, #f8f3f4 520rpx),
+    #f8f3f4;
 }
 
-.welcome { font-size: 40rpx; font-weight: 600; color: #7f1722; display: block; }
+.login-card {
+  margin-top: 48rpx;
+  background: #fff;
+  border-radius: 28rpx;
+  padding: 60rpx 40rpx 42rpx;
+  text-align: center;
+  box-shadow: 0 18rpx 42rpx rgba(82,28,38,0.14);
+}
+
+.login-brand {
+  color: #fff;
+  background: #b70f24;
+  border-radius: 999rpx;
+  padding: 10rpx 24rpx;
+  display: inline-flex;
+  font-weight: 800;
+  font-size: 24rpx;
+  margin-bottom: 34rpx;
+}
+
+.login-illustration {
+  width: 260rpx;
+  height: 220rpx;
+  border-radius: 34rpx;
+  background:
+    radial-gradient(circle at 70% 30%, rgba(183,15,36,0.12), transparent 58rpx),
+    linear-gradient(135deg, #fff5f6, #f3f8ff);
+  margin: 0 auto 30rpx;
+  color: #b70f24;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 46rpx;
+  font-weight: 800;
+}
+
+.welcome { font-size: 38rpx; font-weight: 800; color: #202124; display: block; }
 .desc { font-size: 26rpx; color: #666; display: block; margin: 16rpx 0 24rpx; }
 
+.profile-hero {
+  margin: 0 -24rpx 24rpx;
+  padding: 32rpx 24rpx 18rpx;
+  background:
+    radial-gradient(circle at 82% 18%, rgba(255,255,255,0.16), transparent 120rpx),
+    linear-gradient(135deg, #b70f24, #7f1722);
+}
+
 .summary-card {
-  background: #fff;
-  border-radius: 16rpx;
+  background: rgba(255,255,255,0.96);
+  border-radius: 22rpx;
   padding: 32rpx;
-  margin-bottom: 16rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.06);
+  box-shadow: 0 14rpx 34rpx rgba(0,0,0,0.12);
 }
 
 .avatar-row { display: flex; align-items: center; }
@@ -513,19 +575,20 @@ onMounted(async () => {
   margin-right: 20rpx;
   overflow: hidden;
   background: #f5f5f5;
+  border: 4rpx solid rgba(183,15,36,0.12);
 }
 
 .avatar.fallback {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #7f1722;
+  background: linear-gradient(135deg, #d92b3e, #b70f24);
   color: #fff;
   font-size: 40rpx;
 }
 
 .summary-text { display: flex; flex-direction: column; }
-.name { font-size: 32rpx; font-weight: 600; }
+.name { font-size: 34rpx; font-weight: 800; color: #202124; }
 .sub { font-size: 24rpx; color: #999; margin-top: 4rpx; }
 
 .readonly-card {
@@ -553,25 +616,75 @@ onMounted(async () => {
 
 .stat-row {
   display: flex;
-  justify-content: space-around;
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 24rpx 0;
-  margin-bottom: 16rpx;
+  flex-wrap: wrap;
+  gap: 14rpx;
+  margin-bottom: 18rpx;
+  background: transparent;
+  padding: 0;
 }
 
-.stat-cell { display: flex; flex-direction: column; align-items: center; }
-.stat-num { font-size: 34rpx; font-weight: 600; color: #7f1722; }
+.stat-cell {
+  width: calc((100% - 42rpx) / 4);
+  min-height: 132rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20rpx;
+  background: #fff;
+  box-shadow: var(--shadow-soft);
+}
+.stat-icon {
+  width: 42rpx;
+  height: 42rpx;
+  border-radius: 12rpx;
+  background: #fff1f2;
+  color: #b70f24;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  font-weight: 800;
+  margin-bottom: 8rpx;
+}
+.stat-num { font-size: 32rpx; font-weight: 800; color: #202124; }
 .stat-label { font-size: 22rpx; color: #666; margin-top: 4rpx; }
 
 .section {
   background: #fff;
-  border-radius: 16rpx;
+  border-radius: 22rpx;
   padding: 24rpx;
-  margin-bottom: 16rpx;
+  margin-bottom: 18rpx;
+  box-shadow: var(--shadow-card);
+  border: 1rpx solid #f0e2e5;
 }
 
-.section-title { font-size: 28rpx; font-weight: 600; display: block; margin-bottom: 16rpx; }
+.section-title { font-size: 30rpx; font-weight: 800; display: block; margin-bottom: 18rpx; }
+
+.service-row {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  padding: 18rpx 0;
+  border-bottom: 1rpx solid #f0e2e5;
+  margin-bottom: 10rpx;
+}
+
+.service-icon {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 14rpx;
+  background: #eef6ff;
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+}
+
+.service-copy { flex: 1; }
+.service-title { display: block; font-size: 28rpx; font-weight: 700; color: #1f2937; }
+.service-desc { display: block; margin-top: 4rpx; font-size: 22rpx; color: #8a8f98; }
 
 .info-row {
   display: flex;
@@ -654,11 +767,14 @@ onMounted(async () => {
 .action-btn {
   background: #fff;
   padding: 24rpx;
-  border-radius: 12rpx;
+  border-radius: 18rpx;
   margin-bottom: 12rpx;
-  text-align: center;
   font-size: 28rpx;
-  color: #333;
+  color: #b70f24;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: var(--shadow-soft);
 }
 
 .action-btn.disabled {
@@ -669,10 +785,10 @@ onMounted(async () => {
 .popup-panel {
   background: #fff;
   padding: 32rpx;
-  border-radius: 24rpx 24rpx 0 0;
+  border-radius: 34rpx 34rpx 0 0;
 }
 
-.popup-title { font-size: 32rpx; font-weight: 600; display: block; margin-bottom: 24rpx; }
+.popup-title { font-size: 34rpx; font-weight: 800; display: block; margin-bottom: 24rpx; }
 .form-item { margin-bottom: 16rpx; }
 .label { font-size: 24rpx; color: #666; display: block; margin-bottom: 6rpx; }
 
@@ -680,10 +796,11 @@ onMounted(async () => {
 .textarea,
 .picker-value {
   background: #f7f7f7;
-  border-radius: 8rpx;
-  padding: 14rpx 16rpx;
+  border-radius: 16rpx;
+  padding: 18rpx 18rpx;
   font-size: 26rpx;
   color: #333;
+  border: 1rpx solid #f0e2e5;
 }
 
 .textarea { min-height: 140rpx; width: 100%; }

@@ -1,5 +1,11 @@
 <template>
   <view class="container">
+    <view class="honor-hero">
+      <text class="hero-title">榜样力量，追光而行</text>
+      <text class="hero-sub">见贤思齐 · 躬身笃行 · 不负韶华</text>
+      <view class="hero-seal">RUC</view>
+    </view>
+
     <view class="filter-bar">
       <scroll-view scroll-x class="category-scroll">
         <view
@@ -34,6 +40,10 @@
         class="card"
         @tap="onDetail(honor)"
       >
+        <view class="honor-medal" :class="`lv-${String(honor.level).toLowerCase()}`">
+          {{ medalIcon(honor.level) }}
+        </view>
+        <view class="honor-main">
         <view class="card-head">
           <text class="card-title">{{ honor.title }}</text>
           <text class="card-tag" :class="`lv-${String(honor.level).toLowerCase()}`">
@@ -51,6 +61,8 @@
         <text class="card-meta">{{ honor.awarded_by }} · {{ formatDate(honor.announced_at) }}</text>
         <text v-if="honor.summary" class="card-summary">{{ honor.summary.slice(0, 60) }}</text>
         <text v-if="isHistoricalRecord(honor)" class="archived-mark">{{ historyReasonLabel(honor) }}</text>
+        </view>
+        <text class="card-arrow">›</text>
       </view>
     </view>
 
@@ -62,7 +74,11 @@
 
     <uni-popup ref="detailPopup" type="bottom">
       <view v-if="selected" class="detail-panel">
+        <view class="sheet-handle" />
         <text class="detail-title">{{ selected.title }}</text>
+        <view class="detail-visual" :class="`lv-${String(selected.level).toLowerCase()}`">
+          {{ medalIcon(selected.level) }}
+        </view>
 
         <view class="detail-badges">
           <text class="detail-pill">{{ categoryLabel(selected) }}</text>
@@ -105,7 +121,8 @@
         </view>
 
         <view class="detail-footer">
-          <button size="mini" @tap="closeDetail">返回榜单</button>
+          <view class="detail-action secondary">查看附件</view>
+          <view class="detail-action" @tap="closeDetail">分享荣誉</view>
         </view>
       </view>
     </uni-popup>
@@ -191,6 +208,13 @@ const categoryChips = computed(() => ([
 
 function levelLabel(level: string) {
   return LEVEL_LABELS[level] || level
+}
+
+function medalIcon(level: string) {
+  if (level === 'NATIONAL') return '金'
+  if (level === 'PROVINCIAL') return '杯'
+  if (level === 'SCHOOL') return '证'
+  return '奖'
 }
 
 function formatDate(value?: string | null) {
@@ -309,7 +333,54 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.container { padding: 24rpx; }
+.container {
+  min-height: 100vh;
+  padding: 0 24rpx 36rpx;
+  background:
+    linear-gradient(180deg, #fff4f5 0, #fff 210rpx, #f8f3f4 520rpx),
+    #f8f3f4;
+}
+
+.honor-hero {
+  position: relative;
+  margin: 0 -24rpx 24rpx;
+  min-height: 260rpx;
+  padding: 56rpx 42rpx 34rpx;
+  background:
+    radial-gradient(circle at 86% 46%, rgba(183,15,36,0.16), transparent 150rpx),
+    linear-gradient(135deg, #fff2f3, #fff 64%);
+  overflow: hidden;
+}
+
+.hero-title {
+  display: block;
+  color: #b70f24;
+  font-size: 44rpx;
+  font-weight: 800;
+  letter-spacing: 2rpx;
+}
+
+.hero-sub {
+  display: block;
+  margin-top: 14rpx;
+  color: #5f4d52;
+  font-size: 25rpx;
+}
+
+.hero-seal {
+  position: absolute;
+  right: 42rpx;
+  top: 48rpx;
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 50%;
+  border: 4rpx solid rgba(183,15,36,0.28);
+  color: rgba(183,15,36,0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+}
 
 .filter-bar { margin-bottom: 20rpx; }
 
@@ -324,15 +395,15 @@ onMounted(() => {
   padding: 10rpx 24rpx;
   margin-right: 12rpx;
   border-radius: 32rpx;
-  border: 1rpx solid #d7dadd;
+  border: 1rpx solid #d9b8bd;
   background: #fff;
-  color: #5b6570;
+  color: #9f1d2e;
   font-size: 26rpx;
 }
 
 .chip.active {
-  background: #7f1722;
-  border-color: #7f1722;
+  background: #b70f24;
+  border-color: #b70f24;
   color: #fff;
 }
 
@@ -345,11 +416,12 @@ onMounted(() => {
 
 .control-pill,
 .history-toggle {
-  padding: 12rpx 22rpx;
-  border-radius: 999rpx;
-  background: #f6f7f8;
+  padding: 14rpx 28rpx;
+  border-radius: 18rpx;
+  background: #fff;
   color: #4b5563;
   font-size: 25rpx;
+  border: 1rpx solid #f0e2e5;
 }
 
 .history-toggle.active {
@@ -367,11 +439,40 @@ onMounted(() => {
 }
 
 .card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
   margin-bottom: 18rpx;
-  padding: 24rpx;
-  border-radius: 18rpx;
+  padding: 24rpx 30rpx 24rpx 24rpx;
+  border-radius: 22rpx;
   background: #fff;
-  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.06);
+  border: 1rpx solid #f0e2e5;
+  box-shadow: var(--shadow-card);
+}
+
+.honor-medal {
+  flex-shrink: 0;
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(135deg, #f5c86a, #b87916);
+  color: #fff;
+  font-size: 36rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.honor-medal.lv-provincial { background: linear-gradient(135deg, #e5e7eb, #9ca3af); }
+.honor-medal.lv-school { background: linear-gradient(135deg, #c44b3f, #9a1a25); }
+.honor-main { flex: 1; min-width: 0; }
+.card-arrow {
+  position: absolute;
+  right: 18rpx;
+  color: #9ca3af;
+  font-size: 34rpx;
 }
 
 .card-head {
@@ -384,7 +485,7 @@ onMounted(() => {
   flex: 1;
   color: #1f2937;
   font-size: 31rpx;
-  font-weight: 600;
+  font-weight: 800;
 }
 
 .card-tag {
@@ -458,16 +559,39 @@ onMounted(() => {
 .detail-panel {
   max-height: 80vh;
   overflow-y: auto;
-  padding: 32rpx;
-  border-radius: 28rpx 28rpx 0 0;
+  padding: 18rpx 32rpx 34rpx;
+  border-radius: 34rpx 34rpx 0 0;
   background: #fff;
+}
+
+.sheet-handle {
+  width: 72rpx;
+  height: 8rpx;
+  border-radius: 999rpx;
+  background: #d9d9d9;
+  margin: 0 auto 24rpx;
 }
 
 .detail-title {
   display: block;
   color: #1f2937;
   font-size: 34rpx;
-  font-weight: 600;
+  font-weight: 800;
+}
+
+.detail-visual {
+  width: 150rpx;
+  height: 150rpx;
+  border-radius: 36rpx;
+  margin: 24rpx auto 18rpx;
+  background: linear-gradient(135deg, #f5c86a, #b87916);
+  color: #fff;
+  font-size: 48rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12rpx 28rpx rgba(184,121,22,0.22);
 }
 
 .detail-badges {
@@ -541,6 +665,26 @@ onMounted(() => {
 
 .detail-footer {
   margin-top: 32rpx;
-  text-align: center;
+  display: flex;
+  gap: 18rpx;
+}
+
+.detail-action {
+  flex: 1;
+  height: 76rpx;
+  border-radius: 16rpx;
+  background: #b70f24;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.detail-action.secondary {
+  background: #fff8f9;
+  color: #7f1722;
+  border: 1rpx solid #f0d5da;
 }
 </style>

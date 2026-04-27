@@ -10,10 +10,11 @@
         class="type-item"
         @tap="onPickType(t)"
       >
+        <view class="type-icon">{{ typeIcon(t.code, t.category) }}</view>
         <view class="type-head">
           <text class="type-name">{{ t.name }}</text>
-          <text class="type-cat">{{ categoryLabel(t.category) }}</text>
         </view>
+        <text class="type-cat">{{ categoryLabel(t.category) }}</text>
         <text v-if="t.description" class="type-desc">{{ t.description }}</text>
         <text class="type-meta">
           {{ t.attachment_required ? '需上传附件' : '附件可选' }}
@@ -52,6 +53,11 @@
         <text class="notice-body">{{ draftDetail.decision_comment }}</text>
       </view>
 
+      <view v-if="formErrors.length" class="notice-card error">
+        <text class="notice-title">提交前请先处理以下问题</text>
+        <text v-for="error in formErrors" :key="error" class="notice-body">{{ error }}</text>
+      </view>
+
       <view class="field">
         <text class="label">申请标题 <text class="required">*</text></text>
         <input class="input" v-model="title" placeholder="请简要描述事由" />
@@ -73,7 +79,7 @@
           <text class="section-title">附件材料</text>
           <button
             size="mini"
-            type="primary"
+            :type="UNI_BUTTON_TYPE.primary"
             plain
             :disabled="!draftId"
             :loading="uploading"
@@ -94,14 +100,31 @@
         </view>
       </view>
 
-      <view class="footer">
-        <button v-if="!draftId" size="mini" @tap="onReset">重选类型</button>
-        <button size="mini" :loading="saving" @tap="onSave">
+      <view class="submit-summary">
+        <text class="summary-title">提交摘要</text>
+        <text class="summary-line">事务类型：{{ activeType.name }}</text>
+        <text class="summary-line">申请标题：{{ title.trim() || '未填写' }}</text>
+        <text class="summary-line">
+          附件状态：{{ attachments.length ? `已上传 ${attachments.length} 个` : '暂无附件' }}
+        </text>
+      </view>
+
+      <view class="footer-spacer" />
+
+      <view class="footer safe-area-inset-bottom">
+        <view class="footer-meta">
+          <text class="footer-title">{{ draftId ? '草稿已建立' : '先保存草稿后可上传附件' }}</text>
+          <text class="footer-desc">{{ footerHint }}</text>
+        </view>
+        <view class="footer-actions">
+          <button v-if="!draftId" size="mini" @tap="onReset">重选</button>
+          <button size="mini" :loading="saving" @tap="onSave">
           {{ draftId ? '保存修改' : '保存草稿' }}
-        </button>
-        <button size="mini" type="primary" :loading="submitting" @tap="onSubmit">
-          {{ submitButtonText }}
-        </button>
+          </button>
+          <button size="mini" :type="UNI_BUTTON_TYPE.primary" :loading="submitting" @tap="onSubmit">
+            {{ submitButtonText }}
+          </button>
+        </view>
       </view>
     </view>
   </view>
@@ -110,6 +133,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import DynamicForm from '@/components/DynamicForm.vue'
+import { UNI_BUTTON_TYPE } from '@/utils/uni-button'
 import {
   createRequest,
   getRequestCategoryLabel,
@@ -143,6 +167,7 @@ const dynamicFormRef = ref<InstanceType<typeof DynamicForm> | null>(null)
 const saving = ref(false)
 const submitting = ref(false)
 const uploading = ref(false)
+const formErrors = ref<string[]>([])
 
 const attachmentStepDone = computed(() => {
   if (!activeType.value || !draftId.value) return false
@@ -168,8 +193,26 @@ const attachmentHint = computed(() => {
   return `当前已上传 ${attachments.value.length} 个附件。`
 })
 
+const footerHint = computed(() => {
+  if (!activeType.value) return ''
+  if (!draftId.value) return '保存后可上传附件，提交前会再次确认摘要。'
+  if (activeType.value.attachment_required && !attachments.value.length) {
+    return '该类型必须上传附件后才能提交。'
+  }
+  return draftStatus.value === 'REJECTED' ? '确认已按驳回意见修改后再重新提交。' : '提交后将进入审批流。'
+})
+
 function categoryLabel(category: string) {
   return getRequestCategoryLabel(category)
+}
+
+function typeIcon(code: string, category: string) {
+  if (category === 'CERTIFICATE' || code.includes('CERT')) return '证'
+  if (code.includes('GRADE') || code.includes('SCORE')) return '绩'
+  if (code.includes('SCHOLAR') || code.includes('HONOR')) return '奖'
+  if (code.includes('DORM')) return '宿'
+  if (code.includes('LEAVE')) return '假'
+  return '事'
 }
 
 function statusLabel(status: string) {
@@ -196,6 +239,11 @@ function resetDraftState() {
   draftId.value = null
   draftStatus.value = null
   draftDetail.value = null
+  formErrors.value = []
+}
+
+function setFormErrors(errors: string[]) {
+  formErrors.value = Array.from(new Set(errors.filter(Boolean)))
 }
 
 function syncDraftDetail(detail: RequestDetail) {
@@ -249,14 +297,18 @@ function onReset() {
 }
 
 function validateForm() {
+  const errors: string[] = []
   if (!activeType.value) return false
   if (!title.value.trim()) {
-    uni.showToast({ title: '请输入申请标题', icon: 'none' })
-    return false
+    errors.push('请输入申请标题。')
   }
   const { ok } = dynamicFormRef.value?.validate() ?? { ok: true }
   if (!ok) {
-    uni.showToast({ title: '请完善必填字段', icon: 'none' })
+    errors.push('请完善动态表单中的必填字段。')
+  }
+  setFormErrors(errors)
+  if (errors.length) {
+    uni.showToast({ title: errors[0], icon: 'none' })
     return false
   }
   return true
@@ -264,10 +316,33 @@ function validateForm() {
 
 function validateRequiredAttachments() {
   if (activeType.value?.attachment_required && attachments.value.length === 0) {
+    setFormErrors(['请先上传该事务类型要求的必填附件。'])
     uni.showToast({ title: '请先上传必填附件', icon: 'none' })
     return false
   }
+  setFormErrors([])
   return true
+}
+
+async function confirmSubmit() {
+  if (!activeType.value) return false
+  const content = [
+    `事务类型：${activeType.value.name}`,
+    `申请标题：${title.value.trim()}`,
+    `附件数量：${attachments.value.length}`,
+    draftStatus.value === 'REJECTED' ? '本次将重新提交申请。' : '提交后将进入审批流程。',
+  ].join('\n')
+  const result = await new Promise<{ confirm: boolean; cancel?: boolean }>((resolve) => {
+    uni.showModal({
+      title: '确认提交申请',
+      content,
+      confirmText: draftStatus.value === 'REJECTED' ? '重新提交' : '提交',
+      cancelText: '再检查',
+      success: resolve,
+      fail: () => resolve({ confirm: false, cancel: true }),
+    })
+  })
+  return result.confirm
 }
 
 async function persistDraft(showSuccess: boolean) {
@@ -285,6 +360,7 @@ async function persistDraft(showSuccess: boolean) {
     })
     : await updateRequest(draftId.value, payload)
   syncDraftDetail(resp.data)
+  setFormErrors([])
   if (showSuccess) {
     uni.showToast({ title: isNewDraft ? '草稿已保存' : '修改已保存' })
   }
@@ -341,10 +417,12 @@ async function onUploadAttachment() {
 
 async function onSubmit() {
   if (draftId.value == null) {
+    setFormErrors(['请先保存草稿，再上传附件或提交申请。'])
     uni.showToast({ title: '请先保存草稿', icon: 'none' })
     return
   }
   if (!validateRequiredAttachments()) return
+  if (!(await confirmSubmit())) return
 
   submitting.value = true
   try {
@@ -376,49 +454,81 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.container { padding: 24rpx; }
-.section-title { display: block; font-size: 28rpx; font-weight: 600; margin-bottom: 16rpx; }
+.container {
+  min-height: 100vh;
+  padding: 24rpx;
+  background: #f8f3f4;
+}
+.section-title { display: block; font-size: 30rpx; font-weight: 800; margin-bottom: 18rpx; color: #202124; }
+
+.type-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
 
 .type-item {
+  width: calc((100% - 16rpx) / 2);
   background: #fff;
-  padding: 24rpx;
-  border-radius: 12rpx;
+  padding: 22rpx 16rpx;
+  border-radius: 18rpx;
+  margin-bottom: 0;
+  border: 1rpx solid #f0e2e5;
+  box-shadow: var(--shadow-soft);
+}
+.type-icon {
+  width: 62rpx;
+  height: 62rpx;
+  border-radius: 16rpx;
+  background: #fff1f2;
+  color: #b70f24;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  font-weight: 800;
   margin-bottom: 16rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
 }
 .type-head { display: flex; justify-content: space-between; align-items: center; }
-.type-name { font-size: 30rpx; font-weight: 600; color: #333; }
+.type-name { font-size: 28rpx; font-weight: 800; color: #333; }
 .type-cat {
+  display: inline-flex;
+  margin-top: 10rpx;
   font-size: 22rpx;
-  color: #7f1722;
-  background: #fff1f0;
-  padding: 2rpx 12rpx;
-  border-radius: 4rpx;
+  color: #b70f24;
+  background: #fff1f2;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
 }
-.type-desc { display: block; font-size: 26rpx; color: #666; margin-top: 8rpx; }
+.type-desc { display: block; font-size: 24rpx; color: #666; margin-top: 10rpx; line-height: 1.5; }
 .type-meta { display: block; font-size: 22rpx; color: #999; margin-top: 6rpx; }
 
 .empty { text-align: center; padding: 80rpx 0; color: #999; font-size: 28rpx; }
 .empty-tiny { text-align: center; padding: 24rpx 0; color: #bbb; font-size: 24rpx; }
 
 .form-wrap {
-  background: #fff;
-  padding: 24rpx;
-  border-radius: 12rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 .form-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 16rpx;
-  margin-bottom: 8rpx;
+  margin-bottom: 12rpx;
+  padding: 24rpx;
+  border-radius: 22rpx;
+  background: #fff;
+  box-shadow: var(--shadow-soft);
+  border: 1rpx solid #f0e2e5;
 }
 .form-head-main { flex: 1; }
 .status-chip {
   font-size: 22rpx;
   padding: 4rpx 14rpx;
-  border-radius: 4rpx;
+  border-radius: 999rpx;
   flex-shrink: 0;
 }
 .status-chip.draft { background: #f5f5f5; color: #666; }
@@ -434,15 +544,18 @@ onMounted(async () => {
   color: #999;
   margin-bottom: 20rpx;
   line-height: 1.5;
+  padding: 0 4rpx 18rpx;
 }
 
 .step-card,
 .section-block,
 .notice-card {
-  background: #fafafa;
-  border-radius: 10rpx;
-  padding: 20rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 24rpx;
   margin-bottom: 20rpx;
+  border: 1rpx solid #f0e2e5;
+  box-shadow: var(--shadow-soft);
 }
 .step-item {
   display: block;
@@ -450,12 +563,18 @@ onMounted(async () => {
   color: #999;
   line-height: 1.8;
 }
-.step-item.done { color: #237804; }
+.step-item.done { color: #16a34a; font-weight: 700; }
 
 .notice-card.warning {
   background: #fff7e6;
   border-left: 8rpx solid #d46b08;
 }
+.notice-card.error {
+  background: #fff1f0;
+  border-left: 8rpx solid #cf1322;
+}
+.notice-card.error .notice-title { color: #a8071a; }
+.notice-card.error .notice-body { color: #820014; }
 .notice-title { display: block; font-size: 26rpx; color: #ad6800; font-weight: 600; }
 .notice-body { display: block; font-size: 24rpx; color: #8c8c8c; margin-top: 8rpx; line-height: 1.6; }
 
@@ -464,10 +583,12 @@ onMounted(async () => {
 .required { color: #ff4d4f; margin-left: 6rpx; }
 .input,
 .textarea {
-  background: #f7f7f7;
-  border-radius: 8rpx;
-  padding: 14rpx 16rpx;
+  background: #fff;
+  border: 1rpx solid #f0e2e5;
+  border-radius: 16rpx;
+  padding: 18rpx 18rpx;
   font-size: 26rpx;
+  box-shadow: inset 0 2rpx 8rpx rgba(82,28,38,0.03);
 }
 .textarea { min-height: 140rpx; }
 
@@ -501,11 +622,68 @@ onMounted(async () => {
 }
 .att-meta { color: #999; font-size: 22rpx; }
 
-.footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12rpx;
+.submit-summary {
+  background: linear-gradient(135deg, #fff8f1 0%, #fff 52%, #fff1f2 100%);
+  border: 1rpx solid #f0d5da;
+  border-radius: 20rpx;
+  padding: 24rpx;
   margin-top: 24rpx;
-  flex-wrap: wrap;
+  box-shadow: var(--shadow-soft);
+}
+.summary-title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #7f1722;
+  margin-bottom: 10rpx;
+}
+.summary-line {
+  display: block;
+  font-size: 24rpx;
+  color: #595959;
+  line-height: 1.7;
+}
+.footer-spacer { height: 180rpx; }
+.footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18rpx;
+  padding: 18rpx 24rpx calc(18rpx + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1rpx solid #f0f0f0;
+  box-shadow: 0 -8rpx 28rpx rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+  backdrop-filter: blur(12rpx);
+}
+.footer-meta { flex: 1; min-width: 0; }
+.footer-title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #333;
+}
+.footer-desc {
+  display: block;
+  font-size: 22rpx;
+  color: #8c8c8c;
+  margin-top: 4rpx;
+  line-height: 1.4;
+}
+.footer-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.footer-actions button {
+  min-width: 136rpx;
+  border-radius: 999rpx;
 }
 </style>

@@ -5,12 +5,15 @@
     <template v-else-if="detail">
       <view class="head-card">
         <view class="head-row">
+          <view class="head-icon">文</view>
+          <view class="head-main">
           <text class="title">{{ detail.title }}</text>
+          <text class="meta">编号：{{ detail.request_no }}</text>
+          </view>
           <text class="status" :class="detail.status.toLowerCase()">
             {{ statusLabel(detail.status) }}
           </text>
         </view>
-        <text class="meta">编号：{{ detail.request_no }}</text>
         <text class="meta">类型：{{ detail.type_name }} · {{ categoryLabel(detail.category) }}</text>
         <text v-if="detail.submitted_at" class="meta">
           提交时间：{{ fmt(detail.submitted_at) }}
@@ -31,7 +34,7 @@
           <text class="section-title">证明文件</text>
           <button
             size="mini"
-            type="primary"
+            :type="UNI_BUTTON_TYPE.primary"
             plain
             :disabled="!canPreviewProof"
             :loading="previewing"
@@ -39,6 +42,13 @@
           >
             预览 PDF
           </button>
+        </view>
+        <view class="pdf-card">
+          <view class="pdf-cover">PDF</view>
+          <view class="pdf-copy">
+            <text class="pdf-title">证明材料 PDF 预览</text>
+            <text class="pdf-meta">{{ canPreviewProof ? '审批通过，可在线预览' : '审批通过后开放预览' }}</text>
+          </view>
         </view>
         <text class="section-hint">{{ proofHint }}</text>
       </view>
@@ -79,13 +89,20 @@
       </view>
 
       <view v-if="canEdit || canWithdraw" class="actions">
-        <button v-if="canEdit" size="mini" type="primary" plain @tap="onEdit">
+        <button v-if="canEdit" size="mini" :type="UNI_BUTTON_TYPE.primary" plain @tap="onEdit">
           {{ editButtonText }}
         </button>
-        <button v-if="canWithdraw" type="warn" size="mini" :loading="withdrawing" @tap="onWithdraw">
+        <button
+          v-if="canWithdraw"
+          :type="UNI_BUTTON_TYPE.warn"
+          size="mini"
+          :loading="withdrawing"
+          @tap="onWithdraw"
+        >
           撤回申请
         </button>
       </view>
+      <view v-if="canEdit || canWithdraw" class="bottom-spacer" />
     </template>
 
     <view v-else class="empty">未找到申请记录</view>
@@ -94,6 +111,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { UNI_BUTTON_TYPE } from '@/utils/uni-button'
 import {
   getRequestActionLabel,
   getRequestCategoryLabel,
@@ -264,17 +282,31 @@ onMounted(() => {
 
 .head-card {
   background: #fff;
-  padding: 24rpx;
-  border-radius: 12rpx;
-  margin-bottom: 16rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
+  padding: 26rpx;
+  border-radius: 22rpx;
+  margin-bottom: 18rpx;
+  border: 1rpx solid #f0e2e5;
+  box-shadow: var(--shadow-card);
 }
-.head-row { display: flex; justify-content: space-between; align-items: flex-start; }
-.title { font-size: 32rpx; font-weight: 600; flex: 1; }
+.head-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 18rpx; }
+.head-icon {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 16rpx;
+  background: #b70f24;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  font-weight: 800;
+}
+.head-main { flex: 1; min-width: 0; }
+.title { display: block; font-size: 33rpx; font-weight: 800; flex: 1; line-height: 1.45; }
 .status {
   font-size: 22rpx;
   padding: 4rpx 14rpx;
-  border-radius: 4rpx;
+  border-radius: 999rpx;
   flex-shrink: 0;
   margin-left: 12rpx;
 }
@@ -285,14 +317,15 @@ onMounted(() => {
 .status.rejected { background: #fff1f0; color: #cf1322; }
 .status.withdrawn { background: #f5f5f5; color: #999; }
 .status.offline_handled { background: #fff7e6; color: #d46b08; }
-.meta { display: block; font-size: 24rpx; color: #999; margin-top: 4rpx; }
+.meta { display: block; font-size: 24rpx; color: #8a8f98; margin-top: 8rpx; }
 
 .offline-card {
-  background: #fff7e6;
+  background: #fff7ed;
+  border: 1rpx solid #f6d7aa;
   border-left: 8rpx solid #d46b08;
-  border-radius: 8rpx;
-  padding: 20rpx;
-  margin-bottom: 16rpx;
+  border-radius: 18rpx;
+  padding: 22rpx;
+  margin-bottom: 18rpx;
 }
 .offline-title { display: block; font-size: 28rpx; font-weight: 600; color: #ad6800; }
 .offline-body { display: block; font-size: 26rpx; color: #333; margin-top: 8rpx; line-height: 1.6; }
@@ -301,8 +334,10 @@ onMounted(() => {
 .section {
   background: #fff;
   padding: 24rpx;
-  border-radius: 12rpx;
-  margin-bottom: 16rpx;
+  border-radius: 22rpx;
+  margin-bottom: 18rpx;
+  border: 1rpx solid #f0e2e5;
+  box-shadow: var(--shadow-soft);
 }
 .section-head {
   display: flex;
@@ -310,7 +345,7 @@ onMounted(() => {
   align-items: center;
   gap: 16rpx;
 }
-.section-title { display: block; font-size: 28rpx; font-weight: 600; margin-bottom: 16rpx; }
+.section-title { display: block; font-size: 30rpx; font-weight: 800; margin-bottom: 16rpx; color: #b70f24; }
 .section-hint {
   display: block;
   font-size: 24rpx;
@@ -319,14 +354,41 @@ onMounted(() => {
 }
 
 .summary {
-  background: #fafafa;
+  background: #fff8f9;
   padding: 16rpx;
-  border-radius: 8rpx;
+  border-radius: 14rpx;
   font-size: 26rpx;
   color: #333;
   line-height: 1.6;
   margin-bottom: 16rpx;
 }
+
+.pdf-card {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  padding: 18rpx;
+  border: 1rpx solid #f0e2e5;
+  border-radius: 16rpx;
+  margin-bottom: 16rpx;
+}
+
+.pdf-cover {
+  width: 96rpx;
+  height: 112rpx;
+  border-radius: 12rpx;
+  background: linear-gradient(135deg, #ef4444, #b70f24);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  font-weight: 800;
+}
+
+.pdf-copy { flex: 1; }
+.pdf-title { display: block; font-size: 28rpx; font-weight: 800; color: #202124; }
+.pdf-meta { display: block; margin-top: 8rpx; font-size: 23rpx; color: #8a8f98; }
 
 .info-row {
   display: flex;
@@ -369,10 +431,27 @@ onMounted(() => {
 .record-operator { display: block; font-size: 22rpx; color: #999; margin-top: 4rpx; }
 
 .actions {
-  margin-top: 24rpx;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  margin-top: 0;
+  padding: 18rpx 24rpx calc(18rpx + env(safe-area-inset-bottom));
+  background: rgba(255,255,255,0.98);
+  border-top: 1rpx solid #f0e2e5;
   display: flex;
   justify-content: center;
   gap: 16rpx;
   flex-wrap: wrap;
+  box-shadow: 0 -8rpx 28rpx rgba(82,28,38,0.08);
 }
+
+.actions button {
+  flex: 1;
+  min-width: 220rpx;
+  border-radius: 999rpx;
+}
+
+.bottom-spacer { height: 132rpx; }
 </style>

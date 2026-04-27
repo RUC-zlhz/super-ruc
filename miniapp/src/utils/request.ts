@@ -18,14 +18,15 @@ export function setToken(token: string | null) {
 
 export function request<T>(
   url: string,
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' = 'GET',
   data?: any,
 ): Promise<ApiEnvelope<T>> {
   return new Promise((resolve, reject) => {
     const token = getToken()
     uni.request({
       url: `${BASE_URL}${url}`,
-      method,
+      // uni-app runtime accepts PATCH here, but the shipped type definition does not.
+      method: method as 'GET' | 'POST' | 'PUT' | 'DELETE',
       data,
       header: {
         'Content-Type': 'application/json',

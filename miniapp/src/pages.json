@@ -1,28 +1,28 @@
 {
   "pages": [
-    { "path": "pages/index/index", "style": { "navigationBarTitleText": "综合服务" } },
-    { "path": "pages/knowledge/index", "style": { "navigationBarTitleText": "知识查询" } },
-    { "path": "pages/workflow/index", "style": { "navigationBarTitleText": "党团进度" } },
-    { "path": "pages/workflow/detail", "style": { "navigationBarTitleText": "流程详情" } },
-    { "path": "pages/workflow/quiz", "style": { "navigationBarTitleText": "理论自测" } },
-    { "path": "pages/request/index", "style": { "navigationBarTitleText": "事务申请" } },
-    { "path": "pages/request/create", "style": { "navigationBarTitleText": "发起申请" } },
-    { "path": "pages/request/detail", "style": { "navigationBarTitleText": "申请详情" } },
-    { "path": "pages/notice/index", "style": { "navigationBarTitleText": "通知中心" } },
-    { "path": "pages/notice/detail", "style": { "navigationBarTitleText": "通知详情" } },
-    { "path": "pages/academic/index", "style": { "navigationBarTitleText": "学业查看" } },
-    { "path": "pages/honor/index", "style": { "navigationBarTitleText": "荣誉榜" } },
-    { "path": "pages/profile/index", "style": { "navigationBarTitleText": "我的" } }
+    { "path": "pages/index/index", "style": { "navigationBarTitleText": "首页", "navigationBarBackgroundColor": "#b70f24", "navigationBarTextStyle": "white" } },
+    { "path": "pages/knowledge/index", "style": { "navigationBarTitleText": "知识查询", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black" } },
+    { "path": "pages/workflow/index", "style": { "navigationBarTitleText": "党团进度列表", "navigationBarBackgroundColor": "#b70f24", "navigationBarTextStyle": "white" } },
+    { "path": "pages/workflow/detail", "style": { "navigationBarTitleText": "党团进度详情", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black" } },
+    { "path": "pages/workflow/quiz", "style": { "navigationBarTitleText": "理论自测", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black" } },
+    { "path": "pages/request/index", "style": { "navigationBarTitleText": "事务申请", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black" } },
+    { "path": "pages/request/create", "style": { "navigationBarTitleText": "发起申请", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black" } },
+    { "path": "pages/request/detail", "style": { "navigationBarTitleText": "申请详情", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black" } },
+    { "path": "pages/notice/index", "style": { "navigationBarTitleText": "通知中心", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black" } },
+    { "path": "pages/notice/detail", "style": { "navigationBarTitleText": "通知详情", "navigationBarBackgroundColor": "#b70f24", "navigationBarTextStyle": "white" } },
+    { "path": "pages/academic/index", "style": { "navigationBarTitleText": "学业查看", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black" } },
+    { "path": "pages/honor/index", "style": { "navigationBarTitleText": "荣誉榜", "navigationBarBackgroundColor": "#fff4f5", "navigationBarTextStyle": "black" } },
+    { "path": "pages/profile/index", "style": { "navigationBarTitleText": "我的/画像", "navigationBarBackgroundColor": "#b70f24", "navigationBarTextStyle": "white" } }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "white",
     "navigationBarTitleText": "信息学院综合服务",
-    "navigationBarBackgroundColor": "#7f1722",
-    "backgroundColor": "#f5f5f5"
+    "navigationBarBackgroundColor": "#b70f24",
+    "backgroundColor": "#f8f3f4"
   },
   "tabBar": {
     "color": "#999",
-    "selectedColor": "#7f1722",
+    "selectedColor": "#b70f24",
     "borderStyle": "white",
     "list": [
       { "pagePath": "pages/index/index", "text": "首页", "iconPath": "static/tab-home.png", "selectedIconPath": "static/tab-home-active.png" },
