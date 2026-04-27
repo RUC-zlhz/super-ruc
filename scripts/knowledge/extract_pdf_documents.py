@@ -4,6 +4,8 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
+import subprocess
 import sys
 from collections.abc import Iterable
 from datetime import UTC, datetime
@@ -34,7 +36,8 @@ HEADING_RE = re.compile(
 )
 
 SENTENCE_ENDINGS = tuple("。！？；;:：）)]】》")
-PRINT_HEADER_RE = re.compile(r"^\d{4}/\d{1,2}/\d{1,2}\s+\d{1,2}:\d{2}\s+")
+PRINT_HEADER_RE = re.compile(r"^\d{4}/\d{1,2}/\d{1,2}\s*\d{1,2}:\d{2}(?:\s+.*)?$")
+ARTICLE_HEADER_RE = re.compile(r'^[“"]?五个阶段\s*15\s*个步骤[”"]?发展团员工作流程来啦！$')
 URL_RE = re.compile(r"https?://\S+")
 
 
@@ -71,6 +74,23 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--no-tables",
         action="store_true",
         help="Skip pdfplumber table extraction.",
+    )
+    parser.add_argument(
+        "--ocr",
+        action="store_true",
+        help="Run RapidOCR on image-heavy pages with little usable text.",
+    )
+    parser.add_argument(
+        "--ocr-dpi",
+        default=200,
+        type=int,
+        help="Render DPI for OCR pages.",
+    )
+    parser.add_argument(
+        "--ocr-min-content-chars",
+        default=30,
+        type=int,
+        help="OCR image-heavy pages whose cleaned text is shorter than this threshold.",
     )
     return parser.parse_args(argv)
 
@@ -129,7 +149,11 @@ def strip_print_noise(text: str) -> str:
             continue
         if PRINT_HEADER_RE.match(stripped):
             continue
+        if ARTICLE_HEADER_RE.match(stripped):
+            continue
         if re.fullmatch(r"\d+/\d+", stripped):
+            continue
+        if re.fullmatch(r"[口□]+", stripped):
             continue
         content_lines.append(stripped)
     return "\n".join(content_lines)
@@ -192,6 +216,75 @@ def clean_metadata(metadata: Any) -> dict[str, str]:
     return result
 
 
+class OcrRunner:
+    def __init__(self, dpi: int) -> None:
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+        except ImportError as exc:  # pragma: no cover - depends on optional CLI extras.
+            raise SystemExit(
+                "Missing OCR dependency. Run with:\n"
+                "$env:UV_CACHE_DIR='D:\\Codes\\super-ruc\\.uv-cache'\n"
+                "uv run --project backend --no-sync --with pypdf --with pdfplumber "
+                "--with rapidocr-onnxruntime --with pillow "
+                "python scripts\\knowledge\\extract_pdf_documents.py data "
+                "--output-dir output\\pdf\\extracted --ocr"
+            ) from exc
+        pdftoppm = shutil.which("pdftoppm")
+        if pdftoppm is None:
+            raise SystemExit("OCR requires pdftoppm to render PDF pages, but pdftoppm was not found on PATH.")
+        self.engine = RapidOCR()
+        self.pdftoppm = pdftoppm
+        self.dpi = dpi
+
+    def extract_page(self, pdf_path: Path, page_number: int, work_dir: Path) -> dict[str, Any]:
+        prefix = work_dir / f"page-{page_number}"
+        command = [
+            self.pdftoppm,
+            "-f",
+            str(page_number),
+            "-l",
+            str(page_number),
+            "-r",
+            str(self.dpi),
+            "-png",
+            str(pdf_path),
+            str(prefix),
+        ]
+        try:
+            subprocess.run(command, check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as exc:
+            detail = (exc.stderr or exc.stdout or str(exc)).strip()
+            raise RuntimeError(f"pdftoppm failed for page {page_number}: {detail}") from exc
+        rendered_images = sorted(work_dir.glob(f"{prefix.name}-*.png"))
+        if not rendered_images:
+            raise RuntimeError(f"pdftoppm rendered no image for page {page_number}")
+        image_path = rendered_images[-1]
+        result, elapsed = self.engine(str(image_path))
+        lines: list[dict[str, Any]] = []
+        for item in result or []:
+            bbox, text, confidence = item[0], item[1], item[2]
+            normalized = normalize_text(str(text))
+            if not normalized:
+                continue
+            lines.append(
+                {
+                    "text": normalized,
+                    "confidence": float(confidence),
+                    "bbox": [[float(x), float(y)] for x, y in bbox],
+                }
+            )
+        raw_text = "\n".join(line["text"] for line in lines)
+        return {
+            "engine": "rapidocr_onnxruntime",
+            "dpi": self.dpi,
+            "elapsed": elapsed,
+            "line_count": len(lines),
+            "lines": lines,
+            "text": raw_text,
+            "content_text": strip_print_noise(raw_text),
+        }
+
+
 def chunk_paragraphs(pages: list[dict[str, Any]], max_chars: int) -> list[dict[str, Any]]:
     chunks: list[dict[str, Any]] = []
     current_parts: list[str] = []
@@ -251,13 +344,29 @@ def chunk_paragraphs(pages: list[dict[str, Any]], max_chars: int) -> list[dict[s
     return chunks
 
 
-def extract_pdf(path: Path, *, max_chars: int, limit_pages: int | None, extract_tables: bool) -> dict[str, Any]:
+def extract_pdf(
+    path: Path,
+    *,
+    max_chars: int,
+    limit_pages: int | None,
+    extract_tables: bool,
+    ocr: bool,
+    ocr_dpi: int,
+    ocr_min_content_chars: int,
+) -> dict[str, Any]:
     content_hash = sha256_file(path)
     reader = PdfReader(str(path))
     page_count = len(reader.pages)
     warnings: list[str] = []
     pages: list[dict[str, Any]] = []
     pages_to_extract = min(page_count, limit_pages) if limit_pages else page_count
+    ocr_runner = OcrRunner(ocr_dpi) if ocr else None
+    ocr_work_dir: Path | None = None
+    if ocr_runner:
+        ocr_root = Path("tmp/pdfs/pdf-ocr").resolve()
+        ocr_root.mkdir(parents=True, exist_ok=True)
+        ocr_work_dir = ocr_root / f"{safe_output_stem(path, content_hash)}-ocr"
+        ocr_work_dir.mkdir(parents=True, exist_ok=True)
 
     with pdfplumber.open(str(path)) as pdf:
         for index, page in enumerate(pdf.pages[:pages_to_extract], start=1):
@@ -265,6 +374,7 @@ def extract_pdf(path: Path, *, max_chars: int, limit_pages: int | None, extract_
             text = normalize_text(page.extract_text(x_tolerance=1.5, y_tolerance=4, layout=False))
             content_text = strip_print_noise(text)
             image_count = len(page.images or [])
+            ocr_payload: dict[str, Any] = {"applied": False}
             tables: list[list[list[str]]] = []
             if extract_tables:
                 try:
@@ -272,9 +382,20 @@ def extract_pdf(path: Path, *, max_chars: int, limit_pages: int | None, extract_
                     tables = [table for table in tables if is_meaningful_table(table)]
                 except Exception as exc:  # noqa: BLE001 - keep extraction resilient per page.
                     page_warnings.append(f"table extraction failed: {exc}")
-            if not text:
+            needs_ocr = not text or (image_count > 0 and len(content_text) < ocr_min_content_chars)
+            if needs_ocr and ocr_runner and ocr_work_dir:
+                try:
+                    ocr_payload = {"applied": True, **ocr_runner.extract_page(path, index, ocr_work_dir)}
+                    if ocr_payload["content_text"]:
+                        content_text = str(ocr_payload["content_text"])
+                    else:
+                        page_warnings.append("OCR returned no usable text; OCR may be required")
+                except Exception as exc:  # noqa: BLE001 - keep extraction resilient per page.
+                    ocr_payload = {"applied": False, "error": str(exc)}
+                    page_warnings.append(f"OCR failed: {exc}; OCR may be required")
+            elif not text:
                 page_warnings.append("no text extracted; OCR may be required")
-            elif image_count > 0 and len(content_text) < 30:
+            elif needs_ocr:
                 page_warnings.append("limited text extracted from image-heavy page; OCR may be required")
             pages.append(
                 {
@@ -286,6 +407,7 @@ def extract_pdf(path: Path, *, max_chars: int, limit_pages: int | None, extract_
                     "content_text": content_text,
                     "paragraphs": paragraphize(content_text),
                     "tables": tables,
+                    "ocr": ocr_payload,
                     "warnings": page_warnings,
                 }
             )
@@ -298,7 +420,7 @@ def extract_pdf(path: Path, *, max_chars: int, limit_pages: int | None, extract_
     full_text = "\n\n".join(page["content_text"] for page in pages if page["content_text"]).strip()
     chunks = chunk_paragraphs(pages, max_chars=max_chars)
     return {
-        "schema_version": "super-ruc.pdf_document_extract.v1",
+        "schema_version": "super-ruc.pdf_document_extract.v2",
         "source": {
             "path": str(path),
             "filename": path.name,
@@ -309,6 +431,12 @@ def extract_pdf(path: Path, *, max_chars: int, limit_pages: int | None, extract_
         "extraction": {
             "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "engines": ["pypdf", "pdfplumber"],
+            "ocr": {
+                "enabled": bool(ocr_runner),
+                "engine": "rapidocr_onnxruntime" if ocr_runner else None,
+                "dpi": ocr_dpi if ocr_runner else None,
+                "min_content_chars": ocr_min_content_chars,
+            },
             "page_count": page_count,
             "pages_extracted": pages_to_extract,
             "table_extraction": extract_tables,
@@ -317,9 +445,17 @@ def extract_pdf(path: Path, *, max_chars: int, limit_pages: int | None, extract_
         "statistics": {
             "raw_text_char_count": len(raw_full_text),
             "text_char_count": len(full_text),
+            "ocr_text_char_count": sum(
+                len(page["ocr"].get("content_text", ""))
+                for page in pages
+                if page.get("ocr", {}).get("applied")
+            ),
             "chunk_count": len(chunks),
             "table_count": sum(len(page["tables"]) for page in pages),
             "pages_without_text": [page["page_number"] for page in pages if not page["text"]],
+            "pages_with_ocr": [
+                page["page_number"] for page in pages if page.get("ocr", {}).get("applied")
+            ],
             "pages_requiring_ocr": [
                 page["page_number"]
                 for page in pages
@@ -360,6 +496,7 @@ def write_markdown(document: dict[str, Any], path: Path) -> None:
         f"- Pages: `{extraction['pages_extracted']} / {extraction['page_count']}`",
         f"- Text characters: `{stats['text_char_count']}`",
         f"- Raw text characters: `{stats['raw_text_char_count']}`",
+        f"- OCR text characters: `{stats['ocr_text_char_count']}`",
         f"- Chunks: `{stats['chunk_count']}`",
         f"- Tables: `{stats['table_count']}`",
         "",
@@ -370,6 +507,13 @@ def write_markdown(document: dict[str, Any], path: Path) -> None:
         lines.append("")
     for page in document["pages"]:
         lines.extend([f"## Page {page['page_number']}", ""])
+        if page.get("ocr", {}).get("applied"):
+            lines.extend(
+                [
+                    f"_OCR applied: `{page['ocr']['engine']}`, lines `{page['ocr']['line_count']}`._",
+                    "",
+                ]
+            )
         lines.append(page["content_text"] or "_No content text extracted._")
         lines.append("")
         for table_index, table in enumerate(page["tables"], start=1):
@@ -400,15 +544,17 @@ def write_outputs(documents: list[dict[str, Any]], output_dir: Path) -> dict[str
                 "pages_extracted": document["extraction"]["pages_extracted"],
                 "raw_text_char_count": document["statistics"]["raw_text_char_count"],
                 "text_char_count": document["statistics"]["text_char_count"],
+                "ocr_text_char_count": document["statistics"]["ocr_text_char_count"],
                 "chunk_count": document["statistics"]["chunk_count"],
                 "table_count": document["statistics"]["table_count"],
                 "pages_without_text": document["statistics"]["pages_without_text"],
+                "pages_with_ocr": document["statistics"]["pages_with_ocr"],
                 "pages_requiring_ocr": document["statistics"]["pages_requiring_ocr"],
                 "warnings": document["extraction"]["warnings"],
             }
         )
     manifest = {
-        "schema_version": "super-ruc.pdf_extract_manifest.v1",
+        "schema_version": "super-ruc.pdf_extract_manifest.v2",
         "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "document_count": len(manifest_docs),
         "documents": manifest_docs,
@@ -429,6 +575,9 @@ def main(argv: list[str] | None = None) -> int:
             max_chars=args.max_chars,
             limit_pages=args.limit_pages,
             extract_tables=not args.no_tables,
+            ocr=args.ocr,
+            ocr_dpi=args.ocr_dpi,
+            ocr_min_content_chars=args.ocr_min_content_chars,
         )
         for path in pdfs
     ]
@@ -442,7 +591,10 @@ def main(argv: list[str] | None = None) -> int:
                 "source_filename": item["source_filename"],
                 "pages_extracted": item["pages_extracted"],
                 "text_char_count": item["text_char_count"],
+                "ocr_text_char_count": item["ocr_text_char_count"],
                 "chunk_count": item["chunk_count"],
+                "ocr_pages": item["pages_with_ocr"],
+                "pages_requiring_ocr": item["pages_requiring_ocr"],
                 "warnings": len(item["warnings"]),
             }
             for item in manifest["documents"]

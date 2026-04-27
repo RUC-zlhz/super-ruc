@@ -1,6 +1,6 @@
 {
-  "schema_version": "super-ruc.pdf_extract_manifest.v1",
-  "generated_at": "2026-04-27T09:50:47.241758Z",
+  "schema_version": "super-ruc.pdf_extract_manifest.v2",
+  "generated_at": "2026-04-27T10:39:09.330850Z",
   "document_count": 4,
   "documents": [
     {
@@ -12,11 +12,12 @@
       "page_count": 25,
       "pages_extracted": 25,
       "raw_text_char_count": 9729,
-      "text_char_count": 5531,
-      "chunk_count": 6,
+      "text_char_count": 8925,
+      "ocr_text_char_count": 3366,
+      "chunk_count": 8,
       "table_count": 0,
       "pages_without_text": [],
-      "pages_requiring_ocr": [
+      "pages_with_ocr": [
         2,
         3,
         4,
@@ -32,22 +33,8 @@
         14,
         15
       ],
-      "warnings": [
-        "page 2: limited text extracted from image-heavy page; OCR may be required",
-        "page 3: limited text extracted from image-heavy page; OCR may be required",
-        "page 4: limited text extracted from image-heavy page; OCR may be required",
-        "page 5: limited text extracted from image-heavy page; OCR may be required",
-        "page 6: limited text extracted from image-heavy page; OCR may be required",
-        "page 7: limited text extracted from image-heavy page; OCR may be required",
-        "page 8: limited text extracted from image-heavy page; OCR may be required",
-        "page 9: limited text extracted from image-heavy page; OCR may be required",
-        "page 10: limited text extracted from image-heavy page; OCR may be required",
-        "page 11: limited text extracted from image-heavy page; OCR may be required",
-        "page 12: limited text extracted from image-heavy page; OCR may be required",
-        "page 13: limited text extracted from image-heavy page; OCR may be required",
-        "page 14: limited text extracted from image-heavy page; OCR may be required",
-        "page 15: limited text extracted from image-heavy page; OCR may be required"
-      ]
+      "pages_requiring_ocr": [],
+      "warnings": []
     },
     {
       "source_filename": "关于印发《中国人民大学学生违纪处分管理办.pdf",
@@ -59,9 +46,11 @@
       "pages_extracted": 22,
       "raw_text_char_count": 9993,
       "text_char_count": 9993,
+      "ocr_text_char_count": 0,
       "chunk_count": 9,
       "table_count": 0,
       "pages_without_text": [],
+      "pages_with_ocr": [],
       "pages_requiring_ocr": [],
       "warnings": []
     },
@@ -75,9 +64,11 @@
       "pages_extracted": 19,
       "raw_text_char_count": 8926,
       "text_char_count": 8926,
+      "ocr_text_char_count": 0,
       "chunk_count": 8,
       "table_count": 0,
       "pages_without_text": [],
+      "pages_with_ocr": [],
       "pages_requiring_ocr": [],
       "warnings": []
     },
@@ -91,9 +82,11 @@
       "pages_extracted": 19,
       "raw_text_char_count": 9724,
       "text_char_count": 9724,
+      "ocr_text_char_count": 0,
       "chunk_count": 9,
       "table_count": 0,
       "pages_without_text": [],
+      "pages_with_ocr": [],
       "pages_requiring_ocr": [],
       "warnings": []
     }

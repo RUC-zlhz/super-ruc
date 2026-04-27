@@ -1,5 +1,5 @@
 {
-  "schema_version": "super-ruc.pdf_document_extract.v1",
+  "schema_version": "super-ruc.pdf_document_extract.v2",
   "source": {
     "path": "D:\\Codes\\super-ruc\\data\\关于印发《中国人民大学学生违纪处分管理办.pdf",
     "filename": "关于印发《中国人民大学学生违纪处分管理办.pdf",
@@ -14,11 +14,17 @@
     "Author": "XiaRui"
   },
   "extraction": {
-    "generated_at": "2026-04-27T09:50:46.349724Z",
+    "generated_at": "2026-04-27T10:39:07.775398Z",
     "engines": [
       "pypdf",
       "pdfplumber"
     ],
+    "ocr": {
+      "enabled": true,
+      "engine": "rapidocr_onnxruntime",
+      "dpi": 200,
+      "min_content_chars": 30
+    },
     "page_count": 22,
     "pages_extracted": 22,
     "table_extraction": true,
@@ -27,9 +33,11 @@
   "statistics": {
     "raw_text_char_count": 9993,
     "text_char_count": 9993,
+    "ocr_text_char_count": 0,
     "chunk_count": 9,
     "table_count": 0,
     "pages_without_text": [],
+    "pages_with_ocr": [],
     "pages_requiring_ocr": []
   },
   "pages": [
@@ -46,6 +54,9 @@
         "签中国人民大学章 2024 年 8 月 20 日"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -69,6 +80,9 @@
         "（四）留校察看，12 个月；"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -92,6 +106,9 @@
         "（三）教唆、胁迫、诱骗他人违纪，或在共同违纪中起主要 — 3 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -119,6 +136,9 @@
         "第九条 对于违纪情节轻微，且具有本办法第八条情形之一 — 4 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -141,6 +161,9 @@
         "第十五条 违反保密制度、泄露国家秘密，或公开、传播属 — 5 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -159,6 +182,9 @@
         "第二十条 饮酒后在校园内驾驶机动车，或醉酒在校园内驾 — 6 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -179,6 +205,9 @@
         "第二十六条 组织、成立非法团体或组织的，或组织、参与非法宗教活动、邪教活动、封建迷信活动、传销活动等非法活动 — 7 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -197,6 +226,9 @@
         "— 8 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -218,6 +250,9 @@
         "— 9 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -239,6 +274,9 @@
         "— 10 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -266,6 +304,9 @@
         "（三）考试开始信号发出前答题或者考试结束信号发出后继 — 11 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -293,6 +334,9 @@
         "— 12 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -318,6 +362,9 @@
         "（三）擅自以学校、学院（系）、书院等机构或学生团体名 — 13 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -340,6 +387,9 @@
         "— 14 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -365,6 +415,9 @@
         "第五十八条 校长办公会议作出留校察看和开除学籍的处分 — 15 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -390,6 +443,9 @@
         "— 16 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -414,6 +470,9 @@
         "— 17 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -441,6 +500,9 @@
         "第六十六条 学生违纪处分主管部门作出拟处分意见，并向学生送达拟处分告知书，告知其作出拟处分意见的事实、理由及依据，告知其享有陈述和申辩的权利。其中，拟对学生作出开除 — 18 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -466,6 +528,9 @@
         "— 19 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -488,6 +553,9 @@
         "第七十四条 申诉予以受理的，学生申诉处理委员会按规定 — 20 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -510,6 +578,9 @@
         "— 21 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -523,6 +594,9 @@
         "报：党委常委中国人民大学党政办公室 2024 年 8 月 24 日印发 — 22 —"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     }
   ],

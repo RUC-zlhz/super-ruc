@@ -1,5 +1,5 @@
 {
-  "schema_version": "super-ruc.pdf_document_extract.v1",
+  "schema_version": "super-ruc.pdf_document_extract.v2",
   "source": {
     "path": "D:\\Codes\\super-ruc\\data\\关于印发《中国人民大学研究生学籍管理规定.pdf",
     "filename": "关于印发《中国人民大学研究生学籍管理规定.pdf",
@@ -14,11 +14,17 @@
     "Producer": "Microsoft® Office Word 2007"
   },
   "extraction": {
-    "generated_at": "2026-04-27T09:50:47.236677Z",
+    "generated_at": "2026-04-27T10:39:09.303557Z",
     "engines": [
       "pypdf",
       "pdfplumber"
     ],
+    "ocr": {
+      "enabled": true,
+      "engine": "rapidocr_onnxruntime",
+      "dpi": 200,
+      "min_content_chars": 30
+    },
     "page_count": 19,
     "pages_extracted": 19,
     "table_extraction": true,
@@ -27,9 +33,11 @@
   "statistics": {
     "raw_text_char_count": 9724,
     "text_char_count": 9724,
+    "ocr_text_char_count": 0,
     "chunk_count": 9,
     "table_count": 0,
     "pages_without_text": [],
+    "pages_with_ocr": [],
     "pages_requiring_ocr": []
   },
   "pages": [
@@ -46,6 +54,9 @@
         "中国人民大学 2019 年 2 月 22 日 - 1 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -67,6 +78,9 @@
         "第五条 应报到入学学生有下列情况之一，按放弃入学资格 - 2 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -88,6 +102,9 @@
         "- 3 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -116,6 +133,9 @@
         "新生入学资格复查工作结束后发现入学资格存在问题应取消学籍的，由所在学院或相关部门提出意见，学生处审核后提请 - 4 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -140,6 +160,9 @@
         "保留入学资格期间不缴纳学费，不具有学籍，不享受在校生待遇，不参评奖助学金，不享受校内生活补贴，学校不提供住宿 - 5 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -159,6 +182,9 @@
         "第十一条 除学校规定的节假日外，注册在校的全日制学生不得擅自长时间离校。确有特殊情况需要离校的，如果涉及缺席 - 6 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -179,6 +205,9 @@
         "如果涉及省份变化，学院审核同意后，学生处会同招生部门联系生源省级招生部门或相关单位协助核查，排除招生录取中的违规行为后再进行审批；如果涉及出生日期变化，学生处会同相关部 - 7 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -199,6 +228,9 @@
         "第十八条 学生如因专业调整、导师变动等原因导致无法在 - 8 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -226,6 +258,9 @@
         "- 9 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -253,6 +288,9 @@
         "第二十三条 其他高校申请转入我校学习的研究生，向拟转 - 10 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -277,6 +315,9 @@
         "- 11 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -303,6 +344,9 @@
         "因身心健康问题办理休学，应由校医院出具诊断证明或意见；因创业原因申请休学，应提交创业计划书和相关资质证明， - 12 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -324,6 +368,9 @@
         "- 13 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -344,6 +391,9 @@
         "经研究生院审批同意，硕士研究生最长学习年限可延长至 5 年；博士研究生最长学习年限可延长至 8 年。博士研究生原则上应在 7 年内完成博士学位论文开题和论文写作，若导师认为其论文未达到相应学位论文水平不予推荐，或者学位论文评阅未通过，培养单位批准延期答辩的，可以申请适当延长学习年限，最多不超过 - 14 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -366,6 +416,9 @@
         "第三十七条 在校学习时间满一年的退学学生，可以发给肄业证书；在校学习时间未满一学年的退学学生，可以开具写实性 - 15 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -391,6 +444,9 @@
         "- 16 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -412,6 +468,9 @@
         "- 17 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -433,6 +492,9 @@
         "- 18 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -450,6 +512,9 @@
         "学校办公室 2019 年 2 月 28 日印发 - 19 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     }
   ],

@@ -1,5 +1,5 @@
 {
-  "schema_version": "super-ruc.pdf_document_extract.v1",
+  "schema_version": "super-ruc.pdf_document_extract.v2",
   "source": {
     "path": "D:\\Codes\\super-ruc\\data\\关于印发《中国人民大学本科生学籍管理规定.pdf",
     "filename": "关于印发《中国人民大学本科生学籍管理规定.pdf",
@@ -14,11 +14,17 @@
     "Producer": "Microsoft® Office Word 2007"
   },
   "extraction": {
-    "generated_at": "2026-04-27T09:50:46.739941Z",
+    "generated_at": "2026-04-27T10:39:08.485384Z",
     "engines": [
       "pypdf",
       "pdfplumber"
     ],
+    "ocr": {
+      "enabled": true,
+      "engine": "rapidocr_onnxruntime",
+      "dpi": 200,
+      "min_content_chars": 30
+    },
     "page_count": 19,
     "pages_extracted": 19,
     "table_extraction": true,
@@ -27,9 +33,11 @@
   "statistics": {
     "raw_text_char_count": 8926,
     "text_char_count": 8926,
+    "ocr_text_char_count": 0,
     "chunk_count": 8,
     "table_count": 0,
     "pages_without_text": [],
+    "pages_with_ocr": [],
     "pages_requiring_ocr": []
   },
   "pages": [
@@ -46,6 +54,9 @@
         "中国人民大学 2019 年 2 月 22 日 - 1 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -65,6 +76,9 @@
         "第四条 按照招生规定被我校录取的新生，应持《中国人民大学录取通知书》和身份证件，按期到校办理入学手续。因故不能按期入学者，应以书面形式向所在学院说明情况并请假，同时附相关证明材料。学院审批后准予请假的，报学生处备案。请假 - 2 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -85,6 +99,9 @@
         "第七条 学校成立新生入学资格复查工作领导小组，由分管 - 3 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -111,6 +128,9 @@
         "- 4 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -135,6 +155,9 @@
         "因参军保留入学资格的，可保留至退役后 2 年；其他原因保 - 5 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -153,6 +176,9 @@
         "全日制学生须本人持学生证和身份证件到校进行电子注册和学生证注册，非全日制学生不便到校进行学籍注册的，可以由学院学籍管理专门人员代为注册。因学院统一安排学期初在外实习或学习，以及经学院或学校批准在境外交流学习而无法在学籍注册期限内履行注册手续的，可以由学院学籍管理专门人员代为 - 6 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -173,6 +199,9 @@
         "- 7 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -192,6 +221,9 @@
         "第十五条 学生在报考后、入学注册学籍前姓名、身份证号、 - 8 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -217,6 +249,9 @@
         "- 9 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -243,6 +278,9 @@
         "- 10 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -267,6 +305,9 @@
         "- 11 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -290,6 +331,9 @@
         "第二十四条 休学学生须办理离校手续。学生休学期间，不缴纳学费和住宿费，学校为其保留学籍，不提供住宿床位，其户口不进行迁移，不享受校内生活补贴等在校学习学生待遇，不参加教学培养活动，不参评奖助学金，公费医疗待遇按国家、北京 - 12 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -310,6 +354,9 @@
         "- 13 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -329,6 +376,9 @@
         "第三十三条 本科生所学专业学制 4 年的，最长学习年限为 6 年；所学专业学制 5 年的，最长学习年限为 7 年；所学专业学 - 14 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -351,6 +401,9 @@
         "- 15 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -374,6 +427,9 @@
         "拟依据第一至第三款予以退学的，由教务处提出建议并征求学生所在学院意见，或者由学生所在学院提出建议报教务处出具 - 16 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -393,6 +449,9 @@
         "第四十二条 退学学生应于退学决定送达或公告之后 30 天 - 17 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -414,6 +473,9 @@
         "- 18 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     },
     {
@@ -432,6 +494,9 @@
         "学校办公室 2019 年 2 月 28 日印发 - 19 -"
       ],
       "tables": [],
+      "ocr": {
+        "applied": false
+      },
       "warnings": []
     }
   ],
