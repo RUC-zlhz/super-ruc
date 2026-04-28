@@ -10,7 +10,9 @@
           confirm-type="search"
           @confirm="onSearch"
         />
-        <button class="search-btn" @tap="onSearch" size="mini" :type="UNI_BUTTON_TYPE.primary">搜索</button>
+        <button class="search-btn" hover-class="hover-opacity" @tap="onSearch" size="mini" :type="UNI_BUTTON_TYPE.primary">
+          <text class="btn-icon">🔍</text> 搜索
+        </button>
       </view>
 
       <view class="match-hint">
@@ -174,11 +176,19 @@ function resultIcon(category?: string | null) {
   font-size: 28rpx;
   background: #fff;
 }
+.btn-icon {
+  margin-right: 6rpx;
+  font-size: 26rpx;
+  vertical-align: middle;
+}
+
 .search-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  width: 128rpx;
+  width: 140rpx;
   height: 92rpx;
-  line-height: 92rpx;
   border-radius: 18rpx;
   background: linear-gradient(135deg, #b70f24, #8b1020);
   color: #fff;

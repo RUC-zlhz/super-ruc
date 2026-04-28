@@ -72,7 +72,9 @@
         <text class="summary-line">提交后将立即显示得分与逐题结果。</text>
       </view>
 
-      <button :type="UNI_BUTTON_TYPE.primary" class="primary-btn" @tap="startQuiz">开始自测</button>
+      <button :type="UNI_BUTTON_TYPE.primary" class="primary-btn" hover-class="hover-scale" @tap="startQuiz">
+        <text class="btn-icon">⚡</text> 开始自测
+      </button>
       <text class="hint">
         本结果仅为学习辅助，分数不作为党团发展正式依据。
       </text>
@@ -172,20 +174,36 @@
           </text>
         </view>
         <view class="footer-actions">
-          <button size="mini" :disabled="currentIdx === 0" @tap="prevQ">上一题</button>
+          <button
+            v-if="currentIdx > 0"
+            size="mini"
+            class="flex-btn"
+            hover-class="hover-opacity"
+            @tap="prevQ"
+          >
+            <text class="btn-icon">‹</text> 上一题
+          </button>
           <button
             v-if="currentIdx < questions.length - 1"
             :type="UNI_BUTTON_TYPE.primary"
             size="mini"
+            class="flex-btn"
+            hover-class="hover-opacity"
             @tap="nextQ"
-          >下一题</button>
+          >
+            下一题 <text class="btn-icon">›</text>
+          </button>
           <button
             v-else
             :type="UNI_BUTTON_TYPE.primary"
             size="mini"
             :loading="submitting"
+            class="flex-btn"
+            hover-class="hover-scale"
             @tap="submitQuiz"
-          >提交</button>
+          >
+            <text class="btn-icon">✓</text> 提交
+          </button>
         </view>
       </view>
     </view>
@@ -228,7 +246,9 @@
           </text>
         </view>
       </view>
-      <button :type="UNI_BUTTON_TYPE.primary" class="primary-btn" @tap="restart">再来一轮</button>
+      <button :type="UNI_BUTTON_TYPE.primary" class="primary-btn" hover-class="hover-scale" @tap="restart">
+            <text class="btn-icon">↺</text> 再来一轮
+          </button>
     </view>
   </view>
 </template>
@@ -663,6 +683,10 @@ function restart() {
 }
 
 .primary-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
   margin-top: 28rpx;
   height: 84rpx;
   line-height: 84rpx;
@@ -670,6 +694,17 @@ function restart() {
   background: linear-gradient(135deg, #d51f35, #b70f24);
   color: #fff;
   font-weight: 800;
+}
+
+.flex-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+}
+
+.btn-icon {
+  font-size: 32rpx;
 }
 
 .hint {

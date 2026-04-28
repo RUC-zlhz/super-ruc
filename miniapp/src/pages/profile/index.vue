@@ -29,14 +29,12 @@
         </view>
         <text class="welcome">登录后，查看你的成长画像</text>
         <text class="desc">记录成长点滴，见证更好的你</text>
-        <button
-          class="primary-button"
-          :type="UNI_BUTTON_TYPE.primary"
-          size="default"
-          @tap="onWxLogin"
-        >
-          微信一键登录
-        </button>
+        <view class="login-actions">
+          <button class="primary-button" :type="UNI_BUTTON_TYPE.primary" size="default" hover-class="hover-scale" @tap="onWxLogin">
+            <text class="btn-icon">❖</text> 微信一键登录
+          </button>
+          <text class="login-note">未绑定微信时，请先使用密码登录绑定</text>
+        </view>
       </view>
     </view>
 
@@ -251,7 +249,7 @@
             </view>
             <text class="action-arrow">›</text>
           </view>
-          <view class="action-btn action-btn-logout" @tap="onLogout">
+          <view class="action-btn action-btn-logout" hover-class="hover-opacity" @tap="onLogout">
             <text class="action-title logout-text">退出登录</text>
           </view>
         </view>
@@ -296,15 +294,16 @@
             </view>
           </view>
           <view class="popup-footer">
-            <button class="popup-cancel" size="mini" @tap="closeAppeal">取消</button>
+            <button class="popup-cancel" size="mini" hover-class="hover-opacity" @tap="closeAppeal">取消</button>
             <button
               class="popup-submit"
               size="mini"
               :type="UNI_BUTTON_TYPE.primary"
+              hover-class="hover-scale"
               :loading="appealSubmitting"
               @tap="onSubmitAppeal"
             >
-              提交申诉
+              <text class="btn-icon">✓</text> 提交申诉
             </button>
           </view>
         </view>
@@ -375,15 +374,16 @@
             </view>
           </view>
           <view class="popup-footer">
-            <button class="popup-cancel" size="mini" @tap="closeGrowthSubmission">取消</button>
+            <button class="popup-cancel" size="mini" hover-class="hover-opacity" @tap="closeGrowthSubmission">取消</button>
             <button
               class="popup-submit"
               size="mini"
               :type="UNI_BUTTON_TYPE.primary"
+              hover-class="hover-scale"
               :loading="growthSubmitting"
               @tap="onSubmitGrowth"
             >
-              提交补录
+              <text class="btn-icon">🚀</text> 提交补录
             </button>
           </view>
         </view>
@@ -896,7 +896,16 @@ onMounted(async () => {
   margin: 18rpx 0 28rpx;
 }
 
+.btn-icon {
+  margin-right: 8rpx;
+  font-size: 32rpx;
+  vertical-align: middle;
+}
+
 .primary-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 20rpx;
   box-shadow: 0 14rpx 28rpx rgba(179, 13, 31, 0.18);
 }

@@ -132,6 +132,7 @@ import {
   BookOutlined,
   ClusterOutlined,
   FileDoneOutlined,
+  NodeIndexOutlined,
   ReadOutlined,
   SearchOutlined
 } from '@ant-design/icons-vue'

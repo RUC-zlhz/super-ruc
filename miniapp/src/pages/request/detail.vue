@@ -64,9 +64,11 @@
             size="mini"
             :disabled="!canPreviewProof"
             :loading="previewing"
+            hover-class="hover-opacity"
             @tap="onPreviewProof"
           >
-            预览 PDF
+            <text class="btn-icon">🔍</text>
+            <text>预览 PDF</text>
           </button>
         </view>
         <view class="pdf-card">
@@ -179,17 +181,21 @@
               class="action-btn outline"
               size="mini"
               :loading="withdrawing"
+              hover-class="hover-opacity"
               @tap="onWithdraw"
             >
-              撤回申请
+              <text class="btn-icon">↩️</text>
+              <text>撤回申请</text>
             </button>
             <button
               v-if="canEdit"
               class="action-btn primary"
               size="mini"
+              hover-class="hover-scale"
               @tap="onEdit"
             >
-              {{ editButtonText }}
+              <text class="btn-icon">✏️</text>
+              <text>{{ editButtonText }}</text>
             </button>
           </view>
         </view>
@@ -209,10 +215,10 @@
           撤回后当前审批流将终止，已提交内容可在草稿中修改后重新提交。
         </text>
         <view class="dialog-actions">
-          <button class="dialog-btn secondary" size="mini" @tap="resolveWithdrawDialog(false)">
+          <button class="dialog-btn secondary" size="mini" hover-class="hover-opacity" @tap="resolveWithdrawDialog(false)">
             取消
           </button>
-          <button class="dialog-btn primary" size="mini" @tap="resolveWithdrawDialog(true)">
+          <button class="dialog-btn primary" size="mini" hover-class="hover-scale" @tap="resolveWithdrawDialog(true)">
             确认撤回
           </button>
         </view>
@@ -1028,11 +1034,27 @@ onMounted(() => {
   flex: 1;
 }
 
+.btn-icon {
+  margin-right: 8rpx;
+  font-size: 26rpx;
+  vertical-align: middle;
+}
+
 .action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 0;
   flex: 1;
-  font-size: 24rpx;
+  height: 72rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  font-size: 28rpx;
   font-weight: 700;
+}
+
+.action-btn::after {
+  border: none;
 }
 
 .action-btn.outline {
