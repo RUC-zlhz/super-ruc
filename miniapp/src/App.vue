@@ -95,6 +95,18 @@ button::after {
   box-shadow: var(--shadow-card);
   transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease;
   border: 1px solid var(--border-color);
+  animation: fade-in-up 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .card:active {
@@ -157,5 +169,15 @@ button::after {
   .btn-primary {
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
   }
+}
+
+/* Global Hover Class for touch feedback */
+.hover-opacity {
+  opacity: 0.7;
+  transition: opacity 0.1s ease;
+}
+.hover-scale {
+  transform: scale(0.97);
+  transition: transform 0.1s ease;
 }
 </style>

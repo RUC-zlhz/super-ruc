@@ -26,7 +26,7 @@
       </view>
     </view>
 
-    <view class="hero-card" @tap="goQuiz">
+    <view class="hero-card" hover-class="hover-scale" @tap="goQuiz">
       <view class="quiz-icon">团</view>
       <view class="hero-card-main">
         <text class="hero-card-tag">学习自查</text>
@@ -54,6 +54,7 @@
         v-for="workflow in workflows"
         :key="workflow.id"
         class="flow-card"
+        hover-class="hover-opacity"
         @tap="onDetail(workflow.id)"
       >
         <view class="flow-header">

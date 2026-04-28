@@ -28,7 +28,7 @@
       </view>
     </view>
 
-    <view class="launch-btn" @tap="goCreate">
+    <view class="launch-btn" hover-class="hover-opacity" @tap="goCreate">
       <view class="launch-core">
         <text class="launch-plus">＋</text>
         <text class="launch-text">发起申请</text>
@@ -91,7 +91,7 @@
       </view>
     </view>
 
-    <view class="create-entry" @tap="goCreate">
+    <view class="create-entry" hover-class="hover-opacity" @tap="goCreate">
       <view class="create-copy">
         <text class="create-kicker">草稿补交更清晰</text>
         <text class="create-title">材料不完整？可先保存草稿</text>
@@ -108,6 +108,7 @@
         :key="request.id"
         class="req-card"
         :class="requestToneClass(request.status)"
+        hover-class="hover-opacity"
         @tap="goDetail(request.id)"
       >
         <view class="req-card-bg" />
@@ -159,7 +160,7 @@
       <text class="empty-icon">🗂</text>
       <text class="empty-title">当前筛选下暂无申请记录</text>
       <text class="empty-desc">可切换状态筛选，或直接发起新的事务申请。</text>
-      <view class="empty-action" @tap="goCreate">立即发起</view>
+      <view class="empty-action" hover-class="hover-opacity" @tap="goCreate">立即发起</view>
     </view>
   </view>
 </template>

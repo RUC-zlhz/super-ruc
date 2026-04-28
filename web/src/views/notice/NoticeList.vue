@@ -23,10 +23,16 @@
         </a-select>
       </a-form-item>
       <a-form-item>
-        <a-button type="primary" html-type="submit">查询</a-button>
+        <a-button type="primary" html-type="submit">
+          <template #icon><SearchOutlined /></template>
+          查询
+        </a-button>
       </a-form-item>
       <a-form-item>
-        <a-button type="primary" @click="openEditor()">新建通知</a-button>
+        <a-button type="primary" @click="openEditor()">
+          <template #icon><PlusOutlined /></template>
+          新建通知
+        </a-button>
       </a-form-item>
     </a-form>
 
@@ -62,13 +68,17 @@
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space size="small" wrap>
-            <a-button type="link" size="small" @click="openEditor(record as NoticeBrief)">编辑</a-button>
+            <a-button type="link" size="small" @click="openEditor(record as NoticeBrief)">
+              <template #icon><EditOutlined /></template>
+              编辑
+            </a-button>
             <a-button
               v-if="record.status === 'DRAFT'"
               type="link"
               size="small"
               @click="onPublish(record.id)"
             >
+              <template #icon><CloudUploadOutlined /></template>
               发布
             </a-button>
             <a-button
@@ -77,6 +87,7 @@
               size="small"
               @click="openDispatch(record as NoticeBrief)"
             >
+              <template #icon><SendOutlined /></template>
               发送
             </a-button>
             <a-button
@@ -85,6 +96,7 @@
               size="small"
               @click="openBatches(record as NoticeBrief)"
             >
+              <template #icon><FolderOpenOutlined /></template>
               批次
             </a-button>
             <a-button
@@ -93,6 +105,7 @@
               size="small"
               @click="onArchive(record.id)"
             >
+              <template #icon><InboxOutlined /></template>
               归档
             </a-button>
           </a-space>
@@ -150,12 +163,16 @@
         </section>
 
         <div class="side-actions">
-          <a-button @click="openEditor(primaryNotice)">编辑内容</a-button>
+          <a-button @click="openEditor(primaryNotice)">
+            <template #icon><EditOutlined /></template>
+            编辑内容
+          </a-button>
           <a-button
             type="primary"
             :disabled="primaryNotice.status !== 'PUBLISHED'"
             @click="openDispatch(primaryNotice)"
           >
+            <template #icon><SendOutlined /></template>
             发送通知
           </a-button>
         </div>
@@ -372,6 +389,7 @@
                 :disabled="editorStatus === 'ARCHIVED'"
                 @click="onPreviewTarget"
               >
+                <template #icon><EyeOutlined /></template>
                 命中预览
               </a-button>
               <span class="muted">修改规则后需重新点击预览，结果不会自动刷新。</span>
@@ -441,9 +459,13 @@
                 :loading="submitting"
                 :disabled="editorStatus === 'ARCHIVED'"
               >
+                <template #icon><SaveOutlined /></template>
                 保存
               </a-button>
-              <a-button @click="resetForm">关闭</a-button>
+              <a-button @click="resetForm">
+                <template #icon><CloseOutlined /></template>
+                关闭
+              </a-button>
             </a-space>
           </a-form-item>
         </a-form>
@@ -555,6 +577,7 @@
             </template>
             <template v-else-if="column.key === 'actions'">
               <a-button type="link" size="small" @click="openDeliveries(record as NoticeBatch)">
+                <template #icon><UnorderedListOutlined /></template>
                 投递明细
               </a-button>
             </template>
@@ -627,10 +650,16 @@
             </a-select>
           </a-form-item>
           <a-form-item>
-            <a-button type="primary" html-type="submit">筛选</a-button>
+            <a-button type="primary" html-type="submit">
+              <template #icon><SearchOutlined /></template>
+              筛选
+            </a-button>
           </a-form-item>
           <a-form-item>
-            <a-button @click="resetDeliveryFilters">重置</a-button>
+            <a-button @click="resetDeliveryFilters">
+              <template #icon><ReloadOutlined /></template>
+              重置
+            </a-button>
           </a-form-item>
         </a-form>
 
@@ -677,6 +706,17 @@ import {
   ClockCircleOutlined,
   NotificationOutlined,
   SendOutlined,
+  SearchOutlined,
+  PlusOutlined,
+  EditOutlined,
+  CloudUploadOutlined,
+  FolderOpenOutlined,
+  InboxOutlined,
+  EyeOutlined,
+  SaveOutlined,
+  CloseOutlined,
+  UnorderedListOutlined,
+  ReloadOutlined
 } from '@ant-design/icons-vue'
 import {
   archiveNotice,

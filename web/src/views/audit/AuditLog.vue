@@ -52,10 +52,16 @@
         <a-date-picker v-model:value="filters.until" show-time />
       </a-form-item>
       <a-form-item>
-        <a-button type="primary" html-type="submit">查询</a-button>
-      </a-form-item>
-      <a-form-item>
-        <a-button @click="resetFilters">重置</a-button>
+        <a-space wrap>
+          <a-button type="primary" html-type="submit">
+            <template #icon><SearchOutlined /></template>
+            查询
+          </a-button>
+          <a-button @click="resetFilters">
+            <template #icon><ReloadOutlined /></template>
+            重置
+          </a-button>
+        </a-space>
       </a-form-item>
     </a-form>
 
@@ -118,6 +124,7 @@
                 {{ auditDetailPreview(record) }}
               </button>
               <a-button v-else type="link" size="small" @click="selectAudit(record)">
+                <template #icon><EyeOutlined /></template>
                 查看
               </a-button>
             </template>
@@ -199,7 +206,10 @@
         <span>留存天数：</span>
         <a-input-number v-model:value="archiveDays" :min="30" :max="3650" />
         <a-popconfirm title="确定归档超期日志？" @confirm="onArchive">
-          <a-button type="primary" danger>执行归档</a-button>
+          <a-button type="primary" danger>
+            <template #icon><HistoryOutlined /></template>
+            执行归档
+          </a-button>
         </a-popconfirm>
       </a-space>
       <div v-if="archiveResult" class="mt8">
@@ -213,6 +223,13 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
 import { message } from "ant-design-vue";
+import {
+  FileTextOutlined,
+  SearchOutlined,
+  ReloadOutlined,
+  EyeOutlined,
+  HistoryOutlined
+} from '@ant-design/icons-vue';
 import { useAuthStore } from "@/store/auth";
 import { hasAnyRole } from "@/utils/permission";
 import {

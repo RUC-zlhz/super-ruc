@@ -97,6 +97,26 @@ body {
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+  animation: fade-in-up 0.4s ease-out;
+}
+
+.page-card:hover,
+.filter-card:hover,
+.table-card:hover,
+.panel-card:hover {
+  box-shadow: var(--shadow-float);
+}
+
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .filter-card {
@@ -144,6 +164,13 @@ body {
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  animation: fade-in-up 0.4s ease-out;
+}
+
+.metric-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-float);
 }
 
 .metric-tile::after {
@@ -249,6 +276,12 @@ body {
   border: 1px solid var(--line-soft) !important;
   border-radius: var(--radius-lg) !important;
   box-shadow: var(--shadow-card) !important;
+  transition: box-shadow 0.3s ease, transform 0.3s ease !important;
+  animation: fade-in-up 0.4s ease-out;
+}
+
+.ant-card:hover {
+  box-shadow: var(--shadow-float) !important;
 }
 
 .ant-card-head {
@@ -287,6 +320,11 @@ body {
   border-radius: var(--radius-sm) !important;
   font-weight: 500 !important;
   box-shadow: none !important;
+  transition: all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1) !important;
+}
+
+.ant-btn:active {
+  transform: scale(0.98);
 }
 
 .ant-btn-primary {
@@ -299,6 +337,8 @@ body {
 .ant-btn-primary:hover {
   background: linear-gradient(180deg, #c9001d, #990014) !important;
   border-color: #990014 !important;
+  box-shadow: 0 10px 20px rgba(176, 0, 24, 0.25) !important;
+  transform: translateY(-1px);
 }
 
 .ant-btn-link {
@@ -380,6 +420,7 @@ body {
 .ant-table-tbody > tr > td {
   border-bottom: 1px solid var(--line-soft) !important;
   padding: 10px 14px !important;
+  transition: background-color 0.2s ease;
 }
 
 .ant-table-tbody > tr:hover > td {

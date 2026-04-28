@@ -38,10 +38,16 @@
             />
           </a-form-item>
           <a-form-item>
-            <a-button type="primary" html-type="submit">查询</a-button>
-          </a-form-item>
-          <a-form-item>
-            <a-button @click="resetStudentFilters">重置</a-button>
+            <a-space wrap>
+              <a-button type="primary" html-type="submit">
+                <template #icon><SearchOutlined /></template>
+                查询
+              </a-button>
+              <a-button @click="resetStudentFilters">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+            </a-space>
           </a-form-item>
         </a-form>
 
@@ -76,15 +82,19 @@
                     type="link"
                     size="small"
                     @click="onViewProfile(record.id)"
-                    >画像</a-button
                   >
+                    <template #icon><IdcardOutlined /></template>
+                    画像
+                  </a-button>
                   <a-button
                     v-if="canEditEnrollment"
                     type="link"
                     size="small"
                     @click="onEditEnrollment(record)"
-                    >学籍</a-button
                   >
+                    <template #icon><EditOutlined /></template>
+                    学籍
+                  </a-button>
                 </template>
               </template>
             </a-table>
@@ -124,8 +134,14 @@
                 <a-select-option :value="policyPresetName">{{ policyPresetName }}</a-select-option>
               </a-select>
               <div class="preset-actions">
-                <a-button size="small">保存设置</a-button>
-                <a-button size="small">刷新</a-button>
+                <a-button size="small" type="primary" @click="onSavePolicies" :loading="savingPolicies">
+                  <template #icon><SaveOutlined /></template>
+                  保存设置
+                </a-button>
+                <a-button size="small" @click="loadPolicies">
+                  <template #icon><ReloadOutlined /></template>
+                  刷新
+                </a-button>
               </div>
             </div>
           </aside>
@@ -209,6 +225,12 @@ import {
   TeamOutlined,
   UserDeleteOutlined,
   UserSwitchOutlined,
+  IdcardOutlined,
+  SearchOutlined,
+  SyncOutlined,
+  ReloadOutlined,
+  EditOutlined,
+  SaveOutlined,
 } from "@ant-design/icons-vue";
 import { updateEnrollmentStatus } from "@/api/auth";
 import { adminSearchStudents, type StudentBasic } from "@/api/profile";

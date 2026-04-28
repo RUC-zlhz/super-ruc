@@ -34,7 +34,7 @@
         <text class="sync-title">{{ loading ? "数据同步中" : "数据同步正常" }}</text>
         <text class="sync-desc">最近同步时间：{{ latestSyncText }}</text>
       </view>
-      <view class="sync-action" @tap="loadDashboard">↻</view>
+      <view class="sync-action" hover-class="hover-opacity" @tap="loadDashboard">↻</view>
     </view>
 
     <view class="metric-row">
@@ -43,6 +43,7 @@
         :key="metric.key"
         class="metric-card"
         :class="metric.key"
+        hover-class="hover-scale"
         @tap="goTo(metric.path)"
       >
         <text class="metric-label">{{ metric.label }}</text>
@@ -58,7 +59,7 @@
         <view>
           <text class="section-title">常用服务</text>
         </view>
-        <text class="section-link">全部服务 ›</text>
+        <text class="section-link" hover-class="hover-opacity">全部服务 ›</text>
       </view>
 
       <view class="entry-grid">
@@ -66,6 +67,7 @@
           v-for="item in entries"
           :key="item.path"
           class="entry-card"
+          hover-class="hover-scale"
           @tap="goTo(item.path)"
         >
           <view class="entry-mark">{{ item.mark }}</view>
@@ -79,7 +81,7 @@
         <view>
           <text class="section-title">待办提醒</text>
         </view>
-        <text class="section-link">更多待办 ›</text>
+        <text class="section-link" hover-class="hover-opacity">更多待办 ›</text>
       </view>
 
       <template v-if="focusItems.length">
@@ -87,6 +89,7 @@
           v-for="item in focusItems"
           :key="item.key"
           class="focus-item"
+          hover-class="hover-opacity"
           @tap="goTo(item.path)"
         >
           <view class="focus-leading" :class="item.tone">{{ item.badge }}</view>
@@ -107,7 +110,7 @@
         <view>
           <text class="section-title">最新通知</text>
         </view>
-        <text class="section-link" @tap="goTo('/pages/notice/index')">查看全部</text>
+        <text class="section-link" hover-class="hover-opacity" @tap="goTo('/pages/notice/index')">查看全部</text>
       </view>
 
       <template v-if="recentNotices.length">
@@ -115,6 +118,7 @@
           v-for="notice in recentNotices"
           :key="noticeKey(notice)"
           class="notice-row"
+          hover-class="hover-opacity"
           @tap="openNotice(notice)"
         >
           <view class="notice-top">

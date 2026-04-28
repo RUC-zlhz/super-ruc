@@ -16,6 +16,7 @@
         :key="noticeKey(n)"
         class="notice-card"
         :class="{ unread: isUnread(n), pinned: n.is_pinned }"
+        hover-class="hover-opacity"
         @tap="onDetail(n)"
       >
         <view class="notice-icon" :class="{ muted: !isUnread(n) }">{{ noticeIcon(n) }}</view>
@@ -42,7 +43,7 @@
 
     <view v-else-if="!loading" class="empty">暂无通知</view>
 
-    <view v-if="hasMore" class="load-more" @tap="loadMore">加载更多</view>
+    <view v-if="hasMore" class="load-more" hover-class="hover-opacity" @tap="loadMore">加载更多</view>
     <view v-else-if="!loading && notices.length" class="load-end">没有更多了</view>
   </view>
 </template>

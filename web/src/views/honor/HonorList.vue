@@ -67,12 +67,27 @@
             </a-form-item>
             <a-form-item>
               <a-space wrap>
-                <a-button type="primary" html-type="submit">查询</a-button>
-                <a-button @click="onResetFilters">重置</a-button>
-                <a-button @click="openCategoryManager">类别维护</a-button>
-                <a-button @click="openImportModal">批量导入</a-button>
-                <a-button type="primary" @click="openEditor()">新增荣誉</a-button>
-              </a-space>
+      <a-button type="primary" html-type="submit">
+        <template #icon><SearchOutlined /></template>
+        查询
+      </a-button>
+      <a-button @click="onResetFilters">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
+      <a-button @click="openCategoryManager">
+        <template #icon><SettingOutlined /></template>
+        类别维护
+      </a-button>
+      <a-button @click="openImportModal">
+        <template #icon><ImportOutlined /></template>
+        批量导入
+      </a-button>
+      <a-button type="primary" @click="openEditor()">
+        <template #icon><PlusOutlined /></template>
+        新增荣誉
+      </a-button>
+    </a-space>
             </a-form-item>
           </a-form>
         </a-card>
@@ -138,20 +153,29 @@
 
             <template v-else-if="column.key === 'actions'">
               <a-space size="small">
-                <a-button type="link" size="small" @click="openEditor(record as HonorRecordBrief)">编辑</a-button>
+                <a-button type="link" size="small" @click="openEditor(record as HonorRecordBrief)">
+                  <template #icon><EditOutlined /></template>
+                  编辑
+                </a-button>
                 <a-popconfirm
                   v-if="record.status === 'ACTIVE'"
                   title="确定将该荣誉归档为历史荣誉？"
                   @confirm="onArchive(record.id, 'ARCHIVED')"
                 >
-                  <a-button type="link" size="small">归档</a-button>
+                  <a-button type="link" size="small">
+                    <template #icon><InboxOutlined /></template>
+                    归档
+                  </a-button>
                 </a-popconfirm>
                 <a-popconfirm
                   v-if="record.status !== 'REVOKED'"
                   title="确定撤销该荣誉展示？"
                   @confirm="onArchive(record.id, 'REVOKED')"
                 >
-                  <a-button type="link" size="small" danger>撤销</a-button>
+                  <a-button type="link" size="small" danger>
+                    <template #icon><RollbackOutlined /></template>
+                    撤销
+                  </a-button>
                 </a-popconfirm>
               </a-space>
             </template>
@@ -165,7 +189,10 @@
             <div class="side-title">公示治理</div>
             <div class="side-sub">类别、导入和状态分布</div>
           </div>
-          <a-button type="primary" size="small" @click="openEditor()">新增</a-button>
+          <a-button type="primary" size="small" @click="openEditor()">
+            <template #icon><PlusOutlined /></template>
+            新增
+          </a-button>
         </div>
 
         <div class="status-stack">
@@ -329,11 +356,17 @@
           </a-space>
 
           <div class="drawer-actions">
-            <a-space>
-              <a-button type="primary" html-type="submit" :loading="submitting">保存</a-button>
-              <a-button @click="resetForm">取消</a-button>
-            </a-space>
-          </div>
+          <a-space>
+            <a-button type="primary" html-type="submit" :loading="submitting">
+              <template #icon><SaveOutlined /></template>
+              保存
+            </a-button>
+            <a-button @click="resetForm">
+              <template #icon><CloseOutlined /></template>
+              取消
+            </a-button>
+          </a-space>
+        </div>
         </a-form>
       </a-spin>
     </a-drawer>
@@ -403,11 +436,16 @@
               <a-form-item label="是否启用">
                 <a-switch v-model:checked="categoryForm.is_active" checked-children="启用" un-checked-children="停用" />
               </a-form-item>
+
               <a-space>
                 <a-button type="primary" html-type="submit" :loading="categorySubmitting">
+                  <template #icon><SaveOutlined /></template>
                   保存类别
                 </a-button>
-                <a-button @click="resetCategoryForm">新建一条</a-button>
+                <a-button @click="resetCategoryForm">
+                  <template #icon><PlusOutlined /></template>
+                  新建一条
+                </a-button>
               </a-space>
             </a-form>
           </a-card>
@@ -492,9 +530,13 @@
               :disabled="importPreview.batch.fatal_rows > 0"
               @click="onCommitHonorImport"
             >
+              <template #icon><UploadOutlined /></template>
               {{ importPreview.batch.fatal_rows > 0 ? '存在致命错误，暂不能提交' : '正式提交' }}
             </a-button>
-            <a-button @click="onDownloadImportErrors(importPreview.batch.id)">下载错误报告</a-button>
+            <a-button @click="onDownloadImportErrors(importPreview.batch.id)">
+              <template #icon><DownloadOutlined /></template>
+              下载错误报告
+            </a-button>
           </a-space>
         </a-card>
 
@@ -534,6 +576,17 @@ import {
   ClockCircleOutlined,
   InboxOutlined,
   TrophyOutlined,
+  SearchOutlined,
+  ReloadOutlined,
+  SettingOutlined,
+  ImportOutlined,
+  PlusOutlined,
+  EditOutlined,
+  RollbackOutlined,
+  SaveOutlined,
+  CloseOutlined,
+  UploadOutlined,
+  DownloadOutlined
 } from '@ant-design/icons-vue'
 import {
   adminArchiveRecord,
