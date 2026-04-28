@@ -248,6 +248,7 @@
 - [x] `S6.16` Miniapp 微信开发者工具 CLI AppID 对齐
 - [x] `S6.17` Design 细节级前端优化 Round 5
 - [x] `S6.18` Miniapp 原生弹层运行时修复
+- [x] `S6.20` Miniapp 小程序主图标资产制作
 
 出口条件：
 
@@ -265,6 +266,7 @@
 - `web` 仍偏表格页的题库、培养方案、审计日志、荣誉公示页面继续收口为设计稿式多面板工作台
 - `miniapp` 理论自测、知识详情、通知/荣誉动作和画像弹层继续补齐设计稿中的白卡、头图、动作反馈与上传区细节
 - `miniapp` 知识、荣誉、画像页不再依赖未安装的 `uni-popup` 组件，弹层交互由页面内原生遮罩与底部面板承载
+- `miniapp` 具备可上传到微信公众平台的小程序主图标 PNG 资产，并保留可复现生成脚本
 - `web` 管理端在逐页浏览器截图对照后继续收紧多面板结构，尤其补齐通知、党团流程、导入导出中心的右侧工作面板
 - `data/` 政策/流程 PDF 可转换为 JSON / Markdown，并显式暴露需 OCR 的页面
 - `web build`、`miniapp mp-weixin build` 继续可验证
@@ -289,6 +291,7 @@
 - `S6.16`：用户开启微信开发者工具服务端口后，已新增并完成 `docs/notes/refinements/2026-04-28-s6-miniapp-devtools-cli-appid-alignment.md`。本轮确认 `cli.bat islogin --port 21115` 返回 `{"login":true}`，根目录项目可通过 CLI 打开；同时修复 `miniapp/src/manifest.json` 中 `mp-weixin.appid=wx_test_appid` 导致构建产物 `project.config.json` 带出测试 AppID 的问题，避免直接导入 `dist/build/mp-weixin` 时出现 `AppID 不合法`，并用 CLI `open / preview` 复核构建产物目录可直接运行。
 - `S6.17`：已新增并完成 `docs/notes/refinements/2026-04-28-s6-design-detail-frontend-optimization-round5.md`。本轮按 `design/web/` 与 `design/miniapp/` 继续做细节级前端优化：Web 题库改为右侧编辑器，培养方案改为三栏关系工作台，审计日志补右侧详情面板，荣誉公示补治理侧栏；Miniapp 理论自测收紧红色头图/白卡/结果横幅，申请筛选、知识原文、通知收藏分享、荣誉附件分享和画像上传区补前端反馈。
 - `S6.18`：微信开发者工具 CLI 复核后继续排查页面级运行时风险，发现 `miniapp` 未安装 `uni-popup`，但知识、荣誉、画像页仍使用 `<uni-popup>`；已新增并完成 `docs/notes/refinements/2026-04-28-s6-miniapp-native-popup-runtime-fix.md`。本轮将这三处弹层改为页面内原生 fixed 遮罩与底部面板，移除 popup refs，避免微信运行时依赖未注册组件。
+- `S6.20`：已新增并完成 `docs/notes/refinements/2026-04-28-s6-miniapp-app-icon-asset.md`。本轮新增 `scripts/miniapp/generate_app_icon.ps1`，生成 `miniapp/src/static/app-icon.png`、`app-icon-512.png`、`app-icon-144.png` 三个小程序主图标 PNG 资产，并在 `miniapp/README.md` 说明微信公众平台后台上传边界。
 - 验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p web\tsconfig.json` 与 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 均通过；执行 `uv run --extra dev python -m py_compile app\knowledge\router.py app\knowledge\service.py tests\integration\test_knowledge_flow.py` 通过；本轮 `pytest tests\integration\test_knowledge_flow.py -q` 因本地测试数据库拒连未进入断言阶段。
 - `2026-04-27` 补充验证：执行 `UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache uv run --project backend --no-sync --with pypdf --with pdfplumber --with rapidocr-onnxruntime --with pillow python -m py_compile scripts\knowledge\extract_pdf_documents.py` 通过；执行 `UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache uv run --project backend --no-sync --with pypdf --with pdfplumber --with rapidocr-onnxruntime --with pillow python scripts\knowledge\extract_pdf_documents.py data --output-dir output\pdf\extracted --ocr` 通过，生成 4 份 JSON、4 份 Markdown 与 `manifest.json`；团员发展流程 PDF OCR 后正文字符数 `8925`、OCR 字符数 `3366`、chunk 数 `8`。
 - `2026-04-27` Miniapp JPG 视觉对齐验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；沙箱内 `pnpm -C miniapp build:mp-weixin` 因 esbuild `spawn EPERM` 失败，提权环境下重跑通过并输出 `dist\build\mp-weixin`；复核 `miniapp/dist/build/mp-weixin/app.json`、`project.config.json` 及页面级 JSON 存在。
@@ -303,6 +306,7 @@
 - `2026-04-28` Miniapp 微信开发者工具 CLI AppID 对齐验证：执行 `cli.bat islogin --port 21115` 返回 `{"login":true}`；执行 `pnpm -C miniapp build:mp-weixin` 通过；`miniapp/src/manifest.json`、`miniapp/project.config.json`、`miniapp/dist/build/mp-weixin/project.config.json` 的微信 AppID 已一致；执行 `cli.bat open --project D:\Codes\super-ruc\miniapp\dist\build\mp-weixin --port 21115 --trust-project` 通过；执行 `cli.bat preview --project D:\Codes\super-ruc\miniapp\dist\build\mp-weixin --port 21115 --qr-format terminal --trust-project` 通过并显示 `Using AppID: wxcf977479348ca1d3`；最新微信开发者工具日志包含 `simulator launch success`、`finish load user code`、`webview page ready`，未再出现 `utils/async.js` 或页面未注册错误。
 - `2026-04-28` Design 细节级前端优化 Round 5 验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p web\tsconfig.json` 与 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 均通过；沙箱内 `pnpm -C web build` 与 `pnpm -C miniapp build:mp-weixin` 均命中本机已知 `esbuild spawn EPERM`，提权重跑后两者均通过。
 - `2026-04-28` Miniapp 原生弹层运行时修复验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；执行 `pnpm -C miniapp build:mp-weixin` 通过；产物扫描 `<uni-`、`uni-popup|resolveComponent` 无命中；源码与产物扫描 `utils/async|async.js|allSettled` 无命中；执行 `cli.bat open --project D:\Codes\super-ruc\miniapp\dist\build\mp-weixin --port 21115 --trust-project` 通过，执行 `cli.bat preview --project D:\Codes\super-ruc\miniapp\dist\build\mp-weixin --port 21115 --qr-format terminal --trust-project` 通过并显示 `Using AppID: wxcf977479348ca1d3`；按最后一次 CLI 打开开始时间过滤微信开发者工具日志，未出现 `module not defined`、`AppID 不合法`、`ReferenceError`、`TypeError`、`SyntaxError` 或 route timeout。
+- `2026-04-28` Miniapp 小程序主图标资产验证：执行 `& .\scripts\miniapp\generate_app_icon.ps1` 通过并生成三种尺寸 PNG；执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；执行 `pnpm -C miniapp build:mp-weixin` 通过；确认 `miniapp/dist/build/mp-weixin/static/app-icon*.png` 已带出。
 
 当前结论：
 
@@ -319,6 +323,7 @@
 - `S6.16` 已对齐微信开发者工具 CLI 验收入口与构建产物 AppID：`mp-weixin` 产物不再生成 `wx_test_appid`，且可通过服务端口 CLI 直接 `open / preview`。
 - `S6.17` 已完成基于 `design/` 图片内容的细节级前端优化：Web 管理端关键表格页进一步工作台化，Miniapp 关键动作入口补齐反馈并继续贴近 JPG 视觉。
 - `S6.18` 已完成小程序未注册 popup 组件风险修复：知识、荣誉、画像页弹层改为页面内原生遮罩与底部面板，`mp-weixin` 产物不再包含 `uni-popup` / `resolveComponent` 依赖。
+- `S6.20` 已完成小程序主图标资产制作：`miniapp/src/static/app-icon.png` 可用于微信公众平台后台上传，`scripts/miniapp/generate_app_icon.ps1` 可稳定再生主图标与尺寸变体。
 - `S6.6` 已证明 3 份文字型校级 PDF 可以直接结构化抽取，团员发展流程 PDF 的图片化页面可通过 `--ocr` 自动补齐；OCR 结果仍需人工校对后才能作为权威知识库条目。
 - 后续若继续推进，优先做知识库管理端真实数据走查、PDF OCR / 知识库草稿导入映射、短信 provider 适配或申请流程小程序真机验收。
 
@@ -365,6 +370,7 @@
 | 2026-04-28 | Miniapp 微信开发者工具 CLI AppID 对齐 | `docs/notes/refinements/2026-04-28-s6-miniapp-devtools-cli-appid-alignment.md` | `S6.16` | `[x]` | 已将 manifest 的微信 AppID 对齐到真实 AppID，消除直导构建产物时 `wx_test_appid` 导致的 CLI 校验失败 |
 | 2026-04-28 | Design 细节级前端优化 Round 5 | `docs/notes/refinements/2026-04-28-s6-design-detail-frontend-optimization-round5.md` | `S6.1, S6.2, S6.3, S6.4, S6.7, S6.9, S6.11, S6.12, S6.17` | `[x]` | 已继续按设计稿补齐 Web 多面板工作台与 Miniapp 动作反馈/弹层上传区，通过双端类型检查和构建 |
 | 2026-04-28 | Miniapp 原生弹层运行时修复 | `docs/notes/refinements/2026-04-28-s6-miniapp-native-popup-runtime-fix.md` | `S6.18` | `[x]` | 已将知识、荣誉、画像页的 `uni-popup` 替换为页面内原生遮罩与底部面板，并通过 `miniapp vue-tsc`、`mp-weixin` 出包、产物扫描和 DevTools CLI 验证 |
+| 2026-04-28 | Miniapp 小程序主图标资产制作 | `docs/notes/refinements/2026-04-28-s6-miniapp-app-icon-asset.md` | `S6.20` | `[x]` | 已生成主图标 PNG 与尺寸变体，补可复现生成脚本，并通过 `miniapp vue-tsc` 与 `mp-weixin` 出包验证 |
 
 ## 会话更新要求
 
@@ -421,3 +427,4 @@
 - `2026-04-28`：新增并完成 `S6.16` Miniapp 微信开发者工具 CLI AppID 对齐；服务端口 `21115` 可用于 CLI 登录和打开根目录项目，`miniapp/src/manifest.json` 已改为真实微信 AppID，重新出包后构建产物不再带出 `wx_test_appid`。
 - `2026-04-28`：新增并完成 `S6.17` Design 细节级前端优化 Round 5；Web 题库、培养方案、审计、荣誉页继续工作台化，Miniapp 理论自测、申请筛选、知识/通知/荣誉动作和画像弹层继续按设计稿补细节，并通过双端类型检查和构建。
 - `2026-04-28`：新增并完成 `S6.18` Miniapp 原生弹层运行时修复；知识、荣誉、画像页不再依赖未安装的 `uni-popup`，重新出包后产物无 `uni-popup` / `resolveComponent` 命中，并通过微信开发者工具 CLI `open / preview` 与日志过滤复核。
+- `2026-04-28`：新增并完成 `S6.20` Miniapp 小程序主图标资产制作；生成 `app-icon.png`、`app-icon-512.png`、`app-icon-144.png`，补可复现生成脚本和 README 说明，并确认 `mp-weixin` 构建产物已带出图标资源。

@@ -55,7 +55,7 @@ miniapp/
 ├── utils/
 │   ├── format.ts                      日期/状态格式化
 │   └── upload.ts                      文件选择与上传工具
-├── src/static/                        静态资源（图标、空态图，微信小程序 tabBar 图标从此目录出包）
+├── src/static/                        静态资源（主图标、tabBar 图标、空态图，微信小程序资源从此目录出包）
 ├── pages.json                         页面路由配置
 ├── manifest.json                      应用配置（AppID、权限）
 ├── App.vue
@@ -120,3 +120,4 @@ pnpm build:mp-weixin
 - 申请附件上传限制：单文件 ≤ 30MB，支持 PDF/Word/图片格式。
 - 新增或修改页面能力时，应优先检查是否符合微信小程序约束，例如页面栈、文件能力、登录能力、导航方式和审核可接受性；不要先按 H5 语义实现再被动适配。
 - 微信开发者工具请先执行 `pnpm build:mp-weixin`，再导入 `miniapp/dist/build/mp-weixin`；也可以导入 `miniapp` 根目录，根目录的 `project.config.json` 已通过 `miniprogramRoot` 指向构建产物目录。`tabBar` 图标源码位于 `miniapp/src/static/`，不能只放在项目根目录的其他临时静态目录中。
+- 小程序主图标资产位于 `miniapp/src/static/app-icon.png`，同时提供 `app-icon-512.png` 与 `app-icon-144.png` 尺寸变体；源脚本为 `scripts/miniapp/generate_app_icon.ps1`。微信小程序头像/图标最终仍需在微信公众平台后台上传该 PNG，代码构建只负责保留和出包项目内静态资产。
