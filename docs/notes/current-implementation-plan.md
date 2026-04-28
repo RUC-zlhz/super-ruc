@@ -250,6 +250,7 @@
 - [x] `S6.18` Miniapp 原生弹层运行时修复
 - [x] `S6.19` Web / Miniapp 前端体验增量优化 Round 6 (交互增强)
 - [x] `S6.20` Miniapp 小程序主图标资产制作
+- [x] `S6.21` Web / Miniapp 按钮图标语义补齐 Round 7
 
 出口条件：
 
@@ -294,6 +295,7 @@
 - `S6.18`：微信开发者工具 CLI 复核后继续排查页面级运行时风险，发现 `miniapp` 未安装 `uni-popup`，但知识、荣誉、画像页仍使用 `<uni-popup>`；已新增并完成 `docs/notes/refinements/2026-04-28-s6-miniapp-native-popup-runtime-fix.md`。本轮将这三处弹层改为页面内原生 fixed 遮罩与底部面板，移除 popup refs，避免微信运行时依赖未注册组件。
 - `S6.19`：已新增并完成 `docs/notes/refinements/2026-04-28-s6-frontend-optimization-round6.md`。本轮对 Web 增加全局卡片进入动画、路由切换过渡与 hover 态提升；对 Miniapp 增加统一的 `.hover-opacity` 与 `.hover-scale` 触摸反馈并在首页、事务申请、党团流程、通知页面全面覆盖。
 - `S6.20`：已新增并完成 `docs/notes/refinements/2026-04-28-s6-miniapp-app-icon-asset.md`。本轮新增 `scripts/miniapp/generate_app_icon.ps1`，生成 `miniapp/src/static/app-icon.png`、`app-icon-512.png`、`app-icon-144.png` 三个小程序主图标 PNG 资产，并在 `miniapp/README.md` 说明微信公众平台后台上传边界。
+- `S6.21`：已新增并完成 `docs/notes/refinements/2026-04-28-s6-button-icon-semantics-round7.md`。本轮对 Web 16 个核心视图中约 50 处 `<a-button>` 补充了 `@ant-design/icons-vue` 组件，大幅提升管理后台查询、操作和导出的直观语义；对 Miniapp 使用纯文本和 Emoji 图标强化了学生端的提交、重选、开始自测和退出操作。
 - 验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p web\tsconfig.json` 与 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 均通过；执行 `uv run --extra dev python -m py_compile app\knowledge\router.py app\knowledge\service.py tests\integration\test_knowledge_flow.py` 通过；本轮 `pytest tests\integration\test_knowledge_flow.py -q` 因本地测试数据库拒连未进入断言阶段。
 - `2026-04-27` 补充验证：执行 `UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache uv run --project backend --no-sync --with pypdf --with pdfplumber --with rapidocr-onnxruntime --with pillow python -m py_compile scripts\knowledge\extract_pdf_documents.py` 通过；执行 `UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache uv run --project backend --no-sync --with pypdf --with pdfplumber --with rapidocr-onnxruntime --with pillow python scripts\knowledge\extract_pdf_documents.py data --output-dir output\pdf\extracted --ocr` 通过，生成 4 份 JSON、4 份 Markdown 与 `manifest.json`；团员发展流程 PDF OCR 后正文字符数 `8925`、OCR 字符数 `3366`、chunk 数 `8`。
 - `2026-04-27` Miniapp JPG 视觉对齐验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；沙箱内 `pnpm -C miniapp build:mp-weixin` 因 esbuild `spawn EPERM` 失败，提权环境下重跑通过并输出 `dist\build\mp-weixin`；复核 `miniapp/dist/build/mp-weixin/app.json`、`project.config.json` 及页面级 JSON 存在。
@@ -327,6 +329,7 @@
 - `S6.18` 已完成小程序未注册 popup 组件风险修复：知识、荣誉、画像页弹层改为页面内原生遮罩与底部面板，`mp-weixin` 产物不再包含 `uni-popup` / `resolveComponent` 依赖。
 - `S6.19` 已完成双端交互增强：Web 端增加页面转场、卡片悬浮与载入动画，Miniapp 补充全局通用的触摸反馈机制，显著提升用户操作的确认感。
 - `S6.20` 已完成小程序主图标资产制作：`miniapp/src/static/app-icon.png` 可用于微信公众平台后台上传，`scripts/miniapp/generate_app_icon.ps1` 可稳定再生主图标与尺寸变体。
+- `S6.21` 已完成 Web 与 Miniapp 双端按钮图标语义补齐，解决了纯文字操作按钮的识别效率问题。
 - `S6.6` 已证明 3 份文字型校级 PDF 可以直接结构化抽取，团员发展流程 PDF 的图片化页面可通过 `--ocr` 自动补齐；OCR 结果仍需人工校对后才能作为权威知识库条目。
 - 后续若继续推进，优先做知识库管理端真实数据走查、PDF OCR / 知识库草稿导入映射、短信 provider 适配或申请流程小程序真机验收。
 
