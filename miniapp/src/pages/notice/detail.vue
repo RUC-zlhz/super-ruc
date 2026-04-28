@@ -135,7 +135,7 @@ onMounted(() => {
   min-height: 100vh;
   padding: 0 24rpx 0;
   background:
-    linear-gradient(180deg, #b70f24 0, #b70f24 250rpx, #f7f1f2 500rpx),
+    linear-gradient(180deg, #b70f24 0, #b70f24 228rpx, #f8f3f4 462rpx),
     #f7f1f2;
 }
 .loading, .empty { text-align: center; padding: 80rpx 0; color: #999; font-size: 28rpx; }
@@ -144,8 +144,8 @@ onMounted(() => {
 .notice-hero {
   position: relative;
   margin: 0 -24rpx;
-  min-height: 220rpx;
-  padding: 56rpx 42rpx 78rpx;
+  min-height: 196rpx;
+  padding: 50rpx 42rpx 70rpx;
   color: #fff;
   background:
     radial-gradient(circle at 86% 28%, rgba(255,255,255,0.2), transparent 150rpx),
@@ -180,10 +180,10 @@ onMounted(() => {
 .head-card {
   position: relative;
   z-index: 2;
-  margin-top: -56rpx;
+  margin-top: -48rpx;
   background: rgba(255,255,255,0.98);
   padding: 34rpx 30rpx;
-  border-radius: 28rpx;
+  border-radius: 18rpx;
   margin-bottom: 18rpx;
   box-shadow: var(--shadow-float);
   border: 1rpx solid rgba(240,226,229,0.9);
@@ -264,7 +264,7 @@ onMounted(() => {
 .section-card {
   background: #fff;
   padding: 28rpx;
-  border-radius: 28rpx;
+  border-radius: 18rpx;
   margin-bottom: 18rpx;
   box-shadow: var(--shadow-card);
   border: 1rpx solid #f0e2e5;

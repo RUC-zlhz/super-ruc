@@ -156,52 +156,52 @@ const auth = useAuthStore();
 
 const entries = [
   {
-    mark: "知",
-    label: "知识查询",
-    desc: "按关键字快速查询学院政策与问答。",
-    path: "/pages/knowledge/index",
-  },
-  {
-    mark: "事",
-    label: "事务申请",
+    mark: "□",
+    label: "我的申请",
     desc: "发起请假、证明、盖章等常见申请。",
     path: "/pages/request/index",
   },
   {
-    mark: "知",
-    label: "通知中心",
-    desc: "查看学院通知、系统消息与已读状态。",
-    path: "/pages/notice/index",
-  },
-  {
-    mark: "流",
-    label: "党团进度",
-    desc: "查看当前节点、下一动作与历史记录。",
-    path: "/pages/workflow/index",
-  },
-  {
-    mark: "测",
-    label: "理论自测",
-    desc: "随机抽题，完成党团知识自查。",
-    path: "/pages/workflow/quiz",
-  },
-  {
-    mark: "学",
-    label: "学业查看",
-    desc: "查看学分缺口与培养方案辅助提示。",
+    mark: "100",
+    label: "成绩证明",
+    desc: "查看学业辅助提示与证明办理入口。",
     path: "/pages/academic/index",
   },
   {
-    mark: "荣",
-    label: "荣誉榜",
-    desc: "查看荣誉记录、历史荣誉与学年筛选。",
+    mark: "¥",
+    label: "奖助学金",
+    desc: "查看荣誉与奖助学金相关信息。",
     path: "/pages/honor/index",
   },
   {
-    mark: "我",
-    label: "我的画像",
-    desc: "查看画像快照、纠错申诉与成长补录。",
-    path: "/pages/profile/index",
+    mark: "✓",
+    label: "请假审批",
+    desc: "进入事务申请并选择请假类服务。",
+    path: "/pages/request/create",
+  },
+  {
+    mark: "床",
+    label: "宿舍服务",
+    desc: "宿舍调整、住宿证明等事务入口。",
+    path: "/pages/request/create",
+  },
+  {
+    mark: "¥",
+    label: "缴费记录",
+    desc: "查询政策、缴费说明和服务指南。",
+    path: "/pages/knowledge/index",
+  },
+  {
+    mark: "书",
+    label: "课程事务",
+    desc: "课程、培养方案和教务政策查询。",
+    path: "/pages/knowledge/index",
+  },
+  {
+    mark: "耳",
+    label: "帮助中心",
+    desc: "查询常见问题和办理指引。",
+    path: "/pages/knowledge/index",
   },
 ];
 
@@ -398,19 +398,19 @@ onPullDownRefresh(async () => {
 <style scoped>
 .container {
   min-height: 100vh;
-  padding: 0 24rpx 28rpx;
+  padding: 0 24rpx 34rpx;
   background:
-    linear-gradient(180deg, #b70f24 0, #b70f24 372rpx, #fbf6f7 620rpx, #f8f2f3 100%),
+    linear-gradient(180deg, #b70f24 0, #b70f24 372rpx, #fff7f7 612rpx, #f8f3f4 100%),
     var(--bg-color);
   display: flex;
   flex-direction: column;
-  gap: 20rpx;
+  gap: 18rpx;
 }
 
 .hero-card {
   position: relative;
-  min-height: 430rpx;
-  padding: 42rpx 32rpx 104rpx;
+  min-height: 416rpx;
+  padding: 44rpx 32rpx 108rpx;
   border-radius: 0 0 42rpx 42rpx;
   background:
     linear-gradient(90deg, rgba(127, 23, 34, 0.18), transparent 42%),
@@ -418,7 +418,7 @@ onPullDownRefresh(async () => {
     radial-gradient(circle at 92% 8%, rgba(255,255,255,0.14), transparent 30%),
     linear-gradient(150deg, #c40e25 0%, #b70f24 48%, #8b1020 100%);
   color: #fff;
-  box-shadow: 0 24rpx 56rpx rgba(127, 23, 34, 0.22);
+  box-shadow: 0 20rpx 46rpx rgba(127, 23, 34, 0.2);
   overflow: hidden;
   margin: 0 -24rpx;
 }
@@ -453,7 +453,7 @@ onPullDownRefresh(async () => {
 }
 
 .hero-page-title {
-  font-size: 48rpx;
+  font-size: 42rpx;
   font-weight: 800;
   line-height: 1.1;
 }
@@ -527,7 +527,7 @@ onPullDownRefresh(async () => {
 .hero-title {
   display: block;
   margin-top: 26rpx;
-  font-size: 52rpx;
+  font-size: 46rpx;
   font-weight: 800;
   line-height: 1.2;
 }
@@ -535,7 +535,7 @@ onPullDownRefresh(async () => {
 .hero-subtitle {
   display: block;
   margin-top: 12rpx;
-  font-size: 30rpx;
+  font-size: 28rpx;
   line-height: 1.7;
   opacity: 0.88;
 }
@@ -581,8 +581,8 @@ onPullDownRefresh(async () => {
   position: relative;
   z-index: 2;
   margin-top: -70rpx;
-  padding: 24rpx 24rpx;
-  border-radius: 28rpx;
+  padding: 24rpx 26rpx;
+  border-radius: 22rpx;
   background: rgba(255, 255, 255, 0.97);
   box-shadow: var(--shadow-float);
   display: flex;
@@ -641,9 +641,9 @@ onPullDownRefresh(async () => {
 
 .metric-card {
   position: relative;
-  min-height: 158rpx;
-  padding: 24rpx 18rpx 18rpx;
-  border-radius: 24rpx;
+  min-height: 154rpx;
+  padding: 22rpx 18rpx 18rpx;
+  border-radius: 18rpx;
   background: rgba(255, 255, 255, 0.94);
   border: 1rpx solid #f0e2e5;
   box-shadow: var(--shadow-soft);
@@ -703,8 +703,8 @@ onPullDownRefresh(async () => {
 }
 
 .section-card {
-  padding: 30rpx 24rpx;
-  border-radius: 26rpx;
+  padding: 30rpx 24rpx 28rpx;
+  border-radius: 22rpx;
   background: var(--card-elevated);
   border: 1rpx solid #f0e2e5;
   box-shadow: var(--shadow-card);
@@ -748,18 +748,17 @@ onPullDownRefresh(async () => {
 }
 
 .entry-mark {
-  width: 84rpx;
-  height: 84rpx;
-  border-radius: 28rpx;
-  background:
-    linear-gradient(180deg, #fff7f8, #fff0f2),
-    #fff;
-  color: #a61e2d;
-  box-shadow: inset 0 0 0 1rpx rgba(183, 15, 36, 0.06);
+  width: 78rpx;
+  height: 78rpx;
+  border-radius: 18rpx;
+  background: #fff;
+  color: #b70f24;
+  border: 2rpx solid #d1d5db;
+  box-shadow: inset 0 -8rpx 0 rgba(183, 15, 36, 0.04);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28rpx;
+  font-size: 26rpx;
   font-weight: 700;
 }
 

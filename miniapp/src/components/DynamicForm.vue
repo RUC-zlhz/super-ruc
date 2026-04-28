@@ -203,14 +203,16 @@ defineExpose({ validate })
 .dynamic-form {
   display: flex;
   flex-direction: column;
-  gap: 18rpx;
+  gap: 14rpx;
 }
 .df-row {
-  padding: 18rpx 0;
-  border-bottom: 1rpx solid #f4e9ec;
+  padding: 18rpx;
+  border-radius: 18rpx;
+  background: #fffafa;
+  border: 1rpx solid #f3e6e8;
 }
 .df-row:last-child {
-  border-bottom: none;
+  border-bottom: 1rpx solid #f3e6e8;
 }
 .df-label { display: flex; align-items: center; margin-bottom: 10rpx; }
 .df-label-text { font-size: 25rpx; color: #3b3134; font-weight: 700; }
@@ -220,9 +222,9 @@ defineExpose({ validate })
 .df-input, .df-textarea, .df-picker {
   width: 100%;
   box-sizing: border-box;
-  background: #fffafa;
+  background: #ffffff;
   border: 1rpx solid #f0dfe3;
-  border-radius: 18rpx;
+  border-radius: 14rpx;
   padding: 18rpx 20rpx;
   font-size: 26rpx;
   color: #2f2a2b;
@@ -230,7 +232,7 @@ defineExpose({ validate })
 }
 .df-textarea { min-height: 168rpx; }
 .df-picker {
-  min-height: 78rpx;
+  min-height: 76rpx;
   line-height: 1.5;
   display: flex;
   align-items: center;

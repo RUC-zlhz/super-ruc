@@ -1,5 +1,6 @@
 const TAB_BAR_PAGES = new Set([
   "/pages/index/index",
+  "/pages/request/index",
   "/pages/notice/index",
   "/pages/profile/index",
 ]);

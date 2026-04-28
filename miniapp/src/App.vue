@@ -9,30 +9,31 @@ onLaunch(() => {
 <style>
 page {
   --primary-color: #b70f24;
-  --primary-dark: #7f1722;
-  --primary-soft: #fff1f2;
-  --primary-veil: rgba(183, 15, 36, 0.08);
-  --accent-gold: #d89b2b;
+  --primary-dark: #8f0f1f;
+  --primary-deep: #6f0d18;
+  --primary-soft: #fff2f3;
+  --primary-veil: rgba(183, 15, 36, 0.075);
+  --accent-gold: #d79a2b;
   --accent-blue: #2563eb;
   --accent-green: #16a34a;
   --accent-orange: #ea7a22;
   --secondary-color: #334155;
-  --bg-color: #f7f1f2;
-  --bg-soft: #fff9fa;
+  --bg-color: #f8f3f4;
+  --bg-soft: #fff8f8;
   --card-bg: #ffffff;
   --card-elevated: #fffdfd;
   --success-color: #15803d;
   --warning-color: #d97706;
   --error-color: #dc2626;
-  --border-color: #eee3e6;
+  --border-color: #f0e2e5;
   --text-main: #1e293b;
-  --text-muted: #667085;
-  --shadow-card: 0 16rpx 40rpx rgba(82, 28, 38, 0.1);
-  --shadow-soft: 0 10rpx 28rpx rgba(82, 28, 38, 0.08);
-  --shadow-float: 0 22rpx 52rpx rgba(103, 26, 40, 0.16);
-  --radius-card: 24rpx;
-  --radius-panel: 18rpx;
-  --radius-hero: 36rpx;
+  --text-muted: #6b7280;
+  --shadow-card: 0 14rpx 32rpx rgba(64, 22, 30, 0.08);
+  --shadow-soft: 0 10rpx 24rpx rgba(64, 22, 30, 0.06);
+  --shadow-float: 0 20rpx 44rpx rgba(103, 26, 40, 0.13);
+  --radius-card: 26rpx;
+  --radius-panel: 20rpx;
+  --radius-hero: 30rpx;
   --radius-pill: 999rpx;
 
   --font-base: 14px;
@@ -42,6 +43,9 @@ page {
   --line-height-base: 1.5;
 
   background-color: var(--bg-color);
+  background-image:
+    radial-gradient(circle at 100% 0, rgba(183, 15, 36, 0.04), transparent 260rpx),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(248, 243, 244, 0));
   font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', sans-serif;
   color: var(--text-main);
   font-size: var(--font-base);

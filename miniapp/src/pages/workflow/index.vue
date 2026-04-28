@@ -209,7 +209,7 @@ onPullDownRefresh(async () => {
   min-height: 100vh;
   padding: 0 24rpx 32rpx;
   background:
-    linear-gradient(180deg, #b70f24 0, #b70f24 332rpx, #f8f3f4 600rpx),
+    linear-gradient(180deg, #b70f24 0, #b70f24 318rpx, #fff4f5 508rpx, #f8f3f4 100%),
     #f8f3f4;
   display: flex;
   flex-direction: column;
@@ -218,7 +218,7 @@ onPullDownRefresh(async () => {
 
 .page-hero {
   margin: 0 -24rpx;
-  padding: 50rpx 38rpx 44rpx;
+  padding: 48rpx 38rpx 42rpx;
   color: #fff;
   background:
     radial-gradient(circle at 86% 22%, rgba(255, 255, 255, 0.16), transparent 140rpx),
@@ -394,7 +394,7 @@ onPullDownRefresh(async () => {
   display: block;
   font-size: 30rpx;
   font-weight: 800;
-  color: #ffffff;
+  color: #1f2937;
 }
 
 .section-desc {
@@ -402,7 +402,7 @@ onPullDownRefresh(async () => {
   margin-top: 8rpx;
   font-size: 22rpx;
   line-height: 1.6;
-  color: rgba(255, 255, 255, 0.78);
+  color: #8a7280;
 }
 
 .section-badge {
@@ -410,14 +410,14 @@ onPullDownRefresh(async () => {
   margin-top: 6rpx;
   padding: 10rpx 18rpx;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff5f5;
+  background: #fff1f2;
+  color: #b70f24;
   font-size: 22rpx;
 }
 
 .flow-card {
   padding: 26rpx 24rpx;
-  border-radius: 28rpx;
+  border-radius: 22rpx;
   background:
     linear-gradient(180deg, rgba(255, 251, 251, 0.98), rgba(255, 255, 255, 0.98));
   border: 1rpx solid #f0e2e5;

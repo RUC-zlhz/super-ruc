@@ -6,7 +6,7 @@
       <view class="hero-main">
         <view class="hero-copy">
           <view class="hero-icon-wrap">
-            <text class="hero-icon">📋</text>
+            <text class="hero-icon">申</text>
           </view>
           <view class="hero-text">
             <text class="hero-eyebrow">学生事务服务</text>
@@ -75,17 +75,20 @@
         <text class="filter-meta">共 {{ requests.length }} 项</text>
       </view>
 
-      <scroll-view scroll-x class="tab-row" show-scrollbar="false">
-        <view
-          v-for="t in STATUS_TABS"
-          :key="t.value"
-          class="tab-chip"
-          :class="{ active: tab === t.value }"
-          @tap="onTab(t.value)"
-        >
-          {{ t.label }}
-        </view>
-      </scroll-view>
+      <view class="filter-tabs-row">
+        <scroll-view scroll-x class="tab-row" show-scrollbar="false">
+          <view
+            v-for="t in STATUS_TABS"
+            :key="t.value"
+            class="tab-chip"
+            :class="{ active: tab === t.value }"
+            @tap="onTab(t.value)"
+          >
+            {{ t.label }}
+          </view>
+        </scroll-view>
+        <view class="filter-button">筛选</view>
+      </view>
     </view>
 
     <view class="create-entry" @tap="goCreate">
@@ -317,26 +320,26 @@ onPullDownRefresh(async () => {
 <style scoped>
 .container {
   min-height: 100vh;
-  padding: 28rpx 36rpx 36rpx;
+  padding: 28rpx 36rpx 42rpx;
   background:
-    radial-gradient(circle at 100% 12%, rgba(183, 15, 36, 0.08), transparent 180rpx),
-    linear-gradient(180deg, #fff 0, #fff5f6 260rpx, #f7f1f2 100%),
+    radial-gradient(circle at 100% 10%, rgba(183, 15, 36, 0.06), transparent 190rpx),
+    linear-gradient(180deg, #fff 0, #fff7f7 250rpx, #f8f3f4 100%),
     #f6f0f1;
   display: flex;
   flex-direction: column;
-  gap: 18rpx;
+  gap: 20rpx;
 }
 
 .hero-card {
   position: relative;
   overflow: hidden;
   padding: 28rpx 30rpx;
-  border-radius: 20rpx;
+  border-radius: 16rpx;
   background:
     radial-gradient(circle at 100% 100%, rgba(183, 15, 36, 0.12), transparent 180rpx),
     linear-gradient(135deg, rgba(255, 250, 251, 0.98), rgba(255, 245, 247, 0.98));
   border: 1rpx solid #f0c9cf;
-  box-shadow: 0 12rpx 30rpx rgba(146, 18, 36, 0.08);
+  box-shadow: 0 10rpx 24rpx rgba(146, 18, 36, 0.07);
 }
 
 .hero-orb {
@@ -377,9 +380,9 @@ onPullDownRefresh(async () => {
 .hero-icon-wrap {
   width: 92rpx;
   height: 92rpx;
-  border-radius: 26rpx;
-  background: #fff1f2;
-  box-shadow: inset 0 0 0 1rpx rgba(183, 15, 36, 0.08);
+  border-radius: 20rpx;
+  background: linear-gradient(135deg, #fff1f2, #ffe1e6);
+  box-shadow: inset 0 0 0 1rpx rgba(183, 15, 36, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -387,7 +390,9 @@ onPullDownRefresh(async () => {
 }
 
 .hero-icon {
-  font-size: 44rpx;
+  font-size: 42rpx;
+  color: #b70f24;
+  font-weight: 900;
   line-height: 1;
 }
 
@@ -399,7 +404,7 @@ onPullDownRefresh(async () => {
   display: inline-flex;
   padding: 6rpx 16rpx;
   border-radius: 999rpx;
-  background: #fff1f2;
+  background: transparent;
   color: #b70f24;
   font-size: 20rpx;
   letter-spacing: 1rpx;
@@ -466,8 +471,8 @@ onPullDownRefresh(async () => {
 }
 
 .launch-btn {
-  padding: 20rpx 24rpx;
-  border-radius: 20rpx;
+  padding: 22rpx 24rpx;
+  border-radius: 18rpx;
   background: linear-gradient(135deg, #df1832, #b70f24);
   color: #fff;
   box-shadow: 0 16rpx 34rpx rgba(183, 15, 36, 0.28);
@@ -512,7 +517,7 @@ onPullDownRefresh(async () => {
 .metric-card {
   min-height: 142rpx;
   padding: 22rpx 18rpx;
-  border-radius: 24rpx;
+  border-radius: 16rpx;
   background: rgba(255, 255, 255, 0.94);
   border: 1rpx solid rgba(240, 226, 229, 0.9);
   box-shadow: 0 14rpx 32rpx rgba(36, 17, 21, 0.06);
@@ -616,8 +621,15 @@ onPullDownRefresh(async () => {
   white-space: nowrap;
 }
 
+.filter-tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+}
+
 .tab-row {
-  margin-top: 18rpx;
+  flex: 1;
+  min-width: 0;
   white-space: nowrap;
 }
 
@@ -626,8 +638,8 @@ onPullDownRefresh(async () => {
   align-items: center;
   justify-content: center;
   margin-right: 12rpx;
-  padding: 16rpx 24rpx;
-  border-radius: 999rpx;
+  padding: 15rpx 24rpx;
+  border-radius: 14rpx;
   background: #f8fafc;
   border: 1rpx solid #eef2f7;
   color: #64748b;
@@ -641,6 +653,20 @@ onPullDownRefresh(async () => {
   color: #fff;
   font-weight: 800;
   box-shadow: 0 10rpx 24rpx rgba(183, 15, 36, 0.22);
+}
+
+.filter-button {
+  flex-shrink: 0;
+  min-width: 100rpx;
+  height: 62rpx;
+  border-radius: 14rpx;
+  color: #3f3f46;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1rpx solid #eef2f7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
 }
 
 .create-entry {
@@ -701,7 +727,7 @@ onPullDownRefresh(async () => {
   position: relative;
   overflow: hidden;
   padding: 26rpx;
-  border-radius: 24rpx;
+  border-radius: 20rpx;
   background: rgba(255, 255, 255, 0.96);
   border: 1rpx solid rgba(240, 226, 229, 0.9);
   box-shadow: 0 16rpx 34rpx rgba(41, 18, 23, 0.08);
@@ -749,7 +775,7 @@ onPullDownRefresh(async () => {
 .req-icon {
   width: 82rpx;
   height: 82rpx;
-  border-radius: 24rpx;
+  border-radius: 50%;
   background: linear-gradient(135deg, #fff1f2, #ffe7ea);
   color: #b70f24;
   display: flex;

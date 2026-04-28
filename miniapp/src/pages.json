@@ -21,12 +21,14 @@
     "backgroundColor": "#f8f3f4"
   },
   "tabBar": {
-    "color": "#999",
+    "color": "#8f8f8f",
     "selectedColor": "#b70f24",
     "borderStyle": "white",
+    "backgroundColor": "#ffffff",
     "list": [
       { "pagePath": "pages/index/index", "text": "首页", "iconPath": "static/tab-home.png", "selectedIconPath": "static/tab-home-active.png" },
-      { "pagePath": "pages/notice/index", "text": "通知", "iconPath": "static/tab-notice.png", "selectedIconPath": "static/tab-notice-active.png" },
+      { "pagePath": "pages/request/index", "text": "服务", "iconPath": "static/tab-service.png", "selectedIconPath": "static/tab-service-active.png" },
+      { "pagePath": "pages/notice/index", "text": "消息", "iconPath": "static/tab-notice.png", "selectedIconPath": "static/tab-notice-active.png" },
       { "pagePath": "pages/profile/index", "text": "我的", "iconPath": "static/tab-profile.png", "selectedIconPath": "static/tab-profile-active.png" }
     ]
   }

@@ -674,10 +674,10 @@ onMounted(async () => {
 <style scoped>
 .container {
   min-height: 100vh;
-  padding: 28rpx 24rpx;
+  padding: 26rpx 24rpx;
   background:
-    radial-gradient(circle at 100% 8%, rgba(183, 15, 36, 0.08), transparent 180rpx),
-    linear-gradient(180deg, #fff 0, #fff6f7 240rpx, #f7f1f2 100%),
+    radial-gradient(circle at 100% 8%, rgba(183, 15, 36, 0.055), transparent 180rpx),
+    linear-gradient(180deg, #fff 0, #fff7f7 240rpx, #f8f3f4 100%),
     #f6f0f1;
 }
 
@@ -692,12 +692,12 @@ onMounted(async () => {
   position: relative;
   overflow: hidden;
   padding: 24rpx;
-  border-radius: 22rpx;
+  border-radius: 16rpx;
   background:
     radial-gradient(circle at 100% 100%, rgba(183, 15, 36, 0.1), transparent 180rpx),
     linear-gradient(135deg, rgba(255, 250, 251, 0.98), rgba(255, 246, 247, 0.98));
   border: 1rpx solid #f0c9cf;
-  box-shadow: 0 12rpx 30rpx rgba(146, 18, 36, 0.08);
+  box-shadow: 0 10rpx 24rpx rgba(146, 18, 36, 0.07);
 }
 
 .hero-orb {
@@ -738,9 +738,9 @@ onMounted(async () => {
 .hero-icon-wrap {
   width: 92rpx;
   height: 92rpx;
-  border-radius: 26rpx;
-  background: #fff1f2;
-  box-shadow: inset 0 0 0 1rpx rgba(183, 15, 36, 0.08);
+  border-radius: 18rpx;
+  background: linear-gradient(135deg, #fff1f2, #ffe3e7);
+  box-shadow: inset 0 0 0 1rpx rgba(183, 15, 36, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -766,7 +766,7 @@ onMounted(async () => {
   display: inline-flex;
   padding: 6rpx 16rpx;
   border-radius: 999rpx;
-  background: #fff1f2;
+  background: transparent;
   color: #b70f24;
   font-size: 20rpx;
   letter-spacing: 1rpx;
@@ -775,7 +775,7 @@ onMounted(async () => {
 .hero-title {
   display: block;
   margin-top: 12rpx;
-  font-size: 32rpx;
+  font-size: 31rpx;
   font-weight: 800;
   line-height: 1.45;
   color: #1f2937;
@@ -865,7 +865,7 @@ onMounted(async () => {
 .notice-card,
 .submit-summary {
   background: rgba(255, 255, 255, 0.96);
-  border-radius: 26rpx;
+  border-radius: 18rpx;
   border: 1rpx solid rgba(240, 226, 229, 0.94);
   box-shadow: 0 16rpx 36rpx rgba(41, 18, 23, 0.08);
 }
@@ -925,9 +925,9 @@ onMounted(async () => {
 }
 
 .type-item {
-  min-height: 150rpx;
+  min-height: 166rpx;
   padding: 20rpx 12rpx;
-  border-radius: 14rpx;
+  border-radius: 12rpx;
   background: linear-gradient(180deg, #fffefe, #fff7f8);
   border: 1rpx solid rgba(239, 221, 225, 0.96);
   box-shadow: 0 12rpx 28rpx rgba(41, 18, 23, 0.06);
@@ -941,8 +941,8 @@ onMounted(async () => {
 }
 
 .type-icon {
-  width: 60rpx;
-  height: 60rpx;
+  width: 64rpx;
+  height: 64rpx;
   border-radius: 16rpx;
   background: linear-gradient(135deg, #fff1f2, #ffe7ea);
   color: #b70f24;
@@ -1149,9 +1149,9 @@ onMounted(async () => {
 .textarea {
   width: 100%;
   box-sizing: border-box;
-  background: #fbfcfd;
-  border: 1rpx solid rgba(226, 232, 240, 0.84);
-  border-radius: 18rpx;
+  background: #fffafa;
+  border: 1rpx solid #f0dfe3;
+  border-radius: 14rpx;
   padding: 20rpx 18rpx;
   font-size: 26rpx;
   color: #1f2937;
@@ -1351,7 +1351,7 @@ onMounted(async () => {
   right: 0;
   bottom: 0;
   z-index: 20;
-  padding: 0 20rpx calc(20rpx + env(safe-area-inset-bottom));
+  padding: 0 20rpx calc(16rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 
@@ -1361,7 +1361,7 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 18rpx;
   padding: 18rpx;
-  border-radius: 28rpx 28rpx 0 0;
+  border-radius: 0;
   background: rgba(255, 255, 255, 0.98);
   border-top: 1rpx solid rgba(240, 226, 229, 0.94);
   box-shadow: 0 -12rpx 30rpx rgba(41, 18, 23, 0.1);
@@ -1436,7 +1436,7 @@ onMounted(async () => {
   position: relative;
   overflow: visible;
   padding: 74rpx 28rpx 28rpx;
-  border-radius: 28rpx;
+  border-radius: 18rpx;
   background: #fff;
   box-shadow: 0 24rpx 48rpx rgba(15, 23, 42, 0.24);
 }

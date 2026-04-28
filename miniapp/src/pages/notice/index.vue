@@ -137,11 +137,11 @@ onShow(() => reload())
 <style scoped>
 .container {
   min-height: 100vh;
-  padding: 24rpx 40rpx 36rpx;
+  padding: 24rpx 40rpx 42rpx;
   background:
     linear-gradient(0deg, rgba(183, 15, 36, 0.04) 0 2rpx, transparent 2rpx 100%),
     radial-gradient(circle at 50% 100%, rgba(183, 15, 36, 0.1), transparent 260rpx),
-    linear-gradient(180deg, #fff 0, #fff 130rpx, #fbf6f7 360rpx, var(--bg-color) 100%),
+    linear-gradient(180deg, #fff 0, #fff 130rpx, #fbf7f7 360rpx, var(--bg-color) 100%),
     var(--bg-color);
 }
 
@@ -171,10 +171,10 @@ onShow(() => reload())
 
 .notice-card {
   display: flex;
-  gap: 24rpx;
+  gap: 22rpx;
   background: var(--card-elevated);
-  padding: 30rpx 28rpx;
-  border-radius: 28rpx;
+  padding: 28rpx 26rpx;
+  border-radius: 18rpx;
   margin-bottom: 22rpx;
   border: 1rpx solid #f0e2e5;
   box-shadow: var(--shadow-card);
@@ -204,15 +204,15 @@ onShow(() => reload())
 }
 .notice-icon {
   flex-shrink: 0;
-  width: 94rpx;
-  height: 94rpx;
+  width: 82rpx;
+  height: 82rpx;
   border-radius: 50%;
   background: linear-gradient(135deg, #c83045, #a20e20);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 30rpx;
+  font-size: 28rpx;
   font-weight: 800;
   box-shadow: 0 14rpx 28rpx rgba(200, 48, 69, 0.2);
 }
@@ -235,7 +235,7 @@ onShow(() => reload())
   gap: 12rpx;
 }
 .notice-title {
-  font-size: 33rpx;
+  font-size: 31rpx;
   line-height: 1.45;
   font-weight: 800;
   color: #202124;
@@ -260,7 +260,7 @@ onShow(() => reload())
 }
 .notice-preview {
   display: block;
-  font-size: 27rpx;
+  font-size: 26rpx;
   line-height: 1.72;
   color: #5f6368;
   margin-top: 16rpx;
