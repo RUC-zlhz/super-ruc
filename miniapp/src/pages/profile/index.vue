@@ -287,6 +287,13 @@
               <text class="label">说明</text>
               <textarea class="textarea" v-model="appealForm.reason" placeholder="请说明修改理由" />
             </view>
+            <view class="upload-card" @tap="showUploadHint">
+              <text class="upload-icon">凭</text>
+              <view class="upload-copy">
+                <text class="upload-title">上传凭证</text>
+                <text class="upload-desc">支持图片、PDF 等证明材料，后端附件能力接通后可直接上传</text>
+              </view>
+            </view>
           </view>
           <view class="popup-footer">
             <button class="popup-cancel" size="mini" @tap="closeAppeal">取消</button>
@@ -357,6 +364,13 @@
               <view class="form-item half">
                 <text class="label">等级/名次</text>
                 <input class="input" v-model="growthForm.rank_label" placeholder="例如：一等奖" />
+              </view>
+            </view>
+            <view class="upload-card" @tap="showUploadHint">
+              <text class="upload-icon">附</text>
+              <view class="upload-copy">
+                <text class="upload-title">附件上传</text>
+                <text class="upload-desc">可用于佐证活动、获奖、实践等成长经历</text>
               </view>
             </view>
           </view>
@@ -607,6 +621,10 @@ function openGrowthSubmission() {
 function closeGrowthSubmission() {
   growthPopup.value?.close()
   resetGrowthForm()
+}
+
+function showUploadHint() {
+  uni.showToast({ title: '附件上传入口已预留', icon: 'none' })
 }
 
 async function onSubmitAppeal() {
@@ -1498,6 +1516,52 @@ onMounted(async () => {
 .popup-form {
   border-radius: 26rpx;
   background: #fff;
+}
+
+.upload-card {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  min-height: 128rpx;
+  padding: 22rpx;
+  border-radius: 22rpx;
+  border: 2rpx dashed #ead1d6;
+  background: linear-gradient(135deg, #fffafa, #fff6f7);
+  margin-bottom: 18rpx;
+}
+
+.upload-icon {
+  width: 58rpx;
+  height: 58rpx;
+  border-radius: 18rpx;
+  background: #fff1f2;
+  color: #b30d1f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.upload-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.upload-title {
+  display: block;
+  color: #2a2526;
+  font-size: 27rpx;
+  font-weight: 800;
+}
+
+.upload-desc {
+  display: block;
+  margin-top: 8rpx;
+  color: #9f9094;
+  font-size: 22rpx;
+  line-height: 1.55;
 }
 
 .form-item {

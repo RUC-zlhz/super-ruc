@@ -75,7 +75,7 @@
         <view v-if="selected.source_url" class="detail-source">
           来源：{{ selected.source_url }}
         </view>
-        <view class="detail-action">查看原文</view>
+        <view class="detail-action" @tap="openSource">查看原文</view>
       </view>
     </uni-popup>
   </view>
@@ -113,6 +113,19 @@ function onDetail(item: KnowledgeEntry) {
 function closeDetail() {
   detailPopup.value?.close()
   selected.value = null
+}
+
+function openSource() {
+  if (!selected.value?.source_url) {
+    uni.showToast({ title: '暂无原文链接', icon: 'none' })
+    return
+  }
+  uni.setClipboardData({
+    data: selected.value.source_url,
+    success() {
+      uni.showToast({ title: '原文链接已复制', icon: 'none' })
+    },
+  })
 }
 
 function resultIcon(category?: string | null) {

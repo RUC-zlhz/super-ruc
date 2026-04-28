@@ -85,41 +85,107 @@
       </span>
     </div>
 
-    <a-table
-      :columns="columns"
-      :data-source="rows"
-      :loading="loading"
-      :pagination="pagination"
-      row-key="id"
-      @change="onTableChange"
-    >
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'storage_scope'">
-          <a-tag :color="auditScopeColor(record.storage_scope)">
-            {{ auditScopeLabel(record.storage_scope) }}
-          </a-tag>
-        </template>
-        <template v-else-if="column.key === 'result_code'">
-          <a-tooltip :title="record.result_code">
-            <a-tag :color="auditResultColor(record.result_code)">
-              {{ auditResultLabel(record.result_code) }}
-            </a-tag>
-          </a-tooltip>
-        </template>
-        <template v-else-if="column.key === 'detail'">
-          <a-popover v-if="auditDetailText(record)" placement="left">
-            <template #content>
-              <pre class="detail-pre">{{ auditDetailText(record) }}</pre>
+    <div class="audit-workbench">
+      <section class="audit-table-area">
+        <a-table
+          :columns="columns"
+          :data-source="rows"
+          :loading="loading"
+          :pagination="pagination"
+          row-key="id"
+          @change="onTableChange"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'storage_scope'">
+              <a-tag :color="auditScopeColor(record.storage_scope)">
+                {{ auditScopeLabel(record.storage_scope) }}
+              </a-tag>
             </template>
-            <span class="detail-preview">{{ auditDetailPreview(record) }}</span>
-          </a-popover>
-          <span v-else>-</span>
+            <template v-else-if="column.key === 'result_code'">
+              <a-tooltip :title="record.result_code">
+                <a-tag :color="auditResultColor(record.result_code)">
+                  {{ auditResultLabel(record.result_code) }}
+                </a-tag>
+              </a-tooltip>
+            </template>
+            <template v-else-if="column.key === 'detail'">
+              <button
+                v-if="auditDetailText(record)"
+                class="detail-preview"
+                type="button"
+                @click="selectAudit(record)"
+              >
+                {{ auditDetailPreview(record) }}
+              </button>
+              <a-button v-else type="link" size="small" @click="selectAudit(record)">
+                查看
+              </a-button>
+            </template>
+            <template v-else-if="column.key === 'occurred_at'">
+              {{ formatDateTime(record.occurred_at) }}
+            </template>
+          </template>
+        </a-table>
+      </section>
+
+      <aside class="audit-detail panel-card">
+        <div class="detail-side-head">
+          <div>
+            <div class="detail-side-title">日志详情</div>
+            <div class="detail-side-sub">
+              {{ currentAudit ? `#${currentAudit.id}` : '选择一条日志查看上下文' }}
+            </div>
+          </div>
+          <a-tag v-if="currentAudit" :color="auditResultColor(currentAudit.result_code)">
+            {{ auditResultLabel(currentAudit.result_code) }}
+          </a-tag>
+        </div>
+
+        <template v-if="currentAudit">
+          <div class="detail-facts">
+            <div class="detail-fact">
+              <span>事件</span>
+              <strong>{{ currentAudit.event_type }}</strong>
+            </div>
+            <div class="detail-fact">
+              <span>实体</span>
+              <strong>{{ currentAudit.entity_code || '-' }}</strong>
+            </div>
+            <div class="detail-fact">
+              <span>对象 ID</span>
+              <strong>{{ currentAudit.entity_id || '-' }}</strong>
+            </div>
+            <div class="detail-fact">
+              <span>操作</span>
+              <strong>{{ currentAudit.action }}</strong>
+            </div>
+            <div class="detail-fact">
+              <span>操作人</span>
+              <strong>{{ currentAudit.actor_user_id || '-' }}</strong>
+            </div>
+            <div class="detail-fact">
+              <span>IP</span>
+              <strong>{{ currentAudit.ip_address || '-' }}</strong>
+            </div>
+            <div class="detail-fact">
+              <span>范围</span>
+              <strong>{{ auditScopeLabel(currentAudit.storage_scope) }}</strong>
+            </div>
+            <div class="detail-fact">
+              <span>时间</span>
+              <strong>{{ formatDateTime(currentAudit.occurred_at) }}</strong>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">详情载荷</div>
+            <pre class="detail-pre side">{{ auditDetailText(currentAudit) || '无详情' }}</pre>
+          </div>
         </template>
-        <template v-else-if="column.key === 'occurred_at'">
-          {{ formatDateTime(record.occurred_at) }}
-        </template>
-      </template>
-    </a-table>
+
+        <a-empty v-else image="simple" description="暂无日志" />
+      </aside>
+    </div>
 
     <a-divider v-if="canArchive" />
 
@@ -196,7 +262,14 @@ const filters = reactive<{
 const rows = ref<AuditLogOut[]>([]);
 const loading = ref(false);
 const pagination = reactive({ current: 1, pageSize: 20, total: 0 });
+const selectedAudit = ref<AuditLogOut | null>(null);
 const canArchive = computed(() => hasAnyRole(auth.roleCodes, ["SUPER_ADMIN"]));
+const currentAudit = computed(() => {
+  if (selectedAudit.value && rows.value.some((row) => row.id === selectedAudit.value?.id)) {
+    return selectedAudit.value;
+  }
+  return rows.value[0] || null;
+});
 const resultSummary = computed(() => {
   return rows.value.reduce(
     (summary, row) => {
@@ -302,6 +375,10 @@ function auditDetailPreview(record: AuditDetailPayload) {
   return detailText.length > 96 ? `${detailText.slice(0, 96)}...` : detailText;
 }
 
+function selectAudit(record: AuditLogOut | Record<string, unknown>) {
+  selectedAudit.value = record as AuditLogOut;
+}
+
 async function reload() {
   loading.value = true;
   try {
@@ -319,6 +396,9 @@ async function reload() {
     });
     rows.value = resp.data.items;
     pagination.total = resp.data.meta.total;
+    if (!selectedAudit.value || !rows.value.some((row) => row.id === selectedAudit.value?.id)) {
+      selectedAudit.value = rows.value[0] || null;
+    }
   } finally {
     loading.value = false;
   }
@@ -378,10 +458,16 @@ onMounted(reload);
 .detail-preview {
   display: inline-block;
   max-width: 320px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ruc-red);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
+  font: inherit;
+  text-align: left;
 }
 .detail-pre {
   margin: 0;
@@ -390,6 +476,92 @@ onMounted(reload);
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.detail-pre.side {
+  max-width: none;
+  max-height: 340px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: #101722;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.audit-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+
+.audit-table-area {
+  min-width: 0;
+}
+
+.audit-detail {
+  position: sticky;
+  top: 86px;
+  padding: 16px;
+}
+
+.detail-side-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.detail-side-title {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.detail-side-sub {
+  margin-top: 4px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.detail-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.detail-fact {
+  min-height: 66px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: #fff8f8;
+  border: 1px solid var(--line-soft);
+}
+
+.detail-fact span {
+  display: block;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.detail-fact strong {
+  display: block;
+  margin-top: 7px;
+  color: var(--text);
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.detail-section {
+  margin-top: 16px;
+}
+
+.detail-section-title {
+  margin-bottom: 8px;
+  color: var(--text);
+  font-weight: 700;
 }
 
 .summary-row {
@@ -448,5 +620,15 @@ onMounted(reload);
   border-radius: 999px;
   background: var(--surface-2);
   color: var(--ink-2);
+}
+
+@media (max-width: 1320px) {
+  .audit-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .audit-detail {
+    position: static;
+  }
 }
 </style>

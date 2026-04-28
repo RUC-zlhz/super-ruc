@@ -169,8 +169,8 @@
         </view>
 
         <view class="detail-footer">
-          <view class="detail-action secondary">查看附件</view>
-          <view class="detail-action" @tap="closeDetail">分享荣誉</view>
+          <view class="detail-action secondary" @tap="showAttachmentHint">查看附件</view>
+          <view class="detail-action" @tap="shareHonor">分享荣誉</view>
         </view>
       </view>
     </uni-popup>
@@ -373,6 +373,24 @@ async function onDetail(row: HonorRecordBrief) {
 function closeDetail() {
   detailPopup.value?.close()
   selected.value = null
+}
+
+function showAttachmentHint() {
+  uni.showToast({ title: '附件查看入口已保留，请以后端附件数据为准', icon: 'none' })
+}
+
+function shareHonor() {
+  if (!selected.value) {
+    uni.showToast({ title: '暂无可分享荣誉', icon: 'none' })
+    return
+  }
+  const text = `${selected.value.title}｜${selected.value.awarded_by}｜${formatDate(selected.value.announced_at)}`
+  uni.setClipboardData({
+    data: text,
+    success() {
+      uni.showToast({ title: '荣誉信息已复制', icon: 'none' })
+    },
+  })
 }
 
 onMounted(() => {

@@ -11,150 +11,195 @@
       </div>
     </div>
 
-    <a-card :bordered="false" class="mb16">
-      <a-form layout="inline" :model="filters" @finish="onSearch">
-        <a-form-item label="关键字">
-          <a-input
-            v-model:value="filters.q"
-            placeholder="标题 / 授奖单位 / 获奖人"
-            allow-clear
-            style="width: 220px"
-          />
-        </a-form-item>
-        <a-form-item label="类别">
-          <a-select
-            v-model:value="filters.category_code"
-            :options="categorySelectOptions"
-            allow-clear
-            show-search
-            placeholder="全部类别"
-            style="width: 200px"
-            :filter-option="filterSelectOption"
-          />
-        </a-form-item>
-        <a-form-item label="年份">
-          <a-select
-            v-model:value="filters.year"
-            allow-clear
-            placeholder="全部年份"
-            style="width: 140px"
-          >
-            <a-select-option
-              v-for="year in YEAR_OPTIONS"
-              :key="year"
-              :value="year"
-            >
-              {{ year }} 年
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="级别">
-          <a-select v-model:value="filters.level" style="width: 140px" allow-clear>
-            <a-select-option value="NATIONAL">国家级</a-select-option>
-            <a-select-option value="PROVINCIAL">省部级</a-select-option>
-            <a-select-option value="MINISTERIAL">厅局级</a-select-option>
-            <a-select-option value="SCHOOL">校级</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="状态">
-          <a-select v-model:value="filters.status" style="width: 140px" allow-clear>
-            <a-select-option value="ACTIVE">生效</a-select-option>
-            <a-select-option value="ARCHIVED">归档</a-select-option>
-            <a-select-option value="REVOKED">撤销</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item>
-          <a-space wrap>
-            <a-button type="primary" html-type="submit">查询</a-button>
-            <a-button @click="onResetFilters">重置</a-button>
-            <a-button @click="openCategoryManager">类别维护</a-button>
-            <a-button @click="openImportModal">批量导入</a-button>
-            <a-button type="primary" @click="openEditor()">新增荣誉</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
-    </a-card>
+    <div class="honor-workbench">
+      <section class="honor-main">
+        <a-card :bordered="false" class="mb16">
+          <a-form layout="inline" :model="filters" @finish="onSearch">
+            <a-form-item label="关键字">
+              <a-input
+                v-model:value="filters.q"
+                placeholder="标题 / 授奖单位 / 获奖人"
+                allow-clear
+                style="width: 220px"
+              />
+            </a-form-item>
+            <a-form-item label="类别">
+              <a-select
+                v-model:value="filters.category_code"
+                :options="categorySelectOptions"
+                allow-clear
+                show-search
+                placeholder="全部类别"
+                style="width: 200px"
+                :filter-option="filterSelectOption"
+              />
+            </a-form-item>
+            <a-form-item label="年份">
+              <a-select
+                v-model:value="filters.year"
+                allow-clear
+                placeholder="全部年份"
+                style="width: 140px"
+              >
+                <a-select-option
+                  v-for="year in YEAR_OPTIONS"
+                  :key="year"
+                  :value="year"
+                >
+                  {{ year }} 年
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item label="级别">
+              <a-select v-model:value="filters.level" style="width: 140px" allow-clear>
+                <a-select-option value="NATIONAL">国家级</a-select-option>
+                <a-select-option value="PROVINCIAL">省部级</a-select-option>
+                <a-select-option value="MINISTERIAL">厅局级</a-select-option>
+                <a-select-option value="SCHOOL">校级</a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item label="状态">
+              <a-select v-model:value="filters.status" style="width: 140px" allow-clear>
+                <a-select-option value="ACTIVE">生效</a-select-option>
+                <a-select-option value="ARCHIVED">归档</a-select-option>
+                <a-select-option value="REVOKED">撤销</a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item>
+              <a-space wrap>
+                <a-button type="primary" html-type="submit">查询</a-button>
+                <a-button @click="onResetFilters">重置</a-button>
+                <a-button @click="openCategoryManager">类别维护</a-button>
+                <a-button @click="openImportModal">批量导入</a-button>
+                <a-button type="primary" @click="openEditor()">新增荣誉</a-button>
+              </a-space>
+            </a-form-item>
+          </a-form>
+        </a-card>
 
-    <a-table
-      :columns="columns"
-      :data-source="rows"
-      :loading="loading"
-      :pagination="pagination"
-      :scroll="{ x: 1520 }"
-      row-key="id"
-      @change="onTableChange"
-    >
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'title'">
-          <div class="title-cell">
-            <div class="title-main">{{ record.title }}</div>
-            <div v-if="isHistoricalRecord(record) || record.summary" class="cell-subtle">
-              <a-tag v-if="isHistoricalRecord(record)" color="orange">历史荣誉</a-tag>
-              <span>{{ historyReasonText(record) || record.summary }}</span>
-            </div>
+        <a-table
+          :columns="columns"
+          :data-source="rows"
+          :loading="loading"
+          :pagination="pagination"
+          :scroll="{ x: 1520 }"
+          row-key="id"
+          @change="onTableChange"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'title'">
+              <div class="title-cell">
+                <div class="title-main">{{ record.title }}</div>
+                <div v-if="isHistoricalRecord(record) || record.summary" class="cell-subtle">
+                  <a-tag v-if="isHistoricalRecord(record)" color="orange">历史荣誉</a-tag>
+                  <span>{{ historyReasonText(record) || record.summary }}</span>
+                </div>
+              </div>
+            </template>
+
+            <template v-else-if="column.key === 'category'">
+              <div class="category-cell">
+                <span>{{ categoryLabel(record) }}</span>
+                <a-tag
+                  v-if="categoryMap.get(record.category_code)?.is_active === false"
+                  class="mt4"
+                >
+                  已停用
+                </a-tag>
+              </div>
+            </template>
+
+            <template v-else-if="column.key === 'level'">
+              {{ levelLabel(record.level) }}
+            </template>
+
+            <template v-else-if="column.key === 'recipients'">
+              {{ (record.recipient_names || []).join('、') || '-' }}
+            </template>
+
+            <template v-else-if="column.key === 'status'">
+              <div class="status-cell">
+                <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
+                <a-tag
+                  v-if="isHistoricalRecord(record) && record.status === 'ACTIVE'"
+                  color="orange"
+                >
+                  历史荣誉
+                </a-tag>
+              </div>
+            </template>
+
+            <template v-else-if="column.key === 'maintenance'">
+              <div class="maintenance-cell">
+                <div>{{ record.updated_by_name || '-' }}</div>
+                <div class="cell-subtle">{{ formatDateTime(record.updated_at) }}</div>
+              </div>
+            </template>
+
+            <template v-else-if="column.key === 'actions'">
+              <a-space size="small">
+                <a-button type="link" size="small" @click="openEditor(record as HonorRecordBrief)">编辑</a-button>
+                <a-popconfirm
+                  v-if="record.status === 'ACTIVE'"
+                  title="确定将该荣誉归档为历史荣誉？"
+                  @confirm="onArchive(record.id, 'ARCHIVED')"
+                >
+                  <a-button type="link" size="small">归档</a-button>
+                </a-popconfirm>
+                <a-popconfirm
+                  v-if="record.status !== 'REVOKED'"
+                  title="确定撤销该荣誉展示？"
+                  @confirm="onArchive(record.id, 'REVOKED')"
+                >
+                  <a-button type="link" size="small" danger>撤销</a-button>
+                </a-popconfirm>
+              </a-space>
+            </template>
+          </template>
+        </a-table>
+      </section>
+
+      <aside class="honor-side panel-card">
+        <div class="side-head">
+          <div>
+            <div class="side-title">公示治理</div>
+            <div class="side-sub">类别、导入和状态分布</div>
           </div>
-        </template>
+          <a-button type="primary" size="small" @click="openEditor()">新增</a-button>
+        </div>
 
-        <template v-else-if="column.key === 'category'">
-          <div class="category-cell">
-            <span>{{ categoryLabel(record) }}</span>
-            <a-tag
-              v-if="categoryMap.get(record.category_code)?.is_active === false"
-              class="mt4"
-            >
-              已停用
-            </a-tag>
+        <div class="status-stack">
+          <div v-for="item in statusSummary" :key="item.key" class="status-row">
+            <span :class="['status-dot', item.key]"></span>
+            <span class="status-name">{{ item.label }}</span>
+            <strong>{{ item.count }}</strong>
           </div>
-        </template>
+        </div>
 
-        <template v-else-if="column.key === 'level'">
-          {{ levelLabel(record.level) }}
-        </template>
-
-        <template v-else-if="column.key === 'recipients'">
-          {{ (record.recipient_names || []).join('、') || '-' }}
-        </template>
-
-        <template v-else-if="column.key === 'status'">
-          <div class="status-cell">
-            <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
-            <a-tag
-              v-if="isHistoricalRecord(record) && record.status === 'ACTIVE'"
-              color="orange"
+        <div class="side-section">
+          <div class="side-section-title">类别维护</div>
+          <div class="category-chip-list">
+            <span
+              v-for="category in categoryRows.slice(0, 8)"
+              :key="category.code"
+              class="side-category-chip"
+              :class="{ inactive: !category.is_active }"
             >
-              历史荣誉
-            </a-tag>
+              {{ category.name }}
+            </span>
           </div>
-        </template>
+          <a-button block class="mt12" @click="openCategoryManager">打开类别维护</a-button>
+        </div>
 
-        <template v-else-if="column.key === 'maintenance'">
-          <div class="maintenance-cell">
-            <div>{{ record.updated_by_name || '-' }}</div>
-            <div class="cell-subtle">{{ formatDateTime(record.updated_at) }}</div>
+        <div class="side-section">
+          <div class="side-section-title">批量导入</div>
+          <div class="side-hint">
+            导入前会先完成校验预览；存在致命错误时不能正式提交。
           </div>
-        </template>
-
-        <template v-else-if="column.key === 'actions'">
-          <a-space size="small">
-            <a-button type="link" size="small" @click="openEditor(record as HonorRecordBrief)">编辑</a-button>
-            <a-popconfirm
-              v-if="record.status === 'ACTIVE'"
-              title="确定将该荣誉归档为历史荣誉？"
-              @confirm="onArchive(record.id, 'ARCHIVED')"
-            >
-              <a-button type="link" size="small">归档</a-button>
-            </a-popconfirm>
-            <a-popconfirm
-              v-if="record.status !== 'REVOKED'"
-              title="确定撤销该荣誉展示？"
-              @confirm="onArchive(record.id, 'REVOKED')"
-            >
-              <a-button type="link" size="small" danger>撤销</a-button>
-            </a-popconfirm>
-          </a-space>
-        </template>
-      </template>
-    </a-table>
+          <a-button block type="primary" ghost @click="openImportModal">进入导入</a-button>
+        </div>
+      </aside>
+    </div>
 
     <a-drawer
       :open="showDrawer"
@@ -599,6 +644,23 @@ const metrics = computed(() => [
     value: categoryRows.value.length,
     sub: '类别维护',
     icon: ClockCircleOutlined,
+  },
+])
+const statusSummary = computed(() => [
+  {
+    key: 'active',
+    label: '生效 / 待公示',
+    count: rows.value.filter((item) => item.status === 'ACTIVE').length,
+  },
+  {
+    key: 'archived',
+    label: '历史归档',
+    count: rows.value.filter((item) => item.status === 'ARCHIVED').length,
+  },
+  {
+    key: 'revoked',
+    label: '撤销记录',
+    count: rows.value.filter((item) => item.status === 'REVOKED').length,
   },
 ])
 
@@ -1179,5 +1241,128 @@ onMounted(() => {
 
 .category-form-card {
   background: #fafafa;
+}
+
+.honor-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+
+.honor-main {
+  min-width: 0;
+}
+
+.honor-side {
+  position: sticky;
+  top: 86px;
+  padding: 16px;
+}
+
+.side-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.side-title {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.side-sub,
+.side-hint {
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.side-sub {
+  margin-top: 4px;
+}
+
+.status-stack {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #fff8f8, #fff);
+  border: 1px solid var(--line-soft);
+}
+
+.status-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 30px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--text-3);
+}
+
+.status-dot.active {
+  background: var(--success);
+}
+
+.status-dot.archived {
+  background: var(--warning);
+}
+
+.status-dot.revoked {
+  background: var(--danger);
+}
+
+.side-section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.side-section-title {
+  margin-bottom: 10px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.category-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.side-category-chip {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--danger-soft);
+  color: var(--ruc-red);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.side-category-chip.inactive {
+  color: var(--text-3);
+  background: #f4f5f7;
+}
+
+@media (max-width: 1320px) {
+  .honor-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .honor-side {
+    position: static;
+  }
 }
 </style>

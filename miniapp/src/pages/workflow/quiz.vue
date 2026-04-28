@@ -248,7 +248,7 @@ import {
 type Stage = "pick" | "answer" | "result";
 const stage = ref<Stage>("pick");
 
-const form = reactive({ topic: "", limit: 5 });
+const form = reactive({ topic: "", limit: 20 });
 const TOPICS = [
   { label: "马克思主义基本原理", value: "马克思主义基本原理", icon: "册" },
   { label: "思想道德与法治", value: "思想道德与法治", icon: "法" },
@@ -359,7 +359,8 @@ function restart() {
   min-height: 100vh;
   padding: 24rpx 24rpx 36rpx;
   background:
-    linear-gradient(180deg, #b70f24 0, #b70f24 220rpx, #f8f3f4 460rpx),
+    radial-gradient(circle at 100% 0, rgba(183, 15, 36, 0.08), transparent 220rpx),
+    linear-gradient(180deg, #fff 0, #fff8f8 260rpx, #f8f3f4 100%),
     #f8f3f4;
 }
 
@@ -378,6 +379,50 @@ function restart() {
     linear-gradient(135deg, #d51f35, #b70f24 58%, #8b1020);
   color: #fff;
   box-shadow: 0 18rpx 40rpx rgba(93, 18, 30, 0.16);
+}
+
+.quiz-hero {
+  margin: 0 -24rpx 0;
+  min-height: 184rpx;
+  border-radius: 0 0 28rpx 28rpx;
+  padding: 42rpx 42rpx 76rpx;
+  background:
+    radial-gradient(circle at 84% 18%, rgba(255, 255, 255, 0.2), transparent 130rpx),
+    linear-gradient(135deg, #cf1c32, #ab1024 64%, #86101f);
+}
+
+.pick-card .setup-card:first-of-type {
+  position: relative;
+  z-index: 2;
+  margin-top: -42rpx;
+  border-radius: 30rpx 30rpx 24rpx 24rpx;
+}
+
+.answer-hero {
+  color: #202124;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1rpx solid #f0e2e5;
+  box-shadow: var(--shadow-card);
+}
+
+.answer-hero .hero-kicker {
+  color: #b70f24;
+  background: #fff1f2;
+}
+
+.answer-hero .hero-title,
+.answer-hero .answer-strip-value {
+  color: #202124;
+}
+
+.answer-hero .answer-strip-label {
+  color: #8a8f98;
+}
+
+.answer-hero .question-pill {
+  color: #b70f24;
+  background: #fff1f2;
+  border-color: #f0c9cf;
 }
 
 .hero-top {
@@ -459,6 +504,11 @@ function restart() {
   background: rgba(255, 255, 255, 0.14);
 }
 
+.answer-strip-item {
+  background: #fff8f9;
+  border: 1rpx solid #f0e2e5;
+}
+
 .hero-strip-value,
 .answer-strip-value,
 .result-strip-value {
@@ -519,7 +569,7 @@ function restart() {
   flex: 1;
   min-height: 168rpx;
   padding: 18rpx 14rpx;
-  border-radius: 22rpx;
+  border-radius: 20rpx;
   border: 1rpx solid #f0e2e5;
   background: linear-gradient(180deg, #fff, #fff8f9);
   display: flex;
@@ -638,18 +688,19 @@ function restart() {
 .progress-bar {
   height: 10rpx;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.18);
+  background: #f3e6e8;
   overflow: hidden;
   margin-top: 20rpx;
 }
 
 .progress-fill {
   height: 100%;
-  background: #ffe59a;
+  background: linear-gradient(90deg, #d51f35, #b70f24);
 }
 
 .question-card {
   margin-bottom: 18rpx;
+  border-radius: 22rpx;
 }
 
 .question-head {
@@ -713,7 +764,8 @@ function restart() {
 
 .opt-item.checked {
   border-color: #f0c9cf;
-  background: #fff8f9;
+  background: linear-gradient(90deg, #fff1f3, #fff);
+  box-shadow: 0 10rpx 24rpx rgba(183, 15, 36, 0.09);
 }
 
 .opt-text {
@@ -788,6 +840,10 @@ function restart() {
 
 .result-banner {
   margin-bottom: 18rpx;
+  min-height: 246rpx;
+  background:
+    radial-gradient(circle at 80% 28%, rgba(255, 226, 156, 0.3), transparent 130rpx),
+    linear-gradient(135deg, #cf1c32, #9f1021 62%, #7f1722);
 }
 
 .result-kicker {

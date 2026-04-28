@@ -53,8 +53,10 @@
 
       <view class="bottom-spacer" />
       <view class="bottom-actions safe-area-inset-bottom">
-        <view class="bottom-action secondary">☆<text>收藏</text></view>
-        <view class="bottom-action primary">↗<text>分享</text></view>
+        <view class="bottom-action secondary" @tap="toggleFavorite">
+          {{ favorited ? '★' : '☆' }}<text>{{ favorited ? '已收藏' : '收藏' }}</text>
+        </view>
+        <view class="bottom-action primary" @tap="shareNotice">↗<text>分享</text></view>
       </view>
     </template>
 
@@ -71,6 +73,7 @@ const loading = ref(false)
 const noticeId = ref<number | null>(null)
 const deliveryId = ref<number | null>(null)
 const readSyncFailed = ref(false)
+const favorited = ref(false)
 
 const SOURCE_LABELS: Record<string, string> = {
   MANUAL: '手工发布',
@@ -87,6 +90,34 @@ function sourceClass(s: string) {
 function fmt(s?: string | null) {
   if (!s) return ''
   return s.slice(0, 16).replace('T', ' ')
+}
+
+function noticeShareText() {
+  if (!notice.value) return ''
+  const source = notice.value.source_url ? `\n${notice.value.source_url}` : ''
+  return `${notice.value.title}${source}`
+}
+
+function toggleFavorite() {
+  favorited.value = !favorited.value
+  uni.showToast({
+    title: favorited.value ? '已收藏到本地' : '已取消收藏',
+    icon: 'none',
+  })
+}
+
+function shareNotice() {
+  const text = noticeShareText()
+  if (!text) {
+    uni.showToast({ title: '暂无可分享内容', icon: 'none' })
+    return
+  }
+  uni.setClipboardData({
+    data: text,
+    success() {
+      uni.showToast({ title: '通知标题已复制', icon: 'none' })
+    },
+  })
 }
 
 async function loadDetail() {

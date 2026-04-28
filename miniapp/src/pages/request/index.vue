@@ -87,7 +87,7 @@
             {{ t.label }}
           </view>
         </scroll-view>
-        <view class="filter-button">筛选</view>
+        <view class="filter-button" @tap="openStatusFilter">筛选</view>
       </view>
     </view>
 
@@ -281,6 +281,9 @@ async function reload() {
       items = items.filter((item) => allowed.has(item.status));
     }
     requests.value = items;
+  } catch {
+    requests.value = [];
+    uni.showToast({ title: "申请列表加载失败", icon: "none" });
   } finally {
     loading.value = false;
   }
@@ -288,7 +291,18 @@ async function reload() {
 
 function onTab(value: string) {
   tab.value = value;
-  void reload();
+  void reload().catch(() => undefined);
+}
+
+function openStatusFilter() {
+  uni.showActionSheet({
+    itemList: STATUS_TABS.map((item) => item.label),
+    success(res) {
+      const next = STATUS_TABS[res.tapIndex];
+      if (!next) return;
+      onTab(next.value);
+    },
+  });
 }
 
 async function goCreate() {
@@ -308,12 +322,15 @@ async function goDetail(id: number) {
 }
 
 onShow(() => {
-  void reload();
+  void reload().catch(() => undefined);
 });
 
 onPullDownRefresh(async () => {
-  await reload();
-  uni.stopPullDownRefresh();
+  try {
+    await reload();
+  } finally {
+    uni.stopPullDownRefresh();
+  }
 });
 </script>
 

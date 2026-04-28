@@ -11,77 +11,115 @@
       </div>
     </div>
 
-    <a-tabs v-model:activeKey="activeTab">
-      <a-tab-pane key="plans" tab="培养方案">
-        <a-form layout="inline" class="filter-card" @finish="loadPlans">
-          <a-form-item label="年级">
-            <a-input v-model:value="planFilters.grade_code" placeholder="年级代码" allow-clear />
-          </a-form-item>
-          <a-form-item label="专业">
-            <a-input v-model:value="planFilters.major_code" placeholder="专业代码" allow-clear />
-          </a-form-item>
-          <a-form-item>
-            <a-button type="primary" html-type="submit">查询</a-button>
-          </a-form-item>
-        </a-form>
-        <a-table
-          :columns="planCols"
-          :data-source="plans"
-          :loading="planLoading"
-          row-key="id"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'actions'">
-              <a-button type="link" size="small" @click="viewModules(record)">模块</a-button>
+    <a-form layout="inline" class="filter-card curriculum-filter" @finish="refreshCurriculum">
+      <a-form-item label="年级">
+        <a-input v-model:value="planFilters.grade_code" placeholder="年级代码" allow-clear />
+      </a-form-item>
+      <a-form-item label="专业">
+        <a-input v-model:value="planFilters.major_code" placeholder="专业代码" allow-clear />
+      </a-form-item>
+      <a-form-item label="学期">
+        <a-input v-model:value="offeringFilters.semester" placeholder="如 2025-2026-1" allow-clear />
+      </a-form-item>
+      <a-form-item>
+        <a-button type="primary" html-type="submit">查询</a-button>
+      </a-form-item>
+    </a-form>
+
+    <div class="curriculum-workbench">
+      <section class="plan-rail panel-card">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">培养方案列表</div>
+            <div class="panel-sub">按年级、专业筛选后选择方案</div>
+          </div>
+          <a-tag color="red">{{ plans.length }} 个</a-tag>
+        </div>
+        <a-spin :spinning="planLoading">
+          <div v-if="plans.length" class="plan-list">
+            <button
+              v-for="plan in plans"
+              :key="plan.id"
+              class="plan-card"
+              :class="{ active: selectedPlan?.id === plan.id }"
+              type="button"
+              @click="selectPlan(plan)"
+            >
+              <span class="plan-name">{{ plan.name }}</span>
+              <span class="plan-meta">{{ plan.major_code || '全部专业' }} · {{ plan.grade_code || '全年级' }}</span>
+              <span class="plan-foot">
+                <a-tag :color="selectedPlan?.id === plan.id ? 'red' : 'green'">启用</a-tag>
+                <span>总学分 {{ plan.total_credits ?? '-' }}</span>
+              </span>
+            </button>
+          </div>
+          <a-empty v-else image="simple" description="暂无培养方案" />
+        </a-spin>
+      </section>
+
+      <section class="module-board">
+        <a-card :bordered="false" class="selected-plan-card">
+          <div class="selected-plan-head">
+            <div>
+              <div class="panel-title">{{ selectedPlan?.name || '请选择培养方案' }}</div>
+              <div class="panel-sub">
+                {{ selectedPlan ? `${selectedPlan.grade_code || '全年级'} / ${selectedPlan.major_code || '全部专业'}` : '选择左侧方案后查看模块与课程' }}
+              </div>
+            </div>
+            <a-tag color="red">模块 {{ modules.length }}</a-tag>
+          </div>
+          <a-table
+            :columns="moduleCols"
+            :data-source="modules"
+            :loading="moduleLoading"
+            :pagination="false"
+            row-key="id"
+            size="small"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'is_required'">
+                <a-tag :color="record.is_required ? 'red' : 'blue'">
+                  {{ record.is_required ? '必修' : '选修' }}
+                </a-tag>
+              </template>
             </template>
-          </template>
-        </a-table>
-      </a-tab-pane>
+          </a-table>
+        </a-card>
 
-      <a-tab-pane key="offerings" tab="开课记录">
-        <a-form layout="inline" class="filter-card" @finish="loadOfferings">
-          <a-form-item label="学期">
-            <a-input v-model:value="offeringFilters.semester" placeholder="如 2025-2026-1" allow-clear />
-          </a-form-item>
-          <a-form-item>
-            <a-button type="primary" html-type="submit">查询</a-button>
-          </a-form-item>
-        </a-form>
-        <a-table
-          :columns="offeringCols"
-          :data-source="offerings"
-          :loading="offeringLoading"
-          :pagination="offeringPagination"
-          row-key="id"
-          @change="onOfferingTableChange"
-        />
-      </a-tab-pane>
+        <a-card :bordered="false" title="开课记录" class="mt16">
+          <a-table
+            :columns="offeringCols"
+            :data-source="offerings"
+            :loading="offeringLoading"
+            :pagination="offeringPagination"
+            row-key="id"
+            size="small"
+            @change="onOfferingTableChange"
+          />
+        </a-card>
+      </section>
 
-      <a-tab-pane key="equivalences" tab="课程等价">
+      <aside class="equiv-panel panel-card">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">课程等价关系</div>
+            <div class="panel-sub">查看替代规则与课程映射</div>
+          </div>
+          <a-tag color="orange">{{ equivalences.length }} 条</a-tag>
+        </div>
         <a-table
           :columns="equivCols"
           :data-source="equivalences"
           :loading="equivLoading"
+          :pagination="{ pageSize: 6, size: 'small' }"
           row-key="id"
+          size="small"
         />
-      </a-tab-pane>
-    </a-tabs>
-
-    <!-- 模块 Modal -->
-    <a-modal
-      v-model:open="showModulesModal"
-      :title="`培养模块 — ${selectedPlan?.name || ''}`"
-      width="720"
-      :footer="null"
-    >
-      <a-table :columns="moduleCols" :data-source="modules" row-key="id" size="small">
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'is_required'">
-            {{ record.is_required ? '必修' : '选修' }}
-          </template>
-        </template>
-      </a-table>
-    </a-modal>
+        <div class="equiv-note">
+          完全替代、条件替代与部分替代需结合培养方案模块要求共同判断。
+        </div>
+      </aside>
+    </div>
   </div>
 </template>
 
@@ -97,7 +135,6 @@ import { get } from '@/utils/request'
 import type { ApiEnvelope } from '@/utils/request'
 import type { Paginated } from '@/api/types'
 
-const activeTab = ref('plans')
 const metrics = computed(() => [
   {
     key: 'plans',
@@ -149,6 +186,14 @@ async function loadPlans() {
       params: planFilters,
     })
     plans.value = resp.data
+    if (!selectedPlan.value || !plans.value.some((plan) => plan.id === selectedPlan.value?.id)) {
+      if (plans.value[0]) {
+        await selectPlan(plans.value[0])
+      } else {
+        selectedPlan.value = null
+        modules.value = []
+      }
+    }
   } finally {
     planLoading.value = false
   }
@@ -162,15 +207,19 @@ const moduleCols = [
   { title: '必修', key: 'is_required', width: 80 },
   { title: '最低学分', dataIndex: 'min_credits', key: 'min_credits', width: 100 },
 ]
-const showModulesModal = ref(false)
 const selectedPlan = ref<any>(null)
 const modules = ref<any[]>([])
+const moduleLoading = ref(false)
 
-async function viewModules(plan: any) {
+async function selectPlan(plan: any) {
   selectedPlan.value = plan
-  const resp = await get<ApiEnvelope<any[]>>(`/admin/curriculum/plans/${plan.id}/modules`)
-  modules.value = resp.data
-  showModulesModal.value = true
+  moduleLoading.value = true
+  try {
+    const resp = await get<ApiEnvelope<any[]>>(`/admin/curriculum/plans/${plan.id}/modules`)
+    modules.value = resp.data
+  } finally {
+    moduleLoading.value = false
+  }
 }
 
 // ---------- 开课记录 ----------
@@ -226,6 +275,11 @@ async function loadEquivalences() {
   }
 }
 
+async function refreshCurriculum() {
+  offeringPagination.current = 1
+  await Promise.all([loadPlans(), loadOfferings()])
+}
+
 onMounted(() => {
   loadPlans()
   loadOfferings()
@@ -233,4 +287,129 @@ onMounted(() => {
 })
 </script>
 
-<style scoped></style>
+<style scoped>
+.curriculum-filter {
+  margin-bottom: 14px;
+}
+
+.curriculum-workbench {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) 360px;
+  gap: 16px;
+  align-items: start;
+}
+
+.plan-rail,
+.equiv-panel {
+  padding: 16px;
+}
+
+.panel-head,
+.selected-plan-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.panel-title {
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.panel-sub {
+  margin-top: 5px;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.plan-card {
+  display: flex;
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: #fff;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  flex-direction: column;
+  gap: 7px;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.plan-card:hover,
+.plan-card.active {
+  border-color: rgba(176, 0, 24, 0.35);
+  background: linear-gradient(135deg, #fff7f8, #fff);
+  box-shadow: 0 8px 18px rgba(176, 0, 24, 0.08);
+}
+
+.plan-name {
+  color: var(--text);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.plan-meta,
+.plan-foot {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.plan-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.module-board {
+  min-width: 0;
+}
+
+.selected-plan-card :deep(.ant-card-body) {
+  padding: 16px !important;
+}
+
+.equiv-panel {
+  position: sticky;
+  top: 86px;
+}
+
+.equiv-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: #fff8f0;
+  color: #8a5b13;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+@media (max-width: 1440px) {
+  .curriculum-workbench {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+
+  .equiv-panel {
+    position: static;
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 980px) {
+  .curriculum-workbench {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
