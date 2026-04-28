@@ -155,6 +155,7 @@
                       :disabled="isReadonlyProfile"
                       @click="openDecisionModal(record, 'APPROVED')"
                     >
+                      <template #icon><CheckOutlined /></template>
                       通过
                     </a-button>
                     <a-button
@@ -164,6 +165,7 @@
                       :disabled="isReadonlyProfile"
                       @click="openDecisionModal(record, 'REJECTED')"
                     >
+                      <template #icon><CloseOutlined /></template>
                       驳回
                     </a-button>
                   </a-space>
@@ -231,7 +233,10 @@
           <a-input v-model:value="factForm.rank_label" />
         </a-form-item>
         <a-form-item>
-          <a-button type="primary" html-type="submit" :loading="factSubmitting">保存</a-button>
+          <a-button type="primary" html-type="submit" :loading="factSubmitting">
+            <template #icon><SaveOutlined /></template>
+            保存
+          </a-button>
         </a-form-item>
       </a-form>
     </a-drawer>
@@ -267,7 +272,9 @@ import {
   FileExcelOutlined,
   PlusOutlined,
   DeleteOutlined,
-  SaveOutlined
+  SaveOutlined,
+  CheckOutlined,
+  CloseOutlined
 } from '@ant-design/icons-vue'
 import {
   ExperimentOutlined,
