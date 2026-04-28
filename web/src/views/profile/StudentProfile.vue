@@ -4,9 +4,11 @@
       <template #extra>
         <a-space>
           <a-button :loading="snapshotLoading === 'pdf'" @click="onDownloadSnapshot('pdf')">
+            <template #icon><FilePdfOutlined /></template>
             导出 PDF 快照
           </a-button>
           <a-button :loading="snapshotLoading === 'xlsx'" @click="onDownloadSnapshot('xlsx')">
+            <template #icon><FileExcelOutlined /></template>
             导出 XLSX 快照
           </a-button>
         </a-space>
@@ -68,6 +70,7 @@
             <a-space>
               <span v-if="isReadonlyProfile" class="readonly-text">非在读学生画像只读</span>
               <a-button type="primary" size="small" :disabled="isReadonlyProfile" @click="onOpenFactDrawer">
+                <template #icon><PlusOutlined /></template>
                 新增
               </a-button>
             </a-space>
@@ -106,6 +109,7 @@
                   @confirm="onDeleteFact(record.id)"
                 >
                   <a-button type="link" size="small" danger :disabled="isReadonlyProfile">
+                    <template #icon><DeleteOutlined /></template>
                     删除
                   </a-button>
                 </a-popconfirm>
@@ -258,7 +262,13 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { message } from 'ant-design-vue'
+import {
+  FilePdfOutlined,
+  FileExcelOutlined,
+  PlusOutlined,
+  DeleteOutlined,
+  SaveOutlined
+} from '@ant-design/icons-vue'
 import {
   ExperimentOutlined,
   ExclamationCircleOutlined,

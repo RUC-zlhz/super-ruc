@@ -177,9 +177,13 @@
                 <a-form-item>
                   <a-space>
                     <a-button type="primary" html-type="submit" :loading="loadingAcademicGap">
+                      <template #icon><SearchOutlined /></template>
                       查询
                     </a-button>
-                    <a-button @click="resetAcademicGapFilters">重置</a-button>
+                    <a-button @click="resetAcademicGapFilters">
+                      <template #icon><ReloadOutlined /></template>
+                      重置
+                    </a-button>
                   </a-space>
                 </a-form-item>
               </a-form>
@@ -228,6 +232,7 @@
                   </template>
                   <template v-else-if="column.key === 'actions'">
                     <a-button type="link" size="small" @click="openAcademicGapDetail(record.student_id)">
+                      <template #icon><EyeOutlined /></template>
                       查看明细
                     </a-button>
                   </template>
@@ -279,8 +284,14 @@
               </ul>
             </div>
             <div class="side-actions">
-              <a-button @click="openAcademicGapDetail(primaryGapRow.student_id)">标记已跟进</a-button>
-              <a-button type="primary">发起通知</a-button>
+              <a-button @click="openAcademicGapDetail(primaryGapRow.student_id)">
+                <template #icon><CheckCircleOutlined /></template>
+                标记已跟进
+              </a-button>
+              <a-button type="primary">
+                <template #icon><SendOutlined /></template>
+                发起通知
+              </a-button>
             </div>
           </template>
           <a-empty v-else description="暂无学业缺口详情" />
@@ -382,6 +393,11 @@ import {
   FileDoneOutlined,
   FormOutlined,
   TeamOutlined,
+  SearchOutlined,
+  ReloadOutlined,
+  EyeOutlined,
+  CheckCircleOutlined,
+  SendOutlined,
 } from '@ant-design/icons-vue'
 import {
   buildDashboardViewModel,
