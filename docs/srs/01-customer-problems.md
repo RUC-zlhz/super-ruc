@@ -1,11 +1,11 @@
 # Customer Problems: 信息学院学生综合服务与党团管理平台
 
-**Version:** 1.0 | **Created:** 2026-04-13 | **Last Updated:** 2026-04-13
+**Version:** 1.1 | **Created:** 2026-04-13 | **Last Updated:** 2026-04-21
 
 ## Problem Summary
 
 - **Obligations:** 4
-- **Expectations:** 6
+- **Expectations:** 8
 - **Hopes:** 0
 - **Input Basis:** `docs/srs/00-business-context.md`、`需求文档.md`、`需求补充.md`
 
@@ -149,12 +149,40 @@
 - 学生能据此进行准确自助判断
 - AI 或搜索能力有可靠边界和来源支撑
 
+### CP-011: 荣誉信息分散难集中展示
+
+**Statement:** 学生与学院 expect 校级及以上正式荣誉得到集中展示与查询 otherwise 荣誉信息会持续散落在红头文件、线下通知和零散台账中，难以稳定公示、核验与形成榜样示范。  
+**Classification:** Expectation  
+**Subject:** 学生、学院宣传与学生工作团队  
+**Consequence if Unsolved:**
+- 荣誉信息长期分散，学生难以快速查询
+- 公示、授权与有效期状态难统一核验
+- 榜样展示与学院宣传仍依赖零散线下材料
+**Benefit if Solved:**
+- 校级及以上荣誉可集中展示与持续维护
+- 荣誉条目更易查询、核验与授权管理
+- 榜样示范内容更稳定、可复用
+
+### CP-012: 学生成长数据分散难形成全貌
+
+**Statement:** 辅导员、班主任与学院领导 expect 学籍与成长数据形成可信且可共享的学生全景视图 otherwise 关键信息会持续散落在多个线下表格和零散记录中，导致研判、帮扶与复盘效率低且容易遗漏。  
+**Classification:** Expectation  
+**Subject:** 辅导员、班主任、学院领导  
+**Consequence if Unsolved:**
+- 学籍与成长事实需要跨表格、跨材料人工拼接
+- 学生帮扶、画像复盘和班级研判效率低
+- 重要成长事实容易遗漏，管理判断缺少整体视角
+**Benefit if Solved:**
+- 学生画像可形成统一入口和共享视图
+- 管理侧能更快完成研判、帮扶与复盘
+- 学生成长事实更易沉淀、核对与持续更新
+
 ## Classification Overview
 
 | Class | Count | CP IDs |
 |------|-------|--------|
 | Obligation | 4 | CP-003, CP-004, CP-006, CP-007 |
-| Expectation | 6 | CP-001, CP-002, CP-005, CP-008, CP-009, CP-010 |
+| Expectation | 8 | CP-001, CP-002, CP-005, CP-008, CP-009, CP-010, CP-011, CP-012 |
 | Hope | 0 | None |
 
 ## Notes

@@ -4,6 +4,7 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
@@ -558,7 +559,7 @@ def export_pdf(docx_path: Path, pdf_path: Path) -> None:
     pdf_path.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
         [
-            "python",
+            sys.executable,
             str(BASE / "scripts" / "srs" / "export_docx_pdf.py"),
             "--docx",
             str(docx_path),

@@ -1,10 +1,10 @@
 # Customer Needs: 信息学院学生综合服务与党团管理平台
 
-**Version:** 1.0 | **Created:** 2026-04-13 | **Last Updated:** 2026-04-13
+**Version:** 1.1 | **Created:** 2026-04-13 | **Last Updated:** 2026-04-21
 
 ## Needs Summary
 
-- **Information:** 6
+- **Information:** 8
 - **Control:** 4
 - **Construction:** 3
 - **Entertainment:** 0
@@ -87,6 +87,18 @@
 **Outcome Class:** Information  
 **Traces to:** CP-004, CP-008
 
+### CN-014: 校级及以上荣誉集中公示
+
+**Statement:** 学生与学院需要平台提供校级及以上正式荣誉的集中榜单、详情与授权状态，并在按类别、学年或级别筛选后可查看。  
+**Outcome Class:** Information  
+**Traces to:** CP-011
+
+### CN-015: 学籍与成长数据聚合画像
+
+**Statement:** 学院需要平台提供聚合后的学籍与成长数据画像，并在职责范围内共享查看与核对。  
+**Outcome Class:** Information  
+**Traces to:** CP-012
+
 ## Zigzag Validation: CP → CN
 
 ### Coverage Table
@@ -103,17 +115,19 @@
 | CP-008 | CN-009, CN-010, CN-013 | Complete | 同时覆盖管理侧分发与学生侧接收 |
 | CP-009 | CN-012 | Complete | 保持弱结论边界 |
 | CP-010 | CN-001, CN-002 | Complete | 内容可信与版本治理共同承接 |
+| CP-011 | CN-014 | Complete | 集中公示、授权状态与筛选查看共同承接 |
+| CP-012 | CN-015 | Complete | 学籍与成长信息聚合后形成共享视图 |
 
 ### Orphan Check
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Uncovered CPs | None | 10/10 个 CP 均至少映射到 1 个 CN |
-| Orphan CNs | None | 13/13 个 CN 均可回溯到至少 1 个 CP |
+| Uncovered CPs | None | 12/12 个 CP 均至少映射到 1 个 CN |
+| Orphan CNs | None | 15/15 个 CN 均可回溯到至少 1 个 CP |
 | Cross-boundary Risks | 2 | CN-005/007 与校级正式流程边界；CN-012 与学业强结论边界，已保留为约束说明 |
 
 ### Validation Notes
 
 - `CP-005` 的正式效力边界未在原始资料中完全拍板，因此后续 FR 需把“引导/归档/学院内部审批”与“校级正式生效”明确分开。
 - `CN-012` 明确限定为风险提示而非毕业判断；该能力已纳入一期正式范围，但必须以弱结论边界、规则维护和样例数据兜底实施。
-- `CN-011` 目前仍缺字段级权限矩阵，后续 FR 只规定控制能力，不在本阶段提前固化全部字段规则。
+- `CN-011` 已由 `S4A.1` 形成默认字段策略基线；后续仍可在业务最终确认后扩展角色-字段矩阵细节，但不再构成上游 CN 缺口。

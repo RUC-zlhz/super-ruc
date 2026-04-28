@@ -1,6 +1,6 @@
 # Traceability Matrix
 
-**Version:** 1.1 | **Created:** 2026-04-13 | **Last Updated:** 2026-04-18
+**Version:** 1.2 | **Created:** 2026-04-13 | **Last Updated:** 2026-04-21
 
 ## End-to-End Traceability
 
@@ -65,8 +65,8 @@ flowchart LR
 | CP-008 通知触达不精准且来源分散 | CN-009, CN-010, CN-013 | Complete |
 | CP-009 学业风险识别滞后且误导成本高 | CN-012 | Complete |
 | CP-010 官方内容缺少持续治理 | CN-001, CN-002 | Complete |
-| CP-011 荣誉信息分散难集中展示 | CN-014 | Complete（待上游 01-customer-problems.md 补充条目） |
-| CP-012 学生成长数据分散难形成全貌 | CN-015 | Complete（待上游 01-customer-problems.md 补充条目） |
+| CP-011 荣誉信息分散难集中展示 | CN-014 | Complete |
+| CP-012 学生成长数据分散难形成全貌 | CN-015 | Complete |
 
 ## CN → FR Mapping
 
@@ -85,8 +85,8 @@ flowchart LR
 | CN-011 敏感字段与导出权限受控 | FR-012, FR-013 | Complete |
 | CN-012 弱结论学业风险提示 | FR-014 | Complete |
 | CN-013 学院运营统计汇总 | FR-016 | Complete |
-| CN-014 校级及以上荣誉集中公示 | FR-017 | Complete（待上游 03-customer-needs.md 补充条目） |
-| CN-015 学籍与成长数据聚合画像 | FR-018 | Complete（待上游 03-customer-needs.md 补充条目） |
+| CN-014 校级及以上荣誉集中公示 | FR-017 | Complete |
+| CN-015 学籍与成长数据聚合画像 | FR-018 | Complete |
 
 ## NFR Traceability
 
@@ -104,8 +104,8 @@ flowchart LR
 
 | Check Item | Result | Notes |
 |------------|--------|-------|
-| Every CP has at least one CN | ⚠️ | CP-001~010 已落稿；**CP-011 / CP-012 仅在 FR-017 / FR-018 与 `_index.md` 引用，尚未写入 `01-customer-problems.md`** |
-| Every CN has at least one FR | ⚠️ | CN-001~013 已落稿；**CN-014 / CN-015 仅在 FR-017 / FR-018 与 `_index.md` 引用，尚未写入 `03-customer-needs.md`** |
+| Every CP has at least one CN | ✅ | 12 / 12 traced |
+| Every CN has at least one FR | ✅ | 15 / 15 traced |
 | Every FR traces to a CN | ✅ | 18 / 18 traced |
 | Every FR traces to a CP | ✅ | 18 / 18 traced through CN |
 | Every NFR traces to a CN | ✅ | 5 / 5 traced |
@@ -123,15 +123,19 @@ flowchart LR
 | 学业模块 | FR-014 依赖 FR-015 提供规则基础 | 作为正式范围纳入实施，但以弱结论和样例数据兜底避免越界承诺 |
 | 展示与画像 | FR-017（荣誉公示）与 FR-018（画像）共用敏感字段治理与 consent 机制 | Accept；FR-018 额外承接账号生命周期状态机（v1.5 补充） |
 
-### Gap Analysis
+### Traceability Gap Analysis
 
 | Gap Type | Item | Impact | Resolution |
 |----------|------|--------|------------|
-| Upstream Doc | CP-011 / CP-012 未写入 `01-customer-problems.md` | 文档可追溯链条不完整 | 在 CP 文档中补齐 CP-011 / CP-012 条目 |
-| Upstream Doc | CN-014 / CN-015 未写入 `03-customer-needs.md` | 文档可追溯链条不完整 | 在 CN 文档中补齐 CN-014 / CN-015 条目 |
-| Pending Business Decision | 校级正式流程与学院平台边界（Q-02~Q-06） | 影响部分事务是否仅做指引/归档 | 在详细设计前与业务方确认流程清单 |
-| Pending Data Decision | 培养方案结构化数据来源（Q-08） | 影响 FR-014 / FR-015 可落地性 | 若真实数据暂不可得，以甲方确认的样例数据、规则模板和弱结论模式完成一期交付 |
-| Pending Governance Decision | 字段级权限矩阵（Q-P1） | 影响 FR-012 配置明细 | 在实施前形成角色-字段矩阵 |
+| None | — | 当前 `CP -> CN -> FR -> NFR` 文档追溯链已闭合 | 继续以当前链路作为后续验收与交付依据 |
+
+### Residual Delivery Gates
+
+| Gate Type | Item | Impact | Current Status |
+|-----------|------|--------|----------------|
+| Pending Business Decision | 校级正式流程与学院平台边界（Q-02~Q-06） | 影响部分事务是否仅做指引/归档 | 已通过当前一期“引导/归档/线下办理提示”实现收口，最终清单仍需业务确认 |
+| Pending Data Decision | 培养方案结构化数据来源（Q-08） | 影响 FR-014 / FR-015 的真实样例与规则验证 | 已按弱结论与规则模板完成一期实现，真实数据源仍待补充 |
+| S4 Verification Gate | 字段级权限矩阵回归、索引执行、性能记录、Kingbase 回归 | 影响 `FR-012 / FR-013 / NFR-001 / NFR-003 / ICR-004` 的最终交付签收 | 仍受 `S4A.3 / S4B.1 / S4B.3 / S4C.1~S4C.3` 阻塞，不能在 `S5` 中伪装为已验证完成 |
 
 ## Validation Conclusion
 
@@ -139,4 +143,5 @@ flowchart LR
 - 一期实施主线以**六个核心闭环**组织（知识库 / 流程 / 审批 / 通知 / 审计 / 展示与画像），`FR-001 ~ FR-018` 均属于正式范围。
 - `FR-014` / `FR-015` 与学业模块相关，应通过真实数据或甲方确认的样例数据进入实施与验收计划。
 - `FR-017` / `FR-018` 为 v1.5 新增：展示与画像闭环已纳入范围，`FR-018` 并承接账号生命周期全局状态机（见 `docs/notes/fix.md` 第 1 条）。
-- **文档待办**：在 `01-customer-problems.md` 补 CP-011 / CP-012；在 `03-customer-needs.md` 补 CN-014 / CN-015，以闭合追溯链条。
+- `CP-011 / CP-012` 与 `CN-014 / CN-015` 的上游文档已补齐，追溯链条不再存在“待上游补充”残留。
+- 当前剩余阻塞属于 `S4` 的治理、性能与 Kingbase 验证门，不属于追踪矩阵自身缺口。

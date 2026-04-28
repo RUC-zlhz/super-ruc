@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -160,7 +161,7 @@ def replace_images_with_emf(docx_path: Path, caption_to_emf: dict[str, Path]) ->
 def export_pdf(docx_path: Path, pdf_path: Path) -> None:
     subprocess.run(
         [
-            "python",
+            sys.executable,
             str(BASE / "scripts" / "srs" / "export_docx_pdf.py"),
             "--docx",
             str(docx_path),
