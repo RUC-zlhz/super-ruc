@@ -14,9 +14,12 @@
 from __future__ import annotations
 
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit.models import AuditLog
 from app.auth.models import Student
+from app.core import storage
 from app.workflow import pdf_generator
 
 
@@ -40,6 +43,20 @@ async def _login_as_student(
     )
     assert resp.status_code == 200, resp.text
     return resp.json()["data"]["access_token"]
+
+
+async def _latest_audit(
+    db: AsyncSession,
+    *,
+    action: str,
+    entity_id: int,
+) -> AuditLog | None:
+    stmt = (
+        select(AuditLog)
+        .where(AuditLog.action == action, AuditLog.entity_id == entity_id)
+        .order_by(AuditLog.id.desc())
+    )
+    return (await db.execute(stmt)).scalars().first()
 
 
 async def test_request_happy_path_draft_submit_claim_approve(
@@ -288,11 +305,17 @@ async def test_request_detail_contract_uses_canonical_attachment_and_approval_fi
     client: AsyncClient,
     db: AsyncSession,
     counselor_headers: dict[str, str],
+    monkeypatch,
 ) -> None:
     token = await _login_as_student(
         client, db, student_no="R510001", wx_code="wx_r510001"
     )
     stu_headers = {"Authorization": f"Bearer {token}"}
+
+    def _unexpected_minio_client():
+        raise AssertionError("test env should use local object storage fallback")
+
+    monkeypatch.setattr(storage, "get_minio_client", _unexpected_minio_client)
 
     create = await client.post(
         "/api/v1/requests",
@@ -398,6 +421,14 @@ async def test_proof_preview_returns_pdf_stream(
     assert "inline;" in resp.headers["content-disposition"]
     assert resp.content.startswith(b"%PDF-1.4")
 
+    preview_log = await _latest_audit(
+        db,
+        action="PROOF_PREVIEW",
+        entity_id=request_id,
+    )
+    assert preview_log is not None
+    assert preview_log.result_code == "SUCCESS"
+
 
 async def test_proof_preview_rejects_other_student(
     client: AsyncClient,
@@ -445,6 +476,14 @@ async def test_proof_preview_rejects_other_student(
         headers=other_headers,
     )
     assert resp.status_code == 403, resp.text
+
+    denied_log = await _latest_audit(
+        db,
+        action="READ_DETAIL_DENIED",
+        entity_id=request_id,
+    )
+    assert denied_log is not None
+    assert denied_log.result_code == "DENIED"
 
 
 async def test_request_endpoints_reject_anonymous_and_student_role(

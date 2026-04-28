@@ -1,23 +1,24 @@
 """Alembic 异步迁移入口。
 
-从 app.core.config 读取 DATABASE_URL，以确保 alembic 与运行时共享同一套配置。
+从 app.core.config 读取 `KINGBASE_DATABASE_URL or DATABASE_URL`，
+以确保 alembic 与运行时共享同一套配置。
 """
 from __future__ import annotations
 
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from app.core.config import settings
-from app.core.database import Base
+from alembic import context
+from app.audit import models as _audit_models  # noqa: F401
 
 # 导入所有模型以注册到 Base.metadata
 from app.auth import models as _auth_models  # noqa: F401
-from app.audit import models as _audit_models  # noqa: F401
+from app.core.config import settings
+from app.core.database import Base
 from app.exchange import models as _exchange_models  # noqa: F401
 from app.honor import models as _honor_models  # noqa: F401
 from app.knowledge import models as _knowledge_models  # noqa: F401
@@ -26,9 +27,11 @@ from app.profile import models as _profile_models  # noqa: F401
 from app.workflow import models as _workflow_models  # noqa: F401
 from app.workflow import quiz_models as _workflow_quiz_models  # noqa: F401
 
-
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option(
+    "sqlalchemy.url",
+    settings.KINGBASE_MIGRATION_URL or settings.DATABASE_URL,
+)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

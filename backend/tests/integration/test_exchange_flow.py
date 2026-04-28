@@ -8,10 +8,11 @@ from openpyxl import Workbook, load_workbook
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit.models import AuditLog
 from app.auth.models import Student, User, UserRole
 from app.core.security import create_token
-from app.honor.models import HonorRecord
 from app.exchange.service import ERROR_REPORT_COLUMN
+from app.honor.models import HonorRecord
 
 
 def _build_student_xlsx(rows: list[dict]) -> bytes:
@@ -80,6 +81,15 @@ async def _create_admin_headers(
     await db.commit()
     token = create_token(str(user.id), "access", extra_claims={"roles": ["SUPER_ADMIN"]})
     return {"Authorization": f"Bearer {token}"}
+
+
+async def _latest_audit(
+    db: AsyncSession,
+    *,
+    action: str,
+) -> AuditLog | None:
+    stmt = select(AuditLog).where(AuditLog.action == action).order_by(AuditLog.id.desc())
+    return (await db.execute(stmt)).scalars().first()
 
 
 async def test_student_import_happy_path_validate_and_commit(
@@ -205,6 +215,84 @@ async def test_v15_error_report_download_has_reason_column(
 async def test_exchange_endpoints_reject_anonymous(client: AsyncClient) -> None:
     resp = await client.get("/api/v1/admin/exchange/imports")
     assert resp.status_code == 401
+
+
+async def test_exchange_export_permissions_follow_policy_and_write_audit(
+    client: AsyncClient,
+    db: AsyncSession,
+    counselor_headers: dict[str, str],
+) -> None:
+    db.add(
+        Student(
+            student_no="EXP-001",
+            full_name="导出学生甲",
+            grade_code="2024",
+            major_code="CS",
+            class_code="CS2401",
+            political_status="共青团员",
+            email="export@example.com",
+        )
+    )
+    await db.commit()
+
+    students_resp = await client.get(
+        "/api/v1/admin/exchange/exports/students",
+        headers=counselor_headers,
+    )
+    assert students_resp.status_code == 403, students_resp.text
+    assert students_resp.json()["code"] == 40330
+
+    transcripts_resp = await client.get(
+        "/api/v1/admin/exchange/exports/transcripts",
+        headers=counselor_headers,
+    )
+    assert transcripts_resp.status_code == 403, transcripts_resp.text
+    assert transcripts_resp.json()["code"] == 40330
+
+    curriculum_resp = await client.get(
+        "/api/v1/admin/exchange/exports/curriculum",
+        headers=counselor_headers,
+    )
+    assert curriculum_resp.status_code == 200, curriculum_resp.text
+    assert curriculum_resp.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    invalid_upload = await client.post(
+        "/api/v1/admin/exchange/imports/student",
+        headers=counselor_headers,
+        files={
+            "file": (
+                "counselor-bad.xlsx",
+                _build_student_xlsx([{"student_no": None, "full_name": "缺学号"}]),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+    assert invalid_upload.status_code == 200, invalid_upload.text
+    batch_id = invalid_upload.json()["data"]["batch"]["id"]
+
+    error_report_resp = await client.get(
+        f"/api/v1/admin/exchange/imports/{batch_id}/error-report",
+        headers=counselor_headers,
+    )
+    assert error_report_resp.status_code == 200, error_report_resp.text
+
+    students_denied = await _latest_audit(db, action="EXPORT_STUDENTS_DENIED")
+    assert students_denied is not None
+    assert students_denied.result_code == "DENIED"
+
+    transcripts_denied = await _latest_audit(db, action="EXPORT_TRANSCRIPTS_DENIED")
+    assert transcripts_denied is not None
+    assert transcripts_denied.result_code == "DENIED"
+
+    curriculum_log = await _latest_audit(db, action="EXPORT_CURRICULUM")
+    assert curriculum_log is not None
+    assert curriculum_log.result_code == "SUCCESS"
+
+    error_report_log = await _latest_audit(db, action="DOWNLOAD_ERROR_REPORT")
+    assert error_report_log is not None
+    assert error_report_log.result_code == "SUCCESS"
 
 
 async def test_honor_import_groups_rows_into_single_record(

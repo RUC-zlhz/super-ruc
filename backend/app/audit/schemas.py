@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -17,8 +18,10 @@ class AuditLogOut(BaseModel):
     action: str
     result_code: str
     ip_address: str | None
+    detail: dict[str, Any] | None = None
     message: str | None
     occurred_at: datetime
+    storage_scope: str = "ACTIVE"
 
 
 class RoleFieldPolicyIn(BaseModel):

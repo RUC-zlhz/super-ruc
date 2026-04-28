@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.auth.models import Student
+from app.core.sql import order_by_nulls_last_desc
 from app.workflow.models import (
     REQUEST_STATUS_APPROVED,
     REQUEST_STATUS_IN_REVIEW,
@@ -315,7 +316,7 @@ async def list_requests_admin(
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar_one()
 
-    stmt = stmt.order_by(Request.submitted_at.desc().nullslast(), Request.id.desc()).offset(
+    stmt = stmt.order_by(*order_by_nulls_last_desc(Request.submitted_at), Request.id.desc()).offset(
         (page - 1) * size
     ).limit(size)
     rows = (await db.execute(stmt)).scalars().all()

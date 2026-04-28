@@ -18,6 +18,7 @@ backend/
 │   ├── main.py                    FastAPI app 创建、路由挂载、中间件
 │   ├── core/
 │   │   ├── config.py              pydantic-settings 全局配置
+│   │   ├── audit_archive_scheduler.py 审计归档定时任务入口（Redis 锁）
 │   │   ├── database.py            async engine、SessionLocal、Base
 │   │   ├── security.py            JWT 签发/校验、密码哈希、字段加解密
 │   │   ├── dependencies.py        get_db、get_current_user、require_role
@@ -123,6 +124,7 @@ backend/
 ├── requirements-dev.txt           pytest, httpx, black, ruff 等
 ├── alembic.ini
 ├── .env.example                   环境变量模板（不含真实密钥）
+├── scripts/archive_audit_logs.py  审计日志手工归档脚本
 └── README.md
 ```
 
@@ -157,7 +159,7 @@ uv sync                        # 仅运行时依赖
 uv sync --extra dev            # 连同开发依赖一起安装
 
 # 3. 配置环境变量
-cp .env.example .env           # 按需修改 DATABASE_URL / REDIS_URL / MINIO / JWT_SECRET_KEY / FIELD_ENCRYPTION_KEY
+cp .env.example .env           # 按需修改 DATABASE_URL / KINGBASE_DATABASE_URL / REDIS_URL / MINIO / JWT_SECRET_KEY / FIELD_ENCRYPTION_KEY
 
 # 4. 初始化数据库
 uv run alembic upgrade head
@@ -177,6 +179,31 @@ uv run alembic revision --autogenerate -m "msg"
 uv run pytest
 uv run ruff check .
 ```
+
+## 审计归档与 Kingbase 迁移
+
+- `KINGBASE_DATABASE_URL`：可选，仅 Alembic 迁移使用。配置后 `uv run alembic upgrade head` 会优先连该 DSN；不配置则回退到 `DATABASE_URL`。
+- `AUDIT_ARCHIVE_ENABLED=false`：默认不注册定时任务。设为 `true` 后，应用会在启动时注册每日归档任务。
+- `AUDIT_ARCHIVE_RUN_AT=03:30`：每日运行时间，格式必须为 `HH:MM`。
+- `AUDIT_ARCHIVE_RETENTION_DAYS=180`：主表保留天数，超过后搬迁到 `audit_log_history`。
+- `AUDIT_ARCHIVE_BATCH_SIZE=1000`：单批搬迁上限，避免长事务。
+- `AUDIT_ARCHIVE_LOCK_TTL_SECONDS=3600`：Redis 锁 TTL，多实例部署下用于避免重复归档。
+
+手工补跑方式：
+
+```bash
+# 方式 1：命令行脚本
+uv run python scripts/archive_audit_logs.py --retention-days 180 --batch-size 1000
+
+# 方式 2：管理员接口（仅 SUPER_ADMIN）
+POST /api/v1/admin/audit-logs/archive?retention_days=180&batch_size=1000
+```
+
+运维说明：
+
+- 定时任务实现位于 `app/core/audit_archive_scheduler.py`，依赖 Redis `SET NX EX` 锁保证单实例执行。
+- 需要彻底停用归档时，将 `AUDIT_ARCHIVE_ENABLED=false` 并重启应用即可。
+- 若补跑失败，优先检查 `REDIS_URL`、数据库连通性、`AUDIT_ARCHIVE_RUN_AT` 格式和留存参数边界。
 
 ---
 
@@ -201,7 +228,9 @@ uv run ruff check .
 ## 关键约束提醒
 
 - **Kingbase 连接串**: `postgresql+asyncpg://user:pass@host:54322/sip_db`（dev docker-compose 端口；真实 Kingbase 生产环境按运维配置）
+- **Kingbase 迁移连接串**: `KINGBASE_DATABASE_URL` 仅用于 Alembic；不配置时回退到 `DATABASE_URL`
 - **敏感字段加密**: `身份证号`、`手机号` 用 `cryptography.fernet.Fernet` 加密，字段名后缀 `_enc`
 - **审计日志**: 审批、导出、权限变更、内容停用必须调用 `audit.service.log_action()`
+- **审计归档**: `AUDIT_ARCHIVE_ENABLED=true` 时，应用启动后按 `AUDIT_ARCHIVE_RUN_AT` 注册归档任务；旧日志搬迁到 `audit_log_history`
 - **整批原子**: `exchange/service.py` 导入方法用 `async with session.begin()` 包裹全部写操作
 - **AI 开关**: `settings.AI_QA_ENABLED = False` 时跳过 Anthropic API，返回关键词匹配结果

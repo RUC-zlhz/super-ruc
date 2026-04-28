@@ -12,6 +12,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
 
+from app.audit.enforcement import ensure_export_permission
+from app.audit.policies import REQUEST_PROOF_PREVIEW
+from app.audit.service import build_audit_detail, log_action
 from app.core.dependencies import (
     ActiveStudentDep,
     CurrentUserDep,
@@ -20,7 +23,8 @@ from app.core.dependencies import (
 )
 from app.core.exceptions import BizError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
-from app.workflow import pdf_generator, quiz_service, repository as repo, service
+from app.workflow import pdf_generator, quiz_service, service
+from app.workflow import repository as repo
 from app.workflow.schemas import (
     ApprovalActionIn,
     AttachmentOut,
@@ -190,7 +194,35 @@ async def proof_preview(
 ) -> StreamingResponse:
     # 复用查看权限：学生本人或管理角色
     await service.get_request_detail(db, request_id, user.user_id, user.roles)
+    await ensure_export_permission(
+        db,
+        roles=user.roles,
+        export_code=REQUEST_PROOF_PREVIEW,
+        actor_user_id=user.user_id,
+        actor_role=",".join(user.roles) or None,
+        event_type="REQUEST",
+        entity_code="REQUEST_PROOF",
+        action="PROOF_PREVIEW_DENIED",
+        entity_id=request_id,
+        message="当前角色无权预览证明 PDF",
+        detail=build_audit_detail(
+            target={"request_id": request_id},
+        ),
+    )
     pdf_bytes, filename = await pdf_generator.generate_proof_pdf(db, request_id)
+    await log_action(
+        db,
+        event_type="REQUEST",
+        entity_code="REQUEST_PROOF",
+        action="PROOF_PREVIEW",
+        entity_id=request_id,
+        actor_user_id=user.user_id,
+        actor_role=",".join(user.roles) or None,
+        detail=build_audit_detail(
+            target={"request_id": request_id},
+        ),
+    )
+    await db.commit()
     return StreamingResponse(
         iter([pdf_bytes]),
         media_type="application/pdf",

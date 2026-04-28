@@ -26,9 +26,12 @@ async def list_audit_logs(
     size: int = Query(20, ge=1, le=200),
     event_type: str | None = None,
     entity_code: str | None = None,
+    entity_id: int | None = None,
+    action: str | None = None,
     actor_user_id: int | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
+    storage_scope: str = Query(default="all", pattern="^(active|history|all)$"),
 ) -> ApiResponse[Paginated[schemas.AuditLogOut]]:
     rows, total = await repo.list_audit_logs(
         db,
@@ -36,13 +39,16 @@ async def list_audit_logs(
         size=size,
         event_type=event_type,
         entity_code=entity_code,
+        entity_id=entity_id,
+        action=action,
         actor_user_id=actor_user_id,
         since=since,
         until=until,
+        storage_scope=storage_scope,
     )
     return ok(
         Paginated[schemas.AuditLogOut](
-            items=[schemas.AuditLogOut.model_validate(r) for r in rows],
+            items=[schemas.AuditLogOut.model_validate(dict(r)) for r in rows],
             meta=PageMeta(page=page, size=size, total=total),
         )
     )
@@ -75,4 +81,4 @@ async def list_policies(
     role_code: str | None = None,
 ) -> ApiResponse[list[schemas.RoleFieldPolicyOut]]:
     rows = await repo.list_role_policies(db, role_code=role_code)
-    return ok([schemas.RoleFieldPolicyOut.model_validate(r) for r in rows])
+    return ok([schemas.RoleFieldPolicyOut.model_validate(dict(r)) for r in rows])

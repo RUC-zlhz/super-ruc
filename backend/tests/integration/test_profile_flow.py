@@ -421,7 +421,7 @@ async def test_profile_scope_controls_search_detail_decisions_and_audit(
         entity_id=out_scope_student.id,
     )
     assert read_log is not None
-    assert read_log.result_code == "FORBIDDEN"
+    assert read_log.result_code == "DENIED"
 
     fact_log = await _latest_audit(
         db,
@@ -429,7 +429,7 @@ async def test_profile_scope_controls_search_detail_decisions_and_audit(
         entity_id=out_scope_student.id,
     )
     assert fact_log is not None
-    assert fact_log.result_code == "FORBIDDEN"
+    assert fact_log.result_code == "DENIED"
 
     correction_log = await _latest_audit(
         db,
@@ -437,7 +437,7 @@ async def test_profile_scope_controls_search_detail_decisions_and_audit(
         entity_id=out_scope_student.id,
     )
     assert correction_log is not None
-    assert correction_log.result_code == "FORBIDDEN"
+    assert correction_log.result_code == "DENIED"
 
     snapshot_log = await _latest_audit(
         db,
@@ -445,7 +445,7 @@ async def test_profile_scope_controls_search_detail_decisions_and_audit(
         entity_id=out_scope_student.id,
     )
     assert snapshot_log is not None
-    assert snapshot_log.result_code == "FORBIDDEN"
+    assert snapshot_log.result_code == "DENIED"
 
 
 async def test_profile_read_only_student_and_snapshot_exports(

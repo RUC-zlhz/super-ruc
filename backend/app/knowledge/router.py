@@ -156,6 +156,15 @@ async def admin_list_entries(
     return ok(Paginated[EntryBrief](items=items, meta=PageMeta(page=page, size=size, total=total)))
 
 
+@admin_router.get("/entries/{entry_id}", response_model=ApiResponse[EntryDetail])
+async def admin_get_entry(
+    entry_id: int,
+    db: DBDep,
+    _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+) -> ApiResponse[EntryDetail]:
+    return ok(await service.get_for_admin(db, entry_id))
+
+
 @admin_router.post("/entries", response_model=ApiResponse[EntryDetail])
 async def admin_create_entry(
     payload: EntryCreate,

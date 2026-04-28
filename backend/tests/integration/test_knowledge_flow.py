@@ -53,6 +53,12 @@ async def test_admin_flow_create_publish_search(admin_client: AsyncClient) -> No
     assert entry_detail["status"] == "DRAFT"
     assert "请假" in entry_detail["tags"]
 
+    admin_detail_resp = await admin_client.get(f"/api/v1/admin/knowledge/entries/{entry_id}")
+    assert admin_detail_resp.status_code == 200, admin_detail_resp.text
+    admin_detail = admin_detail_resp.json()["data"]
+    assert admin_detail["status"] == "DRAFT"
+    assert admin_detail["body_md"] == "### 操作流程\n详见步骤。"
+
     # 3. 学生端此时搜不到（只检索 PUBLISHED）
     search_draft = await admin_client.get("/api/v1/knowledge/search?q=病假")
     assert search_draft.status_code == 200

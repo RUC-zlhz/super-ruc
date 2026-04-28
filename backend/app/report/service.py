@@ -10,7 +10,7 @@ FR-016：
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, or_, select
@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import Student
 from app.core.exceptions import NotFoundError
+from app.core.sql import order_by_nulls_last_desc
 from app.exchange.models import (
     CourseEquivalence,
     CourseOffering,
@@ -77,7 +78,7 @@ async def compute_academic_gap(
                 CurriculumPlan.major_code == student.major_code,
                 CurriculumPlan.is_active.is_(True),
             )
-            .order_by(CurriculumPlan.effective_from.desc().nullslast())
+            .order_by(*order_by_nulls_last_desc(CurriculumPlan.effective_from))
             .limit(1)
         )
         plan = (await db.execute(stmt)).scalar_one_or_none()
@@ -90,7 +91,7 @@ async def compute_academic_gap(
             grade_code=student.grade_code,
             major_code=student.major_code,
             data_warnings=data_warnings,
-            generated_at=datetime.now(timezone.utc),
+            generated_at=datetime.now(UTC),
         )
 
     modules = (await db.execute(
@@ -215,7 +216,7 @@ async def compute_academic_gap(
         modules=module_gaps,
         suggested_courses=suggested[:30],
         data_warnings=data_warnings,
-        generated_at=datetime.now(timezone.utc),
+        generated_at=datetime.now(UTC),
     )
 
 
@@ -419,5 +420,5 @@ async def build_overview(db: AsyncSession) -> OverviewResult:
         requests=requests_summary,
         notices=notices_summary,
         workflows=workflows,
-        generated_at=datetime.now(timezone.utc),
+        generated_at=datetime.now(UTC),
     )

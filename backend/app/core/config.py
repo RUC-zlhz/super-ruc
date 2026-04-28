@@ -29,11 +29,18 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
 
     DATABASE_URL: str = "postgresql+asyncpg://sip_user:sip_pass_dev@localhost:54322/sip_db"
+    KINGBASE_DATABASE_URL: str | None = None
     DATABASE_ECHO: bool = False
     DATABASE_POOL_SIZE: int = 10
     DATABASE_MAX_OVERFLOW: int = 20
 
     REDIS_URL: str = "redis://:sip_redis_dev@localhost:6379/0"
+
+    AUDIT_ARCHIVE_ENABLED: bool = False
+    AUDIT_ARCHIVE_RUN_AT: str = "03:30"
+    AUDIT_ARCHIVE_RETENTION_DAYS: int = 180
+    AUDIT_ARCHIVE_BATCH_SIZE: int = 1000
+    AUDIT_ARCHIVE_LOCK_TTL_SECONDS: int = 3600
 
     MINIO_ENDPOINT: str = "localhost:9010"
     MINIO_ACCESS_KEY: str = "sip_minio"
@@ -42,6 +49,7 @@ class Settings(BaseSettings):
     MINIO_BUCKET_ATTACHMENT: str = "sip-attachments"
     MINIO_BUCKET_TEMPLATE: str = "sip-templates"
     MINIO_BUCKET_EXPORT: str = "sip-exports"
+    LOCAL_OBJECT_STORAGE_ROOT: str | None = None
 
     JWT_SECRET_KEY: str = _DEV_JWT_SECRET
     JWT_ALGORITHM: str = "HS256"
@@ -122,12 +130,24 @@ class Settings(BaseSettings):
             errors.append(
                 "SMS_ENABLED=True 时必须配置 SMS_PROVIDER / SMS_ACCESS_KEY / SMS_SECRET_KEY"
             )
+        if len(self.AUDIT_ARCHIVE_RUN_AT.split(":")) != 2:
+            errors.append("AUDIT_ARCHIVE_RUN_AT 必须是 HH:MM 格式")
+        if not 30 <= self.AUDIT_ARCHIVE_RETENTION_DAYS <= 3650:
+            errors.append("AUDIT_ARCHIVE_RETENTION_DAYS 必须在 30~3650 之间")
+        if not 100 <= self.AUDIT_ARCHIVE_BATCH_SIZE <= 10000:
+            errors.append("AUDIT_ARCHIVE_BATCH_SIZE 必须在 100~10000 之间")
+        if self.AUDIT_ARCHIVE_LOCK_TTL_SECONDS <= 0:
+            errors.append("AUDIT_ARCHIVE_LOCK_TTL_SECONDS 必须大于 0")
 
         if errors:
             raise ValueError(
                 "配置校验失败：\n  - " + "\n  - ".join(errors)
             )
         return self
+
+    @property
+    def KINGBASE_MIGRATION_URL(self) -> str | None:
+        return self.KINGBASE_DATABASE_URL or None
 
 
 @lru_cache

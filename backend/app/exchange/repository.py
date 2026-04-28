@@ -1,7 +1,7 @@
 """exchange 模块数据库操作 — FR-009 / FR-015。"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import and_, func, select
@@ -9,10 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.auth.models import Student
+from app.core.sql import order_by_nulls_last_desc
 from app.exchange.models import (
     BATCH_STATUS_COMMITTED,
     BATCH_STATUS_ROLLED_BACK,
-    BATCH_STATUS_VALIDATED,
     CourseEquivalence,
     CourseOffering,
     CurriculumModule,
@@ -150,18 +150,18 @@ async def finalize_batch(
     batch.summary = summary
     if note is not None:
         batch.note = note
-    batch.finished_at = datetime.now(timezone.utc)
+    batch.finished_at = datetime.now(UTC)
     return batch
 
 
 async def mark_batch_committed(db: AsyncSession, batch: ImportBatch) -> None:
     batch.status = BATCH_STATUS_COMMITTED
-    batch.finished_at = datetime.now(timezone.utc)
+    batch.finished_at = datetime.now(UTC)
 
 
 async def mark_batch_rolled_back(db: AsyncSession, batch: ImportBatch) -> None:
     batch.status = BATCH_STATUS_ROLLED_BACK
-    batch.finished_at = datetime.now(timezone.utc)
+    batch.finished_at = datetime.now(UTC)
 
 
 # ============================================================
@@ -419,8 +419,10 @@ async def list_student_records(
     total = (await db.execute(
         select(func.count()).select_from(stmt.subquery())
     )).scalar_one()
-    stmt = stmt.order_by(StudentCourseRecord.term_code.desc().nullslast(),
-                         StudentCourseRecord.course_code.asc()) \
+    stmt = stmt.order_by(
+        *order_by_nulls_last_desc(StudentCourseRecord.term_code),
+        StudentCourseRecord.course_code.asc(),
+    ) \
         .offset((page - 1) * size).limit(size)
     return list((await db.execute(stmt)).scalars().all()), total
 

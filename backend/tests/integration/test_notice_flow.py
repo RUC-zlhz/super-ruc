@@ -1,7 +1,7 @@
 """notice 闭环 — FR-010 目标人群 + FR-011 发送批次与送达记录。
 
 覆盖：
-- admin create → target-preview（按 grade/major/political_status 过滤）
+- admin create → target-preview（按 grade/major/political_status/role_codes 过滤）
 - publish → dispatch（IN_APP + SMS，IN_APP=SENT / SMS=SKIPPED）
 - 学生 GET /notices/inbox 看到自己那条；mark-read 后 read_at 落库
 - DRAFT 通知不能直接 dispatch；ARCHIVED 通知不能修改
@@ -13,7 +13,7 @@ from __future__ import annotations
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.models import Student
+from app.auth.models import Student, User, UserRole
 
 
 async def _login_as_student(
@@ -38,9 +38,9 @@ async def _login_as_student(
     return resp.json()["data"]["access_token"], stu.id
 
 
-async def _seed_broadcast_students(db: AsyncSession) -> None:
-    """写一批覆盖多 grade/major/political_status 的学生，用于 target-preview。"""
-    db.add_all([
+async def _seed_broadcast_students(db: AsyncSession) -> dict[str, int]:
+    """写一批覆盖多 grade/major/political_status/毕业状态的学生，用于 target-preview。"""
+    students = [
         Student(student_no="N10001", full_name="大四党员",
                 grade_code="2021", major_code="CS", class_code="CS2101",
                 political_status="中共党员"),
@@ -53,14 +53,54 @@ async def _seed_broadcast_students(db: AsyncSession) -> None:
         Student(student_no="N10004", full_name="大三软工",
                 grade_code="2022", major_code="SE", class_code="SE2201",
                 political_status="共青团员"),
-    ])
+        Student(student_no="N10005", full_name="已毕业党员",
+                grade_code="2020", major_code="CS", class_code="CS2001",
+                political_status="中共党员", graduation_flag=True, status="GRADUATED"),
+    ]
+    db.add_all(students)
+    await db.flush()
+    student_ids = {row.student_no: row.id for row in students}
+    await db.commit()
+    return student_ids
+
+
+async def _bind_student_roles(
+    db: AsyncSession,
+    *,
+    student_id: int,
+    work_no: str,
+    role_codes: list[str],
+) -> None:
+    user = User(
+        work_no=work_no,
+        display_name=f"notice-{work_no}",
+        student_id=student_id,
+        is_active=True,
+    )
+    db.add(user)
+    await db.flush()
+    effective_role_codes: list[str] = []
+    for role_code in ["STUDENT", *role_codes]:
+        if role_code in effective_role_codes:
+            continue
+        effective_role_codes.append(role_code)
+        db.add(UserRole(user_id=user.id, role_code=role_code))
     await db.commit()
 
 
 async def test_target_preview_filters_by_grade_major_and_political_status(
     db: AsyncSession, admin_client: AsyncClient,
 ) -> None:
-    await _seed_broadcast_students(db)
+    student_ids = await _seed_broadcast_students(db)
+    await _bind_student_roles(
+        db, student_id=student_ids["N10001"], work_no="NROLE10001", role_codes=["PARTY_BACKBONE"]
+    )
+    await _bind_student_roles(
+        db, student_id=student_ids["N10003"], work_no="NROLE10003", role_codes=["PARTY_BACKBONE"]
+    )
+    await _bind_student_roles(
+        db, student_id=student_ids["N10005"], work_no="NROLE10005", role_codes=["PARTY_BACKBONE"]
+    )
 
     # 仅 2021 级 CS
     resp = await admin_client.post(
@@ -86,11 +126,36 @@ async def test_target_preview_filters_by_grade_major_and_political_status(
     assert r["target_count"] == 2
     assert set(r["sample_student_nos"]) == {"N10001", "N10003"}
 
+    # role_codes 也参与命中，默认仍排除已毕业学生
+    resp = await admin_client.post(
+        "/api/v1/admin/notices/target-preview",
+        json={"target_rule": {"role_codes": ["PARTY_BACKBONE"]}},
+    )
+    assert resp.status_code == 200, resp.text
+    r = resp.json()["data"]
+    assert r["target_count"] == 2
+    assert set(r["sample_student_nos"]) == {"N10001", "N10003"}
+
+    # 显式关闭排除毕业生后，已毕业学生也会命中
+    resp = await admin_client.post(
+        "/api/v1/admin/notices/target-preview",
+        json={
+            "target_rule": {
+                "role_codes": ["PARTY_BACKBONE"],
+                "exclude_graduated": False,
+            }
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    r = resp.json()["data"]
+    assert r["target_count"] == 3
+    assert set(r["sample_student_nos"]) == {"N10001", "N10003", "N10005"}
+
     # 空规则 = 全部在读
     resp = await admin_client.post(
         "/api/v1/admin/notices/target-preview", json={"target_rule": None},
     )
-    assert resp.json()["data"]["target_count"] >= 4
+    assert resp.json()["data"]["target_count"] == 4
 
 
 async def test_notice_publish_dispatch_and_student_inbox(

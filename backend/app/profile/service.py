@@ -3,12 +3,17 @@ from __future__ import annotations
 
 import html as html_escape
 import io
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.audit.service import log_action
+from app.audit.enforcement import (
+    ensure_export_permission,
+    sanitize_student_basic,
+)
+from app.audit.policies import EXPORT_PROFILE_SNAPSHOT_DETAIL
+from app.audit.service import build_audit_detail, log_action
 from app.auth import repository as auth_repo
 from app.auth.models import Student
 from app.core.exceptions import BizError, NotFoundError, PermissionError
@@ -21,7 +26,6 @@ from app.profile.models import (
     PROFILE_FACT_LEADERSHIP,
     PROFILE_FACT_PRACTICE,
     PROFILE_FACT_RESEARCH,
-    PROFILE_FACT_VOLUNTEER,
     PROFILE_SOURCE_IMPORT,
     PROFILE_SOURCE_STUDENT_SELF,
     PROFILE_SOURCE_SYSTEM,
@@ -250,6 +254,7 @@ async def _ensure_student_access(
     viewer_user_id: int,
     viewer_role: str | None,
     denied_action: str,
+    denied_detail: dict[str, Any] | None = None,
 ) -> Student:
     student = await repo.get_student(db, student_id)
     if student is None:
@@ -262,7 +267,7 @@ async def _ensure_student_access(
             student_id=student_id,
             actor_user_id=viewer_user_id,
             actor_role=viewer_role,
-            detail={"student_id": student_id},
+            detail=denied_detail or {"student_id": student_id},
         )
         raise PermissionError("无权访问该学生画像", code=40321)
     return student
@@ -314,9 +319,10 @@ async def search_students_admin(
     page: int,
     size: int,
     viewer_user_id: int,
-) -> tuple[list[Student], int]:
+    viewer_role: str | None,
+) -> tuple[list[StudentBasic], int]:
     scope = await _ensure_profile_scope_available(db, viewer_user_id=viewer_user_id)
-    return await repo.search_students(
+    rows, total = await repo.search_students(
         db,
         q=q,
         grade_code=grade_code,
@@ -328,6 +334,43 @@ async def search_students_admin(
         page=page,
         size=size,
     )
+    items: list[StudentBasic] = []
+    masked_fields: set[str] = set()
+    for row in rows:
+        sanitized, current_masked = await sanitize_student_basic(
+            db,
+            roles=viewer_role,
+            student=row,
+        )
+        items.append(sanitized)
+        masked_fields.update(current_masked)
+    await log_action(
+        db,
+        event_type="PROFILE",
+        entity_code="STUDENT_PROFILE",
+        action="SEARCH_ADMIN",
+        actor_user_id=viewer_user_id,
+        actor_role=viewer_role,
+        detail=build_audit_detail(
+            scope={
+                "class_codes": sorted(scope["class_codes"]),
+                "major_codes": sorted(scope["major_codes"]),
+                "legacy_codes": sorted(scope["legacy_codes"]),
+            },
+            refs=[
+                {
+                    "q": q,
+                    "grade_code": grade_code,
+                    "major_code": major_code,
+                    "class_code": class_code,
+                }
+            ],
+            masked_fields=sorted(masked_fields),
+            metrics={"count": len(items), "total": total},
+        ),
+    )
+    await db.commit()
+    return items, total
 
 
 async def build_summary_admin(
@@ -344,10 +387,15 @@ async def build_summary_admin(
         viewer_role=viewer_role,
         denied_action="READ_ADMIN_DENIED",
     )
+    student_basic, masked_fields = await sanitize_student_basic(
+        db,
+        roles=viewer_role,
+        student=student,
+    )
     summary = ProfileSummary(
-        student=_build_student_basic(student),
+        student=student_basic,
         facts=[_build_fact_admin_view(fact, user_names) for fact in facts],
-        generated_at=datetime.now(timezone.utc),
+        generated_at=datetime.now(UTC),
         **_summary_counters(counts),
     )
     await log_action(
@@ -358,6 +406,11 @@ async def build_summary_admin(
         entity_id=student_id,
         actor_user_id=viewer_user_id,
         actor_role=viewer_role,
+        detail=build_audit_detail(
+            target={"student_id": student_id},
+            masked_fields=masked_fields,
+            metrics={"fact_count": len(summary.facts)},
+        ),
     )
     await db.commit()
     return summary
@@ -375,11 +428,16 @@ async def build_summary_self(
         raise NotFoundError("学生不存在")
     facts = await repo.list_facts(db, student_id, only_approved=True)
     visible = [fact for fact in facts if not fact.is_sensitive]
+    student_basic, masked_fields = await sanitize_student_basic(
+        db,
+        roles=viewer_role,
+        student=student,
+    )
     counts = await repo.count_by_type(db, student_id)
     out = ProfileStudentSelfView(
-        student=_build_student_basic(student),
+        student=student_basic,
         facts=[_build_fact_student_view(fact) for fact in visible],
-        generated_at=datetime.now(timezone.utc),
+        generated_at=datetime.now(UTC),
         **_summary_counters(counts),
     )
     await log_action(
@@ -390,6 +448,11 @@ async def build_summary_self(
         entity_id=student_id,
         actor_user_id=viewer_user_id,
         actor_role=viewer_role,
+        detail=build_audit_detail(
+            target={"student_id": student_id},
+            masked_fields=masked_fields,
+            metrics={"fact_count": len(out.facts)},
+        ),
     )
     await db.commit()
     return out
@@ -419,7 +482,7 @@ async def create_fact(
     else:
         data["approval_status"] = PROFILE_APPROVAL_APPROVED
         data["approved_by"] = operator_id
-        data["approved_at"] = datetime.now(timezone.utc)
+        data["approved_at"] = datetime.now(UTC)
     row = await repo.create_fact(db, data)
     _set_review_comment(row, None)
     await log_action(
@@ -601,7 +664,7 @@ async def decide_correction(
 
     row.status = decision
     row.handled_by = operator_id
-    row.handled_at = datetime.now(timezone.utc)
+    row.handled_at = datetime.now(UTC)
     row.handler_comment = comment
 
     if decision == PROFILE_APPROVAL_APPROVED and apply_to_fact and row.fact_id:
@@ -732,7 +795,7 @@ async def decide_fact(
     row.updated_by = operator_id
     if decision == PROFILE_APPROVAL_APPROVED:
         row.approved_by = operator_id
-        row.approved_at = datetime.now(timezone.utc)
+        row.approved_at = datetime.now(UTC)
     _set_review_comment(row, comment)
 
     await log_action(
@@ -862,7 +925,6 @@ def _escape_pdf_text(text: str) -> str:
 
 
 def _fallback_pdf_bytes(lines: list[str]) -> bytes:
-    page_height = 842
     left = 48
     top = 792
     line_height = 15
@@ -932,6 +994,31 @@ async def generate_snapshot_pdf(
     viewer_user_id: int,
     viewer_role: str | None,
 ) -> tuple[bytes, str]:
+    await _ensure_student_access(
+        db,
+        student_id,
+        viewer_user_id=viewer_user_id,
+        viewer_role=viewer_role,
+        denied_action="EXPORT_SNAPSHOT_DENIED",
+        denied_detail=build_audit_detail(
+            target={"student_id": student_id, "format": "pdf"},
+        ),
+    )
+    await ensure_export_permission(
+        db,
+        roles=viewer_role,
+        export_code=EXPORT_PROFILE_SNAPSHOT_DETAIL,
+        actor_user_id=viewer_user_id,
+        actor_role=viewer_role,
+        event_type="PROFILE",
+        entity_code="STUDENT_PROFILE_SNAPSHOT",
+        action="EXPORT_SNAPSHOT_DENIED",
+        entity_id=student_id,
+        message="当前角色无权导出画像 PDF 快照",
+        detail=build_audit_detail(
+            target={"student_id": student_id, "format": "pdf"},
+        ),
+    )
     student, facts, counts, user_names = await _load_admin_summary(
         db,
         student_id,
@@ -942,7 +1029,7 @@ async def generate_snapshot_pdf(
     summary = ProfileSummary(
         student=_build_student_basic(student),
         facts=[_build_fact_admin_view(fact, user_names) for fact in facts],
-        generated_at=datetime.now(timezone.utc),
+        generated_at=datetime.now(UTC),
         **_summary_counters(counts),
     )
     pdf_bytes = _html_to_pdf_bytes(
@@ -957,6 +1044,10 @@ async def generate_snapshot_pdf(
         entity_id=student_id,
         actor_user_id=viewer_user_id,
         actor_role=viewer_role,
+        detail=build_audit_detail(
+            target={"student_id": student_id, "format": "pdf"},
+            metrics={"fact_count": len(summary.facts)},
+        ),
     )
     await db.commit()
     return pdf_bytes, f"profile-snapshot-{student.student_no}.pdf"
@@ -969,6 +1060,31 @@ async def generate_snapshot_xlsx(
     viewer_user_id: int,
     viewer_role: str | None,
 ) -> tuple[bytes, str]:
+    await _ensure_student_access(
+        db,
+        student_id,
+        viewer_user_id=viewer_user_id,
+        viewer_role=viewer_role,
+        denied_action="EXPORT_SNAPSHOT_DENIED",
+        denied_detail=build_audit_detail(
+            target={"student_id": student_id, "format": "xlsx"},
+        ),
+    )
+    await ensure_export_permission(
+        db,
+        roles=viewer_role,
+        export_code=EXPORT_PROFILE_SNAPSHOT_DETAIL,
+        actor_user_id=viewer_user_id,
+        actor_role=viewer_role,
+        event_type="PROFILE",
+        entity_code="STUDENT_PROFILE_SNAPSHOT",
+        action="EXPORT_SNAPSHOT_DENIED",
+        entity_id=student_id,
+        message="当前角色无权导出画像 XLSX 快照",
+        detail=build_audit_detail(
+            target={"student_id": student_id, "format": "xlsx"},
+        ),
+    )
     student, facts, _counts, user_names = await _load_admin_summary(
         db,
         student_id,
@@ -1014,6 +1130,10 @@ async def generate_snapshot_xlsx(
         entity_id=student_id,
         actor_user_id=viewer_user_id,
         actor_role=viewer_role,
+        detail=build_audit_detail(
+            target={"student_id": student_id, "format": "xlsx"},
+            metrics={"fact_count": len(facts)},
+        ),
     )
     await db.commit()
     return data, f"profile-snapshot-{student.student_no}.xlsx"

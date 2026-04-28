@@ -22,12 +22,20 @@
 """
 from __future__ import annotations
 
+from io import BytesIO
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from io import BytesIO
 
+from app.audit.enforcement import ensure_export_permission, sanitize_student_mapping
+from app.audit.policies import (
+    EXPORT_CURRICULUM_SUMMARY,
+    EXPORT_ERROR_REPORT,
+    EXPORT_STUDENTS_DETAIL,
+    EXPORT_TRANSCRIPTS_DETAIL,
+)
+from app.audit.service import build_audit_detail, log_action
 from app.core.dependencies import CurrentUserDep, DBDep, require_role
 from app.core.exceptions import BizError, NotFoundError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
@@ -84,7 +92,7 @@ async def upload_import(
     type_slug: str,
     db: DBDep,
     user: Annotated[CurrentUserDep, Depends(_AdminRole)],
-    file: UploadFile = File(...),
+    file: Annotated[UploadFile, File()],
 ) -> ApiResponse[ImportPreviewResult]:
     import_type = _VALID_IMPORT_TYPES.get(type_slug.lower())
     if import_type is None:
@@ -159,9 +167,37 @@ async def list_imports(
 async def download_error_report(
     batch_id: int,
     db: DBDep,
-    _user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
 ) -> StreamingResponse:
+    await ensure_export_permission(
+        db,
+        roles=user.roles,
+        export_code=EXPORT_ERROR_REPORT,
+        actor_user_id=user.user_id,
+        actor_role=",".join(user.roles) or None,
+        event_type="IMPORT",
+        entity_code="IMPORT_BATCH",
+        action="DOWNLOAD_ERROR_REPORT_DENIED",
+        entity_id=batch_id,
+        message="当前角色无权下载导入错误报告",
+        detail=build_audit_detail(
+            target={"batch_id": batch_id},
+        ),
+    )
     data, filename = await service.build_error_report(db, batch_id)
+    await log_action(
+        db,
+        event_type="IMPORT",
+        entity_code="IMPORT_BATCH",
+        action="DOWNLOAD_ERROR_REPORT",
+        entity_id=batch_id,
+        actor_user_id=user.user_id,
+        actor_role=",".join(user.roles) or None,
+        detail=build_audit_detail(
+            target={"batch_id": batch_id},
+        ),
+    )
+    await db.commit()
     return _xlsx_response(data, filename)
 
 
@@ -201,10 +237,25 @@ def _xlsx_response(data: bytes, filename: str) -> StreamingResponse:
 @router.get("/exchange/exports/students")
 async def export_students(
     db: DBDep,
-    _user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
     grade_code: str | None = None,
     major_code: str | None = None,
 ) -> StreamingResponse:
+    actor_role = ",".join(user.roles) or None
+    await ensure_export_permission(
+        db,
+        roles=user.roles,
+        export_code=EXPORT_STUDENTS_DETAIL,
+        actor_user_id=user.user_id,
+        actor_role=actor_role,
+        event_type="EXPORT",
+        entity_code="STUDENT",
+        action="EXPORT_STUDENTS_DENIED",
+        message="当前角色无权导出学生明细",
+        detail=build_audit_detail(
+            refs=[{"grade_code": grade_code, "major_code": major_code}],
+        ),
+    )
     students = await repo.list_all_students(
         db, grade_code=grade_code, major_code=major_code, limit=10000
     )
@@ -213,23 +264,85 @@ async def export_students(
         "class_code", "political_status", "enrollment_year",
         "expected_graduation_year", "email", "status",
     ]
-    rows = [
-        [s.student_no, s.full_name, s.gender, s.grade_code, s.major_code,
-         s.class_code, s.political_status, s.enrollment_year,
-         s.expected_graduation_year, s.email, s.status]
-        for s in students
-    ]
+    rows: list[list[object | None]] = []
+    masked_fields: set[str] = set()
+    for student in students:
+        sanitized, current_masked = await sanitize_student_mapping(
+            db,
+            roles=user.roles,
+            data={
+                "student_no": student.student_no,
+                "full_name": student.full_name,
+                "gender": student.gender,
+                "grade_code": student.grade_code,
+                "major_code": student.major_code,
+                "class_code": student.class_code,
+                "political_status": student.political_status,
+                "enrollment_year": student.enrollment_year,
+                "expected_graduation_year": student.expected_graduation_year,
+                "email": student.email,
+                "status": student.status,
+                "enrollment_status": student.enrollment_status,
+                "enrollment_status_reason": student.enrollment_status_reason,
+                "enrollment_status_updated_at": student.enrollment_status_updated_at,
+            },
+        )
+        masked_fields.update(current_masked)
+        rows.append(
+            [
+                sanitized.get("student_no"),
+                sanitized.get("full_name"),
+                sanitized.get("gender"),
+                sanitized.get("grade_code"),
+                sanitized.get("major_code"),
+                sanitized.get("class_code"),
+                sanitized.get("political_status"),
+                sanitized.get("enrollment_year"),
+                sanitized.get("expected_graduation_year"),
+                sanitized.get("email"),
+                sanitized.get("status"),
+            ]
+        )
     data = service.export_workbook(headers, rows, sheet_name="students")
+    await log_action(
+        db,
+        event_type="EXPORT",
+        entity_code="STUDENT",
+        action="EXPORT_STUDENTS",
+        actor_user_id=user.user_id,
+        actor_role=actor_role,
+        detail=build_audit_detail(
+            refs=[{"grade_code": grade_code, "major_code": major_code}],
+            masked_fields=sorted(masked_fields),
+            metrics={"count": len(rows)},
+        ),
+    )
+    await db.commit()
     return _xlsx_response(data, "students.xlsx")
 
 
 @router.get("/exchange/exports/transcripts")
 async def export_transcripts(
     db: DBDep,
-    _user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
     student_no: str | None = None,
     term_code: str | None = None,
 ) -> StreamingResponse:
+    actor_role = ",".join(user.roles) or None
+    await ensure_export_permission(
+        db,
+        roles=user.roles,
+        export_code=EXPORT_TRANSCRIPTS_DETAIL,
+        actor_user_id=user.user_id,
+        actor_role=actor_role,
+        event_type="EXPORT",
+        entity_code="TRANSCRIPT",
+        action="EXPORT_TRANSCRIPTS_DENIED",
+        message="当前角色无权导出成绩明细",
+        detail=build_audit_detail(
+            refs=[{"student_no": student_no, "term_code": term_code}],
+        ),
+    )
     records, _ = await repo.list_student_records(
         db, student_no=student_no, term_code=term_code, page=1, size=10000
     )
@@ -243,16 +356,44 @@ async def export_transcripts(
         for r in records
     ]
     data = service.export_workbook(headers, rows, sheet_name="transcripts")
+    await log_action(
+        db,
+        event_type="EXPORT",
+        entity_code="TRANSCRIPT",
+        action="EXPORT_TRANSCRIPTS",
+        actor_user_id=user.user_id,
+        actor_role=actor_role,
+        detail=build_audit_detail(
+            refs=[{"student_no": student_no, "term_code": term_code}],
+            metrics={"count": len(rows)},
+        ),
+    )
+    await db.commit()
     return _xlsx_response(data, "transcripts.xlsx")
 
 
 @router.get("/exchange/exports/curriculum")
 async def export_curriculum(
     db: DBDep,
-    _user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
     grade_code: str | None = None,
     major_code: str | None = None,
 ) -> StreamingResponse:
+    actor_role = ",".join(user.roles) or None
+    await ensure_export_permission(
+        db,
+        roles=user.roles,
+        export_code=EXPORT_CURRICULUM_SUMMARY,
+        actor_user_id=user.user_id,
+        actor_role=actor_role,
+        event_type="EXPORT",
+        entity_code="CURRICULUM_PLAN",
+        action="EXPORT_CURRICULUM_DENIED",
+        message="当前角色无权导出培养方案汇总",
+        detail=build_audit_detail(
+            refs=[{"grade_code": grade_code, "major_code": major_code}],
+        ),
+    )
     plans, _ = await repo.list_plans(
         db, grade_code=grade_code, major_code=major_code, page=1, size=1000
     )
@@ -273,6 +414,19 @@ async def export_curriculum(
                 m.module_code, m.module_name, m.module_type, m.credits_required,
             ])
     data = service.export_workbook(headers, rows, sheet_name="curriculum")
+    await log_action(
+        db,
+        event_type="EXPORT",
+        entity_code="CURRICULUM_PLAN",
+        action="EXPORT_CURRICULUM",
+        actor_user_id=user.user_id,
+        actor_role=actor_role,
+        detail=build_audit_detail(
+            refs=[{"grade_code": grade_code, "major_code": major_code}],
+            metrics={"count": len(rows)},
+        ),
+    )
+    await db.commit()
     return _xlsx_response(data, "curriculum.xlsx")
 
 

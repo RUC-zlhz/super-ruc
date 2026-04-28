@@ -129,6 +129,13 @@ async def get_for_student(db: AsyncSession, entry_id: int) -> EntryDetail:
     return entry_to_detail(entry)
 
 
+async def get_for_admin(db: AsyncSession, entry_id: int) -> EntryDetail:
+    entry = await repo.get_entry(db, entry_id)
+    if entry is None:
+        raise NotFoundError("知识条目不存在")
+    return entry_to_detail(entry)
+
+
 # ---------- AI 问答 ----------
 async def ai_match(db: AsyncSession, query: str, top_k: int) -> AiMatchResponse:
     # 先以关键词预筛一批候选（避免把全库喂给 Claude）

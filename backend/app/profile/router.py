@@ -162,9 +162,9 @@ async def admin_search_students(
         page=page,
         size=size,
         viewer_user_id=user.user_id,
+        viewer_role=",".join(user.roles) or None,
     )
-    items = [StudentBasic.model_validate(row) for row in rows]
-    return ok(Paginated[StudentBasic](items=items, meta=PageMeta(page=page, size=size, total=total)))
+    return ok(Paginated[StudentBasic](items=rows, meta=PageMeta(page=page, size=size, total=total)))
 
 
 @admin_router.get("/{student_id}", response_model=ApiResponse[ProfileSummary])

@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import UTC
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.models import Student, User
+from app.auth.models import Student, User, UserRole
+from app.core.sql import order_by_nulls_last_desc
 from app.notice.models import (
     DELIVERY_STATUS_READ,
     NOTICE_STATUS_PUBLISHED,
@@ -51,8 +53,11 @@ async def list_notices_admin(
         stmt = stmt.where(and_(*conds))
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar_one()
-    stmt = stmt.order_by(Notice.is_pinned.desc(), Notice.published_at.desc().nullslast(),
-                        Notice.updated_at.desc()).offset((page - 1) * size).limit(size)
+    stmt = stmt.order_by(
+        Notice.is_pinned.desc(),
+        *order_by_nulls_last_desc(Notice.published_at),
+        Notice.updated_at.desc(),
+    ).offset((page - 1) * size).limit(size)
     rows = (await db.execute(stmt)).scalars().unique().all()
     return rows, total
 
@@ -73,18 +78,32 @@ async def resolve_target_students(
     db: AsyncSession, rule: dict | None
 ) -> list[Student]:
     """根据 target_rule JSON 解析目标学生列表。"""
-    stmt = select(Student).where(Student.deleted_at.is_(None))
-    if rule:
-        if rule.get("exclude_graduated", True):
-            stmt = stmt.where(Student.graduation_flag.is_(False))
-        if rule.get("grade_codes"):
-            stmt = stmt.where(Student.grade_code.in_(rule["grade_codes"]))
-        if rule.get("major_codes"):
-            stmt = stmt.where(Student.major_code.in_(rule["major_codes"]))
-        if rule.get("class_codes"):
-            stmt = stmt.where(Student.class_code.in_(rule["class_codes"]))
-        if rule.get("political_status"):
-            stmt = stmt.where(Student.political_status.in_(rule["political_status"]))
+    normalized_rule = rule or {}
+    stmt = select(Student).distinct().where(Student.deleted_at.is_(None))
+
+    if normalized_rule.get("exclude_graduated", True):
+        stmt = stmt.where(Student.graduation_flag.is_(False))
+    if normalized_rule.get("grade_codes"):
+        stmt = stmt.where(Student.grade_code.in_(normalized_rule["grade_codes"]))
+    if normalized_rule.get("major_codes"):
+        stmt = stmt.where(Student.major_code.in_(normalized_rule["major_codes"]))
+    if normalized_rule.get("class_codes"):
+        stmt = stmt.where(Student.class_code.in_(normalized_rule["class_codes"]))
+    if normalized_rule.get("political_status"):
+        stmt = stmt.where(Student.political_status.in_(normalized_rule["political_status"]))
+    if normalized_rule.get("role_codes"):
+        stmt = (
+            stmt.join(
+                User,
+                and_(
+                    User.student_id == Student.id,
+                    User.deleted_at.is_(None),
+                    User.is_active.is_(True),
+                ),
+            )
+            .join(UserRole, UserRole.user_id == User.id)
+            .where(UserRole.role_code.in_(normalized_rule["role_codes"]))
+        )
     stmt = stmt.order_by(Student.id)
     return list((await db.execute(stmt)).scalars().all())
 
@@ -176,7 +195,10 @@ async def list_notices_for_student(
     total = (await db.execute(count_stmt)).scalar_one()
 
     stmt = (
-        stmt.order_by(Notice.is_pinned.desc(), Notice.published_at.desc().nullslast())
+        stmt.order_by(
+            Notice.is_pinned.desc(),
+            *order_by_nulls_last_desc(Notice.published_at),
+        )
         .offset((page - 1) * size)
         .limit(size)
     )
@@ -204,12 +226,12 @@ async def student_has_notice_delivery(
 async def mark_delivery_read(
     db: AsyncSession, delivery_id: int, student_id: int
 ) -> NoticeDelivery | None:
-    from datetime import datetime, timezone
+    from datetime import datetime
     d = await db.get(NoticeDelivery, delivery_id)
     if d is None or d.student_id != student_id:
         return None
     if d.read_at is None:
-        d.read_at = datetime.now(timezone.utc)
+        d.read_at = datetime.now(UTC)
         d.status = DELIVERY_STATUS_READ
     await db.flush()
     return d

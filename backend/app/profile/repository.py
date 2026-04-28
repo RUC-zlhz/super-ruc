@@ -7,12 +7,9 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import Student
+from app.core.sql import order_by_nulls_last_desc
 from app.profile.models import (
     PROFILE_APPROVAL_APPROVED,
-    PROFILE_FACT_COMPETITION,
-    PROFILE_FACT_LEADERSHIP,
-    PROFILE_FACT_PRACTICE,
-    PROFILE_FACT_RESEARCH,
     PROFILE_FACT_VOLUNTEER,
     PROFILE_SOURCE_STUDENT_SELF,
     ProfileCorrection,
@@ -101,7 +98,7 @@ async def list_facts(
         stmt = stmt.where(ProfileFact.source == source)
     stmt = stmt.order_by(
         ProfileFact.fact_type.asc(),
-        ProfileFact.started_on.desc().nullslast(),
+        *order_by_nulls_last_desc(ProfileFact.started_on),
         ProfileFact.id.desc(),
     )
     return list((await db.execute(stmt)).scalars().all())

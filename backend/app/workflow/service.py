@@ -4,11 +4,12 @@ from __future__ import annotations
 import hashlib
 import logging
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.audit.service import log_action
+from app.audit.enforcement import audit_forbidden_and_raise
+from app.audit.service import build_audit_detail, log_action
 from app.auth.models import Student
 from app.core.config import settings
 from app.core.exceptions import BizError, ConflictError, NotFoundError
@@ -35,11 +36,6 @@ from app.workflow.models import (
     WorkflowNode,
     WorkflowTemplate,
 )
-from app.workflow.state_machine import (
-    REQUEST_EDITABLE_STATUSES,
-    ApprovalStateMachine,
-    NodeStateMachine,
-)
 from app.workflow.schemas import (
     ApprovalRecordOut,
     AttachmentOut,
@@ -50,6 +46,11 @@ from app.workflow.schemas import (
     StudentWorkflowNodeOut,
     WorkflowNodeOut,
     WorkflowTemplateOut,
+)
+from app.workflow.state_machine import (
+    REQUEST_EDITABLE_STATUSES,
+    ApprovalStateMachine,
+    NodeStateMachine,
 )
 
 logger = logging.getLogger(__name__)
@@ -222,7 +223,7 @@ async def start_student_workflow(
         due = None
         status = WORKFLOW_NODE_PENDING
         if idx == 0:
-            triggered = datetime.now(timezone.utc)
+            triggered = datetime.now(UTC)
             if n.due_rule_days is not None:
                 due = (triggered + timedelta(days=n.due_rule_days)).date()
         await repo.add_student_node_state(
@@ -287,7 +288,7 @@ async def complete_node(
     NodeStateMachine.assert_completable(state.status)
 
     state.status = WORKFLOW_NODE_DONE
-    state.completed_at = datetime.now(timezone.utc)
+    state.completed_at = datetime.now(UTC)
     state.completed_by = operator_id
     state.evidence = evidence
     state.note = note
@@ -302,7 +303,7 @@ async def complete_node(
 
     if next_state is not None:
         next_state.status = WORKFLOW_NODE_PENDING
-        next_state.triggered_at = datetime.now(timezone.utc)
+        next_state.triggered_at = datetime.now(UTC)
         if next_state.node and next_state.node.due_rule_days is not None:
             next_state.due_date = (
                 next_state.triggered_at + timedelta(days=next_state.node.due_rule_days)
@@ -311,7 +312,7 @@ async def complete_node(
     else:
         sw.current_node_id = None
         sw.status = "COMPLETED"
-        sw.completed_at = datetime.now(timezone.utc)
+        sw.completed_at = datetime.now(UTC)
 
     await log_action(
         db,
@@ -448,7 +449,7 @@ async def generate_reminders(
 # B. 申请 — 工厂方法与辅助函数
 # ======================================================================
 def _generate_request_no(type_code: str) -> str:
-    ts = datetime.now(timezone.utc).strftime("%y%m%d%H%M%S")
+    ts = datetime.now(UTC).strftime("%y%m%d%H%M%S")
     return f"{type_code[:4].upper()}-{ts}-{uuid.uuid4().hex[:6].upper()}"
 
 
@@ -540,7 +541,7 @@ async def upload_request_attachment(
             content_type=content_type or "application/octet-stream",
         )
     except Exception as e:
-        logger.exception("MinIO upload failed")
+        logger.exception("Object storage upload failed")
         raise BizError(f"附件上传失败：{e}", code=50002, http_status=500) from e
 
     row = await repo.add_attachment(
@@ -625,7 +626,7 @@ async def submit_request(
         req.revision += 1
     req.status = result.status_after
     assert req.status == REQUEST_STATUS_SUBMITTED
-    req.submitted_at = datetime.now(timezone.utc)
+    req.submitted_at = datetime.now(UTC)
     req.decided_at = None
     req.decided_by = None
     req.decision_comment = None
@@ -686,7 +687,7 @@ async def withdraw_request(
         raise BizError("该类型申请不允许撤回", code=40020)
     if rt and rt.withdraw_hours_limit and req.submitted_at is not None:
         deadline = req.submitted_at + timedelta(hours=rt.withdraw_hours_limit)
-        if datetime.now(timezone.utc) > deadline:
+        if datetime.now(UTC) > deadline:
             raise BizError(
                 f"已超过撤回期限（{rt.withdraw_hours_limit} 小时）", code=40021
             )
@@ -694,7 +695,7 @@ async def withdraw_request(
     result = ApprovalStateMachine.transition(req.status, REQUEST_ACTION_WITHDRAW)
     status_before = result.status_before
     req.status = result.status_after
-    req.withdrawn_at = datetime.now(timezone.utc)
+    req.withdrawn_at = datetime.now(UTC)
 
     await repo.add_approval_record(
         db,
@@ -772,8 +773,36 @@ async def get_request_detail(
         "YOUTH_LEAGUE_TEACHER", "PARTY_BUILD_TEACHER", "CLASS_CADRE",
     }
     if req.applicant_user_id != viewer_user_id and not (set(viewer_roles) & admin_roles):
-        raise BizError("无权查看该申请", code=40303, http_status=403)
-    return _request_to_detail(req)
+        await audit_forbidden_and_raise(
+            db,
+            event_type="REQUEST",
+            entity_code="REQUEST",
+            action="READ_DETAIL_DENIED",
+            entity_id=req.id,
+            actor_user_id=viewer_user_id,
+            actor_role=",".join(viewer_roles) or None,
+            message="无权查看该申请",
+            code=40303,
+            detail=build_audit_detail(
+                target={"request_id": req.id},
+            ),
+        )
+    detail = _request_to_detail(req)
+    await log_action(
+        db,
+        event_type="REQUEST",
+        entity_code="REQUEST",
+        action="READ_DETAIL",
+        entity_id=req.id,
+        actor_user_id=viewer_user_id,
+        actor_role=",".join(viewer_roles) or None,
+        detail=build_audit_detail(
+            target={"request_id": req.id},
+            metrics={"attachment_count": len(detail.attachments)},
+        ),
+    )
+    await db.commit()
+    return detail
 
 
 def _approver_has_role(rt, roles: list[str]) -> bool:
@@ -801,7 +830,7 @@ async def decide_request(
     action = REQUEST_ACTION_APPROVE if approve else REQUEST_ACTION_REJECT
     result = ApprovalStateMachine.transition(req.status, action)
     status_before = result.status_before
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     req.status = result.status_after
     req.decided_at = now
     req.decided_by = operator_id
@@ -855,7 +884,7 @@ async def mark_request_offline(
 
     result = ApprovalStateMachine.transition(req.status, REQUEST_ACTION_OFFLINE)
     status_before = result.status_before
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     req.status = result.status_after
     req.decided_at = now
     req.decided_by = operator_id
@@ -911,6 +940,15 @@ async def claim_in_review(
         status_after=req.status,
         operator_id=operator_id,
         operator_role=",".join(operator_roles),
+    )
+    await log_action(
+        db,
+        event_type="REQUEST",
+        entity_code="REQUEST",
+        action="CLAIM",
+        entity_id=req.id,
+        actor_user_id=operator_id,
+        actor_role=",".join(operator_roles),
     )
     await db.commit()
     await db.refresh(req)

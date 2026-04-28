@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.core.config import settings
+from app.core.kingbase import install_sqlalchemy_kingbase_patch
 
 # Kingbase/PostgreSQL 命名约定，便于 Alembic 自动生成一致的约束名
 NAMING_CONVENTION = {
@@ -57,6 +58,8 @@ class SoftDeleteMixin:
         DateTime(timezone=True), nullable=True, default=None
     )
 
+
+install_sqlalchemy_kingbase_patch()
 
 engine = create_async_engine(
     settings.DATABASE_URL,
