@@ -44,10 +44,16 @@
             </a-select>
           </a-form-item>
           <a-form-item>
-            <a-button type="primary" html-type="submit">查询</a-button>
+            <a-button type="primary" html-type="submit">
+              <template #icon><SearchOutlined /></template>
+              查询
+            </a-button>
           </a-form-item>
           <a-form-item>
-            <a-button type="primary" ghost @click="openCreate">新增题目</a-button>
+            <a-button type="primary" ghost @click="openCreate">
+              <template #icon><PlusOutlined /></template>
+              新增题目
+            </a-button>
           </a-form-item>
         </a-form>
 
@@ -74,20 +80,26 @@
               </a-tag>
             </template>
             <template v-else-if="column.key === 'actions'">
-              <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
-              <a-popconfirm
-                v-if="record.is_active"
-                title="停用该题后将不再抽到，确定？"
-                @confirm="onDelete(record)"
-              >
-                <a-button type="link" size="small" danger>停用</a-button>
-              </a-popconfirm>
-              <a-button
-                v-else
-                type="link"
-                size="small"
-                @click="onReactivate(record)"
-              >重新启用</a-button>
+              <a-space size="small">
+                <a-button type="link" size="small" @click="openEdit(record)">
+                  <template #icon><EditOutlined /></template>
+                  编辑
+                </a-button>
+                <a-popconfirm
+                  v-if="record.is_active"
+                  title="停用该题后将不再抽到，确定？"
+                  @confirm="onDelete(record)"
+                >
+                  <a-button type="link" size="small" danger>
+                    <template #icon><StopOutlined /></template>
+                    停用
+                  </a-button>
+                </a-popconfirm>
+                <a-button v-else type="link" size="small" @click="onReactivate(record)">
+                  <template #icon><CheckCircleOutlined /></template>
+                  重新启用
+                </a-button>
+              </a-space>
             </template>
           </template>
         </a-table>
@@ -99,7 +111,10 @@
             <div class="editor-title">{{ editing ? '编辑题目' : '新增题目' }}</div>
             <div class="editor-sub">题干、选项、答案与解析集中维护</div>
           </div>
-          <a-button size="small" @click="openCreate">清空</a-button>
+          <a-button size="small" @click="openCreate">
+            <template #icon><ClearOutlined /></template>
+            清空
+          </a-button>
         </div>
 
         <div class="topic-summary">
@@ -160,9 +175,15 @@
                   size="small"
                   :disabled="form.options_json!.length <= 2"
                   @click="removeOption(idx)"
-                >删除</a-button>
+                >
+                  <template #icon><DeleteOutlined /></template>
+                  删除
+                </a-button>
               </div>
-              <a-button size="small" @click="addOption">+ 新增选项</a-button>
+              <a-button size="small" @click="addOption">
+                <template #icon><PlusOutlined /></template>
+                新增选项
+              </a-button>
             </a-form-item>
 
             <a-form-item v-if="form.qtype === 'SINGLE'" label="正确答案（A/B/…）" required>
@@ -190,9 +211,13 @@
 
           <div class="editor-actions">
             <a-button type="primary" :loading="saving" @click="onSubmit">
+              <template #icon><SaveOutlined /></template>
               {{ editing ? '保存修改' : '保存题目' }}
             </a-button>
-            <a-button v-if="editing" @click="openCreate">取消编辑</a-button>
+            <a-button v-if="editing" @click="openCreate">
+              <template #icon><CloseOutlined /></template>
+              取消编辑
+            </a-button>
           </div>
         </a-form>
       </aside>
@@ -209,6 +234,15 @@ import {
   PlusCircleOutlined,
   ReadOutlined,
   TagsOutlined,
+  LeftOutlined,
+  SearchOutlined,
+  PlusOutlined,
+  EditOutlined,
+  StopOutlined,
+  ClearOutlined,
+  DeleteOutlined,
+  SaveOutlined,
+  CloseOutlined
 } from '@ant-design/icons-vue'
 import {
   listQuizQuestions,

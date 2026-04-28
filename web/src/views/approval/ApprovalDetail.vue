@@ -148,16 +148,17 @@
             <a-col :xs="24" :lg="10">
               <div v-if="availableActions.length" class="action-buttons">
                 <a-button
-                  v-for="action in availableActions"
-                  :key="action.key"
-                  :type="action.type"
-                  :danger="action.danger"
-                  :loading="action.key === 'claim' ? claiming : actionSubmitting"
-                  block
-                  @click="action.key === 'claim' ? onClaim() : showAction(action.key)"
-                >
-                  {{ ADMIN_REQUEST_ACTION_META[action.key].label }}
-                </a-button>
+            v-for="action in availableActions"
+            :key="action.key"
+            :type="action.type"
+            :danger="action.danger"
+            :loading="action.key === 'claim' ? claiming : actionSubmitting"
+            block
+            @click="action.key === 'claim' ? onClaim() : showAction(action.key)"
+          >
+            <template #icon><component :is="action.icon" /></template>
+            {{ ADMIN_REQUEST_ACTION_META[action.key].label }}
+          </a-button>
               </div>
               <a-empty v-else description="当前状态暂无可执行的管理员动作" />
             </a-col>
@@ -199,6 +200,13 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import {
+  LeftOutlined,
+  CheckSquareOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  MessageOutlined
+} from '@ant-design/icons-vue'
+import {
   ADMIN_REQUEST_ACTION_META,
   approveRequest,
   claimRequest,
@@ -214,8 +222,9 @@ type ActionModalType = 'approve' | 'reject' | 'offline' | null
 
 interface ActionButton {
   key: 'claim' | 'approve' | 'reject' | 'offline'
-  type: 'primary' | 'default'
+  type: 'primary' | 'default' | 'dashed' | 'link' | 'text'
   danger?: boolean
+  icon?: any
 }
 
 const route = useRoute()
@@ -260,23 +269,18 @@ const approvalTimeline = computed(() => {
 })
 
 const availableActions = computed<ActionButton[]>(() => {
-  if (!detail.value) return []
-  if (detail.value.status === 'SUBMITTED') {
-    return [
-      { key: 'claim', type: 'primary' },
-      { key: 'approve', type: 'default' },
-      { key: 'reject', type: 'default', danger: true },
-      { key: 'offline', type: 'default' },
-    ]
+  const actions: ActionButton[] = []
+  if (!detail.value) return actions
+  const status = detail.value.status
+
+  if (status === 'SUBMITTED') {
+    actions.push({ key: 'claim', type: 'primary', icon: CheckSquareOutlined })
+  } else if (status === 'IN_REVIEW') {
+    actions.push({ key: 'approve', type: 'primary', icon: CheckCircleOutlined })
+    actions.push({ key: 'reject', type: 'default', danger: true, icon: CloseCircleOutlined })
+    actions.push({ key: 'offline', type: 'default', icon: MessageOutlined })
   }
-  if (detail.value.status === 'IN_REVIEW') {
-    return [
-      { key: 'approve', type: 'primary' },
-      { key: 'reject', type: 'default', danger: true },
-      { key: 'offline', type: 'default' },
-    ]
-  }
-  return []
+  return actions
 })
 
 const currentActionMeta = computed(() => (

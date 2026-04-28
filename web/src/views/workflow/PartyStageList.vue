@@ -15,7 +15,10 @@
       <a-tab-pane key="templates" tab="流程模板">
         <a-form layout="inline" class="filter-card">
           <a-form-item>
-            <a-button type="primary" @click="showTemplateDrawer = true">新建模板</a-button>
+            <a-button type="primary" @click="showTemplateDrawer = true">
+            <template #icon><PlusOutlined /></template>
+            新建模板
+          </a-button>
           </a-form-item>
         </a-form>
         <a-table
@@ -31,7 +34,10 @@
               </a-tag>
             </template>
             <template v-else-if="column.key === 'actions'">
-              <a-button type="link" size="small" @click="viewNodes(record)">节点</a-button>
+              <a-button type="link" size="small" @click="viewNodes(record)">
+                <template #icon><NodeIndexOutlined /></template>
+                节点
+              </a-button>
             </template>
           </template>
         </a-table>
@@ -46,8 +52,11 @@
             <a-input v-model:value="flowFilters.template_code" placeholder="模板编码" allow-clear />
           </a-form-item>
           <a-form-item>
-            <a-button type="primary" html-type="submit">查询</a-button>
-          </a-form-item>
+              <a-button type="primary" html-type="submit">
+                <template #icon><SearchOutlined /></template>
+                查询
+              </a-button>
+            </a-form-item>
         </a-form>
         <a-table
           :columns="flowCols"
@@ -128,16 +137,20 @@
         <p v-else class="side-muted">点击“查看节点”后展示模板节点结构。</p>
       </section>
 
-      <div class="side-actions">
-        <a-button @click="showTemplateDrawer = true">新建模板</a-button>
-        <a-button
-          type="primary"
-          :disabled="!selectedTemplatePreview"
-          @click="selectedTemplatePreview && viewNodes(selectedTemplatePreview)"
-        >
-          查看节点
-        </a-button>
-      </div>
+      <div class="side-actions vertical">
+          <a-button @click="showTemplateDrawer = true">
+            <template #icon><PlusOutlined /></template>
+            新建模板
+          </a-button>
+          <a-button
+            type="primary"
+            :disabled="!selectedTemplatePreview"
+            @click="selectedTemplatePreview && viewNodes(selectedTemplatePreview)"
+          >
+            <template #icon><EyeOutlined /></template>
+            查看节点
+          </a-button>
+        </div>
     </aside>
 
     <!-- 模板新建/编辑抽屉 -->
@@ -159,8 +172,11 @@
           <a-textarea v-model:value="tplForm.description" :rows="3" />
         </a-form-item>
         <a-form-item>
-          <a-button type="primary" html-type="submit">保存</a-button>
-        </a-form-item>
+            <a-button type="primary" html-type="submit">
+              <template #icon><SaveOutlined /></template>
+              保存
+            </a-button>
+          </a-form-item>
       </a-form>
     </a-drawer>
 
@@ -190,6 +206,11 @@ import {
   BranchesOutlined,
   NodeIndexOutlined,
   TeamOutlined,
+  LeftOutlined,
+  SearchOutlined,
+  PlusOutlined,
+  SaveOutlined,
+  EyeOutlined
 } from '@ant-design/icons-vue'
 import { get, post } from '@/utils/request'
 import type { ApiEnvelope } from '@/utils/request'
