@@ -48,8 +48,8 @@
     </view>
 
     <!-- 详情弹窗 -->
-    <uni-popup ref="detailPopup" type="bottom">
-      <view class="detail-panel" v-if="selected">
+    <view v-if="selected" class="sheet-mask" @tap="closeDetail">
+      <view class="detail-panel" @tap.stop>
         <view class="sheet-handle" />
         <view class="detail-sheet-head">
           <text class="detail-sheet-label">知识详情</text>
@@ -77,7 +77,7 @@
         </view>
         <view class="detail-action" @tap="openSource">查看原文</view>
       </view>
-    </uni-popup>
+    </view>
   </view>
 </template>
 
@@ -91,7 +91,6 @@ const results = ref<KnowledgeEntry[]>([])
 const matchedBy = ref('')
 const searched = ref(false)
 const selected = ref<KnowledgeEntry | null>(null)
-const detailPopup = ref<any>(null)
 
 async function onSearch() {
   if (!query.value.trim()) return
@@ -107,11 +106,9 @@ async function onSearch() {
 
 function onDetail(item: KnowledgeEntry) {
   selected.value = item
-  detailPopup.value?.open()
 }
 
 function closeDetail() {
-  detailPopup.value?.close()
   selected.value = null
 }
 
@@ -289,7 +286,17 @@ function resultIcon(category?: string | null) {
   box-shadow: var(--shadow-soft);
 }
 
+.sheet-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(31, 24, 27, 0.46);
+}
+
 .detail-panel {
+  width: 100%;
   background: #fff;
   padding: 18rpx 32rpx calc(34rpx + env(safe-area-inset-bottom));
   border-radius: 34rpx 34rpx 0 0;

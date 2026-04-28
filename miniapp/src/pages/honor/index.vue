@@ -96,8 +96,8 @@
       {{ loading ? '加载中...' : '加载更多' }}
     </view>
 
-    <uni-popup ref="detailPopup" type="bottom">
-      <view v-if="selected" class="detail-panel">
+    <view v-if="selected" class="sheet-mask" @tap="closeDetail">
+      <view class="detail-panel" @tap.stop>
         <view class="sheet-handle" />
         <view class="detail-sheet-head">
           <text class="detail-sheet-title">荣誉详情</text>
@@ -173,7 +173,7 @@
           <view class="detail-action" @tap="shareHonor">分享荣誉</view>
         </view>
       </view>
-    </uni-popup>
+    </view>
   </view>
 </template>
 
@@ -228,7 +228,6 @@ const loading = ref(false)
 const hasMore = computed(() => !loading.value && items.value.length < total.value)
 
 const selected = ref<HonorRecordDetail | null>(null)
-const detailPopup = ref<any>(null)
 
 const categoryMap = computed(() => {
   const map = new Map<string, string>()
@@ -364,14 +363,12 @@ async function onDetail(row: HonorRecordBrief) {
   try {
     const resp = await getHonorDetail(row.id)
     selected.value = resp.data
-    detailPopup.value?.open()
   } catch {
     // request helper already handles toast
   }
 }
 
 function closeDetail() {
-  detailPopup.value?.close()
   selected.value = null
 }
 
@@ -1022,7 +1019,17 @@ onMounted(() => {
   font-size: 26rpx;
 }
 
+.sheet-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(31, 24, 27, 0.46);
+}
+
 .detail-panel {
+  width: 100%;
   max-height: 80vh;
   overflow-y: auto;
   padding: 18rpx 30rpx calc(34rpx + env(safe-area-inset-bottom));

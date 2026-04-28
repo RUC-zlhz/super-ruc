@@ -257,8 +257,8 @@
         </view>
       </view>
 
-      <uni-popup ref="appealPopup" type="bottom">
-        <view class="popup-panel">
+      <view v-if="appealVisible" class="sheet-mask" @tap="closeAppeal">
+        <view class="popup-panel" @tap.stop>
           <view class="popup-handle"></view>
           <view class="popup-header">
             <text class="popup-title">纠错申诉</text>
@@ -308,10 +308,10 @@
             </button>
           </view>
         </view>
-      </uni-popup>
+      </view>
 
-      <uni-popup ref="growthPopup" type="bottom">
-        <view class="popup-panel">
+      <view v-if="growthVisible" class="sheet-mask" @tap="closeGrowthSubmission">
+        <view class="popup-panel" @tap.stop>
           <view class="popup-handle"></view>
           <view class="popup-header">
             <text class="popup-title">成长补录</text>
@@ -387,7 +387,7 @@
             </button>
           </view>
         </view>
-      </uni-popup>
+      </view>
     </template>
   </view>
 </template>
@@ -418,8 +418,8 @@ const factSubmissions = ref<ProfileFactSubmissionOut[]>([])
 const factSubmissionsSupported = ref(true)
 const appealSubmitting = ref(false)
 const growthSubmitting = ref(false)
-const appealPopup = ref<any>(null)
-const growthPopup = ref<any>(null)
+const appealVisible = ref(false)
+const growthVisible = ref(false)
 
 const ACTIVE_ENROLLMENT_STATUSES = new Set(['ACTIVE', 'IN_SCHOOL'])
 
@@ -605,21 +605,21 @@ async function loadAll() {
 
 function openAppeal() {
   if (!ensureEditable()) return
-  appealPopup.value?.open()
+  appealVisible.value = true
 }
 
 function closeAppeal() {
-  appealPopup.value?.close()
+  appealVisible.value = false
   resetAppealForm()
 }
 
 function openGrowthSubmission() {
   if (!ensureEditable()) return
-  growthPopup.value?.open()
+  growthVisible.value = true
 }
 
 function closeGrowthSubmission() {
-  growthPopup.value?.close()
+  growthVisible.value = false
   resetGrowthForm()
 }
 
@@ -1441,7 +1441,17 @@ onMounted(async () => {
   color: #c11729;
 }
 
+.sheet-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(31, 24, 27, 0.46);
+}
+
 .popup-panel {
+  width: 100%;
   max-height: 82vh;
   overflow-y: auto;
   background: #fff;
