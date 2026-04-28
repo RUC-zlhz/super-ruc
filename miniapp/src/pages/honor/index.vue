@@ -187,7 +187,6 @@ import {
   type HonorRecordBrief,
   type HonorRecordDetail,
 } from '@/api/honor'
-import { allSettled } from '@/utils/async'
 
 const LEVEL_LABELS: Record<string, string> = {
   NATIONAL: '国家级',
@@ -377,7 +376,10 @@ function closeDetail() {
 }
 
 onMounted(() => {
-  void allSettled([loadCategories(), reload(true)])
+  void Promise.all([
+    loadCategories().catch(() => undefined),
+    reload(true).catch(() => undefined),
+  ])
 })
 </script>
 

@@ -45,3 +45,4 @@
 ## 变更记录
 
 - `2026-04-28`：创建文件，记录微信开发者工具白屏的根因、修复项与验证结果。
+- `2026-04-28`：后续微信开发者工具复核发现独立 `utils/async.js` 模块未注册会导致首页和其他页面注册失败；`miniapp/src/utils/async.ts` 已由 `S6.15` 修复替代，详见 `docs/notes/refinements/2026-04-28-s6-miniapp-runtime-module-registration-fix.md`。

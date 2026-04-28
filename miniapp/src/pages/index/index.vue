@@ -150,8 +150,11 @@ import { useAuthStore } from "@/store/auth";
 import { getMyNotices, type StudentNoticeItem } from "@/api/notice";
 import { getMyRequests } from "@/api/workflow";
 import { getMyWorkflows, type StudentWorkflow } from "@/api/workflow";
-import { allSettled } from "@/utils/async";
 import { openMiniappPage, openNoticeDetail } from "@/utils/navigation";
+
+type SettledResult<T> =
+  | { status: "fulfilled"; value: T }
+  | { status: "rejected"; reason: unknown };
 
 const entries = [
   {
@@ -343,6 +346,23 @@ function formatDate(value?: string | null) {
   return normalized.length >= 16 ? normalized.slice(0, 16) : normalized;
 }
 
+function settleAll<T extends readonly Promise<unknown>[]>(
+  promises: T,
+): Promise<{
+  [K in keyof T]: T[K] extends Promise<infer R> ? SettledResult<R> : never;
+}> {
+  return Promise.all(
+    promises.map((promise) =>
+      promise.then(
+        (value) => ({ status: "fulfilled", value }),
+        (reason) => ({ status: "rejected", reason }),
+      ),
+    ),
+  ) as Promise<{
+    [K in keyof T]: T[K] extends Promise<infer R> ? SettledResult<R> : never;
+  }>;
+}
+
 async function goTo(path: string) {
   try {
     await openMiniappPage(path);
@@ -383,11 +403,11 @@ async function loadDashboard() {
       }
     }
 
-    const [noticesResp, requestsResp, workflowsResp] = await allSettled([
+    const [noticesResp, requestsResp, workflowsResp] = await settleAll([
       getMyNotices({ page: 1, size: 5 }),
       getMyRequests({ page: 1, size: 20 }),
       getMyWorkflows(),
-    ]);
+    ] as const);
 
     recentNotices.value =
       noticesResp.status === "fulfilled" ? noticesResp.value.data.items || [] : [];

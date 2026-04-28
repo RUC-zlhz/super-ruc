@@ -244,6 +244,7 @@
 - [x] `S6.12` Miniapp JPG 视觉对齐 Round 4 tabBar 与高频页收紧
 - [x] `S6.13` Miniapp 微信开发者工具白屏修复
 - [x] `S6.14` Miniapp 首页首屏防白屏兜底
+- [x] `S6.15` Miniapp 页面模块注册错误修复
 
 出口条件：
 
@@ -256,6 +257,7 @@
 - `miniapp` 在新一轮复核后继续对齐 JPG 基准的 Round 4 视觉收口，补齐四栏 tabBar、首页八宫格服务入口、申请/通知/党团高频页的紧凑卡片和表单观感
 - `miniapp` 在微信开发者工具中导入源码根目录或构建产物目录时，均能解析到 `mp-weixin` 产物根目录，并在页面 `setup` 中可用 Pinia store
 - `miniapp` 首页首屏不再依赖 Pinia / 后端 API 完成后才渲染，运行时初始化或接口失败时仍显示基础服务入口和红色首页骨架
+- `miniapp` 页面运行时不再依赖微信开发者工具未注册的独立 `utils/async.js` 模块，首页、消息、我的、荣誉等页面可正常注册
 - `web` 管理端在逐页浏览器截图对照后继续收紧多面板结构，尤其补齐通知、党团流程、导入导出中心的右侧工作面板
 - `data/` 政策/流程 PDF 可转换为 JSON / Markdown，并显式暴露需 OCR 的页面
 - `web build`、`miniapp mp-weixin build` 继续可验证
@@ -276,6 +278,7 @@
 - `S6.12`：用户再次指出小程序与 `design/miniapp/` 设计截图仍有明显差距，已新增并完成 `docs/notes/refinements/2026-04-28-s6-miniapp-jpg-visual-alignment-round4.md`；本轮将小程序 tabBar 调整为 `首页 / 服务 / 消息 / 我的` 四栏，新增服务 tab 图标，首页改为设计稿式八宫格服务入口，并继续收紧申请、发起申请、通知、通知详情、党团进度列表和动态表单的浅粉白卡、紧凑信息密度与红色关键动作。
 - `S6.13`：用户在微信开发者工具中反馈白屏并提供 `app.json is not found in the project root directory` 与 `useAuthStore` 读取 `_s` 失败日志，已新增并完成 `docs/notes/refinements/2026-04-28-s6-miniapp-wechat-runtime-white-screen-fix.md`；本轮为 `miniapp/project.config.json` 增加 `miniprogramRoot`，让导入 `miniapp` 根目录时定位到 `dist/build/mp-weixin/`，并在 `miniapp/src/main.ts` 显式设置共享 Pinia active instance。
 - `S6.14`：用户继续反馈微信开发者工具仍只显示导航栏和 tabBar，中间主体空白；已新增并完成 `docs/notes/refinements/2026-04-28-s6-miniapp-home-first-paint-guard.md`。本轮将 `miniapp/src/pages/index/index.vue` 的 `useAuthStore()` 从 `setup` 顶层移入受保护的 `loadDashboard()` 内部，并把首页姓名、通知、申请和流程数据全部改为静态首屏先渲染、异步数据失败后使用空数组兜底；同时为首页首屏容器与 Hero 加入内联背景色，避免 WXSS 对变量或复杂背景解析失败时出现白底白字。
+- `S6.15`：用户继续提供微信开发者工具精确错误 `module 'utils/async.js' is not defined, require args is '../../utils/async.js'`，已新增并完成 `docs/notes/refinements/2026-04-28-s6-miniapp-runtime-module-registration-fix.md`。本轮移除 `miniapp/src/utils/async.ts` 独立工具模块，将首页与我的页的并发安全结算逻辑内联到页面内，荣誉页改为页面内 `Promise.all(...catch)`，避免 `pages/index/index.js`、`pages/profile/index.js`、`pages/honor/index.js` 在微信运行时继续 require 未注册模块。
 - 验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p web\tsconfig.json` 与 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 均通过；执行 `uv run --extra dev python -m py_compile app\knowledge\router.py app\knowledge\service.py tests\integration\test_knowledge_flow.py` 通过；本轮 `pytest tests\integration\test_knowledge_flow.py -q` 因本地测试数据库拒连未进入断言阶段。
 - `2026-04-27` 补充验证：执行 `UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache uv run --project backend --no-sync --with pypdf --with pdfplumber --with rapidocr-onnxruntime --with pillow python -m py_compile scripts\knowledge\extract_pdf_documents.py` 通过；执行 `UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache uv run --project backend --no-sync --with pypdf --with pdfplumber --with rapidocr-onnxruntime --with pillow python scripts\knowledge\extract_pdf_documents.py data --output-dir output\pdf\extracted --ocr` 通过，生成 4 份 JSON、4 份 Markdown 与 `manifest.json`；团员发展流程 PDF OCR 后正文字符数 `8925`、OCR 字符数 `3366`、chunk 数 `8`。
 - `2026-04-27` Miniapp JPG 视觉对齐验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；沙箱内 `pnpm -C miniapp build:mp-weixin` 因 esbuild `spawn EPERM` 失败，提权环境下重跑通过并输出 `dist\build\mp-weixin`；复核 `miniapp/dist/build/mp-weixin/app.json`、`project.config.json` 及页面级 JSON 存在。
@@ -286,6 +289,7 @@
 - `2026-04-28` Web JPG 逐页截图对照 Round 2 验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p web\tsconfig.json` 通过；执行 `node .tmp\web-visual-review\capture-web-pages.mjs` 通过并重新生成 `16` 页截图；执行 `UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache uv run --project backend --no-sync --with pillow python -` 通过并生成 `.tmp/web-visual-review/web-visual-contact-sheet.png`；执行 `pnpm -C web build` 通过。
 - `2026-04-28` Miniapp 微信开发者工具白屏修复验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；执行 `pnpm -C miniapp build:mp-weixin` 通过；确认 `miniapp/project.config.json` 的 `miniprogramRoot=dist/build/mp-weixin/` 可解析；产物 `app.json / project.config.json / pages/index/index.js` 存在；产物 JS 扫描未命中 `??`、原生 `Promise.allSettled`、明显 optional chaining 等兼容风险；产物 `app.js` 已在 mount 前调用 `setActivePinia`。
 - `2026-04-28` Miniapp 首页首屏防白屏验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；执行 `pnpm -C miniapp build:mp-weixin` 通过；确认生成的 `pages/index/index.wxml` 已带出 `background-color:#f8f3f4` 和 `background-color:#b70f24;color:#ffffff` 内联兜底；确认生成的 `pages/index/index.js` 中 `useAuthStore()` 已位于 `loadDashboard()` 内部保护块，页面 `setup` 顶层先建立静态首屏状态；产物 JS 兼容扫描未命中 `?? / Promise.allSettled / Object.fromEntries / flatMap / matchAll / .at(`。
+- `2026-04-28` Miniapp 页面模块注册错误修复验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；执行 `pnpm -C miniapp build:mp-weixin` 通过；源码扫描 `@/utils/async / utils/async / allSettled` 无命中；产物扫描 `utils/async / allSettled` 无命中；产物 `miniapp/dist/build/mp-weixin/utils/` 仅包含 `navigation.js`、`request.js`、`uni-button.js`，`pages/index/index.js`、`pages/profile/index.js`、`pages/honor/index.js` 不再 require `../../utils/async.js`。
 
 当前结论：
 
@@ -298,6 +302,7 @@
 - `S6.12` 已按用户新一轮小程序视觉复核反馈完成 Miniapp JPG 视觉对齐 Round 4，底部导航、首页服务入口、申请/通知/党团高频页与动态表单进一步贴近 `design/miniapp/` JPG 骨架。
 - `S6.13` 已针对微信开发者工具白屏日志完成运行期修复：导入根目录时可通过 `miniprogramRoot` 定位构建产物，页面 `setup` 调用 `useAuthStore()` 时已有 active Pinia instance。
 - `S6.14` 已针对继续出现的首页主体空白完成首屏防白屏兜底：首页不再在 `setup` 顶层依赖 Pinia / API，且首屏关键背景色有内联兜底。
+- `S6.15` 已针对微信开发者工具 `utils/async.js` 模块未注册错误完成运行期修复：页面 JS 不再 require 该独立模块，避免首页崩溃后连带 tabBar 页面未注册。
 - `S6.6` 已证明 3 份文字型校级 PDF 可以直接结构化抽取，团员发展流程 PDF 的图片化页面可通过 `--ocr` 自动补齐；OCR 结果仍需人工校对后才能作为权威知识库条目。
 - 后续若继续推进，优先做知识库管理端真实数据走查、PDF OCR / 知识库草稿导入映射、短信 provider 适配或申请流程小程序真机验收。
 
@@ -340,6 +345,7 @@
 | 2026-04-28 | Miniapp JPG 视觉对齐 Round 4 | `docs/notes/refinements/2026-04-28-s6-miniapp-jpg-visual-alignment-round4.md` | `S6.3, S6.4, S6.7, S6.8, S6.10, S6.12` | `[x]` | 已补四栏 tabBar、服务 tab 图标、首页八宫格和申请/通知/党团高频页视觉收紧，通过 `miniapp vue-tsc` 与 `mp-weixin` 出包 |
 | 2026-04-28 | Miniapp 微信开发者工具白屏修复 | `docs/notes/refinements/2026-04-28-s6-miniapp-wechat-runtime-white-screen-fix.md` | `S6.13` | `[x]` | 已修复导入根目录找不到 `app.json` 与 Pinia active instance 缺失导致的页面白屏，通过 `miniapp vue-tsc` 与 `mp-weixin` 出包 |
 | 2026-04-28 | Miniapp 首页首屏防白屏兜底 | `docs/notes/refinements/2026-04-28-s6-miniapp-home-first-paint-guard.md` | `S6.14` | `[x]` | 已移除首页 setup 顶层 Pinia 依赖，补首屏内联背景兜底，通过 `miniapp vue-tsc` 与 `mp-weixin` 出包 |
+| 2026-04-28 | Miniapp 页面模块注册错误修复 | `docs/notes/refinements/2026-04-28-s6-miniapp-runtime-module-registration-fix.md` | `S6.15` | `[x]` | 已移除页面对独立 `utils/async.js` 的运行时依赖，修复首页模块未定义导致的页面未注册链式错误 |
 
 ## 会话更新要求
 

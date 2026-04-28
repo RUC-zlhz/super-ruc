@@ -381,7 +381,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useAuthStore } from '@/store/auth'
-import { allSettled } from '@/utils/async'
 import { UNI_BUTTON_TYPE } from '@/utils/uni-button'
 import {
   getMyCorrections,
@@ -391,8 +390,12 @@ import {
   submitMyFact,
   type CorrectionOut,
   type ProfileFactSubmissionOut,
-  type ProfileSelfView,
+type ProfileSelfView,
 } from '@/api/profile'
+
+type SettledResult<T> =
+  | { status: 'fulfilled'; value: T }
+  | { status: 'rejected'; reason: unknown }
 
 const auth = useAuthStore()
 const profile = ref<ProfileSelfView | null>(null)
@@ -531,6 +534,23 @@ function resetGrowthForm() {
   })
 }
 
+function settleAll<T extends readonly Promise<unknown>[]>(
+  promises: T,
+): Promise<{
+  [K in keyof T]: T[K] extends Promise<infer R> ? SettledResult<R> : never
+}> {
+  return Promise.all(
+    promises.map((promise) =>
+      promise.then(
+        (value) => ({ status: 'fulfilled', value }),
+        (reason) => ({ status: 'rejected', reason }),
+      ),
+    ),
+  ) as Promise<{
+    [K in keyof T]: T[K] extends Promise<infer R> ? SettledResult<R> : never
+  }>
+}
+
 function ensureEditable() {
   if (canEditProfile.value) return true
   uni.showToast({ title: '当前学籍状态仅支持只读查看', icon: 'none' })
@@ -548,11 +568,11 @@ async function onWxLogin() {
 }
 
 async function loadAll() {
-  const [profileResp, correctionsResp, submissionsResp] = await allSettled([
+  const [profileResp, correctionsResp, submissionsResp] = await settleAll([
     getMyProfile(),
     getMyCorrections({ page: 1, size: 10 }),
     getMyFactSubmissions({ page: 1, size: 20 }),
-  ])
+  ] as const)
 
   if (profileResp.status === 'fulfilled') {
     profile.value = profileResp.value.data
