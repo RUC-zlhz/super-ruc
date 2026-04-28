@@ -294,10 +294,10 @@
           </view>
         </view>
         <view class="dialog-actions">
-          <button class="dialog-btn secondary" size="mini" @tap="resolveSubmitDialog(false)">
+          <button class="dialog-btn secondary" size="mini" hover-class="hover-opacity" @tap="resolveSubmitDialog(false)">
             再检查
           </button>
-          <button class="dialog-btn primary" size="mini" @tap="resolveSubmitDialog(true)">
+          <button class="dialog-btn primary" size="mini" hover-class="hover-scale" @tap="resolveSubmitDialog(true)">
             {{ draftStatus === "REJECTED" ? "确认重提" : "确认提交" }}
           </button>
         </view>
@@ -1421,11 +1421,135 @@ onMounted(async () => {
   flex: 1;
 }
 
+.btn-icon {
+  margin-right: 8rpx;
+  font-size: 26rpx;
+  vertical-align: middle;
+}
+
 .action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 0;
   flex: 1;
-  font-size: 24rpx;
+  height: 72rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  font-size: 28rpx;
   font-weight: 700;
+}
+
+.action-btn::after {
+  border: none;
+}
+
+.action-btn.light {
+  background: #f8fafc;
+  color: #475569;
+  border: 1rpx solid #e2e8f0;
+}
+
+.action-btn.outline {
+  background: #fff1f2;
+  color: #b70f24;
+  border: 1rpx solid #ffe1e6;
+}
+
+.action-btn.primary {
+  background: linear-gradient(135deg, #d51f35, #b70f24);
+  color: #fff;
+  box-shadow: 0 8rpx 20rpx rgba(183, 15, 36, 0.22);
+}
+
+.dialog-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialog-panel {
+  width: 600rpx;
+  background: #fff;
+  border-radius: 24rpx;
+  overflow: hidden;
+  box-shadow: 0 16rpx 48rpx rgba(0, 0, 0, 0.15);
+}
+
+.dialog-head {
+  padding: 32rpx;
+  background: #f8fafc;
+  text-align: center;
+  border-bottom: 1rpx solid #e2e8f0;
+}
+
+.dialog-title {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.dialog-body {
+  padding: 32rpx;
+}
+
+.dialog-desc {
+  font-size: 28rpx;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.dialog-actions {
+  display: flex;
+  border-top: 1rpx solid #e2e8f0;
+}
+
+.dialog-btn {
+  flex: 1;
+  height: 96rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30rpx;
+  font-weight: 700;
+  border-radius: 0;
+  background: #fff;
+}
+
+.dialog-btn::after {
+  border: none;
+  border-radius: 0;
+}
+
+.dialog-btn.secondary {
+  color: #64748b;
+  border-right: 1rpx solid #e2e8f0;
+}
+
+.dialog-btn.primary {
+  color: #b70f24;
+}
+
+.ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  background: transparent;
+  color: #b70f24;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 52rpx;
+}
+
+.ghost-btn::after {
+  border: 1rpx solid currentColor;
 }
 
 .action-btn.light {
