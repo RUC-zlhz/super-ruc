@@ -161,7 +161,7 @@
                 {{ record.operator_role || "待分配审批人" }}
               </text>
               <text v-if="record.comment" class="record-comment">{{ record.comment }}</text>
-              <text class="record-operator">操作人 ID：{{ record.operator_id ?? "-" }}</text>
+              <text class="record-operator">操作人 ID：{{ operatorIdLabel(record.operator_id) }}</text>
             </view>
           </view>
         </view>
@@ -307,7 +307,7 @@ const formRows = computed(() => {
   if (!detail.value?.form_data) return [];
   return Object.entries(detail.value.form_data).map(([key, value]) => ({
     key,
-    value: typeof value === "object" ? JSON.stringify(value) : String(value ?? ""),
+    value: typeof value === "object" ? JSON.stringify(value) : String(value == null ? "" : value),
   }));
 });
 
@@ -362,6 +362,10 @@ async function loadDetail() {
 function onEdit() {
   if (requestId.value == null) return;
   uni.navigateTo({ url: `/pages/request/create?id=${requestId.value}` });
+}
+
+function operatorIdLabel(operatorId?: number | string | null) {
+  return operatorId == null ? "-" : String(operatorId);
 }
 
 function openPdf(filePath: string) {

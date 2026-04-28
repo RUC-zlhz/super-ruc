@@ -526,7 +526,8 @@ function validateForm() {
   if (!title.value.trim()) {
     errors.push("请输入申请标题。");
   }
-  const { ok } = dynamicFormRef.value?.validate() ?? { ok: true };
+  const validation = dynamicFormRef.value ? dynamicFormRef.value.validate() : { ok: true };
+  const { ok } = validation || { ok: true };
   if (!ok) {
     errors.push("请完善动态表单中的必填字段。");
   }

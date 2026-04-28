@@ -242,6 +242,7 @@
 - [x] `S6.10` Miniapp JPG 视觉对齐 Round 3 骨架收口
 - [x] `S6.11` Web JPG 逐页截图对照 Round 2 收紧
 - [x] `S6.12` Miniapp JPG 视觉对齐 Round 4 tabBar 与高频页收紧
+- [x] `S6.13` Miniapp 微信开发者工具白屏修复
 
 出口条件：
 
@@ -252,6 +253,7 @@
 - `miniapp` 在用户复核后继续对齐 JPG 基准的 Round 2 视觉收口，补足上一轮仍存在的页面骨架与密度差距
 - `miniapp` 在再次复核后继续对齐 JPG 基准的 Round 3 视觉收口，纠正通用大红 Hero 误用，回到白色原生导航、浅粉纹理背景、紧凑白卡和红色关键 CTA 的页面骨架
 - `miniapp` 在新一轮复核后继续对齐 JPG 基准的 Round 4 视觉收口，补齐四栏 tabBar、首页八宫格服务入口、申请/通知/党团高频页的紧凑卡片和表单观感
+- `miniapp` 在微信开发者工具中导入源码根目录或构建产物目录时，均能解析到 `mp-weixin` 产物根目录，并在页面 `setup` 中可用 Pinia store
 - `web` 管理端在逐页浏览器截图对照后继续收紧多面板结构，尤其补齐通知、党团流程、导入导出中心的右侧工作面板
 - `data/` 政策/流程 PDF 可转换为 JSON / Markdown，并显式暴露需 OCR 的页面
 - `web build`、`miniapp mp-weixin build` 继续可验证
@@ -270,6 +272,7 @@
 - `S6.10`：用户再次指出小程序仍与 JPG 设计截图差距明显，已新增并完成 `docs/notes/refinements/2026-04-28-s6-miniapp-jpg-visual-alignment-round3.md`；本轮重点纠正通知中心、知识查询、学业查看、事务申请、发起申请、申请详情等页面的通用大红 Hero 误用，统一回到白色原生导航、浅粉纹理背景、紧凑白卡、圆角浅粉表单和固定底部 CTA，并补充首页学生形象视觉资源。
 - `S6.11`：用户要求“用浏览器打开 Web 端逐页做截图对照，继续收紧与 JPG 的像素级差距”，已新增并完成 `docs/notes/refinements/2026-04-28-s6-web-jpg-visual-tightening-round2.md`；本轮使用本地 Chrome/CDP 覆盖 `16` 页截图并生成 `.tmp/web-visual-review/web-visual-contact-sheet.png`，在不写死设计稿业务数据的前提下补齐 `NoticeList.vue`、`PartyStageList.vue`、`ImportCenter.vue` 的固定右侧工作面板。
 - `S6.12`：用户再次指出小程序与 `design/miniapp/` 设计截图仍有明显差距，已新增并完成 `docs/notes/refinements/2026-04-28-s6-miniapp-jpg-visual-alignment-round4.md`；本轮将小程序 tabBar 调整为 `首页 / 服务 / 消息 / 我的` 四栏，新增服务 tab 图标，首页改为设计稿式八宫格服务入口，并继续收紧申请、发起申请、通知、通知详情、党团进度列表和动态表单的浅粉白卡、紧凑信息密度与红色关键动作。
+- `S6.13`：用户在微信开发者工具中反馈白屏并提供 `app.json is not found in the project root directory` 与 `useAuthStore` 读取 `_s` 失败日志，已新增并完成 `docs/notes/refinements/2026-04-28-s6-miniapp-wechat-runtime-white-screen-fix.md`；本轮为 `miniapp/project.config.json` 增加 `miniprogramRoot`，让导入 `miniapp` 根目录时定位到 `dist/build/mp-weixin/`，并在 `miniapp/src/main.ts` 显式设置共享 Pinia active instance。
 - 验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p web\tsconfig.json` 与 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 均通过；执行 `uv run --extra dev python -m py_compile app\knowledge\router.py app\knowledge\service.py tests\integration\test_knowledge_flow.py` 通过；本轮 `pytest tests\integration\test_knowledge_flow.py -q` 因本地测试数据库拒连未进入断言阶段。
 - `2026-04-27` 补充验证：执行 `UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache uv run --project backend --no-sync --with pypdf --with pdfplumber --with rapidocr-onnxruntime --with pillow python -m py_compile scripts\knowledge\extract_pdf_documents.py` 通过；执行 `UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache uv run --project backend --no-sync --with pypdf --with pdfplumber --with rapidocr-onnxruntime --with pillow python scripts\knowledge\extract_pdf_documents.py data --output-dir output\pdf\extracted --ocr` 通过，生成 4 份 JSON、4 份 Markdown 与 `manifest.json`；团员发展流程 PDF OCR 后正文字符数 `8925`、OCR 字符数 `3366`、chunk 数 `8`。
 - `2026-04-27` Miniapp JPG 视觉对齐验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；沙箱内 `pnpm -C miniapp build:mp-weixin` 因 esbuild `spawn EPERM` 失败，提权环境下重跑通过并输出 `dist\build\mp-weixin`；复核 `miniapp/dist/build/mp-weixin/app.json`、`project.config.json` 及页面级 JSON 存在。
@@ -278,6 +281,7 @@
 - `2026-04-28` Miniapp JPG 视觉对齐 Round 3 验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；执行 `pnpm -C miniapp build:mp-weixin` 通过，输出 `miniapp/dist/build/mp-weixin`，且 `static/hero-student.png` 已随产物带出。
 - `2026-04-28` Miniapp JPG 视觉对齐 Round 4 验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；沙箱内 `pnpm -C miniapp build:mp-weixin` 首次命中已知 esbuild `spawn EPERM`，提权环境重跑通过，输出 `miniapp/dist/build/mp-weixin`；构建产物 `app.json` 已包含四栏 tabBar，且 `static/tab-service*.png` 已带出。
 - `2026-04-28` Web JPG 逐页截图对照 Round 2 验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p web\tsconfig.json` 通过；执行 `node .tmp\web-visual-review\capture-web-pages.mjs` 通过并重新生成 `16` 页截图；执行 `UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache uv run --project backend --no-sync --with pillow python -` 通过并生成 `.tmp/web-visual-review/web-visual-contact-sheet.png`；执行 `pnpm -C web build` 通过。
+- `2026-04-28` Miniapp 微信开发者工具白屏修复验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；执行 `pnpm -C miniapp build:mp-weixin` 通过；确认 `miniapp/project.config.json` 的 `miniprogramRoot=dist/build/mp-weixin/` 可解析；产物 `app.json / project.config.json / pages/index/index.js` 存在；产物 JS 扫描未命中 `??`、原生 `Promise.allSettled`、明显 optional chaining 等兼容风险；产物 `app.js` 已在 mount 前调用 `setActivePinia`。
 
 当前结论：
 
@@ -288,6 +292,7 @@
 - `S6.10` 已按用户再次复核反馈完成 Miniapp JPG 视觉对齐 Round 3 骨架收口，重点将不应使用大红 Hero 的知识、学业、通知、事务页面改回 JPG 中的白色导航、浅粉底、紧凑白卡与红色关键动作。
 - `S6.11` 已按用户要求完成 Web 端逐页浏览器截图对照后的 Round 2 收紧，通知中心、党团流程管理、导入导出中心已补齐与 JPG 更接近的右侧治理 / 配置 / 质量面板。
 - `S6.12` 已按用户新一轮小程序视觉复核反馈完成 Miniapp JPG 视觉对齐 Round 4，底部导航、首页服务入口、申请/通知/党团高频页与动态表单进一步贴近 `design/miniapp/` JPG 骨架。
+- `S6.13` 已针对微信开发者工具白屏日志完成运行期修复：导入根目录时可通过 `miniprogramRoot` 定位构建产物，页面 `setup` 调用 `useAuthStore()` 时已有 active Pinia instance。
 - `S6.6` 已证明 3 份文字型校级 PDF 可以直接结构化抽取，团员发展流程 PDF 的图片化页面可通过 `--ocr` 自动补齐；OCR 结果仍需人工校对后才能作为权威知识库条目。
 - 后续若继续推进，优先做知识库管理端真实数据走查、PDF OCR / 知识库草稿导入映射、短信 provider 适配或申请流程小程序真机验收。
 
@@ -328,6 +333,7 @@
 | 2026-04-28 | Miniapp JPG 视觉对齐 Round 3 | `docs/notes/refinements/2026-04-28-s6-miniapp-jpg-visual-alignment-round3.md` | `S6.3, S6.4, S6.7, S6.8, S6.10` | `[x]` | 已按用户再次复核反馈纠正小程序页面骨架、表单与底部操作区，并通过 `miniapp vue-tsc` 与 `mp-weixin` 出包 |
 | 2026-04-28 | Web JPG 逐页截图对照 Round 2 | `docs/notes/refinements/2026-04-28-s6-web-jpg-visual-tightening-round2.md` | `S6.1, S6.2, S6.5, S6.9, S6.11` | `[x]` | 已用 Chrome/CDP 逐页截图对照并补齐通知、党团流程、导入中心右侧工作面板，通过 `web vue-tsc` 与 `pnpm -C web build` |
 | 2026-04-28 | Miniapp JPG 视觉对齐 Round 4 | `docs/notes/refinements/2026-04-28-s6-miniapp-jpg-visual-alignment-round4.md` | `S6.3, S6.4, S6.7, S6.8, S6.10, S6.12` | `[x]` | 已补四栏 tabBar、服务 tab 图标、首页八宫格和申请/通知/党团高频页视觉收紧，通过 `miniapp vue-tsc` 与 `mp-weixin` 出包 |
+| 2026-04-28 | Miniapp 微信开发者工具白屏修复 | `docs/notes/refinements/2026-04-28-s6-miniapp-wechat-runtime-white-screen-fix.md` | `S6.13` | `[x]` | 已修复导入根目录找不到 `app.json` 与 Pinia active instance 缺失导致的页面白屏，通过 `miniapp vue-tsc` 与 `mp-weixin` 出包 |
 
 ## 会话更新要求
 
@@ -379,3 +385,4 @@
 - `2026-04-28`：新增并完成 `S6.10` Miniapp JPG 视觉对齐 Round 3 骨架收口；纠正不应使用大红 Hero 的知识、学业、通知和事务页面，统一浅粉白页面骨架、紧凑卡片、圆角表单与底部 CTA，并通过 `miniapp vue-tsc` 与 `pnpm -C miniapp build:mp-weixin`。
 - `2026-04-28`：新增并完成 `S6.11` Web JPG 逐页截图对照 Round 2；使用本地 Chrome/CDP 覆盖 16 个管理端页面截图并生成 contact sheet，继续补齐通知中心、党团流程管理和导入导出中心的右侧工作面板，通过 `web vue-tsc` 与 `pnpm -C web build`。
 - `2026-04-28`：新增并完成 `S6.12` Miniapp JPG 视觉对齐 Round 4；按用户新反馈补齐四栏 tabBar、服务 tab 图标、首页八宫格服务入口，并继续收紧申请、通知、党团与动态表单视觉，通过 `miniapp vue-tsc` 与提权环境 `pnpm -C miniapp build:mp-weixin`。
+- `2026-04-28`：新增并完成 `S6.13` Miniapp 微信开发者工具白屏修复；根目录 `project.config.json` 指向 `dist/build/mp-weixin/`，运行入口显式设置共享 Pinia active instance，并通过 `miniapp vue-tsc`、`pnpm -C miniapp build:mp-weixin` 与产物 JS 兼容性扫描。

@@ -381,6 +381,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useAuthStore } from '@/store/auth'
+import { allSettled } from '@/utils/async'
 import { UNI_BUTTON_TYPE } from '@/utils/uni-button'
 import {
   getMyCorrections,
@@ -547,7 +548,7 @@ async function onWxLogin() {
 }
 
 async function loadAll() {
-  const [profileResp, correctionsResp, submissionsResp] = await Promise.allSettled([
+  const [profileResp, correctionsResp, submissionsResp] = await allSettled([
     getMyProfile(),
     getMyCorrections({ page: 1, size: 10 }),
     getMyFactSubmissions({ page: 1, size: 20 }),

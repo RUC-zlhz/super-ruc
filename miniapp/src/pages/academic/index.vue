@@ -110,7 +110,7 @@ const totalGapCredits = computed(() => {
   return Math.max(result.value.total_credits_required - result.value.total_credits_earned, 0)
 })
 
-const totalGapPositive = computed(() => (totalGapCredits.value ?? 0) > 0)
+const totalGapPositive = computed(() => (totalGapCredits.value == null ? 0 : totalGapCredits.value) > 0)
 
 function formatCredits(value?: number | null) {
   if (value == null) return '-'

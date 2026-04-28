@@ -1,10 +1,11 @@
-# miniapp — 学生端（uni-app）
+# miniapp — 微信小程序学生端（uni-app）
 
 **框架**: uni-app（Vue 3 基础）  
-**目标平台**: 微信小程序（主）+ H5（兼容）  
-**UI 库**: uni-ui 或 uv-ui（兼容微信小程序和 H5）  
-**HTTP**: uni.request 封装 / axios（H5 模式）  
-**构建**: HBuilderX 或 CLI（`pnpm dev:mp-weixin` / `pnpm dev:h5`）  
+**目标平台**: 微信小程序（`mp-weixin`，唯一权威验收口径）  
+**H5 说明**: 仅保留为本地临时预览入口，不作为需求完成态或交付验收依据  
+**UI 约束**: 以微信小程序可用组件、交互约束和页面栈能力为准  
+**HTTP / 文件能力**: `uni.request`、`uni.uploadFile`、`uni.downloadFile`  
+**构建**: HBuilderX 或 CLI（主入口：`pnpm dev:mp-weixin` / `pnpm build:mp-weixin`）  
 
 ---
 
@@ -54,7 +55,7 @@ miniapp/
 ├── utils/
 │   ├── format.ts                      日期/状态格式化
 │   └── upload.ts                      文件选择与上传工具
-├── static/                            静态资源（图标、空态图）
+├── src/static/                        静态资源（图标、空态图，微信小程序 tabBar 图标从此目录出包）
 ├── pages.json                         页面路由配置
 ├── manifest.json                      应用配置（AppID、权限）
 ├── App.vue
@@ -85,11 +86,14 @@ miniapp/
 ```bash
 pnpm install
 
-# H5 模式（开发调试方便）
+# H5 模式（仅临时预览，不作为验收依据）
 pnpm dev:h5
 
-# 微信小程序模式（需要 HBuilderX 或微信开发者工具）
+# 微信小程序模式（权威开发 / 验收入口，需要 HBuilderX 或微信开发者工具）
 pnpm dev:mp-weixin
+
+# 生成微信开发者工具可导入产物
+pnpm build:mp-weixin
 ```
 
 ---
@@ -114,3 +118,5 @@ pnpm dev:mp-weixin
 - `AcademicBoundaryTip` 组件必须在学业缺口页面顶部强制渲染。
 - 学生端不得展示未脱敏的身份证号、处分记录字段（权限由后端控制）。
 - 申请附件上传限制：单文件 ≤ 30MB，支持 PDF/Word/图片格式。
+- 新增或修改页面能力时，应优先检查是否符合微信小程序约束，例如页面栈、文件能力、登录能力、导航方式和审核可接受性；不要先按 H5 语义实现再被动适配。
+- 微信开发者工具请先执行 `pnpm build:mp-weixin`，再导入 `miniapp/dist/build/mp-weixin`；也可以导入 `miniapp` 根目录，根目录的 `project.config.json` 已通过 `miniprogramRoot` 指向构建产物目录。`tabBar` 图标源码位于 `miniapp/src/static/`，不能只放在项目根目录的其他临时静态目录中。

@@ -113,7 +113,7 @@
       <template v-if="recentNotices.length">
         <view
           v-for="notice in recentNotices"
-          :key="notice.delivery_id ?? notice.id"
+          :key="noticeKey(notice)"
           class="notice-row"
           @tap="openNotice(notice)"
         >
@@ -150,6 +150,7 @@ import { useAuthStore } from "@/store/auth";
 import { getMyNotices, type StudentNoticeItem } from "@/api/notice";
 import { getMyRequests } from "@/api/workflow";
 import { getMyWorkflows, type StudentWorkflow } from "@/api/workflow";
+import { allSettled } from "@/utils/async";
 import { openMiniappPage, openNoticeDetail } from "@/utils/navigation";
 
 const auth = useAuthStore();
@@ -328,6 +329,10 @@ function isUnread(notice: StudentNoticeItem) {
   return !notice.read_at;
 }
 
+function noticeKey(notice: StudentNoticeItem) {
+  return notice.delivery_id == null ? notice.id : notice.delivery_id;
+}
+
 function noticeCategoryLabel(notice: StudentNoticeItem) {
   if (notice.is_pinned) return "置顶通知";
   if (notice.category) return notice.category;
@@ -367,7 +372,7 @@ async function loadDashboard() {
       }
     }
 
-    const [noticesResp, requestsResp, workflowsResp] = await Promise.allSettled([
+    const [noticesResp, requestsResp, workflowsResp] = await allSettled([
       getMyNotices({ page: 1, size: 5 }),
       getMyRequests({ page: 1, size: 20 }),
       getMyWorkflows(),

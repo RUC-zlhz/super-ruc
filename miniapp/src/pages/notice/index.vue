@@ -13,7 +13,7 @@
     <view v-if="visibleNotices.length" class="list">
       <view
         v-for="n in visibleNotices"
-        :key="n.delivery_id ?? n.id"
+        :key="noticeKey(n)"
         class="notice-card"
         :class="{ unread: isUnread(n), pinned: n.is_pinned }"
         @tap="onDetail(n)"
@@ -77,6 +77,10 @@ const hasMore = computed(() => notices.value.length < total.value)
 
 function isUnread(notice: StudentNoticeItem) {
   return !notice.read_at
+}
+
+function noticeKey(notice: StudentNoticeItem) {
+  return notice.delivery_id == null ? notice.id : notice.delivery_id
 }
 
 function noticeTag(notice: StudentNoticeItem) {

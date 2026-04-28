@@ -122,7 +122,8 @@ onMounted(() => {
   const pages = getCurrentPages()
   const current = pages[pages.length - 1] as any
   const opts = current?.options || {}
-  const parsedNoticeId = Number(opts.noticeId ?? opts.id)
+  const noticeIdParam = opts.noticeId != null ? opts.noticeId : opts.id
+  const parsedNoticeId = Number(noticeIdParam)
   const parsedDeliveryId = Number(opts.deliveryId)
   noticeId.value = Number.isFinite(parsedNoticeId) && parsedNoticeId > 0 ? parsedNoticeId : null
   deliveryId.value = Number.isFinite(parsedDeliveryId) && parsedDeliveryId > 0 ? parsedDeliveryId : null
