@@ -1,0 +1,65 @@
+{
+  "source_file": "微信图片_20260427155537.png",
+  "title": "发展党员工作程序",
+  "type": "workflow",
+  "stage_count": 4,
+  "step_count": 29,
+  "exact_match": false,
+  "confidence": "medium",
+  "note": "基于图片内容进行人工逐项校对后的结构化还原；由于原图压缩较重，个别字词可能与图片逐字存在轻微差异，已尽量贴近图中文字。",
+  "stages": [
+    {
+      "stage_no": 1,
+      "stage_name": "入党积极分子的确定",
+      "steps": [
+        { "step_no": 1, "text": "教育引导" },
+        { "step_no": 2, "text": "接收入党申请书并派人谈话" },
+        { "step_no": 3, "text": "确定入党积极分子并报党委备案" },
+        { "step_no": 4, "text": "指定培养联系人并进行培养教育" },
+        { "step_no": 5, "text": "考察" }
+      ]
+    },
+    {
+      "stage_no": 2,
+      "stage_name": "发展对象的确定",
+      "steps": [
+        { "step_no": 6, "text": "支部委员会听取意见后讨论" },
+        { "step_no": 7, "text": "报党委备案后确定发展对象" },
+        { "step_no": 8, "text": "确定入党介绍人" },
+        { "step_no": 9, "text": "政治审查" },
+        { "step_no": 10, "text": "短期集中培训" }
+      ]
+    },
+    {
+      "stage_no": 3,
+      "stage_name": "预备党员的接收",
+      "steps": [
+        { "step_no": 11, "text": "支部委员会听取意见后讨论" },
+        { "step_no": 12, "text": "报党委预审" },
+        { "step_no": 13, "text": "公示" },
+        { "step_no": 14, "text": "召开支部大会讨论接收预备党员" },
+        { "step_no": 15, "text": "将有关材料报党委组织部" },
+        { "step_no": 16, "text": "党委组织部派人进行谈话" },
+        { "step_no": 17, "text": "党委审批" },
+        { "step_no": 18, "text": "党委审批结果通知党支部" },
+        { "step_no": 19, "text": "报上级党委组织部备案" }
+      ]
+    },
+    {
+      "stage_no": 4,
+      "stage_name": "预备党员的教育、考察和转正",
+      "steps": [
+        { "step_no": 20, "text": "编入党支部和党小组" },
+        { "step_no": 21, "text": "组织入党宣誓" },
+        { "step_no": 22, "text": "继续教育考察" },
+        { "step_no": 23, "text": "递交转正申请书" },
+        { "step_no": 24, "text": "公示" },
+        { "step_no": 25, "text": "召开支部大会讨论预备党员转正" },
+        { "step_no": 26, "text": "将有关材料报党委组织部" },
+        { "step_no": 27, "text": "党委审批" },
+        { "step_no": 28, "text": "党委审批结果通知党支部" },
+        { "step_no": 29, "text": "存档" }
+      ]
+    }
+  ]
+}

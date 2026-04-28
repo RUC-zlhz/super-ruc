@@ -1,0 +1,71 @@
+{
+  "schema_version": "super-ruc.pdf_extract_manifest.v1",
+  "generated_at": "2026-04-27T09:43:33.914302Z",
+  "document_count": 4,
+  "documents": [
+    {
+      "source_filename": "“五个阶段 15个步骤” 发展团员工作流程来啦！.pdf",
+      "source_path": "D:\\Codes\\super-ruc\\data\\“五个阶段 15个步骤” 发展团员工作流程来啦！.pdf",
+      "sha256": "24b02731dc926acd655090c04e263afccd01c90b32a0714263b0b6752bd2a225",
+      "json_path": "D:\\Codes\\super-ruc\\output\\pdf\\extracted-smoke\\“五个阶段_15个步骤”_发展团员工作流程来啦！-24b02731.json",
+      "markdown_path": "D:\\Codes\\super-ruc\\output\\pdf\\extracted-smoke\\“五个阶段_15个步骤”_发展团员工作流程来啦！-24b02731.md",
+      "page_count": 25,
+      "pages_extracted": 1,
+      "text_char_count": 348,
+      "chunk_count": 1,
+      "table_count": 0,
+      "pages_without_text": [],
+      "warnings": [
+        "limited extraction: 1/25 pages"
+      ]
+    },
+    {
+      "source_filename": "关于印发《中国人民大学学生违纪处分管理办.pdf",
+      "source_path": "D:\\Codes\\super-ruc\\data\\关于印发《中国人民大学学生违纪处分管理办.pdf",
+      "sha256": "b4385350844fcc1206872e53c6d32835cc73866e35032cfe7c2bde0b75c878b4",
+      "json_path": "D:\\Codes\\super-ruc\\output\\pdf\\extracted-smoke\\关于印发《中国人民大学学生违纪处分管理办-b4385350.json",
+      "markdown_path": "D:\\Codes\\super-ruc\\output\\pdf\\extracted-smoke\\关于印发《中国人民大学学生违纪处分管理办-b4385350.md",
+      "page_count": 22,
+      "pages_extracted": 1,
+      "text_char_count": 166,
+      "chunk_count": 1,
+      "table_count": 0,
+      "pages_without_text": [],
+      "warnings": [
+        "limited extraction: 1/22 pages"
+      ]
+    },
+    {
+      "source_filename": "关于印发《中国人民大学本科生学籍管理规定.pdf",
+      "source_path": "D:\\Codes\\super-ruc\\data\\关于印发《中国人民大学本科生学籍管理规定.pdf",
+      "sha256": "f56f55f56b1d68f4966b2610a36712217ce09db3c90fb502ecf7788120be8ad3",
+      "json_path": "D:\\Codes\\super-ruc\\output\\pdf\\extracted-smoke\\关于印发《中国人民大学本科生学籍管理规定-f56f55f5.json",
+      "markdown_path": "D:\\Codes\\super-ruc\\output\\pdf\\extracted-smoke\\关于印发《中国人民大学本科生学籍管理规定-f56f55f5.md",
+      "page_count": 19,
+      "pages_extracted": 1,
+      "text_char_count": 173,
+      "chunk_count": 1,
+      "table_count": 0,
+      "pages_without_text": [],
+      "warnings": [
+        "limited extraction: 1/19 pages"
+      ]
+    },
+    {
+      "source_filename": "关于印发《中国人民大学研究生学籍管理规定.pdf",
+      "source_path": "D:\\Codes\\super-ruc\\data\\关于印发《中国人民大学研究生学籍管理规定.pdf",
+      "sha256": "8edf692ded273e9e489f53d23ff9c42d12d079d196c914d27b124d48b1018682",
+      "json_path": "D:\\Codes\\super-ruc\\output\\pdf\\extracted-smoke\\关于印发《中国人民大学研究生学籍管理规定-8edf692d.json",
+      "markdown_path": "D:\\Codes\\super-ruc\\output\\pdf\\extracted-smoke\\关于印发《中国人民大学研究生学籍管理规定-8edf692d.md",
+      "page_count": 19,
+      "pages_extracted": 1,
+      "text_char_count": 173,
+      "chunk_count": 1,
+      "table_count": 0,
+      "pages_without_text": [],
+      "warnings": [
+        "limited extraction: 1/19 pages"
+      ]
+    }
+  ]
+}
