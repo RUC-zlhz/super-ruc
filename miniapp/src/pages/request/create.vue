@@ -179,9 +179,11 @@
             size="mini"
             :disabled="!draftId"
             :loading="uploading"
+            hover-class="hover-opacity"
             @tap="onUploadAttachment"
           >
-            上传附件
+            <text class="btn-icon">📎</text>
+            <text>上传附件</text>
           </button>
         </view>
 
@@ -241,12 +243,35 @@
             <text class="footer-desc">{{ footerHint }}</text>
           </view>
           <view class="footer-actions">
-            <button v-if="!draftId" class="action-btn light" size="mini" @tap="onReset">重选</button>
-            <button class="action-btn outline" size="mini" :loading="saving" @tap="onSave">
-              {{ draftId ? "保存修改" : "保存草稿" }}
+            <button
+              v-if="!draftId"
+              class="action-btn light"
+              size="mini"
+              hover-class="hover-opacity"
+              @tap="onReset"
+            >
+              <text class="btn-icon">↺</text>
+              <text>重选</text>
             </button>
-            <button class="action-btn primary" size="mini" :loading="submitting" @tap="onSubmit">
-              {{ submitButtonText }}
+            <button
+              class="action-btn outline"
+              size="mini"
+              hover-class="hover-opacity"
+              :loading="saving"
+              @tap="onSave"
+            >
+              <text class="btn-icon">💾</text>
+              <text>{{ draftId ? "保存修改" : "保存草稿" }}</text>
+            </button>
+            <button
+              class="action-btn primary"
+              size="mini"
+              hover-class="hover-scale"
+              :loading="submitting"
+              @tap="onSubmit"
+            >
+              <text class="btn-icon">🚀</text>
+              <text>{{ submitButtonText }}</text>
             </button>
           </view>
         </view>
