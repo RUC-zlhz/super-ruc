@@ -1,6 +1,6 @@
 <template>
-  <view class="container">
-    <view class="hero-card">
+  <view class="container" style="background-color: #f8f3f4;">
+    <view class="hero-card" style="background-color: #b70f24; color: #ffffff;">
       <view class="hero-topbar">
         <text class="hero-page-title">首页</text>
         <view class="hero-top-actions">
@@ -153,8 +153,6 @@ import { getMyWorkflows, type StudentWorkflow } from "@/api/workflow";
 import { allSettled } from "@/utils/async";
 import { openMiniappPage, openNoticeDetail } from "@/utils/navigation";
 
-const auth = useAuthStore();
-
 const entries = [
   {
     mark: "□",
@@ -219,8 +217,8 @@ const requests = ref<
 >([]);
 const loading = ref(false);
 const latestSyncText = ref("");
+const displayName = ref("同学");
 
-const displayName = computed(() => auth.user?.display_name || "同学");
 const greeting = computed(() => {
   const hour = new Date().getHours();
   if (hour < 11) return "上午好";
@@ -364,9 +362,22 @@ async function openNotice(notice: StudentNoticeItem) {
 async function loadDashboard() {
   loading.value = true;
   try {
-    if (!auth.user) {
+    let auth: ReturnType<typeof useAuthStore> | null = null;
+    try {
+      auth = useAuthStore();
+      if (auth.user?.display_name) {
+        displayName.value = auth.user.display_name;
+      }
+    } catch {
+      auth = null;
+    }
+
+    if (auth && !auth.user) {
       try {
-        await auth.fetchMe();
+        const user = await auth.fetchMe();
+        if (user.display_name) {
+          displayName.value = user.display_name;
+        }
       } catch {
         // ignore
       }
@@ -379,11 +390,11 @@ async function loadDashboard() {
     ]);
 
     recentNotices.value =
-      noticesResp.status === "fulfilled" ? noticesResp.value.data.items : [];
+      noticesResp.status === "fulfilled" ? noticesResp.value.data.items || [] : [];
     requests.value =
-      requestsResp.status === "fulfilled" ? requestsResp.value.data.items : [];
+      requestsResp.status === "fulfilled" ? requestsResp.value.data.items || [] : [];
     workflows.value =
-      workflowsResp.status === "fulfilled" ? workflowsResp.value.data : [];
+      workflowsResp.status === "fulfilled" ? workflowsResp.value.data || [] : [];
     latestSyncText.value = new Date().toISOString().slice(0, 16).replace("T", " ");
   } finally {
     loading.value = false;
