@@ -28,8 +28,11 @@
         </a-select>
       </a-form-item>
       <a-form-item>
-        <a-button type="primary" html-type="submit">查询</a-button>
-      </a-form-item>
+          <a-button type="primary" html-type="submit">
+            <template #icon><SearchOutlined /></template>
+            查询
+          </a-button>
+        </a-form-item>
     </a-form>
 
     <a-table
@@ -55,6 +58,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { SearchOutlined } from '@ant-design/icons-vue'
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,

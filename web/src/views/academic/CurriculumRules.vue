@@ -22,8 +22,11 @@
         <a-input v-model:value="offeringFilters.semester" placeholder="如 2025-2026-1" allow-clear />
       </a-form-item>
       <a-form-item>
-        <a-button type="primary" html-type="submit">查询</a-button>
-      </a-form-item>
+          <a-button type="primary" html-type="submit">
+            <template #icon><SearchOutlined /></template>
+            查询
+          </a-button>
+        </a-form-item>
     </a-form>
 
     <div class="curriculum-workbench">
@@ -128,8 +131,9 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import {
   BookOutlined,
   ClusterOutlined,
-  NodeIndexOutlined,
+  FileDoneOutlined,
   ReadOutlined,
+  SearchOutlined
 } from '@ant-design/icons-vue'
 import { get } from '@/utils/request'
 import type { ApiEnvelope } from '@/utils/request'
