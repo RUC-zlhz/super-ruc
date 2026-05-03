@@ -11,6 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit.models import AuditLog
 from app.auth.models import Student, User, UserRole
 from app.core.security import create_token
+from app.exchange import repository as exchange_repo
+from app.exchange.models import (
+    BATCH_STATUS_VALIDATED,
+    IMPORT_TYPE_TRANSCRIPT_PDF_REVIEW,
+    StudentCourseRecord,
+)
 from app.exchange.service import ERROR_REPORT_COLUMN
 from app.honor.models import HonorRecord
 
@@ -293,6 +299,63 @@ async def test_exchange_export_permissions_follow_policy_and_write_audit(
     error_report_log = await _latest_audit(db, action="DOWNLOAD_ERROR_REPORT")
     assert error_report_log is not None
     assert error_report_log.result_code == "SUCCESS"
+
+
+async def test_transcript_pdf_review_batch_cannot_be_committed_to_formal_records(
+    admin_client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    student = Student(
+        student_no="PDF-REVIEW-001",
+        full_name="PDF 核验学生",
+        grade_code="2024",
+        major_code="CS",
+        class_code="CS2401",
+    )
+    db.add(student)
+    await db.flush()
+    batch = await exchange_repo.create_batch(
+        db,
+        batch_no="IM-TPDF-UNIT-001",
+        import_type=IMPORT_TYPE_TRANSCRIPT_PDF_REVIEW,
+        filename="transcript.pdf",
+        file_size=128,
+        mime_type="application/pdf",
+        operator_id=None,
+        operator_role="STUDENT",
+    )
+    await exchange_repo.finalize_batch(
+        db,
+        batch,
+        status=BATCH_STATUS_VALIDATED,
+        total_rows=1,
+        ok_rows=0,
+        warn_rows=1,
+        fatal_rows=0,
+        summary={
+            "source": "STUDENT_TRANSCRIPT_PDF",
+            "review_required": True,
+            "formal_records_written": 0,
+        },
+    )
+    await db.commit()
+
+    commit = await admin_client.post(
+        f"/api/v1/admin/exchange/imports/{batch.id}/commit",
+        json={"note": "should not write"},
+    )
+    assert commit.status_code == 400, commit.text
+    assert commit.json()["code"] == 40047
+    assert "人工核验" in commit.json()["message"]
+
+    records = (
+        await db.execute(
+            select(StudentCourseRecord).where(
+                StudentCourseRecord.student_id == student.id
+            )
+        )
+    ).scalars().all()
+    assert records == []
 
 
 async def test_honor_import_groups_rows_into_single_record(

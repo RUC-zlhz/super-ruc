@@ -32,13 +32,15 @@ flowchart TB
 
     Platform[学院学生综合服务与党团管理平台]
 
-    subgraph Capability[五个业务模块]
+    subgraph Capability[一期业务能力]
         direction TB
         M1[模块一：智能问答与政策知识库]
         M2[模块二：党团事务流程管理]
         M3[模块三：信息集成与精准推送]
         M4[模块四：电子证明生成与审批流程]
         M5[模块五：学业情况分析与预警]
+        M6[补充：荣誉展示]
+        M7[补充：学生画像]
     end
 
     subgraph Support[平台支撑能力]
@@ -67,6 +69,8 @@ flowchart TB
     Platform --> M3
     Platform --> M4
     Platform --> M5
+    Platform --> M6
+    Platform --> M7
     Platform --> Audit
     Platform --> Exchange
 
@@ -79,3 +83,6 @@ flowchart TB
     Exchange --> Files
     M4 -. 引导 / 补件 / 归档 .-> School
     M5 --> Exchange
+    M6 --> Exchange
+    M7 --> Exchange
+    M7 --> Identity

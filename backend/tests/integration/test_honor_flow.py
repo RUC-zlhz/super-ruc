@@ -283,7 +283,7 @@ async def test_honor_public_history_toggle_hides_revoked_and_consentless(
         sort_order=1,
     )
 
-    current = await _create_record(
+    await _create_record(
         client,
         admin_headers,
         category_code="SCHOLARSHIP",

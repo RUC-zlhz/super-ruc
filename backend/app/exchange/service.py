@@ -13,7 +13,7 @@ from __future__ import annotations
 import io
 import logging
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Any
 
 from openpyxl import Workbook, load_workbook
@@ -31,6 +31,7 @@ from app.exchange.models import (
     IMPORT_TYPE_HONOR,
     IMPORT_TYPE_STUDENT,
     IMPORT_TYPE_TRANSCRIPT,
+    IMPORT_TYPE_TRANSCRIPT_PDF_REVIEW,
     ROW_RESULT_FAILED,
     ROW_SEVERITY_FATAL,
     ROW_SEVERITY_INFO,
@@ -48,7 +49,7 @@ logger = logging.getLogger(__name__)
 def _gen_batch_no(import_type: str) -> str:
     return (
         f"IM-{import_type[:4].upper()}-"
-        f"{datetime.now(timezone.utc).strftime('%y%m%d%H%M%S')}-"
+        f"{datetime.now(UTC).strftime('%y%m%d%H%M%S')}-"
         f"{uuid.uuid4().hex[:6].upper()}"
     )
 
@@ -190,6 +191,11 @@ async def commit_batch(
         raise BizError(f"批次状态 {batch.status} 不可提交，仅 VALIDATED 可提交", code=40040)
     if batch.fatal_rows > 0:
         raise BizError("批次存在致命错误，无法提交", code=40041)
+    if batch.import_type == IMPORT_TYPE_TRANSCRIPT_PDF_REVIEW:
+        raise BizError(
+            "学生成绩单 PDF 上传记录仅供人工核验，不能通过导入提交写入正式成绩",
+            code=40047,
+        )
 
     applier = _APPLIERS.get(batch.import_type)
     if applier is None:

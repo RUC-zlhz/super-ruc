@@ -1,7 +1,7 @@
 """honor 模块 repository — FR-017。"""
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import and_, func, or_, select
@@ -214,7 +214,7 @@ async def archive_record(
 ) -> HonorRecord:
     record.status = new_status
     record.archive_reason = reason
-    record.archived_at = datetime.now(timezone.utc)
+    record.archived_at = datetime.now(UTC)
     record.archived_by = actor_user_id
     return record
 

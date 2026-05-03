@@ -119,7 +119,6 @@ async def test_party_template_upsert_start_complete_workflow(
     assert node_states["APPLY"]["due_date"] is not None
     assert node_states["ACTIVIST"]["status"] == "PENDING"
     assert node_states["ACTIVIST"]["triggered_at"] is None
-    workflow_id = sw["id"]
 
     # 重复启动 → ConflictError
     dup = await admin_client.post(

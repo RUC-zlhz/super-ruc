@@ -94,6 +94,9 @@ class EntryBrief(BaseModel):
     title: str
     summary: str | None
     category_code: str | None
+    applicable_condition: str | None = None
+    required_materials: str | None = None
+    process_steps: str | None = None
     status: str
     ambiguity_flag: bool
     version_label: str | None

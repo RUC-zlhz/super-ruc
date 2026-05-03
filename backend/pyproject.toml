@@ -52,6 +52,12 @@ target-version = "py311"
 select = ["E", "F", "I", "B", "UP", "N", "S"]
 ignore = ["E501", "S101"]
 
+[tool.ruff.lint.per-file-ignores]
+"app/auth/schemas.py" = ["S105"]
+"app/core/config.py" = ["S104", "S105", "N802"]
+"app/core/security.py" = ["S105", "S107"]
+"tests/integration/test_auth_flow.py" = ["S105"]
+
 [tool.black]
 line-length = 110
 target-version = ["py311"]
@@ -61,3 +67,5 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
+cache_dir = ".tmp/pytest-cache"
+addopts = "--basetemp=.tmp/pytest-tmp"

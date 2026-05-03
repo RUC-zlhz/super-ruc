@@ -17,7 +17,7 @@ The platform shall return common student queries and workflow status views withi
 | Traces To | ID | Description |
 |-----------|-----|-------------|
 | Customer Need | CN-001 | 需要平台提供基于官方来源的政策、资格、材料与流程说明 |
-| Applies To FRs | FR-001, FR-004, FR-007, FR-011, FR-016 | 查询、状态查看、审核工作台、通知记录、统计 |
+| Applies To FRs | FR-001, FR-004, FR-007, FR-011, FR-016, FR-017 | 查询、状态查看、审核工作台、通知记录、统计、荣誉展示 |
 
 ## Measurement Criteria
 

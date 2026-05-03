@@ -43,6 +43,40 @@
         </view>
       </view>
 
+      <view class="upload-card">
+        <view class="upload-head">
+          <view>
+            <text class="upload-title">成绩单 PDF 核验</text>
+            <text class="upload-desc">上传后仅生成待核验记录，不会直接改写正式成绩。</text>
+          </view>
+          <button
+            class="upload-btn"
+            size="mini"
+            :loading="uploadingTranscript"
+            :disabled="uploadingTranscript"
+            hover-class="hover-opacity"
+            @tap="onUploadTranscriptPdf"
+          >
+            上传 PDF
+          </button>
+        </view>
+        <view v-if="transcriptUpload" class="upload-result">
+          <view class="upload-result-main">
+            <text class="upload-result-title">已提交人工核验</text>
+            <text class="upload-result-meta">
+              批次 {{ transcriptUpload.batch_no }} · 疑似课程 {{ transcriptUpload.parsed_courses_count }} 条 · 正式写入 {{ transcriptUpload.formal_records_written }} 条
+            </text>
+          </view>
+          <text
+            v-for="warning in transcriptUpload.data_warnings"
+            :key="warning"
+            class="upload-warning"
+          >
+            {{ warning }}
+          </text>
+        </view>
+      </view>
+
       <view class="section">
         <view class="section-head">
           <text class="section-title">模块完成情况</text>
@@ -77,6 +111,30 @@
         <view v-if="!result.modules.length" class="empty-tiny">暂无模块数据</view>
       </view>
 
+      <view class="section">
+        <view class="section-head">
+          <text class="section-title">课程类型建议</text>
+          <text class="plan-name">共 {{ result.suggested_courses?.length || 0 }} 条</text>
+        </view>
+        <view
+          v-for="course in result.suggested_courses || []"
+          :key="suggestedCourseKey(course)"
+          class="suggest-card"
+        >
+          <view class="suggest-head">
+            <text class="suggest-title">{{ course.course_name || course.course_code || '待选课程' }}</text>
+            <text class="suggest-tag">{{ course.course_type || course.module_name || '参考建议' }}</text>
+          </view>
+          <text class="suggest-meta">
+            {{ [course.course_code, course.module_name, formatCredits(course.credits)].filter(Boolean).join(' · ') }}
+          </text>
+          <text v-if="course.reason" class="suggest-reason">{{ course.reason }}</text>
+        </view>
+        <view v-if="!result.suggested_courses?.length" class="empty-tiny">
+          暂无课程类型建议，请以教务审核和培养方案为准。
+        </view>
+      </view>
+
       <view class="footer-hint">
         <text class="footer-icon">盾</text>
         <view>
@@ -92,10 +150,18 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { getMyAcademicGap, type AcademicGapResult } from '@/api/report'
+import {
+  getMyAcademicGap,
+  uploadTranscriptPdf,
+  type AcademicGapResult,
+  type SuggestedCourse,
+  type TranscriptPdfUploadResult,
+} from '@/api/report'
 
 const result = ref<AcademicGapResult | null>(null)
 const loading = ref(false)
+const uploadingTranscript = ref(false)
+const transcriptUpload = ref<TranscriptPdfUploadResult | null>(null)
 const defaultDisclaimer = '本结果仅为辅助提示，不构成毕业资格、课程替代或教务最终结论；请以学院/学校正式审核结果为准。'
 
 const MODULE_TYPE_LABELS: Record<string, string> = {
@@ -127,6 +193,40 @@ function moduleIcon(moduleType: string) {
   if (moduleType === 'PRACTICE') return '验'
   if (moduleType === 'GENERAL') return '星'
   return '学'
+}
+
+function suggestedCourseKey(course: SuggestedCourse) {
+  return [
+    course.module_code || 'module',
+    course.course_code || course.course_name || 'course',
+    course.course_type || 'type',
+  ].join('-')
+}
+
+async function onUploadTranscriptPdf() {
+  const selected = await new Promise<any>((resolve) => {
+    uni.chooseMessageFile({
+      count: 1,
+      type: 'file',
+      success: resolve,
+      fail: () => resolve(null),
+    })
+  })
+  const file = selected?.tempFiles?.[0] as { path?: string; tempFilePath?: string; name?: string } | undefined
+  const filePath = file?.path || file?.tempFilePath
+  if (!filePath) return
+  if (file?.name && !file.name.toLowerCase().endsWith('.pdf')) {
+    uni.showToast({ title: '请选择 PDF 文件', icon: 'none' })
+    return
+  }
+
+  uploadingTranscript.value = true
+  try {
+    transcriptUpload.value = await uploadTranscriptPdf(filePath)
+    uni.showToast({ title: '已提交核验', icon: 'none' })
+  } finally {
+    uploadingTranscript.value = false
+  }
 }
 
 async function reload() {
@@ -257,6 +357,119 @@ onMounted(reload)
   font-size: 24rpx;
   color: #ad6800;
   line-height: 1.6;
+}
+
+.upload-card {
+  background: #fff;
+  border-radius: 28rpx;
+  padding: 24rpx;
+  margin-bottom: 28rpx;
+  box-shadow: var(--shadow-card);
+  border: 1rpx solid #f0e2e5;
+}
+.upload-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 20rpx;
+  align-items: center;
+}
+.upload-title {
+  display: block;
+  font-size: 30rpx;
+  color: #242022;
+  font-weight: 800;
+}
+.upload-desc {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: #6b7280;
+}
+.upload-btn {
+  flex-shrink: 0;
+  min-width: 150rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  border-radius: 999rpx;
+  background: #b70f24;
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+.upload-btn::after {
+  border: none;
+}
+.upload-result {
+  margin-top: 22rpx;
+  padding: 20rpx;
+  border-radius: 20rpx;
+  background: #fff6f7;
+  border: 1rpx solid #f2c8cf;
+}
+.upload-result-main {
+  margin-bottom: 12rpx;
+}
+.upload-result-title {
+  display: block;
+  color: #b70f24;
+  font-size: 26rpx;
+  font-weight: 800;
+}
+.upload-result-meta {
+  display: block;
+  margin-top: 6rpx;
+  color: #6b7280;
+  font-size: 23rpx;
+  line-height: 1.5;
+}
+.upload-warning {
+  display: block;
+  color: #9f1239;
+  font-size: 23rpx;
+  line-height: 1.55;
+}
+
+.suggest-card {
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f0e2e5;
+}
+
+.suggest-card:last-child {
+  border-bottom: none;
+}
+
+.suggest-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx;
+  align-items: flex-start;
+}
+
+.suggest-title {
+  flex: 1;
+  color: #242022;
+  font-size: 28rpx;
+  line-height: 1.45;
+  font-weight: 800;
+}
+
+.suggest-tag {
+  flex-shrink: 0;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  background: #fff1f2;
+  color: #b70f24;
+  font-size: 22rpx;
+}
+
+.suggest-meta,
+.suggest-reason {
+  display: block;
+  margin-top: 8rpx;
+  color: #6b7280;
+  font-size: 23rpx;
+  line-height: 1.55;
 }
 
 .section {

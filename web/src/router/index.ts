@@ -45,7 +45,16 @@ const routes: RouteRecordRaw[] = [
         path: "workflow/party-stage",
         name: "workflow-stage",
         component: () => import("@/views/workflow/PartyStageList.vue"),
-        meta: { title: "党团流程" },
+        meta: {
+          title: "党团流程",
+          roles: [
+            "SUPER_ADMIN",
+            "COUNSELOR",
+            "HEAD_TEACHER",
+            "YOUTH_LEAGUE_TEACHER",
+            "PARTY_BUILD_TEACHER",
+          ],
+        },
       },
       {
         path: "workflow/quiz-bank",

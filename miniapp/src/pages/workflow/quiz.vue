@@ -72,6 +72,22 @@
         <text class="summary-line">提交后将立即显示得分与逐题结果。</text>
       </view>
 
+      <view class="history-card">
+        <view class="block-head">
+          <text class="block-title">历史记录</text>
+          <text class="block-meta">{{ history.length ? `最近 ${history.length} 条` : '暂无记录' }}</text>
+        </view>
+        <view v-if="history.length" class="history-list">
+          <view v-for="item in history" :key="item.id" class="history-row">
+            <text class="history-score" :class="{ ok: item.is_correct }">{{ item.score }}分</text>
+            <text class="history-meta">
+              {{ item.is_correct ? '回答正确' : '需要复习' }} · {{ formatDateTime(item.submitted_at) }}
+            </text>
+          </view>
+        </view>
+        <text v-else class="history-empty">完成一次自测后，这里会显示最近作答记录。</text>
+      </view>
+
       <button :type="UNI_BUTTON_TYPE.primary" class="primary-btn" hover-class="hover-scale" @tap="startQuiz">
         <text class="btn-icon">⚡</text> 开始自测
       </button>
@@ -254,13 +270,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { UNI_BUTTON_TYPE } from "@/utils/uni-button";
 import {
   drawQuiz,
+  listMyQuizRecords,
   submitQuiz as apiSubmitQuiz,
   type QuizDrawResult,
   type QuizQuestionStudent,
+  type QuizRecord,
   type QuizSubmitResult,
   type QuizType,
 } from "@/api/workflow";
@@ -281,6 +299,7 @@ const batchId = ref("");
 const answers = reactive<Record<number, string>>({});
 const submitting = ref(false);
 const result = ref<QuizSubmitResult | null>(null);
+const history = ref<QuizRecord[]>([]);
 
 const current = computed(() => questions.value[currentIdx.value]);
 const maxLimit = Math.max(...LIMITS);
@@ -362,9 +381,24 @@ async function submitQuiz() {
     const resp = await apiSubmitQuiz(payload);
     result.value = resp.data;
     stage.value = "result";
+    await loadHistory();
   } finally {
     submitting.value = false;
   }
+}
+
+async function loadHistory() {
+  try {
+    const resp = await listMyQuizRecords({ limit: 10 });
+    history.value = resp.data;
+  } catch {
+    history.value = [];
+  }
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "-";
+  return value.slice(0, 16).replace("T", " ");
 }
 
 function restart() {
@@ -372,6 +406,8 @@ function restart() {
   result.value = null;
   questions.value = [];
 }
+
+onMounted(loadHistory);
 </script>
 
 <style scoped>
@@ -547,6 +583,7 @@ function restart() {
 }
 
 .setup-card,
+.history-card,
 .question-card,
 .review-list {
   margin-top: 18rpx;
@@ -555,6 +592,43 @@ function restart() {
   background: rgba(255, 255, 255, 0.98);
   border: 1rpx solid #f0e2e5;
   box-shadow: var(--shadow-card);
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+  min-height: 58rpx;
+  border-bottom: 1rpx solid #f0e2e5;
+}
+
+.history-row:last-child {
+  border-bottom: none;
+}
+
+.history-score {
+  flex-shrink: 0;
+  color: #b70f24;
+  font-size: 26rpx;
+  font-weight: 800;
+}
+
+.history-score.ok {
+  color: #15803d;
+}
+
+.history-meta,
+.history-empty {
+  color: #8a8f98;
+  font-size: 23rpx;
+  line-height: 1.5;
 }
 
 .block-head {

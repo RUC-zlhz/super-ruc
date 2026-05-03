@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import delete, insert, select
@@ -240,7 +240,7 @@ async def archive_expired_logs(
     * 迁移成功后才从主表删除，由同一事务保证原子。
     * 建议由定时任务（每日凌晨）调度；可手工触发用于运维。
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+    cutoff = datetime.now(UTC) - timedelta(days=retention_days)
     total_moved = 0
     total_kept = 0
 

@@ -9,10 +9,7 @@
     "title": "信息学院综合服务",
     "router": { "mode": "hash" },
     "devServer": {
-      "port": 5174,
-      "proxy": {
-        "/api": { "target": "http://localhost:8080", "changeOrigin": true }
-      }
+      "port": 5174
     }
   },
   "mp-weixin": {

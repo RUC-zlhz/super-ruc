@@ -21,7 +21,7 @@
 - `v1_5/`
   保存当前 `v1.5` 活跃出件脚本，例如 SVG 插图拆分与 EMF 变体导出。
 - `v1_6/`
-  保存 `v1.6` 严格 gated 出件包装脚本；该目录复用 `v1_5` 的稳定实现，但切换到 `v1.6` 文件名与 `tmp/docs/v1_6/` 工作目录。
+  保存 `v1.6` 正式交付出件包装脚本；该目录复用 `v1_5` 的稳定实现，但切换到 `v1.6` 文件名与 `tmp/docs/v1_6/` 工作目录。
 
 ## 边界
 
@@ -36,15 +36,17 @@
 - 若本地仍存在 `tmp/docs/update_srs_v13_incremental.py`，应视为 superseded 的 `v1.3` 实验脚本，不再作为正式或参考主链入口。
 - 如后续继续清理历史版本脚本，应优先迁移当前真实使用的链路，再处理 `v1.2 ~ v1.4` 的历史遗留脚本。
 
-## 当前 `v1.6` 严格 gated 预检链
+## 当前 `v1.6` 正式交付链
 
 1. `uv run python scripts/srs/build_srs_v16_from_v15.py`
 2. `uv run python scripts/srs/v1_6/update_v16_docx_split_svg.py`
 3. `uv run python scripts/srs/v1_6/build_v16_emf_variant.py`
 4. `uv run python scripts/srs/v1_6/build_v16_inkscape_emf_variant.py`
+5. `powershell -ExecutionPolicy Bypass -File scripts/srs/v1_6/run_v16_delivery_gate.ps1 -Force`
 
 说明：
 
-- 该链路当前仅作为 `S5B` 预检能力准备，不代表本轮已经形成正式 `v1.6` 交付件。
-- 在 `S4A.3 / S4B.1 / S4B.3 / S4C.*` 未关闭前，不应将 `v1.6` 产物标记为最终交付。
+- `S4A.3 / S4B.1 / S4B.3 / S4C.*` 已于 `2026-04-22` 通过隔离 Kingbase gate 关闭；`S5B` 已在该前提下正式执行 `run_v16_delivery_gate.ps1 -Force`。
+- 当前 `output/doc/` 中的 `v1.6`、`v1.6-emf`、`v1.6-emf-inkscape` 三组 `docx / pdf` 共 `6` 个文件是已完成的 `S5` 正式交付基线。
+- `S6` 为 `web + miniapp` 前端体验增量优化，不改变本目录 `v1.6` 出件链的完成态；若后续文档版本继续迭代，应新增版本化脚本或细化记录，不应改写 `v1.6` 交付结论。
 - 现有 `output/doc/*.v1.5.*` 为已冻结历史交付件，不得被 `v1.6` 链路覆盖。

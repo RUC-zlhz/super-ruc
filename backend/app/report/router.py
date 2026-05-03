@@ -2,6 +2,7 @@
 
 学生侧：
 - GET /report/academic-gap            当前学生的学业缺口
+- POST /report/transcript-pdf         上传成绩单 PDF，生成待人工核验记录
 
 管理侧：
 - GET /admin/report/overview          学院运营看板
@@ -11,9 +12,9 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 
-from app.core.dependencies import CurrentUserDep, DBDep, require_role
+from app.core.dependencies import ActiveStudentDep, CurrentUserDep, DBDep, require_role
 from app.core.exceptions import BizError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
 from app.report import service
@@ -21,6 +22,7 @@ from app.report.schemas import (
     AcademicGapAggregateItem,
     AcademicGapResult,
     OverviewResult,
+    TranscriptPdfUploadResult,
 )
 
 _LEADER_ROLES = (
@@ -49,6 +51,30 @@ async def my_academic_gap(
     return ok(result)
 
 
+@router.post(
+    "/report/transcript-pdf",
+    response_model=ApiResponse[TranscriptPdfUploadResult],
+)
+async def upload_my_transcript_pdf(
+    db: DBDep,
+    user: ActiveStudentDep,
+    file: Annotated[UploadFile, File()],
+) -> ApiResponse[TranscriptPdfUploadResult]:
+    if user.student_id is None:
+        raise BizError("仅学生可上传本人成绩单 PDF", code=40305, http_status=403)
+    content = await file.read()
+    result = await service.upload_transcript_pdf_for_review(
+        db,
+        student_id=user.student_id,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+        filename=file.filename,
+        content=content,
+        content_type=file.content_type,
+    )
+    return ok(result)
+
+
 @router.get(
     "/admin/report/overview",
     response_model=ApiResponse[OverviewResult],
@@ -56,8 +82,9 @@ async def my_academic_gap(
 async def admin_overview(
     db: DBDep,
     _user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
+    term_code: str | None = None,
 ) -> ApiResponse[OverviewResult]:
-    return ok(await service.build_overview(db))
+    return ok(await service.build_overview(db, term_code=term_code))
 
 
 @router.get(

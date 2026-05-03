@@ -106,7 +106,7 @@ class HonorRecord(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
-    recipients: Mapped[list["HonorRecipient"]] = relationship(
+    recipients: Mapped[list[HonorRecipient]] = relationship(
         "HonorRecipient",
         back_populates="record",
         cascade="all, delete-orphan",

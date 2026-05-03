@@ -18,6 +18,7 @@ export type ApprovalAction =
   | 'APPROVE'
   | 'REJECT'
   | 'WITHDRAW'
+  | 'REOPEN'
   | 'OFFLINE_HANDLE'
 
 export interface RequestStatusMeta {
@@ -113,9 +114,14 @@ export const APPROVAL_ACTION_META: Record<string, ApprovalActionMeta> = {
     color: 'gold',
     description: '申请需转为线下核验或办理，线上流转同步终止。',
   },
+  REOPEN: {
+    label: '重开审批',
+    color: 'orange',
+    description: '终态申请被审批角色受控重开，重新进入线上审批链路。',
+  },
 }
 
-export const ADMIN_REQUEST_ACTION_META: Record<'claim' | 'approve' | 'reject' | 'offline', AdminRequestActionMeta> = {
+export const ADMIN_REQUEST_ACTION_META: Record<'claim' | 'approve' | 'reject' | 'offline' | 'reopen', AdminRequestActionMeta> = {
   claim: {
     label: '受理',
     title: '受理',
@@ -139,6 +145,12 @@ export const ADMIN_REQUEST_ACTION_META: Record<'claim' | 'approve' | 'reject' | 
     title: '转线下',
     successMessage: '已转线下',
     color: 'gold',
+  },
+  reopen: {
+    label: '重开审批',
+    title: '重开审批',
+    successMessage: '已重开审批',
+    color: 'orange',
   },
 }
 
@@ -249,6 +261,17 @@ export function markRequestOffline(id: number, contact_info: string, note?: stri
   return post<ApiEnvelope<RequestDetail>>(`/admin/requests/${id}/offline`, {
     contact_info,
     note,
+  })
+}
+
+export function reopenRequest(
+  id: number,
+  comment?: string,
+  target_status: 'IN_REVIEW' | 'SUBMITTED' = 'IN_REVIEW',
+) {
+  return post<ApiEnvelope<RequestDetail>>(`/admin/requests/${id}/reopen`, {
+    comment,
+    target_status,
   })
 }
 

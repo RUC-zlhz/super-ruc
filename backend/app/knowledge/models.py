@@ -133,13 +133,13 @@ class KnowledgeEntry(Base):
     )
 
     source: Mapped[KnowledgeSource | None] = relationship("KnowledgeSource", lazy="joined")
-    tags: Mapped[list["KnowledgeEntryTag"]] = relationship(
+    tags: Mapped[list[KnowledgeEntryTag]] = relationship(
         "KnowledgeEntryTag",
         back_populates="entry",
         cascade="all, delete-orphan",
         lazy="selectin",
     )
-    templates: Mapped[list["KnowledgeEntryTemplate"]] = relationship(
+    templates: Mapped[list[KnowledgeEntryTemplate]] = relationship(
         "KnowledgeEntryTemplate",
         back_populates="entry",
         cascade="all, delete-orphan",

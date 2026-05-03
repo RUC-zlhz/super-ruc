@@ -1,7 +1,4 @@
-import { download, get, post, request, type ApiEnvelope } from '@/utils/request'
-
-const REQUEST_API_BASE_URL = 'http://localhost:8080/api/v1'
-const ACCESS_TOKEN_KEY = 'sip.access_token'
+import { buildApiUrl, download, get, getAuthHeader, post, request, setToken, type ApiEnvelope } from '@/utils/request'
 
 export interface StudentWorkflowNode {
   id: number
@@ -92,6 +89,7 @@ export type RequestAction =
   | 'APPROVE'
   | 'REJECT'
   | 'WITHDRAW'
+  | 'REOPEN'
   | 'OFFLINE_HANDLE'
 
 export const REQUEST_CATEGORY_LABELS: Record<string, string> = {
@@ -120,6 +118,7 @@ export const REQUEST_ACTION_LABELS: Record<string, string> = {
   APPROVE: '审批通过',
   REJECT: '驳回申请',
   WITHDRAW: '撤回申请',
+  REOPEN: '重开审批',
   OFFLINE_HANDLE: '转线下办理',
 }
 
@@ -213,12 +212,11 @@ export function getRequestDetail(id: number) {
 
 export function uploadRequestAttachment(requestId: number, filePath: string) {
   return new Promise<RequestAttachment>((resolve, reject) => {
-    const token = uni.getStorageSync(ACCESS_TOKEN_KEY) || null
     uni.uploadFile({
-      url: `${REQUEST_API_BASE_URL}/requests/${requestId}/attachments`,
+      url: buildApiUrl(`/requests/${requestId}/attachments`),
       filePath,
       name: 'file',
-      header: token ? { Authorization: `Bearer ${token}` } : {},
+      header: getAuthHeader(),
       success(res) {
         let payload: ApiEnvelope<RequestAttachment> | null = null
         try {
@@ -231,7 +229,7 @@ export function uploadRequestAttachment(requestId: number, filePath: string) {
           return
         }
         if (res.statusCode === 401) {
-          uni.removeStorageSync(ACCESS_TOKEN_KEY)
+          setToken(null)
           uni.reLaunch({ url: '/pages/profile/index' })
           reject(new Error('登录已失效'))
           return
@@ -294,6 +292,17 @@ export interface QuizSubmitResult {
   items: QuizItemResult[]
 }
 
+export interface QuizRecord {
+  id: number
+  student_id: number
+  question_id: number
+  batch_id?: string | null
+  answer: string
+  is_correct: boolean
+  score: number
+  submitted_at: string
+}
+
 export function drawQuiz(params: { topic?: string; qtype?: QuizType; limit?: number }) {
   return get<QuizDrawResult>('/quiz/draw', params)
 }
@@ -303,4 +312,8 @@ export function submitQuiz(payload: {
   answers: { question_id: number; answer: string }[]
 }) {
   return post<QuizSubmitResult>('/quiz/submit', payload)
+}
+
+export function listMyQuizRecords(params?: { batch_id?: string; limit?: number }) {
+  return get<QuizRecord[]>('/quiz/my/records', params)
 }

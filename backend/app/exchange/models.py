@@ -43,6 +43,7 @@ IMPORT_TYPE_CURRICULUM_MODULE = "CURRICULUM_MODULE"
 IMPORT_TYPE_COURSE_EQUIV = "COURSE_EQUIV"
 IMPORT_TYPE_COURSE_OFFERING = "COURSE_OFFERING"
 IMPORT_TYPE_HONOR = "HONOR"
+IMPORT_TYPE_TRANSCRIPT_PDF_REVIEW = "TRANSCRIPT_PDF_REVIEW"
 IMPORT_TYPE_CUSTOM = "CUSTOM"
 
 # 批次状态
@@ -96,7 +97,7 @@ class ImportBatch(Base):
     )
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    rows: Mapped[list["ImportBatchRow"]] = relationship(
+    rows: Mapped[list[ImportBatchRow]] = relationship(
         "ImportBatchRow",
         back_populates="batch",
         cascade="all, delete-orphan",
@@ -152,7 +153,7 @@ class CurriculumPlan(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
-    modules: Mapped[list["CurriculumModule"]] = relationship(
+    modules: Mapped[list[CurriculumModule]] = relationship(
         "CurriculumModule",
         back_populates="plan",
         cascade="all, delete-orphan",

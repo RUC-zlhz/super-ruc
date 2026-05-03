@@ -148,17 +148,17 @@
             <a-col :xs="24" :lg="10">
               <div v-if="availableActions.length" class="action-buttons">
                 <a-button
-            v-for="action in availableActions"
-            :key="action.key"
-            :type="action.type"
-            :danger="action.danger"
-            :loading="action.key === 'claim' ? claiming : actionSubmitting"
-            block
-            @click="action.key === 'claim' ? onClaim() : showAction(action.key)"
-          >
-            <template #icon><component :is="action.icon" /></template>
-            {{ ADMIN_REQUEST_ACTION_META[action.key].label }}
-          </a-button>
+                  v-for="action in availableActions"
+                  :key="action.key"
+                  :type="action.type"
+                  :danger="action.danger"
+                  :loading="action.key === 'claim' ? claiming : actionSubmitting"
+                  block
+                  @click="action.key === 'claim' ? onClaim() : showAction(action.key)"
+                >
+                  <template #icon><component :is="action.icon" /></template>
+                  {{ ADMIN_REQUEST_ACTION_META[action.key].label }}
+                </a-button>
               </div>
               <a-empty v-else description="当前状态暂无可执行的管理员动作" />
             </a-col>
@@ -180,7 +180,7 @@
           <a-textarea
             v-model:value="actionModal.comment"
             :rows="4"
-            :placeholder="actionModal.type === 'reject' ? '请填写驳回原因，便于申请人补充后重提' : '可选填处理说明'"
+            :placeholder="commentPlaceholder"
           />
         </a-form-item>
         <a-form-item
@@ -204,7 +204,8 @@ import {
   CheckSquareOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
-  MessageOutlined
+  MessageOutlined,
+  ReloadOutlined
 } from '@ant-design/icons-vue'
 import {
   ADMIN_REQUEST_ACTION_META,
@@ -214,14 +215,15 @@ import {
   getRequestDetail,
   getRequestStatusMeta,
   markRequestOffline,
+  reopenRequest,
   rejectRequest,
   type RequestDetail,
 } from '@/api/workflow'
 
-type ActionModalType = 'approve' | 'reject' | 'offline' | null
+type ActionModalType = 'approve' | 'reject' | 'offline' | 'reopen' | null
 
 interface ActionButton {
-  key: 'claim' | 'approve' | 'reject' | 'offline'
+  key: 'claim' | 'approve' | 'reject' | 'offline' | 'reopen'
   type: 'primary' | 'default' | 'dashed' | 'link' | 'text'
   danger?: boolean
   icon?: any
@@ -279,6 +281,8 @@ const availableActions = computed<ActionButton[]>(() => {
     actions.push({ key: 'approve', type: 'primary', icon: CheckCircleOutlined })
     actions.push({ key: 'reject', type: 'default', danger: true, icon: CloseCircleOutlined })
     actions.push({ key: 'offline', type: 'default', icon: MessageOutlined })
+  } else if (['APPROVED', 'OFFLINE_HANDLED', 'WITHDRAWN'].includes(status)) {
+    actions.push({ key: 'reopen', type: 'primary', icon: ReloadOutlined })
   }
   return actions
 })
@@ -286,6 +290,12 @@ const availableActions = computed<ActionButton[]>(() => {
 const currentActionMeta = computed(() => (
   actionModal.type ? ADMIN_REQUEST_ACTION_META[actionModal.type] : null
 ))
+
+const commentPlaceholder = computed(() => {
+  if (actionModal.type === 'reject') return '请填写驳回原因，便于申请人补充后重提'
+  if (actionModal.type === 'reopen') return '请填写重开原因，便于审计追溯'
+  return '可选填处理说明'
+})
 
 function getTime(value?: string | null) {
   if (!value) return 0
@@ -381,6 +391,10 @@ async function onAction() {
     message.warning('请填写线下联系信息')
     return
   }
+  if (actionModal.type === 'reopen' && !actionModal.comment.trim()) {
+    message.warning('请填写重开原因')
+    return
+  }
 
   actionSubmitting.value = true
   try {
@@ -394,6 +408,8 @@ async function onAction() {
         actionModal.contact_info.trim(),
         actionModal.comment.trim() || undefined,
       )
+    } else if (actionModal.type === 'reopen') {
+      await reopenRequest(id, actionModal.comment.trim(), 'IN_REVIEW')
     }
     message.success(ADMIN_REQUEST_ACTION_META[actionModal.type].successMessage)
     actionModal.visible = false

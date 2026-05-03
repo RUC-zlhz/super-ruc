@@ -10,16 +10,27 @@ FR-016：
 """
 from __future__ import annotations
 
+import hashlib
+import re
+import uuid
 from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit.service import build_audit_detail, log_action
 from app.auth.models import Student
-from app.core.exceptions import NotFoundError
+from app.core.config import settings
+from app.core.exceptions import BizError, NotFoundError
 from app.core.sql import order_by_nulls_last_desc
+from app.core.storage import put_object
+from app.exchange import repository as exchange_repo
 from app.exchange.models import (
+    BATCH_STATUS_VALIDATED,
+    IMPORT_TYPE_TRANSCRIPT_PDF_REVIEW,
+    ROW_RESULT_SKIPPED,
+    ROW_SEVERITY_WARN,
     CourseEquivalence,
     CourseOffering,
     CurriculumModule,
@@ -35,8 +46,11 @@ from app.report.schemas import (
     NoticeSummary,
     OverviewResult,
     RequestSummary,
+    TranscriptPdfCandidateCourse,
+    TranscriptPdfUploadResult,
     WorkflowSummary,
 )
+from app.report.transcript_pdf import analyze_transcript_pdf, candidate_to_dict
 from app.workflow.models import (
     REQUEST_STATUS_APPROVED,
     REQUEST_STATUS_DRAFT,
@@ -54,10 +68,185 @@ from app.workflow.models import (
     WorkflowTemplate,
 )
 
-
 # ============================================================
 # FR-014 学业缺口
 # ============================================================
+_TRANSCRIPT_PDF_MAX_BYTES = 10 * 1024 * 1024
+
+
+def _generate_transcript_pdf_batch_no() -> str:
+    return (
+        f"IM-TPDF-{datetime.now(UTC).strftime('%y%m%d%H%M%S')}-"
+        f"{uuid.uuid4().hex[:6].upper()}"
+    )
+
+
+def _safe_filename(filename: str | None) -> str:
+    value = (filename or "transcript.pdf").strip() or "transcript.pdf"
+    value = value.replace("\\", "_").replace("/", "_")
+    if not value.lower().endswith(".pdf"):
+        value = f"{value}.pdf"
+    return value[:180]
+
+
+async def upload_transcript_pdf_for_review(
+    db: AsyncSession,
+    *,
+    student_id: int,
+    operator_id: int,
+    operator_role: str | None,
+    filename: str | None,
+    content: bytes,
+    content_type: str | None,
+) -> TranscriptPdfUploadResult:
+    """学生上传成绩单 PDF 的最小闭环：存文件、建核验批次、不写正式成绩。"""
+    student = (
+        await db.execute(select(Student).where(Student.id == student_id))
+    ).scalar_one_or_none()
+    if student is None:
+        raise NotFoundError("学生不存在")
+    if not content:
+        raise BizError("成绩单 PDF 文件为空", code=40070)
+    max_bytes = min(settings.UPLOAD_MAX_SIZE_BYTES, _TRANSCRIPT_PDF_MAX_BYTES)
+    if len(content) > max_bytes:
+        raise BizError(
+            f"成绩单 PDF 文件超过 {max_bytes // 1024 // 1024} MB 上限",
+            code=41310,
+            http_status=413,
+        )
+    if not content[:1024].lstrip().startswith(b"%PDF"):
+        raise BizError("仅支持上传 PDF 格式的成绩单文件", code=40071)
+
+    safe_name = _safe_filename(filename)
+    checksum = hashlib.sha256(content).hexdigest()
+    object_bucket = settings.MINIO_BUCKET_ATTACHMENT
+    object_key = f"transcripts/pdf-review/{student.id}/{uuid.uuid4().hex}_{safe_name}"
+    put_object(
+        bucket=object_bucket,
+        object_key=object_key,
+        data=content,
+        length=len(content),
+        content_type=content_type or "application/pdf",
+    )
+
+    analysis = analyze_transcript_pdf(
+        content,
+        student_no=student.student_no,
+        student_name=student.full_name,
+    )
+    candidate_rows = [candidate_to_dict(candidate) for candidate in analysis.candidate_courses]
+    warnings = analysis.data_warnings
+
+    batch = await exchange_repo.create_batch(
+        db,
+        batch_no=_generate_transcript_pdf_batch_no(),
+        import_type=IMPORT_TYPE_TRANSCRIPT_PDF_REVIEW,
+        filename=safe_name,
+        object_bucket=object_bucket,
+        object_key=object_key,
+        file_size=len(content),
+        mime_type=content_type or "application/pdf",
+        operator_id=operator_id,
+        operator_role=operator_role,
+    )
+
+    row_no = 1
+    for warning in warnings:
+        await exchange_repo.add_batch_row(
+            db,
+            batch_id=batch.id,
+            row_no=row_no,
+            severity=ROW_SEVERITY_WARN,
+            result=ROW_RESULT_SKIPPED,
+            field_name="data_warnings",
+            message=warning,
+            raw_data={"warning": warning},
+        )
+        row_no += 1
+    for candidate in candidate_rows:
+        await exchange_repo.add_batch_row(
+            db,
+            batch_id=batch.id,
+            row_no=row_no,
+            severity=ROW_SEVERITY_WARN,
+            result=ROW_RESULT_SKIPPED,
+            field_name="parsed_courses",
+            message="PDF 文本层疑似课程记录，仅供人工核验，不写入正式成绩。",
+            raw_data=candidate,
+        )
+        row_no += 1
+
+    await exchange_repo.finalize_batch(
+        db,
+        batch,
+        status=BATCH_STATUS_VALIDATED,
+        total_rows=row_no - 1,
+        ok_rows=0,
+        warn_rows=row_no - 1,
+        fatal_rows=0,
+        summary={
+            "source": "STUDENT_TRANSCRIPT_PDF",
+            "review_required": True,
+            "formal_records_written": 0,
+            "student_id": student.id,
+            "student_no": student.student_no,
+            "student_name": student.full_name,
+            "sha256": checksum,
+            "parsed_text_chars": len(analysis.extracted_text),
+            "parsed_courses_count": len(candidate_rows),
+            "candidate_courses": candidate_rows,
+            "data_warnings": warnings,
+            "text_preview": analysis.extracted_text[:1000],
+        },
+    )
+    await log_action(
+        db,
+        event_type="REPORT",
+        entity_code="TRANSCRIPT_PDF",
+        action="UPLOAD_TRANSCRIPT_PDF_REVIEW",
+        entity_id=batch.id,
+        actor_user_id=operator_id,
+        actor_role=operator_role,
+        detail=build_audit_detail(
+            target={
+                "student_id": student.id,
+                "student_no": student.student_no,
+                "filename": safe_name,
+            },
+            metrics={
+                "file_size": len(content),
+                "parsed_text_chars": len(analysis.extracted_text),
+                "parsed_courses_count": len(candidate_rows),
+                "formal_records_written": 0,
+            },
+            refs=[{"object_bucket": object_bucket, "object_key": object_key}],
+        ),
+    )
+    await db.commit()
+    await db.refresh(batch)
+
+    return TranscriptPdfUploadResult(
+        upload_id=batch.id,
+        batch_no=batch.batch_no,
+        status="PENDING_REVIEW",
+        student_no=student.student_no,
+        student_name=student.full_name,
+        filename=batch.filename,
+        file_size=len(content),
+        mime_type=batch.mime_type,
+        object_key=batch.object_key,
+        parsed_text_chars=len(analysis.extracted_text),
+        parsed_courses_count=len(candidate_rows),
+        parsed_courses=[
+            TranscriptPdfCandidateCourse(**candidate) for candidate in candidate_rows
+        ],
+        review_required=True,
+        formal_records_written=0,
+        data_warnings=warnings,
+        uploaded_at=batch.finished_at or datetime.now(UTC),
+    )
+
+
 async def compute_academic_gap(
     db: AsyncSession, student_id: int
 ) -> AcademicGapResult:
@@ -304,7 +493,30 @@ async def list_academic_gap_overview(
 # ============================================================
 # FR-016 运营看板
 # ============================================================
-async def build_overview(db: AsyncSession) -> OverviewResult:
+def _term_code_date_range(term_code: str | None) -> tuple[datetime, datetime] | None:
+    if not term_code:
+        return None
+    match = re.fullmatch(r"(\d{4})-(SPRING|SUMMER|FALL|WINTER)", term_code.upper())
+    if not match:
+        return None
+    year = int(match.group(1))
+    season = match.group(2)
+    ranges = {
+        "SPRING": ((2, 1), (7, 1)),
+        "SUMMER": ((7, 1), (9, 1)),
+        "FALL": ((9, 1), (1, 1)),
+        "WINTER": ((1, 1), (2, 1)),
+    }
+    (start_month, start_day), (end_month, end_day) = ranges[season]
+    end_year = year + 1 if season == "FALL" else year
+    return (
+        datetime(year, start_month, start_day, tzinfo=UTC),
+        datetime(end_year, end_month, end_day, tzinfo=UTC),
+    )
+
+
+async def build_overview(db: AsyncSession, *, term_code: str | None = None) -> OverviewResult:
+    term_range = _term_code_date_range(term_code)
     # --- requests 按类型 × 状态聚合 ---
     stmt = (
         select(
@@ -314,6 +526,8 @@ async def build_overview(db: AsyncSession) -> OverviewResult:
         )
         .group_by(Request.type_code, Request.status)
     )
+    if term_range:
+        stmt = stmt.where(Request.created_at >= term_range[0], Request.created_at < term_range[1])
     grouped = (await db.execute(stmt)).all()
 
     types = (await db.execute(select(RequestType))).scalars().all()
@@ -341,18 +555,29 @@ async def build_overview(db: AsyncSession) -> OverviewResult:
     requests_summary = list(summary_map.values())
 
     # --- notices ---
-    total_notices = (await db.execute(
-        select(func.count()).select_from(Notice)
-    )).scalar_one()
-    published_notices = (await db.execute(
-        select(func.count()).select_from(Notice).where(Notice.status == "PUBLISHED")
-    )).scalar_one()
-    total_batches = (await db.execute(
-        select(func.count()).select_from(NoticeDeliveryBatch)
-    )).scalar_one()
-    delivery_rows = (await db.execute(
-        select(NoticeDelivery.status, func.count()).group_by(NoticeDelivery.status)
-    )).all()
+    notice_count_stmt = select(func.count()).select_from(Notice)
+    published_notice_stmt = notice_count_stmt.where(Notice.status == "PUBLISHED")
+    batch_count_stmt = select(func.count()).select_from(NoticeDeliveryBatch)
+    delivery_stmt = select(NoticeDelivery.status, func.count()).group_by(NoticeDelivery.status)
+    if term_range:
+        notice_count_stmt = notice_count_stmt.where(
+            Notice.created_at >= term_range[0], Notice.created_at < term_range[1]
+        )
+        published_notice_stmt = published_notice_stmt.where(
+            Notice.created_at >= term_range[0], Notice.created_at < term_range[1]
+        )
+        batch_count_stmt = batch_count_stmt.where(
+            NoticeDeliveryBatch.started_at >= term_range[0],
+            NoticeDeliveryBatch.started_at < term_range[1],
+        )
+        delivery_stmt = delivery_stmt.where(
+            NoticeDelivery.created_at >= term_range[0],
+            NoticeDelivery.created_at < term_range[1],
+        )
+    total_notices = (await db.execute(notice_count_stmt)).scalar_one()
+    published_notices = (await db.execute(published_notice_stmt)).scalar_one()
+    total_batches = (await db.execute(batch_count_stmt)).scalar_one()
+    delivery_rows = (await db.execute(delivery_stmt)).all()
     sent = failed = skipped = read = 0
     total_deliveries = 0
     for st, c in delivery_rows:
@@ -377,17 +602,27 @@ async def build_overview(db: AsyncSession) -> OverviewResult:
     templates = (await db.execute(select(WorkflowTemplate))).scalars().all()
     workflows: list[WorkflowSummary] = []
     for t in templates:
-        total_students = (await db.execute(
-            select(func.count()).select_from(StudentWorkflow).where(
-                StudentWorkflow.template_id == t.id
+        workflow_count_stmt = select(func.count()).select_from(StudentWorkflow).where(
+            StudentWorkflow.template_id == t.id
+        )
+        if term_range:
+            workflow_count_stmt = workflow_count_stmt.where(
+                StudentWorkflow.started_at >= term_range[0],
+                StudentWorkflow.started_at < term_range[1],
             )
-        )).scalar_one()
-        node_rows = (await db.execute(
+        total_students = (await db.execute(workflow_count_stmt)).scalar_one()
+        node_stmt = (
             select(StudentWorkflowNode.status, func.count())
             .join(StudentWorkflow, StudentWorkflow.id == StudentWorkflowNode.workflow_id)
             .where(StudentWorkflow.template_id == t.id)
             .group_by(StudentWorkflowNode.status)
-        )).all()
+        )
+        if term_range:
+            node_stmt = node_stmt.where(
+                StudentWorkflowNode.created_at >= term_range[0],
+                StudentWorkflowNode.created_at < term_range[1],
+            )
+        node_rows = (await db.execute(node_stmt)).all()
         node_map = dict(node_rows)
         workflows.append(WorkflowSummary(
             template_code=t.code,
@@ -416,6 +651,7 @@ async def build_overview(db: AsyncSession) -> OverviewResult:
     ]
 
     return OverviewResult(
+        term_code=term_code,
         metrics=metrics,
         requests=requests_summary,
         notices=notices_summary,

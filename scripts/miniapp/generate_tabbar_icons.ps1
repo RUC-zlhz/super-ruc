@@ -99,6 +99,23 @@ function Draw-BellIcon {
     }
 }
 
+function Draw-ServiceIcon {
+    param(
+        [System.Drawing.Graphics]$Graphics,
+        [System.Drawing.Color]$Color
+    )
+
+    $pen = New-StrokePen -Color $Color -Width 5
+    try {
+        $Graphics.DrawRectangle($pen, 22, 22, 20, 20)
+        $Graphics.DrawRectangle($pen, 54, 22, 20, 20)
+        $Graphics.DrawRectangle($pen, 22, 54, 20, 20)
+        $Graphics.DrawRectangle($pen, 54, 54, 20, 20)
+    } finally {
+        $pen.Dispose()
+    }
+}
+
 function Draw-ProfileIcon {
     param(
         [System.Drawing.Graphics]$Graphics,
@@ -120,6 +137,8 @@ $activeColor = [System.Drawing.ColorTranslator]::FromHtml('#7f1722')
 $iconSpecs = @(
     @{ FileName = 'tab-home.png'; Color = $inactiveColor; Paint = ${function:Draw-HomeIcon} },
     @{ FileName = 'tab-home-active.png'; Color = $activeColor; Paint = ${function:Draw-HomeIcon} },
+    @{ FileName = 'tab-service.png'; Color = $inactiveColor; Paint = ${function:Draw-ServiceIcon} },
+    @{ FileName = 'tab-service-active.png'; Color = $activeColor; Paint = ${function:Draw-ServiceIcon} },
     @{ FileName = 'tab-notice.png'; Color = $inactiveColor; Paint = ${function:Draw-BellIcon} },
     @{ FileName = 'tab-notice-active.png'; Color = $activeColor; Paint = ${function:Draw-BellIcon} },
     @{ FileName = 'tab-profile.png'; Color = $inactiveColor; Paint = ${function:Draw-ProfileIcon} },

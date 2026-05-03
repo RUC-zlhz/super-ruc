@@ -103,7 +103,37 @@ export interface ProfileSummary {
   practice_count: number
   volunteer_hours: number
   leadership_count: number
+  masked_fields?: string[]
+  hidden_sensitive_fact_count?: number
+  full_view_approved_fields?: string[]
+  full_view_sensitive_facts_approved?: boolean
   generated_at: string
+}
+
+export interface ProfileFullViewRequestOut {
+  id: number
+  student_id: number
+  requester_user_id?: number | null
+  requester_name?: string | null
+  target_type: 'STUDENT_FIELD' | 'PROFILE_FACTS' | string
+  field_name?: string | null
+  reason?: string | null
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | string
+  handled_by?: number | null
+  handled_at?: string | null
+  handler_comment?: string | null
+  created_at: string
+}
+
+export interface ProfileFullViewRequestIn {
+  target_type: 'STUDENT_FIELD' | 'PROFILE_FACTS'
+  field_name?: string | null
+  reason?: string | null
+}
+
+export interface ProfileFullViewDecisionIn {
+  decision: 'APPROVED' | 'REJECTED'
+  comment?: string | null
 }
 
 type StudentBasicRaw = Omit<StudentBasic, 'status' | 'enrollment_status'> & {
@@ -125,6 +155,8 @@ export async function adminSearchStudents(params: {
   grade_code?: string
   major_code?: string
   class_code?: string
+  include_non_active?: boolean
+  enrollment_status?: string
   page?: number
   size?: number
 }) {
@@ -208,6 +240,23 @@ export function adminListPendingFacts(params?: {
 
 export function adminDecideFact(factId: number, payload: FactDecisionIn) {
   return post<ApiEnvelope<ProfileFactOut>>(`/admin/profile/facts/${factId}/decision`, payload)
+}
+
+export function adminSubmitFullViewRequest(studentId: number, payload: ProfileFullViewRequestIn) {
+  return post<ApiEnvelope<ProfileFullViewRequestOut>>(`/admin/profile/${studentId}/full-view-requests`, payload)
+}
+
+export function adminListFullViewRequests(params?: {
+  student_id?: number
+  status?: string
+  page?: number
+  size?: number
+}) {
+  return get<ApiEnvelope<Paginated<ProfileFullViewRequestOut>>>('/admin/profile/full-view-requests', { params })
+}
+
+export function adminDecideFullViewRequest(id: number, payload: ProfileFullViewDecisionIn) {
+  return post<ApiEnvelope<ProfileFullViewRequestOut>>(`/admin/profile/full-view-requests/${id}/decision`, payload)
 }
 
 export async function downloadStudentProfileSnapshot(studentId: number, format: 'pdf' | 'xlsx') {

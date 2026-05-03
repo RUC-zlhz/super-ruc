@@ -15,15 +15,13 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
-    Integer,
     Numeric,
     String,
     Text,
-    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 
@@ -45,6 +43,13 @@ PROFILE_SOURCE_SYSTEM = "SYSTEM"
 PROFILE_APPROVAL_PENDING = "PENDING"
 PROFILE_APPROVAL_APPROVED = "APPROVED"
 PROFILE_APPROVAL_REJECTED = "REJECTED"
+
+# 复用 profile_corrections 的审批字段承载“完整查看申请”。
+# 前缀用于和普通纠错申诉隔离，避免污染既有纠错列表。
+PROFILE_FULL_VIEW_FIELD_PREFIX = "VIEW:"
+PROFILE_FULL_VIEW_MARKER_PREFIX = "VIEW_REQUESTER:"
+PROFILE_FULL_VIEW_TARGET_STUDENT_FIELD = "STUDENT_FIELD"
+PROFILE_FULL_VIEW_TARGET_PROFILE_FACTS = "PROFILE_FACTS"
 
 
 class ProfileFact(Base):

@@ -54,6 +54,38 @@ class AcademicGapAggregateItem(BaseModel):
     generated_at: datetime
 
 
+class TranscriptPdfCandidateCourse(BaseModel):
+    line_no: int
+    raw_text: str
+    course_code: str | None = None
+    course_name: str | None = None
+    credits: float | None = None
+    term_code: str | None = None
+    score: float | None = None
+    grade_letter: str | None = None
+    pass_flag: bool | None = None
+    confidence: str = "LOW"
+
+
+class TranscriptPdfUploadResult(BaseModel):
+    upload_id: int
+    batch_no: str
+    status: str
+    student_no: str
+    student_name: str
+    filename: str
+    file_size: int
+    mime_type: str | None = None
+    object_key: str | None = None
+    parsed_text_chars: int = 0
+    parsed_courses_count: int = 0
+    parsed_courses: list[TranscriptPdfCandidateCourse] = []
+    review_required: bool = True
+    formal_records_written: int = 0
+    data_warnings: list[str] = []
+    uploaded_at: datetime
+
+
 # ============================================================
 # FR-016 运营看板
 # ============================================================
@@ -100,6 +132,7 @@ class WorkflowSummary(BaseModel):
 
 
 class OverviewResult(BaseModel):
+    term_code: str | None = None
     metrics: list[KVMetric]
     requests: list[RequestSummary]
     notices: NoticeSummary | None

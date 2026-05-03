@@ -37,6 +37,18 @@
               style="width: 120px"
             />
           </a-form-item>
+          <a-form-item label="学籍">
+            <a-select v-model:value="stuFilters.enrollment_status" allow-clear style="width: 140px">
+              <a-select-option value="ACTIVE">在读</a-select-option>
+              <a-select-option value="SUSPENDED">休学</a-select-option>
+              <a-select-option value="TRANSFERRED">转出</a-select-option>
+              <a-select-option value="GRADUATED">毕业</a-select-option>
+              <a-select-option value="ARCHIVED">归档</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item>
+            <a-checkbox v-model:checked="stuFilters.include_non_active">包含非在读</a-checkbox>
+          </a-form-item>
           <a-form-item>
             <a-space wrap>
               <a-button type="primary" html-type="submit">
@@ -134,13 +146,13 @@
                 <a-select-option :value="policyPresetName">{{ policyPresetName }}</a-select-option>
               </a-select>
               <div class="preset-actions">
-                <a-button size="small" type="primary" @click="onSavePolicies" :loading="savingPolicies">
-                  <template #icon><SaveOutlined /></template>
-                  保存设置
-                </a-button>
-                <a-button size="small" @click="loadPolicies">
+                <a-button size="small" type="primary" @click="refreshPolicies" :loading="policyLoading">
                   <template #icon><ReloadOutlined /></template>
-                  刷新
+                  刷新策略
+                </a-button>
+                <a-button size="small" @click="onViewAllPolicies">
+                  <template #icon><IdcardOutlined /></template>
+                  查看全部
                 </a-button>
               </div>
             </div>
@@ -230,7 +242,6 @@ import {
   SyncOutlined,
   ReloadOutlined,
   EditOutlined,
-  SaveOutlined,
 } from "@ant-design/icons-vue";
 import { updateEnrollmentStatus } from "@/api/auth";
 import { adminSearchStudents, type StudentBasic } from "@/api/profile";
@@ -294,6 +305,8 @@ const stuFilters = reactive<{
   grade_code?: string;
   major_code?: string;
   class_code?: string;
+  include_non_active?: boolean;
+  enrollment_status?: string;
 }>({});
 const students = ref<StudentBasic[]>([]);
 const stuLoading = ref(false);
@@ -341,6 +354,8 @@ async function reloadStudents() {
       grade_code: stuFilters.grade_code,
       major_code: stuFilters.major_code,
       class_code: stuFilters.class_code,
+      include_non_active: stuFilters.include_non_active,
+      enrollment_status: stuFilters.enrollment_status,
       page: stuPagination.current,
       size: stuPagination.pageSize,
     });
@@ -367,6 +382,8 @@ function resetStudentFilters() {
   stuFilters.grade_code = undefined;
   stuFilters.major_code = undefined;
   stuFilters.class_code = undefined;
+  stuFilters.include_non_active = false;
+  stuFilters.enrollment_status = undefined;
   stuPagination.current = 1;
   void reloadStudents();
 }
@@ -501,8 +518,8 @@ function maskStrategyLabel(maskStrategy?: string | null) {
   return maskStrategy;
 }
 
-async function loadPolicies() {
-  if (!canViewPolicies.value || policyLoaded.value) return;
+async function loadPolicies(force = false) {
+  if (!canViewPolicies.value || (!force && policyLoaded.value)) return;
   policyLoading.value = true;
   try {
     const resp = await get<ApiEnvelope<RoleFieldPolicy[]>>(
@@ -513,6 +530,15 @@ async function loadPolicies() {
   } finally {
     policyLoading.value = false;
   }
+}
+
+function refreshPolicies() {
+  void loadPolicies(true);
+}
+
+function onViewAllPolicies() {
+  activeTab.value = "roles";
+  void loadPolicies();
 }
 
 onMounted(() => {

@@ -45,6 +45,13 @@ export const NAV_GROUPS: NavGroup[] = [
         key: "/workflow/party-stage",
         label: "党团流程管理",
         icon: BranchesOutlined,
+        roles: [
+          "SUPER_ADMIN",
+          "COUNSELOR",
+          "HEAD_TEACHER",
+          "YOUTH_LEAGUE_TEACHER",
+          "PARTY_BUILD_TEACHER",
+        ],
       },
     ],
   },

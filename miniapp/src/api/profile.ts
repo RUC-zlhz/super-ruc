@@ -1,7 +1,4 @@
-import { get, post, setToken, type ApiEnvelope } from '@/utils/request'
-
-const BASE_URL = 'http://localhost:8080/api/v1'
-const TOKEN_KEY = 'sip.access_token'
+import { buildApiUrl, get, getAuthHeader, post, setToken, type ApiEnvelope } from '@/utils/request'
 
 export interface ProfileStudent {
   id: number
@@ -64,7 +61,14 @@ export interface ProfileFactSubmissionIn {
   ended_on?: string | null
   hours?: number | null
   rank_label?: string | null
-  attachments?: Record<string, any> | null
+  attachments?: ProfileFactAttachment[] | Record<string, any> | null
+}
+
+export interface ProfileFactAttachment {
+  name: string
+  path: string
+  size?: number | null
+  mime_type?: string | null
 }
 
 export interface CorrectionOut {
@@ -90,7 +94,26 @@ export interface ProfileSelfView {
   practice_count: number
   volunteer_hours: number
   leadership_count: number
+  masked_fields?: string[]
+  hidden_sensitive_fact_count?: number
+  full_view_approved_fields?: string[]
+  full_view_sensitive_facts_approved?: boolean
   generated_at: string
+}
+
+export interface ProfileFullViewRequestOut {
+  id: number
+  student_id: number
+  requester_user_id?: number | null
+  requester_name?: string | null
+  target_type: 'STUDENT_FIELD' | 'PROFILE_FACTS' | string
+  field_name?: string | null
+  reason?: string | null
+  status: string
+  handled_by?: number | null
+  handled_at?: string | null
+  handler_comment?: string | null
+  created_at: string
 }
 
 type ProfileStudentRaw = Omit<ProfileStudent, 'status' | 'enrollment_status'> & {
@@ -111,20 +134,6 @@ function withEnrollmentAlias(student: ProfileStudentRaw): ProfileStudent {
   }
 }
 
-function getToken() {
-  return uni.getStorageSync(TOKEN_KEY) || null
-}
-
-function buildUrl(url: string, params?: Record<string, any>) {
-  const query = params
-    ? Object.entries(params)
-      .filter(([, value]) => value != null && value !== '')
-      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
-      .join('&')
-    : ''
-  return `${BASE_URL}${url}${query ? `?${query}` : ''}`
-}
-
 function optionalRequest<T>(
   url: string,
   method: 'GET' | 'POST' = 'GET',
@@ -132,14 +141,13 @@ function optionalRequest<T>(
   params?: Record<string, any>,
 ) {
   return new Promise<T | null>((resolve, reject) => {
-    const token = getToken()
     uni.request({
-      url: buildUrl(url, params),
+      url: buildApiUrl(url, params),
       method,
       data,
       header: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...getAuthHeader(),
       },
       success(res) {
         const payload = res.data as ApiEnvelope<T>
@@ -188,6 +196,18 @@ export function submitCorrection(payload: {
 
 export function getMyCorrections(params?: { status?: string; page?: number; size?: number }) {
   return get<{ items: CorrectionOut[]; meta: any }>('/profile/me/corrections', params)
+}
+
+export function getMyFullViewRequests(params?: { status?: string; page?: number; size?: number }) {
+  return get<{ items: ProfileFullViewRequestOut[]; meta: any }>('/profile/me/full-view-requests', params)
+}
+
+export function submitMyFullViewRequest(payload: {
+  target_type: 'STUDENT_FIELD' | 'PROFILE_FACTS'
+  field_name?: string | null
+  reason?: string | null
+}) {
+  return post<ProfileFullViewRequestOut>('/profile/me/full-view-requests', payload)
 }
 
 export async function getMyFactSubmissions(params?: { status?: string; page?: number; size?: number }) {

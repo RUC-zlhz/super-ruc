@@ -1,11 +1,22 @@
 """report contract smoke — S1 canonical route/schema guardrails."""
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.models import Student
-from app.exchange.models import CurriculumModule, CurriculumPlan, StudentCourseRecord
+from app.auth.models import Student, User
+from app.exchange.models import (
+    IMPORT_TYPE_TRANSCRIPT_PDF_REVIEW,
+    CourseOffering,
+    CurriculumModule,
+    CurriculumPlan,
+    ImportBatch,
+    StudentCourseRecord,
+)
+from app.workflow.models import Request, RequestType
 
 
 async def _login_as_student(
@@ -82,6 +93,18 @@ async def test_report_routes_use_canonical_contract(
             pass_flag=True,
         )
     )
+    db.add(
+        CourseOffering(
+            term_code="2025-FALL",
+            course_code="CS199",
+            course_name="课程实践",
+            credits=3,
+            course_type="PRACTICE",
+            major_codes="CS",
+            grade_codes="2022",
+            is_active=True,
+        )
+    )
     await db.commit()
 
     academic_gap = await client.get("/api/v1/report/academic-gap", headers=stu_headers)
@@ -93,6 +116,9 @@ async def test_report_routes_use_canonical_contract(
     assert "gap_credits" not in data
     assert "generated_at" in data
     assert "disclaimer" in data
+    assert data["suggested_courses"]
+    assert data["suggested_courses"][0]["course_code"] == "CS199"
+    assert "graduation" not in str(data["suggested_courses"][0]).lower()
     assert len(data["modules"]) == 2
     first_module = data["modules"][0]
     assert {"credits_required", "credits_earned", "credits_gap"} <= set(first_module)
@@ -113,12 +139,103 @@ async def test_report_routes_use_canonical_contract(
         metric = overview_data["metrics"][0]
         assert {"key", "label", "value"} <= set(metric)
 
+    request_type = RequestType(
+        code="TERM_OVERVIEW",
+        name="学期看板测试",
+        category="OTHER",
+        approver_roles="COUNSELOR",
+    )
+    db.add(request_type)
+    await db.flush()
+    applicant_user = (
+        await db.execute(select(User).where(User.student_id == student_id))
+    ).scalar_one()
+    db.add(
+        Request(
+            request_no="REQ-TERM-2501",
+            type_id=request_type.id,
+            type_code=request_type.code,
+            applicant_user_id=applicant_user.id,
+            applicant_student_id=student_id,
+            title="秋季事务",
+            form_data={},
+            status="SUBMITTED",
+            created_at=datetime(2025, 10, 1, tzinfo=UTC),
+        )
+    )
+    db.add(
+        Request(
+            request_no="REQ-TERM-2601",
+            type_id=request_type.id,
+            type_code=request_type.code,
+            applicant_user_id=applicant_user.id,
+            applicant_student_id=student_id,
+            title="春季事务",
+            form_data={},
+            status="SUBMITTED",
+            created_at=datetime(2026, 3, 1, tzinfo=UTC),
+        )
+    )
+    await db.commit()
+
+    fall_overview = await admin_client.get(
+        "/api/v1/admin/report/overview",
+        params={"term_code": "2025-FALL"},
+    )
+    assert fall_overview.status_code == 200, fall_overview.text
+    fall_data = fall_overview.json()["data"]
+    assert fall_data["term_code"] == "2025-FALL"
+    term_summary = next(
+        item for item in fall_data["requests"] if item["type_code"] == "TERM_OVERVIEW"
+    )
+    assert term_summary["total"] == 1
+
     admin_gap = await admin_client.get(f"/api/v1/admin/report/academic-gap/{student_id}")
     assert admin_gap.status_code == 200, admin_gap.text
     admin_gap_data = admin_gap.json()["data"]
     assert admin_gap_data["student_no"] == "A100001"
     assert admin_gap_data["total_credits_required"] == 6
     assert admin_gap_data["modules"][0]["module_code"] == "CORE"
+
+
+async def test_student_transcript_pdf_upload_creates_review_record_without_formal_grades(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    token, student_id = await _login_as_student(
+        client, db, student_no="A100002", wx_code="wx_a100002"
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    pdf_bytes = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF"
+    upload = await client.post(
+        "/api/v1/report/transcript-pdf",
+        headers=headers,
+        files={"file": ("transcript.pdf", pdf_bytes, "application/pdf")},
+    )
+    assert upload.status_code == 200, upload.text
+    data = upload.json()["data"]
+    assert data["status"] == "PENDING_REVIEW"
+    assert data["review_required"] is True
+    assert data["formal_records_written"] == 0
+    assert data["data_warnings"]
+    assert any("不会写入正式成绩" in warning for warning in data["data_warnings"])
+
+    batch = await db.get(ImportBatch, data["upload_id"])
+    assert batch is not None
+    assert batch.import_type == IMPORT_TYPE_TRANSCRIPT_PDF_REVIEW
+    assert batch.summary["review_required"] is True
+    assert batch.summary["formal_records_written"] == 0
+    assert batch.object_key
+
+    records = (
+        await db.execute(
+            select(StudentCourseRecord).where(
+                StudentCourseRecord.student_id == student_id
+            )
+        )
+    ).scalars().all()
+    assert records == []
 
 
 async def test_admin_academic_gap_aggregate_query_uses_items_meta_and_filters(

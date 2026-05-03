@@ -92,6 +92,7 @@ export interface OverviewWorkflowSummary {
 }
 
 export interface OverviewResult {
+  term_code?: string | null
   metrics: OverviewMetric[]
   requests: OverviewRequestSummary[]
   notices?: OverviewNoticeSummary | null
@@ -414,8 +415,8 @@ export function buildDashboardViewModel(
   }
 }
 
-export function fetchOverview() {
-  return get<ApiEnvelope<OverviewResult>>('/admin/report/overview')
+export function fetchOverview(params?: { term_code?: string }) {
+  return get<ApiEnvelope<OverviewResult>>('/admin/report/overview', { params })
 }
 
 export function fetchAcademicGapList(params: AcademicGapAggregateParams) {

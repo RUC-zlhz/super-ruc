@@ -39,6 +39,7 @@ from app.workflow.schemas import (
     QuizSubmitIn,
     QuizSubmitOut,
     ReminderGenerateIn,
+    ReopenRequestIn,
     RequestBrief,
     RequestCreate,
     RequestDetail,
@@ -491,6 +492,29 @@ async def admin_reject_request(
             request_id,
             approve=False,
             comment=payload.comment,
+            operator_id=user.user_id,
+            operator_roles=user.roles,
+        )
+    )
+
+
+@admin_router.post(
+    "/requests/{request_id}/reopen",
+    response_model=ApiResponse[RequestDetail],
+    summary="FR-008 终态申请受控重开 / 重批",
+)
+async def admin_reopen_request(
+    request_id: int,
+    payload: ReopenRequestIn,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_ApproverRole)],
+) -> ApiResponse[RequestDetail]:
+    return ok(
+        await service.reopen_request(
+            db,
+            request_id,
+            comment=payload.comment,
+            target_status=payload.target_status,
             operator_id=user.user_id,
             operator_roles=user.roles,
         )

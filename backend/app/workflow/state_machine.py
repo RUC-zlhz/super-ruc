@@ -10,6 +10,7 @@
                    SUBMITTED ─approve/reject──▶ 同上
                    SUBMITTED/IN_REVIEW ─withdraw──▶ WITHDRAWN
                    SUBMITTED/IN_REVIEW ─offline ──▶ OFFLINE_HANDLED
+                   APPROVED/OFFLINE_HANDLED/WITHDRAWN ─reopen─▶ IN_REVIEW/SUBMITTED
 """
 from __future__ import annotations
 
@@ -20,6 +21,7 @@ from app.workflow.models import (
     REQUEST_ACTION_APPROVE,
     REQUEST_ACTION_OFFLINE,
     REQUEST_ACTION_REJECT,
+    REQUEST_ACTION_REOPEN,
     REQUEST_ACTION_RESUBMIT,
     REQUEST_ACTION_SUBMIT,
     REQUEST_ACTION_WITHDRAW,
@@ -34,7 +36,6 @@ from app.workflow.models import (
     WORKFLOW_NODE_OVERDUE,
     WORKFLOW_NODE_PENDING,
 )
-
 
 # =====================================================================
 # 申请（Request）状态机
@@ -70,6 +71,20 @@ _REQUEST_TRANSITIONS: dict[str, tuple[frozenset[str], str]] = {
         REQUEST_STATUS_OFFLINE_HANDLED,
     ),
 }
+_REQUEST_REOPEN_ALLOWED_STATUSES: frozenset[str] = frozenset(
+    {
+        REQUEST_STATUS_APPROVED,
+        REQUEST_STATUS_WITHDRAWN,
+        REQUEST_STATUS_OFFLINE_HANDLED,
+    }
+)
+_REQUEST_REOPEN_TARGET_STATUSES: frozenset[str] = frozenset(
+    {REQUEST_STATUS_SUBMITTED, REQUEST_STATUS_IN_REVIEW}
+)
+_REQUEST_TRANSITIONS[REQUEST_ACTION_REOPEN] = (
+    _REQUEST_REOPEN_ALLOWED_STATUSES,
+    REQUEST_STATUS_IN_REVIEW,
+)
 
 # 前端 / 学生可编辑的状态
 REQUEST_EDITABLE_STATUSES: frozenset[str] = frozenset(
@@ -120,6 +135,26 @@ class ApprovalStateMachine:
             )
         return TransitionResult(
             status_before=current_status, status_after=target, action=action
+        )
+
+    @staticmethod
+    def reopen(current_status: str, target_status: str) -> TransitionResult:
+        if current_status not in _REQUEST_REOPEN_ALLOWED_STATUSES:
+            raise BizError(
+                f"当前状态 {current_status} 不允许执行 {REQUEST_ACTION_REOPEN}"
+                f"（期望之一：{sorted(_REQUEST_REOPEN_ALLOWED_STATUSES)}）",
+                code=40022,
+            )
+        if target_status not in _REQUEST_REOPEN_TARGET_STATUSES:
+            raise BizError(
+                f"重开目标状态不合法：{target_status}"
+                f"（期望之一：{sorted(_REQUEST_REOPEN_TARGET_STATUSES)}）",
+                code=40026,
+            )
+        return TransitionResult(
+            status_before=current_status,
+            status_after=target_status,
+            action=REQUEST_ACTION_REOPEN,
         )
 
     @staticmethod

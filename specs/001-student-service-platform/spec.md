@@ -6,6 +6,7 @@
 **Input**: User description: "读取 docs/srs/ 下的追踪矩阵和所有 FR/NFR，依据 `.spec-kit/constitution.md` 生成技术规格，按知识库、流程、审批、通知、审计五个核心闭环拆解，补充 Kingbase 数据建模、离线文件流转协议和 FR 追溯标签。"
 
 > 说明：`知识库、流程、审批、通知、审计` 五个闭环是技术拆解主线，不代表范围删减；`需求文档.md` 中提出的受控 AI 匹配问答、理论自测、官方通知汇聚、短信通道、证明 PDF 预览、学业课程建议等能力均已纳入本规格，并分别映射到对应闭环。
+> v1.5 / v1.6 补充：`docs/source/additional-request.txt` 中的奖励荣誉展示与学生画像能力已纳入本规格，分别追溯为 `FR-017` 与 `FR-018`，并作为“展示与画像闭环”补充到一期范围。
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -99,6 +100,26 @@
 2. **Given** 成绩或规则数据不完整，**When** 学生访问学业分析页，**Then** 系统明确提示结果不可用于最终资格判断。
 3. **Given** 本学期开设课程清单可用，**When** 系统识别学生缺失模块，**Then** 页面可给出课程类型级选课建议，但不展示动态抢课人数或作出毕业结论。
 
+---
+
+### User Story 6 - 荣誉展示与学生画像闭环 (Priority: P3)
+
+作为学生、辅导员、班主任和学院领导，我希望系统集中展示正式荣誉并聚合学生成长画像，
+这样先进典型可以被合规公示，学生成长数据也能在权限范围内被完整查看和维护。
+
+**Why this priority**: 荣誉与画像属于学院服务的展示和管理补充闭环，依赖学籍、权限、审计和离线导入能力，
+因此安排在核心流程闭合后实施，但仍属于一期正式交付范围。
+
+**Independent Test**: 仅实现展示与画像闭环后，用户仍可独立完成“浏览荣誉榜单 / 查看荣誉详情 /
+辅导员查看画像 / 学生查看本人画像并发起纠错申诉”的完整流程。
+
+**Acceptance Scenarios**:
+
+1. **Given** 管理员已导入经审核的校级及以上荣誉，**When** 学生进入荣誉榜单，**Then** 系统按类别和学年展示获奖者、荣誉名称、授予单位、公示日期和事迹摘要。
+2. **Given** 荣誉已过期、撤销或归档，**When** 用户浏览荣誉信息，**Then** 系统默认不主动推送该条目，并在历史入口标注“历史荣誉”。
+3. **Given** 辅导员具备所带班级权限，**When** 辅导员查看学生画像，**Then** 系统聚合展示学籍静态字段和科研、竞赛、实践、志愿服务、学生干部任职等动态成长字段，并显示来源、录入人和最后更新时间。
+4. **Given** 学生本人查看画像，**When** 页面展示本人信息，**Then** 系统隐藏管理元数据，提供纠错申诉入口，并且不得输出自动评分、排名或评价结论。
+
 ### Edge Cases
 
 - 当知识内容已过期但仍被查询时，系统如何阻止其作为最新口径继续展示？
@@ -107,6 +128,8 @@
 - 当 PDF 成绩单无法稳定解析必填字段时，系统如何阻止错误结果进入学业分析？
 - 当某事务必须由校级系统正式生效时，学院平台如何展示“仅预检 / 归档 / 跟踪”的边界？
 - 当角色权限变化发生在审批中途时，系统如何处理未完成任务与可见范围变更？
+- 当荣誉获得者已毕业或撤回授权时，系统如何保留历史记录但隐藏联系方式等敏感信息？
+- 当学生画像扩展字段来源不一致或存在争议时，系统如何标注来源并进入纠错申诉流程？
 
 ## Requirements *(mandatory)*
 
@@ -128,6 +151,8 @@
 - **FR-014**: 系统 MUST 在规则与成绩数据可用时展示学业缺口、风险提示和课程类型级选课建议，而不输出毕业强结论。
 - **FR-015**: 系统 MUST 允许授权角色维护培养方案、模块规则、课程等价关系和开课信息。
 - **FR-016**: 系统 MUST 为授权领导与业务负责人提供按学期汇总的党团记录、审批进度、通知触达和服务使用情况。
+- **FR-017**: 系统 MUST 支持录入或批量导入校级及以上正式荣誉，按类别和学年公示荣誉榜单与详情，展示获奖者基本信息、荣誉名称、授予单位、文号或证书编号、公示日期和事迹摘要，并支持历史荣誉、归档、撤销、维护人和更新时间留痕。
+- **FR-018**: 系统 MUST 聚合学生学籍核心字段与科研项目、学科竞赛、社会实践、志愿服务、学生干部任职等动态成长字段，支持授权角色按权限检索、筛选和导出画像快照，学生仅可查看本人画像并提交纠错申诉，且系统不得输出自动评分、排名或评价结论。
 
 ### Integration & Compliance Requirements *(mandatory for this project)*
 
@@ -172,6 +197,13 @@
 - **Document Audit Component**: 记录审批、配置、知识维护、导出、导入与敏感访问等关键动作，支持学期级追溯。 [FR-013]
 - **Offline Exchange Controller**: 管理 Excel / Word / PDF 文件的上传、模板识别、校验、回滚和批次记录。 [FR-009][FR-013]
 - **Academic Hint Component**: 基于结构化成绩、培养方案和开课信息生成缺口、风险提示与课程类型级建议，并在数据不足时强制降级为人工核验提示。 [FR-014][FR-015][FR-016]
+
+#### 6. 展示与画像闭环
+
+- **Honor Showcase Component**: 公开展示经官方红头文件或证书确认的校级及以上荣誉，支持类别、学年和历史荣誉筛选。 [FR-017]
+- **Honor Governance Component**: 支持荣誉记录批量导入、人工维护、归档、撤销、授权状态、维护人和更新时间留痕。 [FR-017][FR-012][FR-013]
+- **Student Growth Profile Component**: 聚合学籍静态字段与科研、竞赛、实践、志愿服务、学生干部任职等动态成长记录，支持授权检索、筛选和画像快照导出。 [FR-018][FR-012]
+- **Profile Correction and Privacy Guard**: 为学生端提供本人画像查看和纠错申诉入口，隐藏管理元数据与未授权敏感字段，并禁止自动评分、排名或评价结论输出。 [FR-018][FR-012][FR-013]
 
 ### Offline File Exchange Protocol
 
@@ -328,6 +360,27 @@
   `scope_text text`、`masking_policy text`、`file_store_key varchar(255)`、
   `export_status varchar(32)`、`requested_by bigint`、`requested_at timestamp`。 [FR-009][FR-013]
 
+#### Display and Profile Tables
+
+- **honor_category**: 存储荣誉类别。关键字段：`category_id bigserial`、`category_code varchar(64)`、
+  `category_name varchar(255)`、`level_code varchar(64)`、`display_order integer`、
+  `active_flag boolean`。 [FR-017]
+- **honor_record**: 存储荣誉公示记录。关键字段：`honor_id bigserial`、`honor_name varchar(255)`、
+  `honor_level varchar(64)`、`category_id bigint`、`awardee_type varchar(32)`、
+  `student_id bigint`、`team_name varchar(255)`、`awarding_unit varchar(255)`、
+  `document_no varchar(128)`、`certificate_no varchar(128)`、`public_date date`、
+  `effective_until date`、`story_summary text`、`award_statement text`、`status varchar(32)`、
+  `is_historical boolean`、`history_reason text`、`consent_flag boolean`、`created_by bigint`、
+  `updated_by bigint`、`updated_at timestamp`。 [FR-017][FR-012][FR-013]
+- **student_profile_extension**: 存储学生画像扩展字段。关键字段：`extension_id bigserial`、
+  `student_id bigint`、`dimension_code varchar(64)`、`title varchar(255)`、`description text`、
+  `source_type varchar(64)`、`source_name varchar(255)`、`entered_by bigint`、
+  `last_updated_at timestamp`、`review_status varchar(32)`、`sensitive_flag boolean`。 [FR-018][FR-012]
+- **profile_correction_request**: 存储学生画像纠错申诉。关键字段：`correction_id bigserial`、
+  `student_id bigint`、`target_field varchar(128)`、`request_reason text`、
+  `request_status varchar(32)`、`submitted_at timestamp`、`handled_by bigint`、
+  `handled_at timestamp`、`handle_comment text`。 [FR-018][FR-013]
+
 #### Academic Hint Tables
 
 - **curriculum_rule_set**: 存储培养方案规则头。关键字段：`rule_set_id bigserial`、
@@ -359,6 +412,8 @@
 - **SC-006**: 学业分析页面 100% 显示“仅供风险提示”边界文案，且在数据不足时不会输出最终资格结论。
 - **SC-007**: 90% 的标准证明申请可基于模板自动生成 PDF 预览，并在审批链中保持同一份预览引用。
 - **SC-008**: 当学期开课信息可用时，100% 的选课建议仅输出课程类型级推荐，不输出动态选课人数或毕业资格结论。
+- **SC-009**: 荣誉榜单能够按类别和学年准确筛选，随机抽检 10 条正式荣誉均能展示授予单位、文号或证书编号、公示日期和事迹摘要，且历史或撤销荣誉不会被默认主动推送。
+- **SC-010**: 学生画像能够按权限聚合静态学籍字段与动态成长字段；学生本人仅可查看本人画像并可提交纠错申诉，未授权角色无法查看高敏字段、管理元数据或画像导出内容。
 
 ## Assumptions
 
@@ -367,3 +422,5 @@
 - Kingbase 是唯一受支持的生产数据库，设计中所有表结构和查询都必须以其兼容性为前提。
 - 敏感字段默认受限，未经甲方明确授权不开放明文展示或原始导出。
 - 学业模块默认处于弱提示模式；当培养方案、成绩数据和替代规则均结构化可用时生成完整分析结果，否则必须展示数据不足提示、保留规则维护入口，并允许使用甲方确认的样例数据完成演示与验收。
+- 荣誉展示仅覆盖经官方文件、证书或学院审核确认的正式荣誉；口头表扬、临时奖励或非官方评选结果不进入默认公示范围。
+- 学生画像仅作为信息聚合与展示工具，不作为综合素质自动评价、排名或奖惩决策依据。

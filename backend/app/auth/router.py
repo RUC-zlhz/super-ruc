@@ -1,10 +1,13 @@
 """auth 路由：微信登录、工号登录、刷新、当前用户信息。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Request
 
 from app.auth import service
 from app.auth.schemas import (
+    EnrollmentStatusUpdate,
     RefreshTokenRequest,
     RoleInfo,
     TokenResponse,
@@ -12,11 +15,8 @@ from app.auth.schemas import (
     WorkNoLoginRequest,
     WxLoginRequest,
 )
-from app.auth.schemas import EnrollmentStatusUpdate
 from app.core.dependencies import CurrentUserDep, DBDep, require_role
 from app.core.response import ApiResponse, ok
-from typing import Annotated
-from fastapi import Depends
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 admin_router = APIRouter(prefix="/admin/auth", tags=["auth-admin"])

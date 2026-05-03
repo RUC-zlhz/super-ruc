@@ -1,7 +1,7 @@
 """安全工具：JWT 签发/校验、密码哈希、字段加解密（敏感字段 Fernet AES）。"""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -32,7 +32,7 @@ def create_token(
     extra_claims: dict[str, Any] | None = None,
     expires_delta: timedelta | None = None,
 ) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if expires_delta is None:
         expires_delta = (
             timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)

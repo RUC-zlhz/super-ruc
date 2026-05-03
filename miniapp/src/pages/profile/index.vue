@@ -30,10 +30,16 @@
         <text class="welcome">登录后，查看你的成长画像</text>
         <text class="desc">记录成长点滴，见证更好的你</text>
         <view class="login-actions">
+          <input
+            class="bind-input"
+            v-model="studentNoForBinding"
+            placeholder="首次登录请输入学号完成绑定"
+            confirm-type="done"
+          />
           <button class="primary-button" :type="UNI_BUTTON_TYPE.primary" size="default" hover-class="hover-scale" @tap="onWxLogin">
             <text class="btn-icon">❖</text> 微信一键登录
           </button>
-          <text class="login-note">未绑定微信时，请先使用密码登录绑定</text>
+          <text class="login-note">已绑定微信可直接登录；未绑定时填写学号后自动绑定。</text>
         </view>
       </view>
     </view>
@@ -148,6 +154,43 @@
             <text class="info-value status-text">{{ studentStatusLabel }}</text>
           </view>
         </view>
+        <view v-if="hasFullViewTargets" class="sensitive-card">
+          <view class="sensitive-head">
+            <view>
+              <text class="sensitive-title">敏感信息完整查看</text>
+              <text class="sensitive-desc">脱敏或隐藏内容需审批通过后查看，并保留审计记录</text>
+            </view>
+          </view>
+          <view
+            v-for="field in maskedFields"
+            :key="field"
+            class="sensitive-row"
+            :class="{ disabled: fullViewSubmitting === fullViewTargetKey('STUDENT_FIELD', field) }"
+            @tap="onSubmitFullView('STUDENT_FIELD', field)"
+          >
+            <view class="sensitive-copy">
+              <text class="sensitive-row-title">{{ studentFieldLabel(field) }}</text>
+              <text class="sensitive-row-desc">{{ fullViewStatusLabel('STUDENT_FIELD', field) }}</text>
+            </view>
+            <text class="sensitive-action">
+              {{ fullViewRequestStatus('STUDENT_FIELD', field) === 'APPROVED' ? '已获批' : '申请' }}
+            </text>
+          </view>
+          <view
+            v-if="hiddenSensitiveFactCount > 0"
+            class="sensitive-row"
+            :class="{ disabled: fullViewSubmitting === fullViewTargetKey('PROFILE_FACTS') }"
+            @tap="onSubmitFullView('PROFILE_FACTS')"
+          >
+            <view class="sensitive-copy">
+              <text class="sensitive-row-title">隐藏成长事实</text>
+              <text class="sensitive-row-desc">当前有 {{ hiddenSensitiveFactCount }} 条敏感记录未展示</text>
+            </view>
+            <text class="sensitive-action">
+              {{ fullViewRequestStatus('PROFILE_FACTS') === 'APPROVED' ? '已获批' : '申请' }}
+            </text>
+          </view>
+        </view>
       </view>
 
       <view v-if="profile && profile.facts?.length" class="section archive-section">
@@ -194,6 +237,31 @@
           </view>
         </template>
         <view v-else class="empty-inline">暂无纠错申诉记录</view>
+      </view>
+
+      <view class="section">
+        <view class="section-head">
+          <view class="section-copy">
+            <text class="section-title">完整查看申请</text>
+            <text class="section-tip">查看敏感字段或隐藏记录的审批进度</text>
+          </view>
+        </view>
+        <template v-if="fullViewRequests.length">
+          <view v-for="item in fullViewRequests" :key="item.id" class="submission-row">
+            <view class="submission-head">
+              <text class="submission-title">{{ fullViewTargetLabel(item) }}</text>
+              <text class="status-chip" :class="statusClass(item.status)">
+                {{ correctionLabel(item.status) }}
+              </text>
+            </view>
+            <text class="submission-desc" v-if="item.reason">{{ item.reason }}</text>
+            <text class="submission-meta">提交时间：{{ formatDateTime(item.created_at) }}</text>
+            <text class="submission-meta" v-if="item.handler_comment">
+              审批意见：{{ item.handler_comment }}
+            </text>
+          </view>
+        </template>
+        <view v-else class="empty-inline">暂无完整查看申请</view>
       </view>
 
       <view class="section">
@@ -289,7 +357,7 @@
               <text class="upload-icon">凭</text>
               <view class="upload-copy">
                 <text class="upload-title">上传凭证</text>
-                <text class="upload-desc">支持图片、PDF 等证明材料，后端附件能力接通后可直接上传</text>
+                <text class="upload-desc">纠错申诉暂不支持附件，若需附证请改用成长补录上传</text>
               </view>
             </view>
           </view>
@@ -365,11 +433,24 @@
                 <input class="input" v-model="growthForm.rank_label" placeholder="例如：一等奖" />
               </view>
             </view>
-            <view class="upload-card" @tap="showUploadHint">
+            <view class="upload-card" @tap="onPickGrowthAttachments">
               <text class="upload-icon">附</text>
               <view class="upload-copy">
                 <text class="upload-title">附件上传</text>
-                <text class="upload-desc">可用于佐证活动、获奖、实践等成长经历</text>
+                <text class="upload-desc">可选择图片、PDF、文档等材料，提交时会一并带入补录</text>
+              </view>
+            </view>
+            <view v-if="growthAttachments.length" class="attachment-list">
+              <view
+                v-for="(attachment, index) in growthAttachments"
+                :key="`${attachment.name}-${index}`"
+                class="attachment-row"
+              >
+                <view class="attachment-main">
+                  <text class="att-name">{{ attachment.name }}</text>
+                  <text class="att-meta">{{ formatAttachmentSize(attachment.size) }}</text>
+                </view>
+                <text class="attachment-remove" @tap.stop="removeGrowthAttachment(index)">移除</text>
               </view>
             </view>
           </view>
@@ -399,12 +480,16 @@ import { UNI_BUTTON_TYPE } from '@/utils/uni-button'
 import {
   getMyCorrections,
   getMyFactSubmissions,
+  getMyFullViewRequests,
   getMyProfile,
   submitCorrection,
+  submitMyFullViewRequest,
   submitMyFact,
   type CorrectionOut,
+  type ProfileFactAttachment,
+  type ProfileFullViewRequestOut,
   type ProfileFactSubmissionOut,
-type ProfileSelfView,
+  type ProfileSelfView,
 } from '@/api/profile'
 
 type SettledResult<T> =
@@ -415,11 +500,15 @@ const auth = useAuthStore()
 const profile = ref<ProfileSelfView | null>(null)
 const corrections = ref<CorrectionOut[]>([])
 const factSubmissions = ref<ProfileFactSubmissionOut[]>([])
+const fullViewRequests = ref<ProfileFullViewRequestOut[]>([])
 const factSubmissionsSupported = ref(true)
 const appealSubmitting = ref(false)
 const growthSubmitting = ref(false)
+const fullViewSubmitting = ref('')
+const studentNoForBinding = ref('')
 const appealVisible = ref(false)
 const growthVisible = ref(false)
+const growthAttachments = ref<ProfileFactAttachment[]>([])
 
 const ACTIVE_ENROLLMENT_STATUSES = new Set(['ACTIVE', 'IN_SCHOOL'])
 
@@ -446,6 +535,22 @@ const APPROVAL_LABELS: Record<string, string> = {
   PENDING: '待审核',
   APPROVED: '已通过',
   REJECTED: '已驳回',
+}
+
+const STUDENT_FIELD_LABELS: Record<string, string> = {
+  student_no: '学号',
+  full_name: '姓名',
+  gender: '性别',
+  grade_code: '年级',
+  major_code: '专业',
+  class_code: '班级',
+  political_status: '政治面貌',
+  enrollment_year: '入学年份',
+  expected_graduation_year: '预计毕业',
+  status: '学籍状态',
+  enrollment_status: '学籍生命周期',
+  enrollment_status_reason: '状态说明',
+  enrollment_status_updated_at: '状态更新时间',
 }
 
 function factLabel(type: string) {
@@ -500,6 +605,35 @@ function statusClass(status?: string | null) {
   return (status || '').toLowerCase()
 }
 
+const maskedFields = computed(() => profile.value?.masked_fields || [])
+
+const hiddenSensitiveFactCount = computed(() => profile.value?.hidden_sensitive_fact_count || 0)
+
+const hasFullViewTargets = computed(() => maskedFields.value.length > 0 || hiddenSensitiveFactCount.value > 0)
+
+function studentFieldLabel(field: string) {
+  return STUDENT_FIELD_LABELS[field] || field
+}
+
+function fullViewTargetLabel(item: ProfileFullViewRequestOut) {
+  if (item.target_type === 'PROFILE_FACTS') return '隐藏成长事实'
+  return item.field_name ? studentFieldLabel(item.field_name) : item.target_type
+}
+
+function fullViewTargetKey(targetType: 'STUDENT_FIELD' | 'PROFILE_FACTS', fieldName?: string | null) {
+  return targetType === 'PROFILE_FACTS' ? 'PROFILE_FACTS' : `STUDENT_FIELD:${fieldName || ''}`
+}
+
+function fullViewRequestStatus(targetType: 'STUDENT_FIELD' | 'PROFILE_FACTS', fieldName?: string | null) {
+  const key = fullViewTargetKey(targetType, fieldName)
+  return fullViewRequests.value.find((item) => fullViewTargetKey(item.target_type as any, item.field_name) === key)?.status || ''
+}
+
+function fullViewStatusLabel(targetType: 'STUDENT_FIELD' | 'PROFILE_FACTS', fieldName?: string | null) {
+  const status = fullViewRequestStatus(targetType, fieldName)
+  return status ? correctionLabel(status) : '未申请'
+}
+
 function formatDateTime(value?: string | null) {
   if (!value) return '-'
   const normalized = value.replace('T', ' ').replace('Z', '')
@@ -546,6 +680,7 @@ function resetGrowthForm() {
     hours: '',
     rank_label: '',
   })
+  growthAttachments.value = []
 }
 
 function settleAll<T extends readonly Promise<unknown>[]>(
@@ -574,7 +709,7 @@ function ensureEditable() {
 async function onWxLogin() {
   try {
     const loginRes = await uni.login({ provider: 'weixin' })
-    await auth.wxLogin((loginRes as any).code)
+    await auth.wxLogin((loginRes as any).code, studentNoForBinding.value)
     await loadAll()
   } catch {
     uni.showToast({ title: '登录失败', icon: 'none' })
@@ -582,10 +717,11 @@ async function onWxLogin() {
 }
 
 async function loadAll() {
-  const [profileResp, correctionsResp, submissionsResp] = await settleAll([
+  const [profileResp, correctionsResp, submissionsResp, fullViewResp] = await settleAll([
     getMyProfile(),
     getMyCorrections({ page: 1, size: 10 }),
     getMyFactSubmissions({ page: 1, size: 20 }),
+    getMyFullViewRequests({ page: 1, size: 20 }),
   ] as const)
 
   if (profileResp.status === 'fulfilled') {
@@ -600,6 +736,9 @@ async function loadAll() {
   } else {
     factSubmissionsSupported.value = false
     factSubmissions.value = []
+  }
+  if (fullViewResp.status === 'fulfilled') {
+    fullViewRequests.value = fullViewResp.value.data.items || []
   }
 }
 
@@ -624,7 +763,85 @@ function closeGrowthSubmission() {
 }
 
 function showUploadHint() {
-  uni.showToast({ title: '附件上传入口已预留', icon: 'none' })
+  uni.showToast({ title: '纠错申诉暂不支持附件', icon: 'none' })
+}
+
+function formatAttachmentSize(size?: number | null) {
+  if (!size) return '未读取大小'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let value = size
+  let index = 0
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024
+    index += 1
+  }
+  return `${value.toFixed(index ? 1 : 0)} ${units[index]}`
+}
+
+async function onPickGrowthAttachments() {
+  if (!ensureEditable()) return
+  const selected = await new Promise<any>((resolve) => {
+    uni.chooseMessageFile({
+      count: 9,
+      type: 'all',
+      success: resolve,
+      fail: () => resolve(null),
+    })
+  })
+  if (!selected?.tempFiles?.length) return
+  const nextAttachments = (selected.tempFiles as Array<{
+    name?: string
+    path?: string
+    tempFilePath?: string
+    size?: number
+    mimeType?: string
+  }>).reduce<ProfileFactAttachment[]>((items, file) => {
+    const path = file.path || file.tempFilePath
+    if (!path) return items
+    items.push({
+      name: file.name || path.split(/[\\/]/).pop() || '未命名附件',
+      path,
+      size: file.size ?? null,
+      mime_type: file.mimeType || null,
+    })
+    return items
+  }, [])
+
+  if (!nextAttachments.length) return
+  growthAttachments.value = [...growthAttachments.value, ...nextAttachments]
+  uni.showToast({ title: `已选择 ${nextAttachments.length} 份附件`, icon: 'none' })
+}
+
+function removeGrowthAttachment(index: number) {
+  growthAttachments.value = growthAttachments.value.filter((_, itemIndex) => itemIndex !== index)
+}
+
+async function onSubmitFullView(targetType: 'STUDENT_FIELD' | 'PROFILE_FACTS', fieldName?: string) {
+  if (!ensureEditable()) return
+  const key = fullViewTargetKey(targetType, fieldName)
+  const status = fullViewRequestStatus(targetType, fieldName)
+  if (status === 'PENDING') {
+    uni.showToast({ title: '已提交，等待审核', icon: 'none' })
+    return
+  }
+  if (status === 'APPROVED') {
+    uni.showToast({ title: '已获批，刷新后查看完整信息', icon: 'none' })
+    return
+  }
+  fullViewSubmitting.value = key
+  try {
+    await submitMyFullViewRequest({
+      target_type: targetType,
+      field_name: targetType === 'STUDENT_FIELD' ? fieldName : undefined,
+      reason: targetType === 'PROFILE_FACTS'
+        ? '申请查看隐藏的敏感成长事实'
+        : `申请查看${studentFieldLabel(fieldName || '')}完整信息`,
+    })
+    uni.showToast({ title: '已提交，等待审核', icon: 'none' })
+    await loadAll()
+  } finally {
+    fullViewSubmitting.value = ''
+  }
 }
 
 async function onSubmitAppeal() {
@@ -674,6 +891,7 @@ async function onSubmitGrowth() {
       ended_on: growthForm.ended_on || undefined,
       hours: growthForm.hours ? Number(growthForm.hours) : undefined,
       rank_label: growthForm.rank_label || undefined,
+      attachments: growthAttachments.value.length ? { files: growthAttachments.value } : undefined,
     })
     uni.showToast({ title: '已提交成长补录', icon: 'none' })
     closeGrowthSubmission()
@@ -691,6 +909,7 @@ function onLogout() {
   profile.value = null
   corrections.value = []
   factSubmissions.value = []
+  fullViewRequests.value = []
 }
 
 onMounted(async () => {
@@ -908,6 +1127,19 @@ onMounted(async () => {
   justify-content: center;
   border-radius: 20rpx;
   box-shadow: 0 14rpx 28rpx rgba(179, 13, 31, 0.18);
+}
+
+.bind-input {
+  height: 84rpx;
+  margin-bottom: 18rpx;
+  padding: 0 26rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid #f0e2e5;
+  background: #fbf8f8;
+  color: #333;
+  font-size: 27rpx;
+  box-sizing: border-box;
+  text-align: left;
 }
 
 .profile-hero {
@@ -1255,6 +1487,75 @@ onMounted(async () => {
   color: #b30d1f;
 }
 
+.sensitive-card {
+  margin-top: 18rpx;
+  padding: 22rpx;
+  border-radius: 24rpx;
+  background: #fff9f0;
+  border: 1rpx solid #f6dfb8;
+}
+
+.sensitive-head {
+  margin-bottom: 12rpx;
+}
+
+.sensitive-title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 800;
+  color: #6f3a00;
+}
+
+.sensitive-desc {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: #9b6a26;
+}
+
+.sensitive-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 18rpx 0;
+  border-top: 1rpx solid rgba(225, 185, 122, 0.46);
+}
+
+.sensitive-row.disabled {
+  opacity: 0.6;
+}
+
+.sensitive-copy {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.sensitive-row-title {
+  font-size: 25rpx;
+  font-weight: 700;
+  color: #2a2526;
+}
+
+.sensitive-row-desc {
+  margin-top: 6rpx;
+  font-size: 21rpx;
+  color: #9b6a26;
+}
+
+.sensitive-action {
+  min-width: 92rpx;
+  padding: 9rpx 16rpx;
+  border-radius: 999rpx;
+  text-align: center;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #b30d1f;
+  background: #fff;
+  border: 1rpx solid #f0c8ce;
+}
+
 .fact-row {
   display: flex;
   gap: 18rpx;
@@ -1581,6 +1882,34 @@ onMounted(async () => {
   color: #9f9094;
   font-size: 22rpx;
   line-height: 1.55;
+}
+
+.attachment-list {
+  margin-top: 16rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.attachment-row {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  padding: 16rpx 18rpx;
+  border-radius: 18rpx;
+  background: #fbf8f8;
+  border: 1rpx solid #f0e2e5;
+}
+
+.attachment-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.attachment-remove {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  color: #b30d1f;
 }
 
 .form-item {

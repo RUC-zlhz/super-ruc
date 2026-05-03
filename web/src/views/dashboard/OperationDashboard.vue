@@ -3,8 +3,31 @@
     <a-page-header title="运营看板" sub-title="学院事务运营、通知触达与学业缺口弱提示" />
 
     <div v-if="dashboard.generatedAt" class="board-meta mb16">
-      数据生成时间：{{ formatDateTime(dashboard.generatedAt) }} · 当前仅消费 canonical overview
+      数据生成时间：{{ formatDateTime(dashboard.generatedAt) }} · {{ overviewFilters.term_code || '全量学期' }}
     </div>
+
+    <a-form layout="inline" :model="overviewFilters" class="filter-card compact mb16" @finish="loadOverview">
+      <a-form-item label="看板学期">
+        <a-input
+          v-model:value="overviewFilters.term_code"
+          allow-clear
+          placeholder="如 2025-FALL"
+          style="width: 150px"
+        />
+      </a-form-item>
+      <a-form-item>
+        <a-space>
+          <a-button type="primary" html-type="submit" :loading="loadingOverview">
+            <template #icon><SearchOutlined /></template>
+            刷新看板
+          </a-button>
+          <a-button @click="resetOverviewFilters">
+            <template #icon><ReloadOutlined /></template>
+            全量
+          </a-button>
+        </a-space>
+      </a-form-item>
+    </a-form>
 
     <a-alert
       v-if="overviewError"
@@ -417,6 +440,8 @@ const loadingAcademicGap = ref(false)
 const overviewError = ref('')
 const academicGapError = ref('')
 
+const overviewFilters = reactive<{ term_code?: string }>({})
+
 const academicGapFilters = reactive<{
   keyword?: string
   grade_code?: string
@@ -483,7 +508,7 @@ async function loadOverview() {
   loadingOverview.value = true
   overviewError.value = ''
   try {
-    const resp = await fetchOverview()
+    const resp = await fetchOverview({ term_code: overviewFilters.term_code })
     overview.value = resp.data
   } catch {
     overview.value = null
@@ -491,6 +516,11 @@ async function loadOverview() {
   } finally {
     loadingOverview.value = false
   }
+}
+
+function resetOverviewFilters() {
+  overviewFilters.term_code = undefined
+  loadOverview()
 }
 
 async function loadAcademicGapList() {

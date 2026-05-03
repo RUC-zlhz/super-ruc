@@ -17,7 +17,7 @@ The platform shall allow a trained student to complete a common request submissi
 | Traces To | ID | Description |
 |-----------|-----|-------------|
 | Customer Need | CN-005 | 学生需要平台创建常见事务申请并附带所需信息或附件 |
-| Applies To FRs | FR-006, FR-007, FR-008 | 提交申请、审核工作台、流转规则 |
+| Applies To FRs | FR-006, FR-007, FR-008, FR-018 | 提交申请、审核工作台、流转规则、学生画像 |
 
 ## Measurement Criteria
 

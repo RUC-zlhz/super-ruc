@@ -39,6 +39,12 @@
             <text class="control-pill-arrow">⌄</text>
           </view>
         </picker>
+        <picker mode="selector" :range="LEVEL_OPTION_LABELS" :value="levelIdx" @change="onLevelChange">
+          <view class="control-pill">
+            <text>{{ levelFilterLabel }}</text>
+            <text class="control-pill-arrow">⌄</text>
+          </view>
+        </picker>
         <view class="history-toggle" :class="{ active: filters.include_archived }" @tap="onToggleHistory">
           <text class="history-toggle-text">{{ filters.include_archived ? '仅看当前' : '包含历史' }}</text>
           <view class="history-switch">
@@ -197,6 +203,14 @@ const LEVEL_LABELS: Record<string, string> = {
 
 const currentYear = new Date().getFullYear()
 const YEAR_OPTIONS = ['全部年份', ...Array.from({ length: 6 }, (_, index) => String(currentYear - index))]
+const LEVEL_OPTIONS = [
+  { label: '全部级别', value: '' },
+  { label: '国家级', value: 'NATIONAL' },
+  { label: '省部级', value: 'PROVINCIAL' },
+  { label: '厅局级', value: 'MINISTERIAL' },
+  { label: '校级', value: 'SCHOOL' },
+]
+const LEVEL_OPTION_LABELS = LEVEL_OPTIONS.map((item) => item.label)
 
 type HistoryLike = {
   status?: string
@@ -210,15 +224,18 @@ type HistoryLike = {
 
 const filters = reactive<{
   category_code: string
+  level: string
   year: number | null
   include_archived: boolean
 }>({
   category_code: '',
+  level: '',
   year: null,
   include_archived: false,
 })
 
 const yearIdx = ref(0)
+const levelIdx = ref(0)
 const categories = ref<HonorCategory[]>([])
 const items = ref<HonorRecordBrief[]>([])
 const page = ref(1)
@@ -252,6 +269,7 @@ const categoryChips = computed(() => ([
   { code: '', name: '全部' },
   ...Array.from(categoryMap.value.entries()).map(([code, name]) => ({ code, name })),
 ]))
+const levelFilterLabel = computed(() => LEVEL_OPTIONS[levelIdx.value]?.label || '全部级别')
 
 function levelLabel(level: string) {
   return LEVEL_LABELS[level] || level
@@ -319,6 +337,7 @@ async function reload(reset = true) {
   try {
     const resp = await listPublicHonors({
       category_code: filters.category_code || undefined,
+      level: filters.level || undefined,
       year: filters.year || undefined,
       include_archived: filters.include_archived,
       page: page.value,
@@ -341,6 +360,13 @@ function onYearChange(event: { detail: { value: string | number } }) {
   const index = Number(event.detail.value)
   yearIdx.value = index
   filters.year = index === 0 ? null : Number(YEAR_OPTIONS[index])
+  void reload(true).catch(() => undefined)
+}
+
+function onLevelChange(event: { detail: { value: string | number } }) {
+  const index = Number(event.detail.value)
+  levelIdx.value = index
+  filters.level = LEVEL_OPTIONS[index]?.value || ''
   void reload(true).catch(() => undefined)
 }
 

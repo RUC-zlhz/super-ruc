@@ -17,7 +17,7 @@ The platform shall retain searchable administrator and approval audit records fo
 | Traces To | ID | Description |
 |-----------|-----|-------------|
 | Customer Need | CN-007 | 需要平台管理驳回、撤回、重提、重批与留痕规则 |
-| Applies To FRs | FR-008, FR-012, FR-013, FR-016 | 流转规则、权限、日志、统计 |
+| Applies To FRs | FR-008, FR-012, FR-013, FR-016, FR-017, FR-018 | 流转规则、权限、日志、统计、荣誉与画像 |
 
 ## Measurement Criteria
 

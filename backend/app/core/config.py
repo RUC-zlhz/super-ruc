@@ -99,7 +99,7 @@ class Settings(BaseSettings):
     # 生产守卫：确保部署环境不会带着 dev 默认值 / 空密钥上线。
     # ------------------------------------------------------------------
     @model_validator(mode="after")
-    def _enforce_prod_invariants(self) -> "Settings":
+    def _enforce_prod_invariants(self) -> Settings:
         errors: list[str] = []
 
         # 关键密钥：dev/prod 都至少要有，prod 禁止使用 dev 默认值

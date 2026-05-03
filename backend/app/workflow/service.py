@@ -14,12 +14,14 @@ from app.auth.models import Student
 from app.core.config import settings
 from app.core.exceptions import BizError, ConflictError, NotFoundError
 from app.core.storage import put_object
+from app.notice.service import create_system_in_app_notice_for_student
 from app.workflow import repository as repo
 from app.workflow.models import (
     REMINDER_STATUS_PENDING,
     REQUEST_ACTION_APPROVE,
     REQUEST_ACTION_OFFLINE,
     REQUEST_ACTION_REJECT,
+    REQUEST_ACTION_REOPEN,
     REQUEST_ACTION_RESUBMIT,
     REQUEST_ACTION_SUBMIT,
     REQUEST_ACTION_WITHDRAW,
@@ -913,6 +915,77 @@ async def mark_request_offline(
         actor_user_id=operator_id,
         actor_role=",".join(operator_roles),
         detail={"contact": contact_info, "note": note},
+    )
+    if req.applicant_student_id is not None:
+        body = (
+            f"你的申请《{req.title}》已转为线下办理。\n\n"
+            f"联系方式：{contact_info}"
+            + (f"\n\n说明：{note}" if note else "")
+        )
+        await create_system_in_app_notice_for_student(
+            db,
+            student_id=req.applicant_student_id,
+            user_id=req.applicant_user_id,
+            title=f"申请已转线下办理：{req.title}",
+            body_md=body,
+            summary=f"请按线下办理提示联系负责老师：{contact_info}",
+            category="WORKFLOW",
+            source_type="SYSTEM",
+            source_url=f"request:{req.id}",
+            operator_id=operator_id,
+        )
+    await db.commit()
+    await db.refresh(req)
+    return _request_to_detail(req)
+
+
+async def reopen_request(
+    db: AsyncSession,
+    request_id: int,
+    *,
+    comment: str | None,
+    target_status: str,
+    operator_id: int,
+    operator_roles: list[str],
+) -> RequestDetail:
+    req = await repo.get_request(db, request_id)
+    if req is None:
+        raise NotFoundError("申请不存在")
+    if not _approver_has_role(req.type_ref, operator_roles):
+        raise BizError("无权重开该类型申请", code=40304, http_status=403)
+
+    result = ApprovalStateMachine.reopen(req.status, target_status)
+    status_before = result.status_before
+    req.status = result.status_after
+    req.decided_at = None
+    req.decided_by = None
+    req.decision_comment = None
+    req.withdrawn_at = None
+
+    await repo.add_approval_record(
+        db,
+        request_id=req.id,
+        revision=req.revision,
+        action=REQUEST_ACTION_REOPEN,
+        status_before=status_before,
+        status_after=req.status,
+        operator_id=operator_id,
+        operator_role=",".join(operator_roles),
+        comment=comment,
+    )
+    await log_action(
+        db,
+        event_type="REQUEST",
+        entity_code="REQUEST",
+        action=REQUEST_ACTION_REOPEN,
+        entity_id=req.id,
+        actor_user_id=operator_id,
+        actor_role=",".join(operator_roles),
+        detail={
+            "comment": comment,
+            "status_before": status_before,
+            "status_after": req.status,
+        },
     )
     await db.commit()
     await db.refresh(req)

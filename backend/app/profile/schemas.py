@@ -109,6 +109,10 @@ class ProfileSummary(BaseModel):
     practice_count: int = 0
     volunteer_hours: float = 0
     leadership_count: int = 0
+    masked_fields: list[str] = []
+    hidden_sensitive_fact_count: int = 0
+    full_view_approved_fields: list[str] = []
+    full_view_sensitive_facts_approved: bool = False
     generated_at: datetime
 
 
@@ -120,6 +124,10 @@ class ProfileStudentSelfView(BaseModel):
     practice_count: int = 0
     volunteer_hours: float = 0
     leadership_count: int = 0
+    masked_fields: list[str] = []
+    hidden_sensitive_fact_count: int = 0
+    full_view_approved_fields: list[str] = []
+    full_view_sensitive_facts_approved: bool = False
     generated_at: datetime
 
 
@@ -154,5 +162,31 @@ class CorrectionDecisionIn(BaseModel):
 
 
 class ProfileFactDecisionIn(BaseModel):
+    decision: str = Field(description="APPROVED/REJECTED")
+    comment: str | None = None
+
+
+class ProfileFullViewRequestIn(BaseModel):
+    target_type: str = Field(description="STUDENT_FIELD/PROFILE_FACTS")
+    field_name: str | None = None
+    reason: str | None = None
+
+
+class ProfileFullViewRequestOut(BaseModel):
+    id: int
+    student_id: int
+    requester_user_id: int | None = None
+    requester_name: str | None = None
+    target_type: str
+    field_name: str | None = None
+    reason: str | None = None
+    status: str
+    handled_by: int | None = None
+    handled_at: datetime | None = None
+    handler_comment: str | None = None
+    created_at: datetime
+
+
+class ProfileFullViewDecisionIn(BaseModel):
     decision: str = Field(description="APPROVED/REJECTED")
     comment: str | None = None

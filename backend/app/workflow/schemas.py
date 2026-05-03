@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -269,6 +269,13 @@ class OfflineHandleIn(BaseModel):
 
     contact_info: str = Field(..., min_length=1, max_length=256)
     note: str | None = Field(default=None, max_length=512)
+
+
+class ReopenRequestIn(BaseModel):
+    """受控重开入参。默认直接回到审核中，也可回到待受理。"""
+
+    comment: str | None = Field(default=None, max_length=512)
+    target_status: Literal["IN_REVIEW", "SUBMITTED"] = "IN_REVIEW"
 
 
 # ============================================================

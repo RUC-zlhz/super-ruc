@@ -68,14 +68,28 @@
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
-              <StatusTag :status="record.status" />
+              <StatusTag :status="record.current_node_status || record.status" />
+            </template>
+            <template v-else-if="column.key === 'due_date'">
+              {{ record.due_date || '-' }}
             </template>
           </template>
         </a-table>
       </a-tab-pane>
 
       <a-tab-pane key="reminders" tab="节点提醒">
+        <a-alert
+          class="mb16"
+          type="info"
+          show-icon
+          message="提醒记录由后端按待办节点实时生成；当前页面保留手动生成入口和最近生成结果。"
+        />
+        <a-button type="primary" :loading="reminderLoading" @click="generateReminders">
+          <template #icon><BellOutlined /></template>
+          生成待办提醒
+        </a-button>
         <a-table
+          class="mt16"
           :columns="reminderCols"
           :data-source="reminders"
           :loading="reminderLoading"
@@ -131,7 +145,7 @@
           <div v-for="node in nodes.slice(0, 5)" :key="node.id">
             <i />
             <span>{{ node.name }}</span>
-            <em>{{ node.expected_days || 0 }} 天</em>
+            <em>{{ node.due_rule_days || 0 }} 天</em>
           </div>
         </div>
         <p v-else class="side-muted">点击“查看节点”后展示模板节点结构。</p>
@@ -163,9 +177,10 @@
           <a-input v-model:value="tplForm.name" />
         </a-form-item>
         <a-form-item label="类型">
-          <a-select v-model:value="tplForm.category" style="width: 100%">
+          <a-select v-model:value="tplForm.kind" style="width: 100%">
             <a-select-option value="PARTY">党员发展</a-select-option>
-            <a-select-option value="YOUTH">团员培养</a-select-option>
+            <a-select-option value="YOUTH_LEAGUE">团员培养</a-select-option>
+            <a-select-option value="OTHER">其他</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="描述">
@@ -189,8 +204,10 @@
     >
       <a-table :columns="nodeCols" :data-source="nodes" row-key="id" size="small">
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'is_required'">
-            {{ record.is_required ? '必须' : '可选' }}
+          <template v-if="column.key === 'is_active'">
+            <a-tag :color="record.is_active ? 'green' : 'default'">
+              {{ record.is_active ? '启用' : '停用' }}
+            </a-tag>
           </template>
         </template>
       </a-table>
@@ -206,7 +223,6 @@ import {
   BranchesOutlined,
   NodeIndexOutlined,
   TeamOutlined,
-  LeftOutlined,
   SearchOutlined,
   PlusOutlined,
   SaveOutlined,
@@ -251,54 +267,93 @@ const metrics = computed(() => [
 ])
 
 // ---------- 模板 ----------
+type WorkflowNode = {
+  id: number
+  code: string
+  name: string
+  sort_order: number
+  stage_group?: string | null
+  due_rule_days?: number | null
+  is_active: boolean
+}
+
+type WorkflowTemplate = {
+  id: number
+  code: string
+  name: string
+  kind: string
+  description?: string | null
+  version_label?: string | null
+  is_active: boolean
+  nodes: WorkflowNode[]
+}
+
+type StudentWorkflowBrief = {
+  id: number
+  student_no?: string | null
+  student_name?: string | null
+  template_code: string
+  template_name: string
+  current_node_name?: string | null
+  current_node_status?: string | null
+  due_date?: string | null
+}
+
 const templateCols = [
   { title: '编码', dataIndex: 'code', key: 'code', width: 140 },
   { title: '名称', dataIndex: 'name', key: 'name' },
-  { title: '类型', dataIndex: 'category', key: 'category', width: 100 },
+  { title: '类型', dataIndex: 'kind', key: 'kind', width: 120 },
   { title: '状态', key: 'is_active', width: 80 },
   { title: '操作', key: 'actions', width: 100 },
 ]
-const templates = ref<any[]>([])
+const templates = ref<WorkflowTemplate[]>([])
 const tplLoading = ref(false)
 
 async function loadTemplates() {
   tplLoading.value = true
   try {
-    const resp = await get<ApiEnvelope<any[]>>('/admin/workflow/templates')
+    const resp = await get<ApiEnvelope<WorkflowTemplate[]>>('/admin/workflow/templates')
     templates.value = resp.data
+    if (!selectedTemplate.value && templates.value[0]) {
+      viewNodes(templates.value[0], false)
+    }
   } finally {
     tplLoading.value = false
   }
 }
 
 const showTemplateDrawer = ref(false)
-const tplForm = reactive({ code: '', name: '', category: 'PARTY', description: '' })
+const tplForm = reactive({ code: '', name: '', kind: 'PARTY', description: '' })
 
 async function onSubmitTemplate() {
-  await post<ApiEnvelope<any>>('/admin/workflow/templates', tplForm)
+  await post<ApiEnvelope<WorkflowTemplate>>('/admin/workflow/templates', {
+    ...tplForm,
+    nodes: [],
+  })
   message.success('保存成功')
   showTemplateDrawer.value = false
-  Object.assign(tplForm, { code: '', name: '', category: 'PARTY', description: '' })
+  Object.assign(tplForm, { code: '', name: '', kind: 'PARTY', description: '' })
   loadTemplates()
 }
 
 // ---------- 节点 ----------
 const nodeCols = [
-  { title: '序号', dataIndex: 'seq', key: 'seq', width: 60 },
+  { title: '序号', dataIndex: 'sort_order', key: 'sort_order', width: 70 },
   { title: '编码', dataIndex: 'code', key: 'code', width: 140 },
   { title: '名称', dataIndex: 'name', key: 'name' },
-  { title: '必须', key: 'is_required', width: 80 },
-  { title: '预计天数', dataIndex: 'expected_days', key: 'expected_days', width: 100 },
+  { title: '阶段', dataIndex: 'stage_group', key: 'stage_group', width: 120 },
+  { title: '预计天数', dataIndex: 'due_rule_days', key: 'due_rule_days', width: 100 },
+  { title: '状态', key: 'is_active', width: 80 },
 ]
 const showNodesModal = ref(false)
-const selectedTemplate = ref<any>(null)
-const nodes = ref<any[]>([])
+const selectedTemplate = ref<WorkflowTemplate | null>(null)
+const nodes = ref<WorkflowNode[]>([])
 
-async function viewNodes(tpl: any) {
-  selectedTemplate.value = tpl
-  const resp = await get<ApiEnvelope<any[]>>(`/admin/workflow/templates/${tpl.id}/nodes`)
-  nodes.value = resp.data
-  showNodesModal.value = true
+function viewNodes(tpl: WorkflowTemplate | Record<string, any>, openModal = true) {
+  const normalized = tpl as WorkflowTemplate
+  selectedTemplate.value = normalized
+  nodes.value = [...(normalized.nodes || [])].sort((a, b) => a.sort_order - b.sort_order)
+  showNodesModal.value = openModal
 }
 
 // ---------- 学生流程 ----------
@@ -307,21 +362,28 @@ const flowCols = [
   { title: '姓名', dataIndex: 'student_name', key: 'student_name', width: 100 },
   { title: '模板', dataIndex: 'template_code', key: 'template_code', width: 140 },
   { title: '当前节点', dataIndex: 'current_node_name', key: 'current_node_name' },
-  { title: '状态', key: 'status', width: 100 },
-  { title: '开始日期', dataIndex: 'started_at', key: 'started_at', width: 120 },
+  { title: '节点状态', key: 'status', width: 100 },
+  { title: '到期日', key: 'due_date', width: 120 },
 ]
 const flowFilters = reactive<{ student_no?: string; template_code?: string }>({})
-const flows = ref<any[]>([])
+const flows = ref<StudentWorkflowBrief[]>([])
 const flowLoading = ref(false)
 const flowPagination = reactive({ current: 1, pageSize: 20, total: 0 })
 
 async function reloadStudentFlows() {
   flowLoading.value = true
   try {
-    const resp = await get<ApiEnvelope<Paginated<any>>>('/admin/workflow/student-workflows', {
-      params: { ...flowFilters, page: flowPagination.current, size: flowPagination.pageSize },
+    const resp = await get<ApiEnvelope<Paginated<StudentWorkflowBrief>>>('/admin/workflow/students', {
+      params: {
+        template_code: flowFilters.template_code,
+        page: flowPagination.current,
+        size: flowPagination.pageSize,
+      },
     })
-    flows.value = resp.data.items
+    const items = resp.data.items
+    flows.value = flowFilters.student_no
+      ? items.filter((item) => item.student_no?.includes(flowFilters.student_no || ''))
+      : items
     flowPagination.total = resp.data.meta.total
   } finally {
     flowLoading.value = false
@@ -336,19 +398,28 @@ function onFlowTableChange(p: any) {
 
 // ---------- 提醒 ----------
 const reminderCols = [
-  { title: '提醒名称', dataIndex: 'name', key: 'name' },
-  { title: '节点编码', dataIndex: 'node_code', key: 'node_code', width: 140 },
-  { title: '提前天数', dataIndex: 'advance_days', key: 'advance_days', width: 100 },
+  { title: '结果', dataIndex: 'name', key: 'name' },
+  { title: '渠道', dataIndex: 'channel', key: 'channel', width: 120 },
+  { title: '生成数', dataIndex: 'created', key: 'created', width: 100 },
   { title: '状态', key: 'is_active', width: 80 },
 ]
-const reminders = ref<any[]>([])
+const reminders = ref<{ id: number; name: string; channel: string; created: number; is_active: boolean }[]>([])
 const reminderLoading = ref(false)
 
-async function loadReminders() {
+async function generateReminders() {
   reminderLoading.value = true
   try {
-    const resp = await get<ApiEnvelope<any[]>>('/admin/workflow/reminders')
-    reminders.value = resp.data
+    const resp = await post<ApiEnvelope<{ created: number }>>('/admin/workflow/reminders/generate', {
+      channel: 'IN_APP',
+    })
+    reminders.value = [{
+      id: Date.now(),
+      name: '最近一次待办提醒生成',
+      channel: 'IN_APP',
+      created: resp.data.created,
+      is_active: true,
+    }]
+    message.success(`已生成 ${resp.data.created} 条提醒`)
   } finally {
     reminderLoading.value = false
   }
@@ -357,7 +428,6 @@ async function loadReminders() {
 onMounted(() => {
   loadTemplates()
   reloadStudentFlows()
-  loadReminders()
 })
 </script>
 

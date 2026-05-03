@@ -10,15 +10,15 @@ from __future__ import annotations
 import logging
 import smtplib
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.mime.text import MIMEText
-from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import log_action
 from app.core.config import settings
 from app.core.exceptions import BizError, ConflictError, NotFoundError
+from app.core.security import decrypt_field, mask_phone
 from app.notice import repository as repo
 from app.notice.models import (
     CHANNEL_EMAIL,
@@ -31,6 +31,7 @@ from app.notice.models import (
     NOTICE_STATUS_DRAFT,
     NOTICE_STATUS_PUBLISHED,
     Notice,
+    NoticeDelivery,
     NoticeDeliveryBatch,
 )
 from app.notice.schemas import (
@@ -197,7 +198,7 @@ async def publish_notice(
         raise BizError("已归档通知不可重新发布", code=40031)
 
     row.status = NOTICE_STATUS_PUBLISHED
-    row.published_at = datetime.now(timezone.utc)
+    row.published_at = datetime.now(UTC)
     row.published_by = operator_id
     await log_action(
         db,
@@ -222,7 +223,7 @@ async def archive_notice(
     if row.status == NOTICE_STATUS_ARCHIVED:
         return notice_to_out(row)
     row.status = NOTICE_STATUS_ARCHIVED
-    row.archived_at = datetime.now(timezone.utc)
+    row.archived_at = datetime.now(UTC)
     row.archived_by = operator_id
     await log_action(
         db,
@@ -265,6 +266,72 @@ def _send_sms(_to_number: str, _body: str) -> tuple[bool, str | None]:
     return True, None
 
 
+def _resolve_sms_number(user, student) -> str | None:
+    """Resolve raw phone number for SMS gateway; never returns email fallback."""
+    return decrypt_field(getattr(user, "phone_enc", None)) or decrypt_field(
+        getattr(student, "phone_enc", None)
+    )
+
+
+async def create_system_in_app_notice_for_student(
+    db: AsyncSession,
+    *,
+    student_id: int,
+    user_id: int | None,
+    title: str,
+    body_md: str,
+    summary: str | None = None,
+    category: str | None = "WORKFLOW",
+    source_type: str = "SYSTEM",
+    source_url: str | None = None,
+    operator_id: int | None = None,
+) -> NoticeDelivery:
+    """Create a published one-student in-app notice and delivery in one transaction."""
+    now = datetime.now(UTC)
+    notice = await repo.create_notice(
+        db,
+        title=title,
+        body_md=body_md,
+        summary=summary,
+        category=category,
+        status=NOTICE_STATUS_PUBLISHED,
+        source_type=source_type,
+        source_url=source_url,
+        target_rule={"student_ids": [student_id]},
+        target_summary="单个学生站内通知",
+        channels=CHANNEL_IN_APP,
+        published_at=now,
+        published_by=operator_id,
+        created_by=operator_id,
+        updated_by=operator_id,
+    )
+    batch = await repo.create_batch(
+        db,
+        notice_id=notice.id,
+        batch_no=f"NB-{now.strftime('%y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}",
+        channels=CHANNEL_IN_APP,
+        target_rule_snapshot=notice.target_rule,
+        target_count=1,
+        success_count=1,
+        failed_count=0,
+        status="COMPLETED",
+        note="系统自动站内通知",
+        finished_at=now,
+        created_by=operator_id,
+    )
+    delivery = await repo.add_delivery(
+        db,
+        batch_id=batch.id,
+        notice_id=notice.id,
+        student_id=student_id,
+        user_id=user_id,
+        channel=CHANNEL_IN_APP,
+        status=DELIVERY_STATUS_SENT,
+        sent_at=now,
+    )
+    return delivery
+
+
 async def dispatch_notice(
     db: AsyncSession,
     notice_id: int,
@@ -288,7 +355,7 @@ async def dispatch_notice(
     batch = await repo.create_batch(
         db,
         notice_id=notice.id,
-        batch_no=f"NB-{datetime.now(timezone.utc).strftime('%y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}",
+        batch_no=f"NB-{datetime.now(UTC).strftime('%y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}",
         channels=",".join(channels),
         target_rule_snapshot=notice.target_rule,
         target_count=len(students),
@@ -322,18 +389,21 @@ async def dispatch_notice(
                 if not settings.SMS_ENABLED:
                     err_code = "SMS_DISABLED"
                 else:
-                    # phone 解密能力后续接入；此处仅 mock 使用 user phone email 字段
-                    target_handle = (user.email if user else stu.email) or ""
-                    ok_, err = _send_sms(target_handle, notice.summary or notice.title)
-                    sent_ok = ok_
-                    if not ok_:
-                        err_code = "SMS_ERROR"
-                        err_msg = err
+                    raw_phone = _resolve_sms_number(user, stu)
+                    if not raw_phone:
+                        err_code = "NO_PHONE"
+                    else:
+                        target_handle = mask_phone(raw_phone)
+                        ok_, err = _send_sms(raw_phone, notice.summary or notice.title)
+                        sent_ok = ok_
+                        if not ok_:
+                            err_code = "SMS_ERROR"
+                            err_msg = err
             else:
                 err_code = "UNSUPPORTED_CHANNEL"
 
             status = DELIVERY_STATUS_SENT if sent_ok else (
-                DELIVERY_STATUS_SKIPPED if err_code in ("NO_EMAIL", "SMS_DISABLED", "UNSUPPORTED_CHANNEL")
+                DELIVERY_STATUS_SKIPPED if err_code in ("NO_EMAIL", "NO_PHONE", "SMS_DISABLED", "UNSUPPORTED_CHANNEL")
                 else DELIVERY_STATUS_FAILED
             )
             if sent_ok:
@@ -350,14 +420,14 @@ async def dispatch_notice(
                 channel=ch,
                 status=status,
                 target_handle=target_handle,
-                sent_at=datetime.now(timezone.utc) if sent_ok else None,
+                sent_at=datetime.now(UTC) if sent_ok else None,
                 error_code=err_code,
                 error_message=err_msg,
             )
 
     batch.success_count = success
     batch.failed_count = failed
-    batch.finished_at = datetime.now(timezone.utc)
+    batch.finished_at = datetime.now(UTC)
     if failed == 0:
         batch.status = "COMPLETED"
     elif success == 0:

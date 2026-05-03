@@ -11,9 +11,11 @@
 from __future__ import annotations
 
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import Student, User, UserRole
+from app.core.security import encrypt_field
 
 
 async def _login_as_student(
@@ -21,11 +23,13 @@ async def _login_as_student(
     student_no: str, wx_code: str,
     grade_code: str = "2022", major_code: str = "CS", class_code: str = "CS2201",
     political_status: str | None = None,
+    email: str | None = None,
 ) -> tuple[str, int]:
     stu = Student(
         student_no=student_no, full_name=f"n-{student_no}",
         grade_code=grade_code, major_code=major_code, class_code=class_code,
         political_status=political_status,
+        email=email,
     )
     db.add(stu)
     await db.commit()
@@ -301,6 +305,169 @@ async def test_notice_publish_dispatch_and_student_inbox(
     assert in_app_row["target_handle"] is None
     assert sms_row["error_code"] == "SMS_DISABLED"
     assert "target_handle" in sms_row
+
+
+async def test_notice_email_dispatch_records_delivery(
+    client: AsyncClient, db: AsyncSession, admin_client: AsyncClient, monkeypatch,
+) -> None:
+    token, student_id = await _login_as_student(
+        client, db, student_no="N20021", wx_code="wx_n20021",
+        political_status="中共党员",
+        email="n20021@example.com",
+    )
+
+    create = await admin_client.post(
+        "/api/v1/admin/notices",
+        json={
+            "title": "邮件通知测试",
+            "body_md": "正文",
+            "summary": "邮件通知摘要",
+            "category": "PARTY",
+            "target_rule": {
+                "grade_codes": ["2022"],
+                "major_codes": ["CS"],
+                "political_status": ["中共党员"],
+            },
+            "channels": ["EMAIL"],
+        },
+    )
+    assert create.status_code == 200, create.text
+    notice_id = create.json()["data"]["id"]
+
+    await admin_client.post(f"/api/v1/admin/notices/{notice_id}/publish")
+
+    from app.notice import service as notice_service
+
+    def fake_send_email(to_addr: str, subject: str, body: str):
+        return True, None
+
+    monkeypatch.setattr(notice_service, "_send_email", fake_send_email)
+
+    dispatch = await admin_client.post(
+        f"/api/v1/admin/notices/{notice_id}/dispatch",
+        json={},
+    )
+    assert dispatch.status_code == 200, dispatch.text
+    batch = dispatch.json()["data"]
+    assert batch["status"] == "COMPLETED"
+    assert batch["success_count"] == 1
+    assert batch["failed_count"] == 0
+
+    deliveries = await admin_client.get(
+        f"/api/v1/admin/notices/batches/{batch['id']}/deliveries",
+    )
+    assert deliveries.status_code == 200, deliveries.text
+    rows = deliveries.json()["data"]["items"]
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["channel"] == "EMAIL"
+    assert row["status"] == "SENT"
+    assert row["target_handle"] is not None
+
+
+async def test_notice_sms_enabled_uses_phone_and_masks_delivery_handle(
+    client: AsyncClient,
+    db: AsyncSession,
+    admin_client: AsyncClient,
+    monkeypatch,
+) -> None:
+    token, student_id = await _login_as_student(
+        client,
+        db,
+        student_no="N20031",
+        wx_code="wx_n20031",
+        political_status="中共党员",
+    )
+    user = (
+        await db.execute(select(User).where(User.student_id == student_id))
+    ).scalar_one()
+    user.phone_enc = encrypt_field("13800138000")
+    await db.commit()
+
+    create = await admin_client.post(
+        "/api/v1/admin/notices",
+        json={
+            "title": "短信通知测试",
+            "body_md": "正文",
+            "summary": "短信摘要",
+            "category": "PARTY",
+            "target_rule": {"political_status": ["中共党员"]},
+            "channels": ["SMS"],
+        },
+    )
+    assert create.status_code == 200, create.text
+    notice_id = create.json()["data"]["id"]
+    await admin_client.post(f"/api/v1/admin/notices/{notice_id}/publish")
+
+    from app.notice import service as notice_service
+
+    sent_to: list[str] = []
+
+    def fake_send_sms(to_number: str, body: str):
+        sent_to.append(to_number)
+        return True, None
+
+    monkeypatch.setattr(notice_service.settings, "SMS_ENABLED", True)
+    monkeypatch.setattr(notice_service, "_send_sms", fake_send_sms)
+
+    dispatch = await admin_client.post(f"/api/v1/admin/notices/{notice_id}/dispatch", json={})
+    assert dispatch.status_code == 200, dispatch.text
+    assert sent_to == ["13800138000"]
+
+    deliveries = await admin_client.get(
+        f"/api/v1/admin/notices/batches/{dispatch.json()['data']['id']}/deliveries",
+    )
+    row = deliveries.json()["data"]["items"][0]
+    assert row["status"] == "SENT"
+    assert row["target_handle"] == "138****8000"
+
+
+async def test_notice_sms_enabled_without_phone_is_not_sent(
+    client: AsyncClient,
+    db: AsyncSession,
+    admin_client: AsyncClient,
+    monkeypatch,
+) -> None:
+    await _login_as_student(
+        client,
+        db,
+        student_no="N20032",
+        wx_code="wx_n20032",
+        political_status="中共党员",
+    )
+    create = await admin_client.post(
+        "/api/v1/admin/notices",
+        json={
+            "title": "无手机号短信通知测试",
+            "body_md": "正文",
+            "summary": "短信摘要",
+            "category": "PARTY",
+            "target_rule": {"political_status": ["中共党员"]},
+            "channels": ["SMS"],
+        },
+    )
+    notice_id = create.json()["data"]["id"]
+    await admin_client.post(f"/api/v1/admin/notices/{notice_id}/publish")
+
+    from app.notice import service as notice_service
+
+    def should_not_send(_to_number: str, _body: str):
+        raise AssertionError("SMS gateway should not be called without phone")
+
+    monkeypatch.setattr(notice_service.settings, "SMS_ENABLED", True)
+    monkeypatch.setattr(notice_service, "_send_sms", should_not_send)
+
+    dispatch = await admin_client.post(f"/api/v1/admin/notices/{notice_id}/dispatch", json={})
+    assert dispatch.status_code == 200, dispatch.text
+    batch = dispatch.json()["data"]
+    assert batch["success_count"] == 0
+    assert batch["failed_count"] == 0
+    deliveries = await admin_client.get(
+        f"/api/v1/admin/notices/batches/{batch['id']}/deliveries",
+    )
+    row = deliveries.json()["data"]["items"][0]
+    assert row["status"] == "SKIPPED"
+    assert row["error_code"] == "NO_PHONE"
 
 
 async def test_archived_notice_cannot_be_edited(

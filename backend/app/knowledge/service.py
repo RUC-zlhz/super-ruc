@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,6 +49,9 @@ def entry_to_brief(entry: KnowledgeEntry) -> EntryBrief:
         title=entry.title,
         summary=entry.summary,
         category_code=entry.category_code,
+        applicable_condition=entry.applicable_condition,
+        required_materials=entry.required_materials,
+        process_steps=entry.process_steps,
         status=entry.status,
         ambiguity_flag=entry.ambiguity_flag,
         version_label=entry.version_label,
@@ -335,7 +338,7 @@ async def publish_entry(
 
     status_before = entry.status
     entry.status = ENTRY_STATUS_PUBLISHED
-    entry.published_at = datetime.now(timezone.utc)
+    entry.published_at = datetime.now(UTC)
     entry.published_by = operator_id
     entry.deprecated_at = None
     entry.deprecated_by = None
@@ -376,7 +379,7 @@ async def deprecate_entry(
         raise NotFoundError("条目不存在")
     status_before = entry.status
     entry.status = ENTRY_STATUS_DEPRECATED
-    entry.deprecated_at = datetime.now(timezone.utc)
+    entry.deprecated_at = datetime.now(UTC)
     entry.deprecated_by = operator_id
     entry.updated_by = operator_id
 
@@ -479,7 +482,7 @@ async def deprecate_template(
     if tpl is None:
         raise NotFoundError("模板不存在")
     tpl.status = TEMPLATE_STATUS_DEPRECATED
-    tpl.deprecated_at = datetime.now(timezone.utc)
+    tpl.deprecated_at = datetime.now(UTC)
     tpl.deprecated_by = operator_id
     await log_action(
         db,

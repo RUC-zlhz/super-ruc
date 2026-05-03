@@ -1,6 +1,6 @@
 # Traceability Matrix
 
-**Version:** 1.2 | **Created:** 2026-04-13 | **Last Updated:** 2026-04-21
+**Version:** 1.2 | **Created:** 2026-04-13 | **Last Updated:** 2026-05-02
 
 ## End-to-End Traceability
 
@@ -129,13 +129,20 @@ flowchart LR
 |----------|------|--------|------------|
 | None | — | 当前 `CP -> CN -> FR -> NFR` 文档追溯链已闭合 | 继续以当前链路作为后续验收与交付依据 |
 
-### Residual Delivery Gates
+### Residual Business Decisions
 
 | Gate Type | Item | Impact | Current Status |
 |-----------|------|--------|----------------|
 | Pending Business Decision | 校级正式流程与学院平台边界（Q-02~Q-06） | 影响部分事务是否仅做指引/归档 | 已通过当前一期“引导/归档/线下办理提示”实现收口，最终清单仍需业务确认 |
 | Pending Data Decision | 培养方案结构化数据来源（Q-08） | 影响 FR-014 / FR-015 的真实样例与规则验证 | 已按弱结论与规则模板完成一期实现，真实数据源仍待补充 |
-| S4 Verification Gate | 字段级权限矩阵回归、索引执行、性能记录、Kingbase 回归 | 影响 `FR-012 / FR-013 / NFR-001 / NFR-003 / ICR-004` 的最终交付签收 | 仍受 `S4A.3 / S4B.1 / S4B.3 / S4C.1~S4C.3` 阻塞，不能在 `S5` 中伪装为已验证完成 |
+
+### Phase Status Alignment
+
+| Phase | Current Status | Evidence |
+|-------|----------------|----------|
+| S4 权限、审计、性能、数据库兼容 | `[x]` 已闭合 | 隔离 `54323` Kingbase gate 已完成迁移、seed、`44` 条 S4 集成回归与导入 benchmark；字段级权限、审计链路、索引迁移、性能基线和 Kingbase 兼容回归均已有脚本、环境与结果证据 |
+| S5 文档与交付闭环 | `[x]` 已闭合 | 追踪矩阵、验收走查和 `v1.6` 正式交付件已收口；`scripts/srs/v1_6/run_v16_delivery_gate.ps1 -Force` 已生成 `v1.6`、`v1.6-emf`、`v1.6-emf-inkscape` 三组 `docx / pdf` 共 `6` 个正式交付件，并完成页数与嵌入资源一致性检查 |
+| S6 前端体验增量优化 | `ACTIVE` / 已完成多轮增量 | 当前主计划目标为在 `S1 ~ S5` 已闭合基础上继续推进 `web + miniapp` 体验优化；截至 `2026-04-28`，`S6.1 ~ S6.21` 已按登记细化完成并通过双端类型检查、构建或微信小程序出包验证 |
 
 ## Validation Conclusion
 
@@ -144,4 +151,5 @@ flowchart LR
 - `FR-014` / `FR-015` 与学业模块相关，应通过真实数据或甲方确认的样例数据进入实施与验收计划。
 - `FR-017` / `FR-018` 为 v1.5 新增：展示与画像闭环已纳入范围，`FR-018` 并承接账号生命周期全局状态机（见 `docs/notes/fix.md` 第 1 条）。
 - `CP-011 / CP-012` 与 `CN-014 / CN-015` 的上游文档已补齐，追溯链条不再存在“待上游补充”残留。
-- 当前剩余阻塞属于 `S4` 的治理、性能与 Kingbase 验证门，不属于追踪矩阵自身缺口。
+- `S4` 的治理、性能与 Kingbase 验证门已于 `2026-04-22` 关闭；`S5` 正式交付链也已完成，相关状态已统一改为完成态。
+- 当前 `S6` 属于已闭合交付基线之上的前端体验增量优化，不改变本矩阵的 `CP -> CN -> FR -> NFR` 追溯结论。

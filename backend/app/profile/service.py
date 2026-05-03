@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import html as html_escape
 import io
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -12,7 +13,7 @@ from app.audit.enforcement import (
     ensure_export_permission,
     sanitize_student_basic,
 )
-from app.audit.policies import EXPORT_PROFILE_SNAPSHOT_DETAIL
+from app.audit.policies import EXPORT_PROFILE_SNAPSHOT_DETAIL, student_policy_field_names
 from app.audit.service import build_audit_detail, log_action
 from app.auth import repository as auth_repo
 from app.auth.models import Student
@@ -26,6 +27,10 @@ from app.profile.models import (
     PROFILE_FACT_LEADERSHIP,
     PROFILE_FACT_PRACTICE,
     PROFILE_FACT_RESEARCH,
+    PROFILE_FULL_VIEW_FIELD_PREFIX,
+    PROFILE_FULL_VIEW_MARKER_PREFIX,
+    PROFILE_FULL_VIEW_TARGET_PROFILE_FACTS,
+    PROFILE_FULL_VIEW_TARGET_STUDENT_FIELD,
     PROFILE_SOURCE_IMPORT,
     PROFILE_SOURCE_STUDENT_SELF,
     PROFILE_SOURCE_SYSTEM,
@@ -37,6 +42,7 @@ from app.profile.schemas import (
     ProfileFactOut,
     ProfileFactStudentView,
     ProfileFactSubmissionOut,
+    ProfileFullViewRequestOut,
     ProfileStudentSelfView,
     ProfileSummary,
     StudentBasic,
@@ -50,6 +56,130 @@ _PROFILE_SOURCE_LABELS = {
     PROFILE_SOURCE_STUDENT_SELF: "学生补录",
     PROFILE_SOURCE_SYSTEM: "系统同步",
 }
+_FULL_VIEW_FIELD_KIND = "FIELD:"
+_FULL_VIEW_FACTS_KIND = "FACTS"
+
+
+@dataclass(slots=True)
+class _FullViewGrants:
+    student_fields: set[str]
+    profile_facts: bool = False
+
+
+def _full_view_requester_marker(requester_user_id: int) -> str:
+    return f"{PROFILE_FULL_VIEW_MARKER_PREFIX}{requester_user_id}"
+
+
+def _parse_full_view_requester_id(row: ProfileCorrection) -> int | None:
+    marker = row.current_value or ""
+    if not marker.startswith(PROFILE_FULL_VIEW_MARKER_PREFIX):
+        return None
+    try:
+        return int(marker[len(PROFILE_FULL_VIEW_MARKER_PREFIX):])
+    except ValueError:
+        return None
+
+
+def _allowed_student_full_view_fields() -> set[str]:
+    return set(student_policy_field_names()) & set(StudentBasic.model_fields)
+
+
+def _encode_full_view_field_name(target_type: str, field_name: str | None) -> str:
+    normalized = (target_type or "").strip().upper()
+    if normalized == PROFILE_FULL_VIEW_TARGET_STUDENT_FIELD:
+        field = (field_name or "").strip()
+        if field not in _allowed_student_full_view_fields():
+            raise BizError("不支持申请该画像字段的完整查看", code=40190)
+        return f"{PROFILE_FULL_VIEW_FIELD_PREFIX}{_FULL_VIEW_FIELD_KIND}{field}"
+    if normalized == PROFILE_FULL_VIEW_TARGET_PROFILE_FACTS:
+        return f"{PROFILE_FULL_VIEW_FIELD_PREFIX}{_FULL_VIEW_FACTS_KIND}"
+    raise BizError("不支持的完整查看申请目标", code=40191)
+
+
+def _decode_full_view_field_name(encoded: str) -> tuple[str, str | None]:
+    if encoded == f"{PROFILE_FULL_VIEW_FIELD_PREFIX}{_FULL_VIEW_FACTS_KIND}":
+        return PROFILE_FULL_VIEW_TARGET_PROFILE_FACTS, None
+    prefix = f"{PROFILE_FULL_VIEW_FIELD_PREFIX}{_FULL_VIEW_FIELD_KIND}"
+    if encoded.startswith(prefix):
+        return PROFILE_FULL_VIEW_TARGET_STUDENT_FIELD, encoded[len(prefix):]
+    return "UNKNOWN", None
+
+
+def _build_full_view_request_out(
+    row: ProfileCorrection, user_names: dict[int, str] | None = None
+) -> ProfileFullViewRequestOut:
+    target_type, field_name = _decode_full_view_field_name(row.field_name)
+    requester_user_id = _parse_full_view_requester_id(row)
+    return ProfileFullViewRequestOut(
+        id=row.id,
+        student_id=row.student_id,
+        requester_user_id=requester_user_id,
+        requester_name=(user_names or {}).get(requester_user_id or 0),
+        target_type=target_type,
+        field_name=field_name,
+        reason=row.reason,
+        status=row.status,
+        handled_by=row.handled_by,
+        handled_at=row.handled_at,
+        handler_comment=row.handler_comment,
+        created_at=row.created_at,
+    )
+
+
+async def _load_full_view_request_user_names(
+    db: AsyncSession, rows: list[ProfileCorrection]
+) -> dict[int, str]:
+    user_ids = {
+        user_id
+        for row in rows
+        for user_id in (_parse_full_view_requester_id(row), row.handled_by)
+        if user_id is not None
+    }
+    return await _load_user_name_map(db, user_ids)
+
+
+async def _load_full_view_grants(
+    db: AsyncSession, *, student_id: int, requester_user_id: int
+) -> _FullViewGrants:
+    rows = await repo.list_approved_full_view_requests(
+        db,
+        student_id=student_id,
+        requester_user_id=requester_user_id,
+    )
+    fields: set[str] = set()
+    profile_facts = False
+    for row in rows:
+        target_type, field_name = _decode_full_view_field_name(row.field_name)
+        if target_type == PROFILE_FULL_VIEW_TARGET_PROFILE_FACTS:
+            profile_facts = True
+        elif target_type == PROFILE_FULL_VIEW_TARGET_STUDENT_FIELD and field_name:
+            fields.add(field_name)
+    return _FullViewGrants(student_fields=fields, profile_facts=profile_facts)
+
+
+async def _sanitize_student_basic_with_grants(
+    db: AsyncSession,
+    *,
+    roles: str | None,
+    student: Student,
+    grants: _FullViewGrants,
+) -> tuple[StudentBasic, list[str]]:
+    sanitized, masked_fields = await sanitize_student_basic(
+        db,
+        roles=roles,
+        student=student,
+    )
+    if not grants.student_fields:
+        return sanitized, masked_fields
+
+    payload = sanitized.model_dump()
+    original = _build_student_basic(student).model_dump()
+    remaining_masked = set(masked_fields)
+    for field_name in grants.student_fields:
+        if field_name in payload and field_name in original:
+            payload[field_name] = original[field_name]
+            remaining_masked.discard(field_name)
+    return StudentBasic.model_validate(payload), sorted(remaining_masked)
 
 
 def _summary_counters(counts: dict[str, float]) -> dict[str, Any]:
@@ -316,6 +446,8 @@ async def search_students_admin(
     grade_code: str | None,
     major_code: str | None,
     class_code: str | None,
+    include_non_active: bool,
+    enrollment_status: str | None,
     page: int,
     size: int,
     viewer_user_id: int,
@@ -331,6 +463,8 @@ async def search_students_admin(
         class_scope_codes=scope["class_codes"],
         major_scope_codes=scope["major_codes"],
         legacy_scope_codes=scope["legacy_codes"],
+        include_non_active=include_non_active,
+        enrollment_status=enrollment_status,
         page=page,
         size=size,
     )
@@ -363,6 +497,8 @@ async def search_students_admin(
                     "grade_code": grade_code,
                     "major_code": major_code,
                     "class_code": class_code,
+                    "include_non_active": include_non_active,
+                    "enrollment_status": enrollment_status,
                 }
             ],
             masked_fields=sorted(masked_fields),
@@ -387,14 +523,24 @@ async def build_summary_admin(
         viewer_role=viewer_role,
         denied_action="READ_ADMIN_DENIED",
     )
-    student_basic, masked_fields = await sanitize_student_basic(
+    grants = await _load_full_view_grants(
+        db,
+        student_id=student_id,
+        requester_user_id=viewer_user_id,
+    )
+    student_basic, masked_fields = await _sanitize_student_basic_with_grants(
         db,
         roles=viewer_role,
         student=student,
+        grants=grants,
     )
     summary = ProfileSummary(
         student=student_basic,
         facts=[_build_fact_admin_view(fact, user_names) for fact in facts],
+        masked_fields=masked_fields,
+        hidden_sensitive_fact_count=0,
+        full_view_approved_fields=sorted(grants.student_fields),
+        full_view_sensitive_facts_approved=grants.profile_facts,
         generated_at=datetime.now(UTC),
         **_summary_counters(counts),
     )
@@ -408,6 +554,12 @@ async def build_summary_admin(
         actor_role=viewer_role,
         detail=build_audit_detail(
             target={"student_id": student_id},
+            refs=[
+                {
+                    "full_view_fields": sorted(grants.student_fields),
+                    "full_view_sensitive_facts": grants.profile_facts,
+                }
+            ],
             masked_fields=masked_fields,
             metrics={"fact_count": len(summary.facts)},
         ),
@@ -427,16 +579,29 @@ async def build_summary_self(
     if student is None:
         raise NotFoundError("学生不存在")
     facts = await repo.list_facts(db, student_id, only_approved=True)
-    visible = [fact for fact in facts if not fact.is_sensitive]
-    student_basic, masked_fields = await sanitize_student_basic(
+    grants = await _load_full_view_grants(
+        db,
+        student_id=student_id,
+        requester_user_id=viewer_user_id,
+    )
+    visible = [fact for fact in facts if not fact.is_sensitive or grants.profile_facts]
+    hidden_sensitive_fact_count = sum(1 for fact in facts if fact.is_sensitive)
+    if grants.profile_facts:
+        hidden_sensitive_fact_count = 0
+    student_basic, masked_fields = await _sanitize_student_basic_with_grants(
         db,
         roles=viewer_role,
         student=student,
+        grants=grants,
     )
     counts = await repo.count_by_type(db, student_id)
     out = ProfileStudentSelfView(
         student=student_basic,
         facts=[_build_fact_student_view(fact) for fact in visible],
+        masked_fields=masked_fields,
+        hidden_sensitive_fact_count=hidden_sensitive_fact_count,
+        full_view_approved_fields=sorted(grants.student_fields),
+        full_view_sensitive_facts_approved=grants.profile_facts,
         generated_at=datetime.now(UTC),
         **_summary_counters(counts),
     )
@@ -450,6 +615,12 @@ async def build_summary_self(
         actor_role=viewer_role,
         detail=build_audit_detail(
             target={"student_id": student_id},
+            refs=[
+                {
+                    "full_view_fields": sorted(grants.student_fields),
+                    "full_view_sensitive_facts": grants.profile_facts,
+                }
+            ],
             masked_fields=masked_fields,
             metrics={"fact_count": len(out.facts)},
         ),
@@ -733,6 +904,182 @@ async def list_my_fact_submissions(
         page=page,
         size=size,
     )
+
+
+async def submit_full_view_request(
+    db: AsyncSession,
+    student_id: int,
+    payload: dict[str, Any],
+    *,
+    requester_user_id: int,
+    requester_role: str | None,
+    enforce_student_scope: bool = False,
+) -> ProfileCorrection:
+    if enforce_student_scope:
+        await _ensure_student_access(
+            db,
+            student_id,
+            viewer_user_id=requester_user_id,
+            viewer_role=requester_role,
+            denied_action="FULL_VIEW_REQUEST_DENIED",
+        )
+    elif await repo.get_student(db, student_id) is None:
+        raise NotFoundError("学生不存在")
+
+    encoded_field_name = _encode_full_view_field_name(
+        str(payload.get("target_type") or ""),
+        payload.get("field_name"),
+    )
+    existing = await repo.find_active_full_view_request(
+        db,
+        student_id=student_id,
+        encoded_field_name=encoded_field_name,
+        requester_user_id=requester_user_id,
+    )
+    if existing is not None:
+        return existing
+
+    row = await repo.create_correction(
+        db,
+        {
+            "student_id": student_id,
+            "field_name": encoded_field_name,
+            "current_value": _full_view_requester_marker(requester_user_id),
+            "proposed_value": None,
+            "reason": payload.get("reason"),
+            "status": PROFILE_APPROVAL_PENDING,
+        },
+    )
+    target_type, field_name = _decode_full_view_field_name(encoded_field_name)
+    await log_action(
+        db,
+        event_type="PROFILE",
+        entity_code="PROFILE_FULL_VIEW_REQUEST",
+        action="FULL_VIEW_REQUEST_SUBMIT",
+        entity_id=row.id,
+        actor_user_id=requester_user_id,
+        actor_role=requester_role,
+        detail=build_audit_detail(
+            target={"student_id": student_id},
+            refs=[
+                {
+                    "target_type": target_type,
+                    "field_name": field_name,
+                    "requester_user_id": requester_user_id,
+                }
+            ],
+            reason=payload.get("reason"),
+        ),
+    )
+    await db.commit()
+    await db.refresh(row)
+    return row
+
+
+async def list_full_view_requests_self(
+    db: AsyncSession,
+    *,
+    student_id: int,
+    requester_user_id: int,
+    status: str | None,
+    page: int,
+    size: int,
+) -> tuple[list[ProfileCorrection], int]:
+    return await repo.list_full_view_requests(
+        db,
+        student_id=student_id,
+        status=status,
+        requester_user_id=requester_user_id,
+        page=page,
+        size=size,
+    )
+
+
+async def list_full_view_requests_admin(
+    db: AsyncSession,
+    *,
+    student_id: int | None,
+    status: str | None,
+    page: int,
+    size: int,
+    viewer_user_id: int,
+    viewer_role: str | None,
+) -> tuple[list[ProfileCorrection], int]:
+    if student_id is not None:
+        await _ensure_student_access(
+            db,
+            student_id,
+            viewer_user_id=viewer_user_id,
+            viewer_role=viewer_role,
+            denied_action="LIST_FULL_VIEW_REQUEST_DENIED",
+        )
+    scope = await _ensure_profile_scope_available(db, viewer_user_id=viewer_user_id)
+    return await repo.list_full_view_requests(
+        db,
+        student_id=student_id,
+        status=status,
+        class_scope_codes=scope["class_codes"],
+        major_scope_codes=scope["major_codes"],
+        legacy_scope_codes=scope["legacy_codes"],
+        page=page,
+        size=size,
+    )
+
+
+async def decide_full_view_request(
+    db: AsyncSession,
+    request_id: int,
+    *,
+    decision: str,
+    comment: str | None,
+    operator_id: int,
+    operator_role: str | None,
+) -> ProfileCorrection:
+    if decision not in (PROFILE_APPROVAL_APPROVED, PROFILE_APPROVAL_REJECTED):
+        raise BizError(f"无效的处理结果 {decision}", code=40192)
+    row = await repo.get_full_view_request(db, request_id)
+    if row is None:
+        raise NotFoundError("完整查看申请不存在")
+    await _ensure_student_access(
+        db,
+        row.student_id,
+        viewer_user_id=operator_id,
+        viewer_role=operator_role,
+        denied_action="DECIDE_FULL_VIEW_REQUEST_DENIED",
+    )
+    if row.status != PROFILE_APPROVAL_PENDING:
+        raise BizError("该完整查看申请已处理", code=40193)
+
+    row.status = decision
+    row.handled_by = operator_id
+    row.handled_at = datetime.now(UTC)
+    row.handler_comment = comment
+
+    target_type, field_name = _decode_full_view_field_name(row.field_name)
+    await log_action(
+        db,
+        event_type="PROFILE",
+        entity_code="PROFILE_FULL_VIEW_REQUEST",
+        action="FULL_VIEW_REQUEST_DECIDE",
+        entity_id=row.id,
+        actor_user_id=operator_id,
+        actor_role=operator_role,
+        detail=build_audit_detail(
+            target={"student_id": row.student_id},
+            refs=[
+                {
+                    "target_type": target_type,
+                    "field_name": field_name,
+                    "requester_user_id": _parse_full_view_requester_id(row),
+                }
+            ],
+            changes={"decision": decision},
+            reason=comment,
+        ),
+    )
+    await db.commit()
+    await db.refresh(row)
+    return row
 
 
 async def list_pending_facts_admin(

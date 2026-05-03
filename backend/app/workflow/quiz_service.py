@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 import random
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -320,7 +320,7 @@ async def submit_quiz(
     if missing:
         raise NotFoundError(f"题目不存在：{sorted(missing)}")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     per_score = 100 // len(answers) if len(answers) else 0
     items: list[dict] = []
     correct_count = 0

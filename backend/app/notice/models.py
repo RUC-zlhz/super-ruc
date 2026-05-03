@@ -104,13 +104,13 @@ class Notice(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
-    tags: Mapped[list["NoticeTag"]] = relationship(
+    tags: Mapped[list[NoticeTag]] = relationship(
         "NoticeTag",
         back_populates="notice",
         cascade="all, delete-orphan",
         lazy="selectin",
     )
-    batches: Mapped[list["NoticeDeliveryBatch"]] = relationship(
+    batches: Mapped[list[NoticeDeliveryBatch]] = relationship(
         "NoticeDeliveryBatch",
         back_populates="notice",
         cascade="all, delete-orphan",
@@ -165,7 +165,7 @@ class NoticeDeliveryBatch(Base):
     created_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     notice: Mapped[Notice] = relationship("Notice", back_populates="batches")
-    deliveries: Mapped[list["NoticeDelivery"]] = relationship(
+    deliveries: Mapped[list[NoticeDelivery]] = relationship(
         "NoticeDelivery",
         back_populates="batch",
         cascade="all, delete-orphan",

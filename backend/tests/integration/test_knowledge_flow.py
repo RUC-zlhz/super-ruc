@@ -80,6 +80,9 @@ async def test_admin_flow_create_publish_search(admin_client: AsyncClient) -> No
     hit = body["data"]["items"][0]
     assert hit["slug"] == "sick-leave-procedure"
     assert hit["status"] == "PUBLISHED"
+    assert hit["applicable_condition"] == "学生本人因病需请假 1-3 日"
+    assert hit["required_materials"] == "医院门诊收据或病历复印件"
+    assert hit["process_steps"].startswith("1. 小程序提交")
 
     # 6. 详情返回来源（FR-002 来源治理）
     detail_resp = await admin_client.get(f"/api/v1/knowledge/{entry_id}")

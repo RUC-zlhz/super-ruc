@@ -19,7 +19,7 @@
         <a-input v-model:value="planFilters.major_code" placeholder="专业代码" allow-clear />
       </a-form-item>
       <a-form-item label="学期">
-        <a-input v-model:value="offeringFilters.semester" placeholder="如 2025-2026-1" allow-clear />
+        <a-input v-model:value="offeringFilters.term_code" placeholder="如 2026-SPRING" allow-clear />
       </a-form-item>
       <a-form-item>
           <a-button type="primary" html-type="submit">
@@ -36,7 +36,7 @@
             <div class="panel-title">培养方案列表</div>
             <div class="panel-sub">按年级、专业筛选后选择方案</div>
           </div>
-          <a-tag color="red">{{ plans.length }} 个</a-tag>
+          <a-tag color="red">{{ planPagination.total || plans.length }} 个</a-tag>
         </div>
         <a-spin :spinning="planLoading">
           <div v-if="plans.length" class="plan-list">
@@ -48,11 +48,11 @@
               type="button"
               @click="selectPlan(plan)"
             >
-              <span class="plan-name">{{ plan.name }}</span>
+              <span class="plan-name">{{ plan.plan_name }}</span>
               <span class="plan-meta">{{ plan.major_code || '全部专业' }} · {{ plan.grade_code || '全年级' }}</span>
               <span class="plan-foot">
-                <a-tag :color="selectedPlan?.id === plan.id ? 'red' : 'green'">启用</a-tag>
-                <span>总学分 {{ plan.total_credits ?? '-' }}</span>
+                <a-tag :color="plan.is_active ? 'green' : 'default'">{{ plan.is_active ? '启用' : '停用' }}</a-tag>
+                <span>总学分 {{ plan.total_credits_required ?? '-' }}</span>
               </span>
             </button>
           </div>
@@ -64,7 +64,7 @@
         <a-card :bordered="false" class="selected-plan-card">
           <div class="selected-plan-head">
             <div>
-              <div class="panel-title">{{ selectedPlan?.name || '请选择培养方案' }}</div>
+              <div class="panel-title">{{ selectedPlan?.plan_name || '请选择培养方案' }}</div>
               <div class="panel-sub">
                 {{ selectedPlan ? `${selectedPlan.grade_code || '全年级'} / ${selectedPlan.major_code || '全部专业'}` : '选择左侧方案后查看模块与课程' }}
               </div>
@@ -80,9 +80,9 @@
             size="small"
           >
             <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'is_required'">
-                <a-tag :color="record.is_required ? 'red' : 'blue'">
-                  {{ record.is_required ? '必修' : '选修' }}
+              <template v-if="column.key === 'module_type'">
+                <a-tag :color="record.module_type === 'REQUIRED' ? 'red' : 'blue'">
+                  {{ moduleTypeLabel(record.module_type) }}
                 </a-tag>
               </template>
             </template>
@@ -131,7 +131,6 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import {
   BookOutlined,
   ClusterOutlined,
-  FileDoneOutlined,
   NodeIndexOutlined,
   ReadOutlined,
   SearchOutlined
@@ -152,7 +151,7 @@ const metrics = computed(() => [
     key: 'modules',
     label: '模块数',
     value: modules.value.length,
-    sub: selectedPlan.value ? selectedPlan.value.name : '最近查看方案',
+    sub: selectedPlan.value ? selectedPlan.value.plan_name : '最近查看方案',
     icon: ClusterOutlined,
   },
   {
@@ -171,26 +170,68 @@ const metrics = computed(() => [
   },
 ])
 
+type CurriculumModule = {
+  id: number
+  module_code: string
+  module_name: string
+  module_type: string
+  credits_required: number
+  courses?: Record<string, unknown>[] | null
+  sort_order: number
+}
+
+type CurriculumPlanBrief = {
+  id: number
+  grade_code: string
+  major_code: string
+  plan_name: string
+  version_label?: string | null
+  total_credits_required?: number | null
+  is_active: boolean
+}
+
+type CurriculumPlanDetail = CurriculumPlanBrief & {
+  modules: CurriculumModule[]
+}
+
+type CourseOffering = {
+  id: number
+  term_code: string
+  course_code: string
+  course_name: string
+  credits: number
+  course_type?: string | null
+  teacher?: string | null
+}
+
+type CourseEquivalence = {
+  id: number
+  source_course_code: string
+  source_course_name?: string | null
+  target_course_code: string
+  target_course_name?: string | null
+  ratio: number
+  is_active: boolean
+}
+
 // ---------- 培养方案 ----------
-const planCols = [
-  { title: '编码', dataIndex: 'code', key: 'code', width: 120 },
-  { title: '名称', dataIndex: 'name', key: 'name' },
-  { title: '年级', dataIndex: 'grade_code', key: 'grade_code', width: 100 },
-  { title: '专业', dataIndex: 'major_code', key: 'major_code', width: 120 },
-  { title: '总学分', dataIndex: 'total_credits', key: 'total_credits', width: 80 },
-  { title: '操作', key: 'actions', width: 100 },
-]
 const planFilters = reactive<{ grade_code?: string; major_code?: string }>({})
-const plans = ref<any[]>([])
+const plans = ref<CurriculumPlanBrief[]>([])
 const planLoading = ref(false)
+const planPagination = reactive({ current: 1, pageSize: 20, total: 0 })
 
 async function loadPlans() {
   planLoading.value = true
   try {
-    const resp = await get<ApiEnvelope<any[]>>('/admin/curriculum/plans', {
-      params: planFilters,
+    const resp = await get<ApiEnvelope<Paginated<CurriculumPlanBrief>>>('/admin/curriculum/plans', {
+      params: {
+        ...planFilters,
+        page: planPagination.current,
+        size: planPagination.pageSize,
+      },
     })
-    plans.value = resp.data
+    plans.value = resp.data.items
+    planPagination.total = resp.data.meta.total
     if (!selectedPlan.value || !plans.value.some((plan) => plan.id === selectedPlan.value?.id)) {
       if (plans.value[0]) {
         await selectPlan(plans.value[0])
@@ -206,22 +247,32 @@ async function loadPlans() {
 
 // ---------- 模块 ----------
 const moduleCols = [
-  { title: '编码', dataIndex: 'code', key: 'code', width: 120 },
-  { title: '名称', dataIndex: 'name', key: 'name' },
-  { title: '类型', dataIndex: 'module_type', key: 'module_type', width: 100 },
-  { title: '必修', key: 'is_required', width: 80 },
-  { title: '最低学分', dataIndex: 'min_credits', key: 'min_credits', width: 100 },
+  { title: '编码', dataIndex: 'module_code', key: 'module_code', width: 120 },
+  { title: '名称', dataIndex: 'module_name', key: 'module_name' },
+  { title: '类型', key: 'module_type', width: 100 },
+  { title: '要求学分', dataIndex: 'credits_required', key: 'credits_required', width: 100 },
 ]
-const selectedPlan = ref<any>(null)
-const modules = ref<any[]>([])
+const selectedPlan = ref<CurriculumPlanBrief | null>(null)
+const modules = ref<CurriculumModule[]>([])
 const moduleLoading = ref(false)
 
-async function selectPlan(plan: any) {
+function moduleTypeLabel(value?: string | null) {
+  return {
+    REQUIRED: '必修',
+    ELECTIVE: '选修',
+    GENERAL: '通识',
+    PRACTICE: '实践',
+    OTHER: '其他',
+  }[value || ''] || value || '-'
+}
+
+async function selectPlan(plan: CurriculumPlanBrief) {
   selectedPlan.value = plan
   moduleLoading.value = true
   try {
-    const resp = await get<ApiEnvelope<any[]>>(`/admin/curriculum/plans/${plan.id}/modules`)
-    modules.value = resp.data
+    const resp = await get<ApiEnvelope<CurriculumPlanDetail>>(`/admin/curriculum/plans/${plan.id}`)
+    selectedPlan.value = resp.data
+    modules.value = [...(resp.data.modules || [])].sort((a, b) => a.sort_order - b.sort_order)
   } finally {
     moduleLoading.value = false
   }
@@ -231,19 +282,19 @@ async function selectPlan(plan: any) {
 const offeringCols = [
   { title: '课程编码', dataIndex: 'course_code', key: 'course_code', width: 120 },
   { title: '课程名', dataIndex: 'course_name', key: 'course_name' },
-  { title: '学期', dataIndex: 'semester', key: 'semester', width: 120 },
+  { title: '学期', dataIndex: 'term_code', key: 'term_code', width: 120 },
   { title: '学分', dataIndex: 'credits', key: 'credits', width: 80 },
-  { title: '教师', dataIndex: 'instructor_name', key: 'instructor_name', width: 120 },
+  { title: '教师', dataIndex: 'teacher', key: 'teacher', width: 120 },
 ]
-const offeringFilters = reactive<{ semester?: string }>({})
-const offerings = ref<any[]>([])
+const offeringFilters = reactive<{ term_code?: string }>({})
+const offerings = ref<CourseOffering[]>([])
 const offeringLoading = ref(false)
 const offeringPagination = reactive({ current: 1, pageSize: 20, total: 0 })
 
 async function loadOfferings() {
   offeringLoading.value = true
   try {
-    const resp = await get<ApiEnvelope<Paginated<any>>>('/admin/curriculum/offerings', {
+    const resp = await get<ApiEnvelope<Paginated<CourseOffering>>>('/admin/curriculum/offerings', {
       params: { ...offeringFilters, page: offeringPagination.current, size: offeringPagination.pageSize },
     })
     offerings.value = resp.data.items
@@ -265,16 +316,17 @@ const equivCols = [
   { title: '源课程名', dataIndex: 'source_course_name', key: 'source_course_name' },
   { title: '目标课程', dataIndex: 'target_course_code', key: 'target_course_code', width: 140 },
   { title: '目标课程名', dataIndex: 'target_course_name', key: 'target_course_name' },
-  { title: '类型', dataIndex: 'equiv_type', key: 'equiv_type', width: 100 },
+  { title: '比例', dataIndex: 'ratio', key: 'ratio', width: 80 },
+  { title: '启用', dataIndex: 'is_active', key: 'is_active', width: 80 },
 ]
-const equivalences = ref<any[]>([])
+const equivalences = ref<CourseEquivalence[]>([])
 const equivLoading = ref(false)
 
 async function loadEquivalences() {
   equivLoading.value = true
   try {
-    const resp = await get<ApiEnvelope<any[]>>('/admin/curriculum/equivalences')
-    equivalences.value = resp.data
+    const resp = await get<ApiEnvelope<Paginated<CourseEquivalence>>>('/admin/curriculum/equivalences')
+    equivalences.value = resp.data.items
   } finally {
     equivLoading.value = false
   }

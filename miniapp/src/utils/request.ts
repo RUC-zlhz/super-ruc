@@ -1,5 +1,7 @@
-const BASE_URL = 'http://localhost:8080/api/v1'
-const TOKEN_KEY = 'sip.access_token'
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8080/api/v1'
+const API_BASE_URL_STORAGE_KEY = 'sip.api_base_url'
+const API_BASE_URL_ENV_KEYS = ['VITE_MINIAPP_API_BASE_URL', 'VITE_API_BASE_URL']
+export const TOKEN_KEY = 'sip.access_token'
 
 export interface ApiEnvelope<T> {
   code: number
@@ -7,8 +9,37 @@ export interface ApiEnvelope<T> {
   data: T
 }
 
-function getToken(): string | null {
+function getEnvApiBaseUrl(): string | null {
+  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env
+  for (const key of API_BASE_URL_ENV_KEYS) {
+    const value = env?.[key]?.trim()
+    if (value) return value
+  }
+  return null
+}
+
+function normalizeApiBaseUrl(baseUrl: string): string {
+  return baseUrl.trim().replace(/\/+$/, '')
+}
+
+export function getApiBaseUrl(): string {
+  const runtimeValue = uni.getStorageSync(API_BASE_URL_STORAGE_KEY)
+  const runtimeBaseUrl = typeof runtimeValue === 'string' ? runtimeValue.trim() : ''
+  return normalizeApiBaseUrl(runtimeBaseUrl || getEnvApiBaseUrl() || DEFAULT_API_BASE_URL)
+}
+
+export function setApiBaseUrl(baseUrl: string | null) {
+  if (baseUrl?.trim()) uni.setStorageSync(API_BASE_URL_STORAGE_KEY, normalizeApiBaseUrl(baseUrl))
+  else uni.removeStorageSync(API_BASE_URL_STORAGE_KEY)
+}
+
+export function getToken(): string | null {
   return uni.getStorageSync(TOKEN_KEY) || null
+}
+
+export function getAuthHeader(): Record<string, string> {
+  const token = getToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 export function setToken(token: string | null) {
@@ -22,15 +53,14 @@ export function request<T>(
   data?: any,
 ): Promise<ApiEnvelope<T>> {
   return new Promise((resolve, reject) => {
-    const token = getToken()
     uni.request({
-      url: `${BASE_URL}${url}`,
+      url: buildApiUrl(url),
       // uni-app runtime accepts PATCH here, but the shipped type definition does not.
       method: method as 'GET' | 'POST' | 'PUT' | 'DELETE',
       data,
       header: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...getAuthHeader(),
       },
       success(res) {
         const payload = res.data as ApiEnvelope<T>
@@ -55,14 +85,24 @@ export function request<T>(
   })
 }
 
-function withQuery(url: string, params?: Record<string, any>) {
-  const qs = params
-    ? '?' + Object.entries(params)
+function buildQuery(params?: Record<string, any>) {
+  return params
+    ? Object.entries(params)
       .filter(([, v]) => v != null)
       .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
       .join('&')
     : ''
-  return `${url}${qs}`
+}
+
+export function buildApiUrl(url: string, params?: Record<string, any>) {
+  const path = url.startsWith('/') ? url : `/${url}`
+  const query = buildQuery(params)
+  return `${getApiBaseUrl()}${path}${query ? `?${query}` : ''}`
+}
+
+function withQuery(url: string, params?: Record<string, any>) {
+  const qs = buildQuery(params)
+  return `${url}${qs ? `?${qs}` : ''}`
 }
 
 export function get<T>(url: string, params?: Record<string, any>) {
@@ -79,10 +119,9 @@ export function put<T>(url: string, data?: any) {
 
 export function download(url: string, params?: Record<string, any>) {
   return new Promise<{ tempFilePath: string; statusCode: number }>((resolve, reject) => {
-    const token = getToken()
     uni.downloadFile({
-      url: `${BASE_URL}${withQuery(url, params)}`,
-      header: token ? { Authorization: `Bearer ${token}` } : {},
+      url: buildApiUrl(url, params),
+      header: getAuthHeader(),
       success(res) {
         if (res.statusCode === 401) {
           setToken(null)

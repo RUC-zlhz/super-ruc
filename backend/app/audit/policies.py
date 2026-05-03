@@ -252,6 +252,12 @@ def iter_default_role_field_policies() -> list[dict[str, Any]]:
     return [dict(row) for row in _DEFAULT_POLICY_MAP.values()]
 
 
+def student_policy_field_names() -> tuple[str, ...]:
+    """Return student-profile fields controlled by field policies."""
+
+    return tuple(_STUDENT_FIELD_ENTITIES.keys())
+
+
 def _merge_policy_rows(rows: Sequence[RoleFieldPolicy | Mapping[str, Any]]) -> PolicyDecision:
     if not rows:
         return PolicyDecision()

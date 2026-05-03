@@ -76,10 +76,10 @@ class User(Base):
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    student: Mapped["Student | None"] = relationship(
+    student: Mapped[Student | None] = relationship(
         "Student", foreign_keys=[student_id], lazy="joined"
     )
-    roles: Mapped[list["UserRole"]] = relationship(
+    roles: Mapped[list[UserRole]] = relationship(
         "UserRole", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
     )
 

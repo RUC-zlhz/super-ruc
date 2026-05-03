@@ -19,6 +19,7 @@ B. 常见事务申请（FR-006/007/008）
     DRAFT → SUBMITTED → IN_REVIEW → APPROVED
                               └───→ REJECTED → (RESUBMITTED=新 SUBMITTED)
     SUBMITTED/IN_REVIEW → WITHDRAWN
+    APPROVED/OFFLINE_HANDLED/WITHDRAWN → (REOPEN=受控重开) → IN_REVIEW/SUBMITTED
 """
 from __future__ import annotations
 
@@ -100,7 +101,7 @@ class WorkflowTemplate(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
-    nodes: Mapped[list["WorkflowNode"]] = relationship(
+    nodes: Mapped[list[WorkflowNode]] = relationship(
         "WorkflowNode",
         back_populates="template",
         cascade="all, delete-orphan",
@@ -192,7 +193,7 @@ class StudentWorkflow(Base):
     )
 
     template: Mapped[WorkflowTemplate] = relationship("WorkflowTemplate", lazy="joined")
-    node_states: Mapped[list["StudentWorkflowNode"]] = relationship(
+    node_states: Mapped[list[StudentWorkflowNode]] = relationship(
         "StudentWorkflowNode",
         back_populates="workflow",
         cascade="all, delete-orphan",
@@ -349,13 +350,13 @@ class Request(Base):
     )
 
     type_ref: Mapped[RequestType] = relationship("RequestType", lazy="joined")
-    attachments: Mapped[list["RequestAttachment"]] = relationship(
+    attachments: Mapped[list[RequestAttachment]] = relationship(
         "RequestAttachment",
         back_populates="request",
         cascade="all, delete-orphan",
         lazy="selectin",
     )
-    approval_records: Mapped[list["RequestApprovalRecord"]] = relationship(
+    approval_records: Mapped[list[RequestApprovalRecord]] = relationship(
         "RequestApprovalRecord",
         back_populates="request",
         cascade="all, delete-orphan",

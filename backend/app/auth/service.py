@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -181,7 +182,7 @@ async def update_enrollment_status(
     operator_role: str | None,
 ) -> None:
     """v1.5 账号生命周期变更 — 写 Student.enrollment_status + 审计。"""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.auth.models import (
         ENROLLMENT_ACTIVE,
@@ -208,7 +209,7 @@ async def update_enrollment_status(
     before = student.enrollment_status
     student.enrollment_status = status_code
     student.enrollment_status_reason = reason
-    student.enrollment_status_updated_at = datetime.now(timezone.utc)
+    student.enrollment_status_updated_at = datetime.now(UTC)
     await log_action(
         db,
         event_type="AUTH",

@@ -2,14 +2,15 @@
 from __future__ import annotations
 
 import io
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from httpx import AsyncClient
 from openpyxl import load_workbook
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.audit.models import AuditLog
+from app.audit.models import AuditLog, RoleFieldPolicy
+from app.audit.policies import POLITICAL_STATUS
 from app.auth.models import ENROLLMENT_ACTIVE, ENROLLMENT_GRADUATED, Student, User, UserRole
 from app.core.security import create_token
 from app.profile.models import (
@@ -18,6 +19,8 @@ from app.profile.models import (
     PROFILE_APPROVAL_REJECTED,
     PROFILE_FACT_COMPETITION,
     PROFILE_FACT_RESEARCH,
+    PROFILE_FULL_VIEW_TARGET_PROFILE_FACTS,
+    PROFILE_FULL_VIEW_TARGET_STUDENT_FIELD,
     PROFILE_SOURCE_STUDENT_SELF,
     PROFILE_SOURCE_TEACHER_ENTRY,
     ProfileCorrection,
@@ -43,7 +46,7 @@ async def _create_student(
         class_code=class_code,
         enrollment_status=enrollment_status,
         enrollment_status_reason=enrollment_status_reason,
-        enrollment_status_updated_at=datetime.now(timezone.utc),
+        enrollment_status_updated_at=datetime.now(UTC),
     )
     db.add(row)
     await db.commit()
@@ -106,7 +109,7 @@ async def _create_fact(
         created_by=created_by,
         updated_by=updated_by,
         approved_by=updated_by if approval_status == PROFILE_APPROVAL_APPROVED else None,
-        approved_at=datetime.now(timezone.utc) if approval_status == PROFILE_APPROVAL_APPROVED else None,
+        approved_at=datetime.now(UTC) if approval_status == PROFILE_APPROVAL_APPROVED else None,
         extra=extra,
     )
     db.add(row)
@@ -143,6 +146,27 @@ async def _latest_audit(db: AsyncSession, *, action: str, entity_id: int) -> Aud
         .order_by(AuditLog.id.desc())
     )
     return (await db.execute(stmt)).scalars().first()
+
+
+async def _set_policy_mask(
+    db: AsyncSession,
+    *,
+    role_code: str,
+    field_name: str,
+    mask_strategy: str,
+) -> None:
+    row = (
+        await db.execute(
+            select(RoleFieldPolicy).where(
+                RoleFieldPolicy.role_code == role_code,
+                RoleFieldPolicy.entity_code == POLITICAL_STATUS,
+                RoleFieldPolicy.field_name == field_name,
+            )
+        )
+    ).scalar_one()
+    row.can_read = True
+    row.mask_strategy = mask_strategy
+    await db.commit()
 
 
 async def test_profile_self_view_submission_review_and_metadata_visibility(
@@ -210,11 +234,22 @@ async def test_profile_self_view_submission_review_and_metadata_visibility(
             "fact_type": PROFILE_FACT_COMPETITION,
             "title": "学生补录通过项",
             "description": "待审批",
+            "attachments": {
+                "files": [
+                    {
+                        "name": "award-proof.pdf",
+                        "path": "C:/fixtures/award-proof.pdf",
+                        "size": 1024,
+                        "mime_type": "application/pdf",
+                    }
+                ]
+            },
         },
     )
     assert approve_submission.status_code == 200, approve_submission.text
     approved_fact_id = approve_submission.json()["data"]["id"]
     assert approve_submission.json()["data"]["approval_status"] == PROFILE_APPROVAL_PENDING
+    assert approve_submission.json()["data"]["attachments"]["files"][0]["name"] == "award-proof.pdf"
 
     pending = await client.get(
         "/api/v1/admin/profile/facts/pending",
@@ -292,18 +327,265 @@ async def test_profile_self_view_submission_review_and_metadata_visibility(
     assert admin_facts["学生补录通过项"]["review_comment"] == "通过"
 
 
+async def test_profile_full_view_request_student_reveals_masked_fields_and_hidden_facts(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    student = await _create_student(
+        db,
+        student_no="P300021",
+        full_name="完整查看学生",
+        class_code="CS2301",
+        major_code="CS",
+    )
+    student.political_status = "共青团员"
+    await db.commit()
+    await _set_policy_mask(
+        db,
+        role_code="STUDENT",
+        field_name="political_status",
+        mask_strategy="full",
+    )
+    student_headers, _ = await _create_headers(
+        db,
+        work_no="S500021",
+        display_name="Full View Student",
+        student_id=student.id,
+        roles=[("STUDENT", None)],
+    )
+    admin_headers, admin_user = await _create_headers(
+        db,
+        work_no="T500021",
+        display_name="Full View Admin",
+        roles=[("SUPER_ADMIN", None)],
+    )
+    await _create_fact(
+        db,
+        student_id=student.id,
+        fact_type=PROFILE_FACT_COMPETITION,
+        title="隐藏竞赛记录",
+        source=PROFILE_SOURCE_TEACHER_ENTRY,
+        approval_status=PROFILE_APPROVAL_APPROVED,
+        created_by=admin_user.id,
+        updated_by=admin_user.id,
+        is_sensitive=True,
+    )
+
+    masked_profile = await client.get("/api/v1/profile/me", headers=student_headers)
+    assert masked_profile.status_code == 200, masked_profile.text
+    masked_data = masked_profile.json()["data"]
+    assert masked_data["student"]["political_status"] == "***"
+    assert "political_status" in masked_data["masked_fields"]
+    assert masked_data["hidden_sensitive_fact_count"] == 1
+    assert [fact["title"] for fact in masked_data["facts"]] == []
+
+    field_req = await client.post(
+        "/api/v1/profile/me/full-view-requests",
+        headers=student_headers,
+        json={
+            "target_type": PROFILE_FULL_VIEW_TARGET_STUDENT_FIELD,
+            "field_name": "political_status",
+            "reason": "核对个人材料",
+        },
+    )
+    assert field_req.status_code == 200, field_req.text
+    field_req_id = field_req.json()["data"]["id"]
+    assert field_req.json()["data"]["status"] == PROFILE_APPROVAL_PENDING
+
+    facts_req = await client.post(
+        "/api/v1/profile/me/full-view-requests",
+        headers=student_headers,
+        json={
+            "target_type": PROFILE_FULL_VIEW_TARGET_PROFILE_FACTS,
+            "reason": "查看隐藏成长记录",
+        },
+    )
+    assert facts_req.status_code == 200, facts_req.text
+    facts_req_id = facts_req.json()["data"]["id"]
+
+    my_requests = await client.get(
+        "/api/v1/profile/me/full-view-requests",
+        headers=student_headers,
+    )
+    assert my_requests.status_code == 200, my_requests.text
+    assert {item["id"] for item in my_requests.json()["data"]["items"]} == {
+        field_req_id,
+        facts_req_id,
+    }
+
+    corrections = await client.get("/api/v1/profile/me/corrections", headers=student_headers)
+    assert corrections.status_code == 200, corrections.text
+    assert corrections.json()["data"]["items"] == []
+
+    pending = await client.get(
+        "/api/v1/admin/profile/full-view-requests",
+        headers=admin_headers,
+        params={"student_id": student.id, "status": PROFILE_APPROVAL_PENDING},
+    )
+    assert pending.status_code == 200, pending.text
+    assert {item["id"] for item in pending.json()["data"]["items"]} == {
+        field_req_id,
+        facts_req_id,
+    }
+
+    for request_id in (field_req_id, facts_req_id):
+        decision = await client.post(
+            f"/api/v1/admin/profile/full-view-requests/{request_id}/decision",
+            headers=admin_headers,
+            json={"decision": PROFILE_APPROVAL_APPROVED, "comment": "同意查看"},
+        )
+        assert decision.status_code == 200, decision.text
+        assert decision.json()["data"]["status"] == PROFILE_APPROVAL_APPROVED
+
+    full_profile = await client.get("/api/v1/profile/me", headers=student_headers)
+    assert full_profile.status_code == 200, full_profile.text
+    full_data = full_profile.json()["data"]
+    assert full_data["student"]["political_status"] == "共青团员"
+    assert "political_status" not in full_data["masked_fields"]
+    assert "political_status" in full_data["full_view_approved_fields"]
+    assert full_data["full_view_sensitive_facts_approved"] is True
+    assert full_data["hidden_sensitive_fact_count"] == 0
+    assert [fact["title"] for fact in full_data["facts"]] == ["隐藏竞赛记录"]
+
+    submit_log = await _latest_audit(
+        db,
+        action="FULL_VIEW_REQUEST_SUBMIT",
+        entity_id=field_req_id,
+    )
+    assert submit_log is not None
+    assert submit_log.entity_code == "PROFILE_FULL_VIEW_REQUEST"
+    decide_log = await _latest_audit(
+        db,
+        action="FULL_VIEW_REQUEST_DECIDE",
+        entity_id=field_req_id,
+    )
+    assert decide_log is not None
+    assert decide_log.detail["refs"][0]["field_name"] == "political_status"
+
+
+async def test_profile_full_view_request_counselor_reveals_masked_admin_field(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    student = await _create_student(
+        db,
+        student_no="P300022",
+        full_name="辅导员完整查看学生",
+        class_code="CS2301",
+        major_code="CS",
+    )
+    student.political_status = "中共党员"
+    await db.commit()
+    await _set_policy_mask(
+        db,
+        role_code="COUNSELOR",
+        field_name="political_status",
+        mask_strategy="partial",
+    )
+    counselor_headers, counselor_user = await _create_headers(
+        db,
+        work_no="T500022",
+        display_name="Scoped Counselor",
+        roles=[("COUNSELOR", "CLASS:CS2301")],
+    )
+    admin_headers, _ = await _create_headers(
+        db,
+        work_no="T500023",
+        display_name="Full View Super Admin",
+        roles=[("SUPER_ADMIN", None)],
+    )
+
+    masked_profile = await client.get(
+        f"/api/v1/admin/profile/{student.id}",
+        headers=counselor_headers,
+    )
+    assert masked_profile.status_code == 200, masked_profile.text
+    masked_data = masked_profile.json()["data"]
+    assert masked_data["student"]["political_status"] != "中共党员"
+    assert "political_status" in masked_data["masked_fields"]
+
+    request_resp = await client.post(
+        f"/api/v1/admin/profile/{student.id}/full-view-requests",
+        headers=counselor_headers,
+        json={
+            "target_type": PROFILE_FULL_VIEW_TARGET_STUDENT_FIELD,
+            "field_name": "political_status",
+            "reason": "班级谈话前核对政治面貌",
+        },
+    )
+    assert request_resp.status_code == 200, request_resp.text
+    request_id = request_resp.json()["data"]["id"]
+    assert request_resp.json()["data"]["requester_user_id"] == counselor_user.id
+
+    approve = await client.post(
+        f"/api/v1/admin/profile/full-view-requests/{request_id}/decision",
+        headers=admin_headers,
+        json={"decision": PROFILE_APPROVAL_APPROVED, "comment": "同意"},
+    )
+    assert approve.status_code == 200, approve.text
+
+    full_profile = await client.get(
+        f"/api/v1/admin/profile/{student.id}",
+        headers=counselor_headers,
+    )
+    assert full_profile.status_code == 200, full_profile.text
+    full_data = full_profile.json()["data"]
+    assert full_data["student"]["political_status"] == "中共党员"
+    assert "political_status" not in full_data["masked_fields"]
+    assert full_data["full_view_approved_fields"] == ["political_status"]
+
+
+async def test_profile_full_view_request_rejects_unsupported_field(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    student = await _create_student(
+        db,
+        student_no="P300099",
+        full_name="非法字段学生",
+        class_code="CS2301",
+        major_code="CS",
+    )
+    student_headers, _ = await _create_headers(
+        db,
+        work_no="S509099",
+        display_name="Unsupported Field Student",
+        student_id=student.id,
+        roles=[("STUDENT", None)],
+    )
+
+    resp = await client.post(
+        "/api/v1/profile/me/full-view-requests",
+        headers=student_headers,
+        json={
+            "target_type": PROFILE_FULL_VIEW_TARGET_STUDENT_FIELD,
+            "field_name": "unsupported_field",
+            "reason": "测试非法字段",
+        },
+    )
+    assert resp.status_code == 400, resp.text
+    assert resp.json()["code"] == 40190
+
+    pending = await client.get(
+        "/api/v1/profile/me/full-view-requests",
+        headers=student_headers,
+    )
+    assert pending.status_code == 200, pending.text
+    assert pending.json()["data"]["items"] == []
+
+
 async def test_profile_scope_controls_search_detail_decisions_and_audit(
     client: AsyncClient,
     db: AsyncSession,
 ) -> None:
-    in_scope_student = await _create_student(
+    await _create_student(
         db,
         student_no="P300002",
         full_name="班级命中学生",
         class_code="CS2301",
         major_code="CS",
     )
-    legacy_scope_student = await _create_student(
+    await _create_student(
         db,
         student_no="P300003",
         full_name="旧 scope 学生",
@@ -448,6 +730,64 @@ async def test_profile_scope_controls_search_detail_decisions_and_audit(
     assert snapshot_log.result_code == "DENIED"
 
 
+async def test_profile_student_search_defaults_active_and_allows_explicit_history(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    await _create_student(
+        db,
+        student_no="P310001",
+        full_name="默认在读学生",
+        class_code="CS2401",
+        major_code="CS",
+    )
+    await _create_student(
+        db,
+        student_no="P310002",
+        full_name="毕业历史学生",
+        class_code="CS2401",
+        major_code="CS",
+        enrollment_status=ENROLLMENT_GRADUATED,
+    )
+    admin_headers, _ = await _create_headers(
+        db,
+        work_no="T510001",
+        display_name="Profile Search Admin",
+        roles=[("SUPER_ADMIN", None)],
+    )
+
+    default_search = await client.get(
+        "/api/v1/admin/profile/students",
+        headers=admin_headers,
+        params={"class_code": "CS2401"},
+    )
+    assert default_search.status_code == 200, default_search.text
+    assert [item["student_no"] for item in default_search.json()["data"]["items"]] == [
+        "P310001"
+    ]
+
+    include_history = await client.get(
+        "/api/v1/admin/profile/students",
+        headers=admin_headers,
+        params={"class_code": "CS2401", "include_non_active": True},
+    )
+    assert include_history.status_code == 200, include_history.text
+    assert {item["student_no"] for item in include_history.json()["data"]["items"]} == {
+        "P310001",
+        "P310002",
+    }
+
+    graduated_only = await client.get(
+        "/api/v1/admin/profile/students",
+        headers=admin_headers,
+        params={"class_code": "CS2401", "enrollment_status": ENROLLMENT_GRADUATED},
+    )
+    assert graduated_only.status_code == 200, graduated_only.text
+    assert [item["student_no"] for item in graduated_only.json()["data"]["items"]] == [
+        "P310002"
+    ]
+
+
 async def test_profile_read_only_student_and_snapshot_exports(
     client: AsyncClient,
     db: AsyncSession,
@@ -539,11 +879,19 @@ async def test_profile_read_only_student_and_snapshot_exports(
 
 async def test_profile_new_endpoints_require_auth(client: AsyncClient) -> None:
     assert (await client.get("/api/v1/profile/me/fact-submissions")).status_code == 401
+    assert (await client.get("/api/v1/profile/me/full-view-requests")).status_code == 401
     assert (
         await client.post(
             "/api/v1/profile/me/facts",
             json={"fact_type": PROFILE_FACT_RESEARCH, "title": "匿名补录"},
         )
     ).status_code == 401
+    assert (
+        await client.post(
+            "/api/v1/profile/me/full-view-requests",
+            json={"target_type": PROFILE_FULL_VIEW_TARGET_STUDENT_FIELD, "field_name": "political_status"},
+        )
+    ).status_code == 401
     assert (await client.get("/api/v1/admin/profile/facts/pending")).status_code == 401
+    assert (await client.get("/api/v1/admin/profile/full-view-requests")).status_code == 401
     assert (await client.get("/api/v1/admin/profile/1/snapshot.pdf")).status_code == 401

@@ -15,7 +15,7 @@ from __future__ import annotations
 import html as html_escape
 import io
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,7 +41,7 @@ def _is_certificate_request(req: Request) -> bool:
 
 def _render_html(req: Request, student: Student | None) -> str:
     e = html_escape.escape
-    now_text = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now_text = datetime.now(UTC).strftime("%Y-%m-%d")
     title = e(req.title or "证明")
     type_name = e(req.type_ref.name if req.type_ref else req.type_code)
     student_block = ""

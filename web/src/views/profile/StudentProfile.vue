@@ -50,6 +50,21 @@
           </a-descriptions>
         </a-card>
 
+        <a-alert
+          v-if="maskedFields.length"
+          class="mb16"
+          type="info"
+          show-icon
+          :message="`当前有 ${maskedFields.length} 个画像字段按权限策略脱敏显示`"
+          description="如确需查看完整信息，可提交申请，审批通过后该字段在本页恢复为完整值，并保留审计记录。"
+        >
+          <template #action>
+            <a-button size="small" type="primary" @click="openFullViewModal">
+              申请查看完整信息
+            </a-button>
+          </template>
+        </a-alert>
+
         <div class="metric-grid">
           <div v-for="metric in factMetrics" :key="metric.key" class="metric-tile">
             <span class="metric-icon"><component :is="factMetricIcon(metric.key)" /></span>
@@ -183,6 +198,60 @@
             message="学生补录审核队列将在后端待审核接口上线后自动接通。"
           />
         </a-card>
+
+        <a-card title="敏感字段完整查看申请" :bordered="false" size="small" class="mb16">
+          <template #extra>
+            <a-space>
+              <a-tag color="gold">{{ pendingFullViewCount }}</a-tag>
+              <a-button
+                v-if="maskedFields.length"
+                size="small"
+                type="primary"
+                @click="openFullViewModal"
+              >
+                申请
+              </a-button>
+            </a-space>
+          </template>
+          <a-table
+            :columns="fullViewRequestCols"
+            :data-source="fullViewRequests"
+            :pagination="false"
+            row-key="id"
+            size="small"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'target'">
+                <span>{{ fullViewTargetLabel(record) }}</span>
+              </template>
+              <template v-else-if="column.key === 'status'">
+                <a-tag :color="approvalStatusColor(fullViewStatus(record))">
+                  {{ approvalStatusLabel(fullViewStatus(record)) }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'requester'">
+                <span>{{ operatorLabel(fullViewRequesterName(record), fullViewRequesterId(record)) }}</span>
+              </template>
+              <template v-else-if="column.key === 'created_at'">
+                <span>{{ formatDateTime(fullViewCreatedAt(record)) }}</span>
+              </template>
+              <template v-else-if="column.key === 'actions'">
+                <a-space v-if="fullViewStatus(record) === 'PENDING'">
+                  <a-button type="link" size="small" @click="onDecideFullView(record, 'APPROVED')">
+                    通过
+                  </a-button>
+                  <a-button type="link" size="small" danger @click="onDecideFullView(record, 'REJECTED')">
+                    驳回
+                  </a-button>
+                </a-space>
+                <span v-else>-</span>
+              </template>
+            </template>
+            <template #emptyText>
+              <a-empty description="暂无完整查看申请" />
+            </template>
+          </a-table>
+        </a-card>
       </template>
     </a-spin>
 
@@ -261,6 +330,31 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-modal
+      v-model:open="fullViewModalOpen"
+      title="申请查看完整信息"
+      :confirm-loading="fullViewSubmitting"
+      @ok="onSubmitFullViewRequest"
+      @cancel="closeFullViewModal"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="申请字段" required>
+          <a-select v-model:value="fullViewForm.field_name">
+            <a-select-option v-for="field in maskedFields" :key="field" :value="field">
+              {{ studentFieldLabel(field) }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="申请原因">
+          <a-textarea
+            v-model:value="fullViewForm.reason"
+            :rows="4"
+            placeholder="请说明查看完整信息的业务场景"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -287,12 +381,16 @@ import {
 } from '@ant-design/icons-vue'
 import {
   adminAddFact,
+  adminDecideFullViewRequest,
   adminDecideFact,
   adminDeleteFact,
   adminGetProfile,
+  adminListFullViewRequests,
   adminListCorrections,
   adminListPendingFacts,
+  adminSubmitFullViewRequest,
   downloadStudentProfileSnapshot,
+  type ProfileFullViewRequestOut,
   type ProfileFactOut,
   type ProfileSummary,
 } from '@/api/profile'
@@ -305,6 +403,7 @@ const loading = ref(false)
 const pendingCorrectionCount = ref(0)
 const pendingFacts = ref<ProfileFactOut[]>([])
 const pendingFactsSupported = ref(true)
+const fullViewRequests = ref<ProfileFullViewRequestOut[]>([])
 const snapshotLoading = ref<'pdf' | 'xlsx' | ''>('')
 
 const ACTIVE_ENROLLMENT_STATUSES = new Set(['ACTIVE', 'IN_SCHOOL'])
@@ -332,6 +431,22 @@ const FACT_STATUS_LABELS: Record<string, string> = {
   PENDING: '待审核',
   APPROVED: '已通过',
   REJECTED: '已驳回',
+}
+
+const STUDENT_FIELD_LABELS: Record<string, string> = {
+  student_no: '学号',
+  full_name: '姓名',
+  gender: '性别',
+  grade_code: '年级',
+  major_code: '专业',
+  class_code: '班级',
+  political_status: '政治面貌',
+  enrollment_year: '入学年份',
+  expected_graduation_year: '预计毕业',
+  status: '学籍状态',
+  enrollment_status: '学籍生命周期',
+  enrollment_status_reason: '状态说明',
+  enrollment_status_updated_at: '状态更新时间',
 }
 
 type FactRecordLike = Partial<ProfileFactOut> & Record<string, any>
@@ -379,6 +494,40 @@ function factSourceLabel(record: FactRecordLike) {
   return record.source_label || record.source || '-'
 }
 
+function studentFieldLabel(field: string) {
+  return STUDENT_FIELD_LABELS[field] || field
+}
+
+function asFullViewRequest(record: Record<string, any> | ProfileFullViewRequestOut): ProfileFullViewRequestOut {
+  return record as ProfileFullViewRequestOut
+}
+
+function fullViewTargetLabel(record: Record<string, any> | ProfileFullViewRequestOut) {
+  const item = asFullViewRequest(record)
+  if (item.target_type === 'PROFILE_FACTS') return '隐藏成长事实'
+  return item.field_name ? studentFieldLabel(item.field_name) : item.target_type
+}
+
+function fullViewStatus(record: Record<string, any> | ProfileFullViewRequestOut) {
+  return asFullViewRequest(record).status
+}
+
+function fullViewRequesterName(record: Record<string, any> | ProfileFullViewRequestOut) {
+  return asFullViewRequest(record).requester_name
+}
+
+function fullViewRequesterId(record: Record<string, any> | ProfileFullViewRequestOut) {
+  return asFullViewRequest(record).requester_user_id
+}
+
+function fullViewCreatedAt(record: Record<string, any> | ProfileFullViewRequestOut) {
+  return asFullViewRequest(record).created_at
+}
+
+function fullViewRequestId(record: Record<string, any> | ProfileFullViewRequestOut) {
+  return asFullViewRequest(record).id
+}
+
 function operatorLabel(name?: string | null, id?: number | null) {
   if (name) return name
   if (id != null) return `#${id}`
@@ -409,6 +558,12 @@ const factMetrics = computed(() => {
     { key: 'leadership_count', label: '学生骨干', value: profile.value.leadership_count },
   ]
 })
+
+const maskedFields = computed(() => profile.value?.masked_fields || [])
+
+const pendingFullViewCount = computed(() =>
+  fullViewRequests.value.filter((item) => item.status === 'PENDING').length,
+)
 
 const FACT_METRIC_ICON: Record<string, unknown> = {
   research_count: ExperimentOutlined,
@@ -441,12 +596,14 @@ async function loadPendingFacts() {
 async function loadProfile() {
   loading.value = true
   try {
-    const [profileResp, correctionResp] = await Promise.all([
+    const [profileResp, correctionResp, fullViewResp] = await Promise.all([
       adminGetProfile(studentId),
       adminListCorrections({ student_id: studentId, status: 'PENDING', page: 1, size: 1 }),
+      adminListFullViewRequests({ student_id: studentId, page: 1, size: 20 }),
     ])
     profile.value = profileResp.data
     pendingCorrectionCount.value = correctionResp.data.meta.total
+    fullViewRequests.value = fullViewResp.data.items
     await loadPendingFacts()
   } finally {
     loading.value = false
@@ -493,6 +650,15 @@ const pendingFactCols = [
   { title: '状态', key: 'approval_status', width: 100 },
   { title: '治理信息', key: 'governance', width: 280 },
   { title: '审核意见', key: 'review_comment', width: 220 },
+  { title: '操作', key: 'actions', width: 120 },
+]
+
+const fullViewRequestCols = [
+  { title: '申请目标', key: 'target', width: 180 },
+  { title: '申请人', key: 'requester', width: 160 },
+  { title: '状态', key: 'status', width: 100 },
+  { title: '原因', dataIndex: 'reason', key: 'reason' },
+  { title: '提交时间', key: 'created_at', width: 160 },
   { title: '操作', key: 'actions', width: 120 },
 ]
 
@@ -614,6 +780,57 @@ async function onSubmitDecision() {
   } finally {
     decisionSubmitting.value = false
   }
+}
+
+const fullViewModalOpen = ref(false)
+const fullViewSubmitting = ref(false)
+const fullViewForm = reactive({
+  field_name: '',
+  reason: '',
+})
+
+function openFullViewModal() {
+  if (!maskedFields.value.length) {
+    message.info('当前没有被脱敏的画像字段')
+    return
+  }
+  fullViewForm.field_name = maskedFields.value[0]
+  fullViewModalOpen.value = true
+}
+
+function closeFullViewModal() {
+  fullViewModalOpen.value = false
+  fullViewForm.field_name = ''
+  fullViewForm.reason = ''
+}
+
+async function onSubmitFullViewRequest() {
+  if (!fullViewForm.field_name) {
+    message.warning('请选择申请字段')
+    return
+  }
+  fullViewSubmitting.value = true
+  try {
+    await adminSubmitFullViewRequest(studentId, {
+      target_type: 'STUDENT_FIELD',
+      field_name: fullViewForm.field_name,
+      reason: fullViewForm.reason || undefined,
+    })
+    message.success('已提交完整查看申请')
+    closeFullViewModal()
+    await loadProfile()
+  } finally {
+    fullViewSubmitting.value = false
+  }
+}
+
+async function onDecideFullView(record: Record<string, any> | ProfileFullViewRequestOut, decision: 'APPROVED' | 'REJECTED') {
+  await adminDecideFullViewRequest(fullViewRequestId(record), {
+    decision,
+    comment: decision === 'APPROVED' ? '同意查看完整信息' : '不符合查看条件',
+  })
+  message.success(decision === 'APPROVED' ? '已批准完整查看申请' : '已驳回完整查看申请')
+  await loadProfile()
 }
 
 async function onDownloadSnapshot(format: 'pdf' | 'xlsx') {

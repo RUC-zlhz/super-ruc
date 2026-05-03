@@ -11,7 +11,8 @@
 """
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from app.exchange.models import (
     IMPORT_TYPE_COURSE_EQUIV,

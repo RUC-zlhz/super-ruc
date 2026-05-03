@@ -20,6 +20,9 @@ from app.profile.schemas import (
     ProfileFactIn,
     ProfileFactOut,
     ProfileFactSubmissionOut,
+    ProfileFullViewDecisionIn,
+    ProfileFullViewRequestIn,
+    ProfileFullViewRequestOut,
     ProfileStudentSelfView,
     ProfileSummary,
     StudentBasic,
@@ -140,6 +143,59 @@ async def list_my_fact_submissions(
     )
 
 
+@router.post(
+    "/me/full-view-requests",
+    response_model=ApiResponse[ProfileFullViewRequestOut],
+)
+async def submit_my_full_view_request(
+    payload: ProfileFullViewRequestIn,
+    db: DBDep,
+    user: ActiveStudentDep,
+) -> ApiResponse[ProfileFullViewRequestOut]:
+    if user.student_id is None:
+        raise BizError("仅学生可提交完整查看申请", code=40305, http_status=403)
+    row = await service.submit_full_view_request(
+        db,
+        user.student_id,
+        payload.model_dump(),
+        requester_user_id=user.user_id,
+        requester_role=",".join(user.roles) or None,
+    )
+    names = await service._load_full_view_request_user_names(db, [row])
+    return ok(service._build_full_view_request_out(row, names))
+
+
+@router.get(
+    "/me/full-view-requests",
+    response_model=ApiResponse[Paginated[ProfileFullViewRequestOut]],
+)
+async def list_my_full_view_requests(
+    db: DBDep,
+    user: CurrentUserDep,
+    status: str | None = None,
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+) -> ApiResponse[Paginated[ProfileFullViewRequestOut]]:
+    if user.student_id is None:
+        raise BizError("仅学生可查看本人完整查看申请", code=40305, http_status=403)
+    rows, total = await service.list_full_view_requests_self(
+        db,
+        student_id=user.student_id,
+        requester_user_id=user.user_id,
+        status=status,
+        page=page,
+        size=size,
+    )
+    names = await service._load_full_view_request_user_names(db, rows)
+    items = [service._build_full_view_request_out(row, names) for row in rows]
+    return ok(
+        Paginated[ProfileFullViewRequestOut](
+            items=items,
+            meta=PageMeta(page=page, size=size, total=total),
+        )
+    )
+
+
 @admin_router.get(
     "/students", response_model=ApiResponse[Paginated[StudentBasic]]
 )
@@ -150,6 +206,8 @@ async def admin_search_students(
     grade_code: str | None = None,
     major_code: str | None = None,
     class_code: str | None = None,
+    include_non_active: bool = Query(default=False),
+    enrollment_status: str | None = None,
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
 ) -> ApiResponse[Paginated[StudentBasic]]:
@@ -159,12 +217,67 @@ async def admin_search_students(
         grade_code=grade_code,
         major_code=major_code,
         class_code=class_code,
+        include_non_active=include_non_active,
+        enrollment_status=enrollment_status,
         page=page,
         size=size,
         viewer_user_id=user.user_id,
         viewer_role=",".join(user.roles) or None,
     )
     return ok(Paginated[StudentBasic](items=rows, meta=PageMeta(page=page, size=size, total=total)))
+
+
+@admin_router.get(
+    "/full-view-requests",
+    response_model=ApiResponse[Paginated[ProfileFullViewRequestOut]],
+)
+async def admin_list_full_view_requests(
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+    student_id: int | None = None,
+    status: str | None = None,
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+) -> ApiResponse[Paginated[ProfileFullViewRequestOut]]:
+    rows, total = await service.list_full_view_requests_admin(
+        db,
+        student_id=student_id,
+        status=status,
+        page=page,
+        size=size,
+        viewer_user_id=user.user_id,
+        viewer_role=",".join(user.roles) or None,
+    )
+    names = await service._load_full_view_request_user_names(db, rows)
+    items = [service._build_full_view_request_out(row, names) for row in rows]
+    return ok(
+        Paginated[ProfileFullViewRequestOut](
+            items=items,
+            meta=PageMeta(page=page, size=size, total=total),
+        )
+    )
+
+
+@admin_router.post(
+    "/full-view-requests/{request_id}/decision",
+    response_model=ApiResponse[ProfileFullViewRequestOut],
+)
+async def admin_decide_full_view_request(
+    request_id: int,
+    payload: ProfileFullViewDecisionIn,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+) -> ApiResponse[ProfileFullViewRequestOut]:
+    row = await service.decide_full_view_request(
+        db,
+        request_id,
+        decision=payload.decision,
+        comment=payload.comment,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    names = await service._load_full_view_request_user_names(db, [row])
+    return ok(service._build_full_view_request_out(row, names))
 
 
 @admin_router.get("/{student_id}", response_model=ApiResponse[ProfileSummary])
@@ -180,6 +293,28 @@ async def admin_get_profile(
         viewer_role=",".join(user.roles) or None,
     )
     return ok(result)
+
+
+@admin_router.post(
+    "/{student_id}/full-view-requests",
+    response_model=ApiResponse[ProfileFullViewRequestOut],
+)
+async def admin_submit_full_view_request(
+    student_id: int,
+    payload: ProfileFullViewRequestIn,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+) -> ApiResponse[ProfileFullViewRequestOut]:
+    row = await service.submit_full_view_request(
+        db,
+        student_id,
+        payload.model_dump(),
+        requester_user_id=user.user_id,
+        requester_role=",".join(user.roles) or None,
+        enforce_student_scope=True,
+    )
+    names = await service._load_full_view_request_user_names(db, [row])
+    return ok(service._build_full_view_request_out(row, names))
 
 
 @admin_router.post(

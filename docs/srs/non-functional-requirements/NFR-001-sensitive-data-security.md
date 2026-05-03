@@ -17,7 +17,7 @@ The platform shall protect sensitive student data with encryption at rest and in
 | Traces To | ID | Description |
 |-----------|-----|-------------|
 | Customer Need | CN-011 | 需要平台控制敏感字段可见性、导出权限与访问审计 |
-| Applies To FRs | FR-006, FR-009, FR-012, FR-013 | 申请、数据交换、权限控制、审计日志 |
+| Applies To FRs | FR-006, FR-009, FR-012, FR-013, FR-018 | 申请、数据交换、权限控制、审计日志、学生画像 |
 
 ## Measurement Criteria
 

@@ -17,7 +17,7 @@ The platform shall preserve consistency of request states, party-work records, a
 | Traces To | ID | Description |
 |-----------|-----|-------------|
 | Customer Need | CN-008 | 需要平台创建和更新学生主数据、模板文件与业务台账，并通过文件交换保持一致 |
-| Applies To FRs | FR-005, FR-006, FR-008, FR-009, FR-014, FR-015 | 流程、申请、导入导出、学业分析 |
+| Applies To FRs | FR-005, FR-006, FR-008, FR-009, FR-014, FR-015, FR-017 | 流程、申请、导入导出、学业分析、荣誉数据 |
 
 ## Measurement Criteria
 

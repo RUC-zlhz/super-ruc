@@ -333,6 +333,34 @@
 - `S6.6` 已证明 3 份文字型校级 PDF 可以直接结构化抽取，团员发展流程 PDF 的图片化页面可通过 `--ocr` 自动补齐；OCR 结果仍需人工校对后才能作为权威知识库条目。
 - 后续若继续推进，优先做知识库管理端真实数据走查、PDF OCR / 知识库草稿导入映射、短信 provider 适配或申请流程小程序真机验收。
 
+### S7 全量需求 Gap 闭环修复
+
+- [x] `S7.1` Web 静态检查修复
+- [x] `S7.2` Miniapp 运行配置收口
+- [x] `S7.3` 文档漂移清理
+- [x] `S7.4` `FR-008` 受控重批 / 重开闭环
+- [x] `S7.5` `FR-014` 成绩单 PDF 上传解析最小闭环
+- [x] `S7.6` `FR-018` 敏感字段完整查看申请闭环
+- [x] `S7.DB` 后端定向集成测试实跑
+
+当前结论：
+
+- `S7.1 ~ S7.6` 代码与文档修改已落地：Web 权限策略面板静态错误、小程序 API/AppID/tabBar 配置、规格文档漂移、`FR-008` 重开审批、`FR-014` 成绩单 PDF 核验、`FR-018` 敏感字段完整查看申请均已补齐。
+- 已通过 `web vue-tsc`、`miniapp vue-tsc`、`pnpm -C web build`、`pnpm -C miniapp build:mp-weixin`、本轮后端改动文件定向 `ruff check`、`py_compile` 与 `git diff --check`。
+- `S7.DB` 已在隔离 Kingbase gate 上实跑完成：`& '.\backend\scripts\dev\run_s4_kingbase_gate.ps1' all -SkipSync` 依次完成迁移、种子、`uv run pytest` 集成回归与导入 benchmark，集成回归结果 `52 passed`，benchmark `student_import_standard_100_rows` 中位数 `0.088482s / 0.066155s / 0.022327s`。
+
+### S8 全量需求 Gap 闭环推进
+
+- [x] `S8.1` 小程序知识库自助闭环：分类/标签搜索、显式 AI match、详情模板列表、模板下载打开与人工咨询提示。
+- [x] `S8.2` Workflow / Notice 闭环：转线下生成学生站内通知，短信通道改为手机号解密发送、脱敏句柄留痕且无手机号不伪成功。
+- [x] `S8.3` Report / Profile 口径闭环：运营看板支持 `term_code` 学期过滤，管理端学生搜索默认在读且可显式包含/查询非在读历史。
+- [x] `S8.4` Docs / Validation baseline：补 S8 细化文件、NFR 与上下文图追踪漂移、S6.21 登记、S7 前快照说明和后端 lint 基线。
+
+当前结论：
+
+- `S8.1 ~ S8.4` 已完成代码与文档收口；历史 `2026-04-22` tabBar “6 个 PNG”记录保留为当时三栏旧基线，当前有效口径以 `S6.12 / S7.2 / S8` 的四栏 tabBar、8 个图标为准。
+- 验证：已通过 `web vue-tsc`、`miniapp vue-tsc`、`pnpm -C web build`、`pnpm -C miniapp build:mp-weixin` 与 `backend` 下 `uv run --no-sync ruff check app tests`；S8 定向后端集成测试在隔离 Kingbase `127.0.0.1:54323` 下通过 `34 passed in 24.78s`，结果记录在 `docs/notes/refinements/2026-05-04-s8-requirements-gap-closure.md`。
+
 ## 细化文件登记
 
 > 规则：每个新细化文件都要写入本表，且必须关联一个或多个主计划条目编号。
@@ -378,6 +406,9 @@
 | 2026-04-28 | Miniapp 原生弹层运行时修复 | `docs/notes/refinements/2026-04-28-s6-miniapp-native-popup-runtime-fix.md` | `S6.18` | `[x]` | 已将知识、荣誉、画像页的 `uni-popup` 替换为页面内原生遮罩与底部面板，并通过 `miniapp vue-tsc`、`mp-weixin` 出包、产物扫描和 DevTools CLI 验证 |
 | 2026-04-28 | Web / Miniapp 前端体验增量优化 Round 6 (交互增强) | `docs/notes/refinements/2026-04-28-s6-frontend-optimization-round6.md` | `S6.19` | `[x]` | 已对 Web 增加页面转场、卡片悬浮与载入动画，对 Miniapp 补充全局触摸反馈并覆盖高频核心页面，通过双端类型检查和构建 |
 | 2026-04-28 | Miniapp 小程序主图标资产制作 | `docs/notes/refinements/2026-04-28-s6-miniapp-app-icon-asset.md` | `S6.20` | `[x]` | 已生成主图标 PNG 与尺寸变体，补可复现生成脚本，并通过 `miniapp vue-tsc` 与 `mp-weixin` 出包验证 |
+| 2026-04-28 | Web / Miniapp 按钮图标语义补齐 Round 7 | `docs/notes/refinements/2026-04-28-s6-button-icon-semantics-round7.md` | `S6.21` | `[x]` | 补登记已完成的按钮图标语义增强；当前 S6 状态范围为 `S6.1 ~ S6.21` |
+| 2026-05-02 | S7 全量需求 Gap 闭环修复 | `docs/notes/refinements/2026-05-02-s7-requirements-gap-closure.md` | `S7.1, S7.2, S7.3, S7.4, S7.5, S7.6, S7.DB` | `[x]` | 六路实现已落地并通过静态/构建验证；隔离 Kingbase gate 已闭合，集成回归 52 passed |
+| 2026-05-04 | S8 全量需求 Gap 闭环推进 | `docs/notes/refinements/2026-05-04-s8-requirements-gap-closure.md` | `S8.1, S8.2, S8.3, S8.4` | `[x]` | 已补齐知识库自助、转线下通知、短信脱敏、学期看板、非在读列表口径、文档漂移与 lint 基线，并通过双端构建、ruff 与 S8 定向集成回归 |
 
 ## 会话更新要求
 

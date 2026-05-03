@@ -5,6 +5,7 @@
 - reject → resubmit → approve（revision 自增）
 - submit → withdraw
 - v1.5：submit → admin 标记 offline → OFFLINE_HANDLED（contact_info 落在 decision_comment）
+- FR-008：APPROVED / OFFLINE_HANDLED 等终态由审批角色受控 REOPEN 后重批
 - C-03：无 token 401；学生不可审批 → 403
 - FR-006：attachment_required 类型无附件不能提交
 
@@ -261,6 +262,14 @@ async def test_request_mark_offline_v15(
     actions = [r["action"] for r in body["approval_records"]]
     assert "OFFLINE_HANDLE" in actions
 
+    inbox = await client.get("/api/v1/notices/inbox", headers=stu_headers)
+    assert inbox.status_code == 200, inbox.text
+    assert any(
+        "申请已转线下办理" in item["title"]
+        and item["delivery_id"] is not None
+        for item in inbox.json()["data"]["items"]
+    )
+
     # 终态不可再次审批
     retry = await client.post(
         f"/api/v1/admin/requests/{request_id}/approve",
@@ -268,6 +277,124 @@ async def test_request_mark_offline_v15(
         json={"comment": "..."},
     )
     assert retry.status_code == 400
+
+
+async def test_request_reopen_approved_terminal_to_in_review_records_history_and_audit(
+    client: AsyncClient,
+    db: AsyncSession,
+    counselor_headers: dict[str, str],
+) -> None:
+    token = await _login_as_student(
+        client, db, student_no="R410001", wx_code="wx_r410001"
+    )
+    stu_headers = {"Authorization": f"Bearer {token}"}
+
+    create = await client.post(
+        "/api/v1/requests",
+        headers=stu_headers,
+        json={
+            "type_code": "LEAVE_PERSONAL",
+            "title": "重批测试请假",
+            "form_data": {
+                "reason": "会议冲突",
+                "start_date": "2026-04-24",
+                "end_date": "2026-04-24",
+                "leave_type": "事假",
+            },
+        },
+    )
+    assert create.status_code == 200, create.text
+    request_id = create.json()["data"]["id"]
+    await client.post(f"/api/v1/requests/{request_id}/submit", headers=stu_headers)
+
+    approve = await client.post(
+        f"/api/v1/admin/requests/{request_id}/approve",
+        headers=counselor_headers,
+        json={"comment": "初次通过"},
+    )
+    assert approve.status_code == 200, approve.text
+    assert approve.json()["data"]["status"] == "APPROVED"
+
+    reopen = await client.post(
+        f"/api/v1/admin/requests/{request_id}/reopen",
+        headers=counselor_headers,
+        json={"comment": "发现需补充核验，重开审批"},
+    )
+    assert reopen.status_code == 200, reopen.text
+    reopened = reopen.json()["data"]
+    assert reopened["status"] == "IN_REVIEW"
+    assert reopened["decided_at"] is None
+    assert reopened["decided_by"] is None
+    assert reopened["decision_comment"] is None
+
+    reopen_records = [r for r in reopened["approval_records"] if r["action"] == "REOPEN"]
+    assert len(reopen_records) == 1
+    assert reopen_records[0]["status_before"] == "APPROVED"
+    assert reopen_records[0]["status_after"] == "IN_REVIEW"
+    assert reopen_records[0]["comment"] == "发现需补充核验，重开审批"
+
+    reopen_log = await _latest_audit(db, action="REOPEN", entity_id=request_id)
+    assert reopen_log is not None
+    assert reopen_log.result_code == "SUCCESS"
+
+    reapprove = await client.post(
+        f"/api/v1/admin/requests/{request_id}/approve",
+        headers=counselor_headers,
+        json={"comment": "复核后通过"},
+    )
+    assert reapprove.status_code == 200, reapprove.text
+    assert reapprove.json()["data"]["status"] == "APPROVED"
+
+
+async def test_request_reopen_offline_handled_terminal_can_return_to_submitted(
+    client: AsyncClient,
+    db: AsyncSession,
+    counselor_headers: dict[str, str],
+) -> None:
+    token = await _login_as_student(
+        client, db, student_no="R420001", wx_code="wx_r420001"
+    )
+    stu_headers = {"Authorization": f"Bearer {token}"}
+
+    create = await client.post(
+        "/api/v1/requests",
+        headers=stu_headers,
+        json={
+            "type_code": "CERTIFICATE_IN_SCHOOL",
+            "title": "转线下后恢复线上",
+            "form_data": {"purpose": "学院证明补充材料"},
+        },
+    )
+    assert create.status_code == 200, create.text
+    request_id = create.json()["data"]["id"]
+    await client.post(f"/api/v1/requests/{request_id}/submit", headers=stu_headers)
+
+    offline = await client.post(
+        f"/api/v1/admin/requests/{request_id}/offline",
+        headers=counselor_headers,
+        json={"contact_info": "王老师 010-12345678", "note": "需线下核验"},
+    )
+    assert offline.status_code == 200, offline.text
+    assert offline.json()["data"]["status"] == "OFFLINE_HANDLED"
+
+    reopen = await client.post(
+        f"/api/v1/admin/requests/{request_id}/reopen",
+        headers=counselor_headers,
+        json={
+            "comment": "材料已转为可线上核验，恢复待受理",
+            "target_status": "SUBMITTED",
+        },
+    )
+    assert reopen.status_code == 200, reopen.text
+    reopened = reopen.json()["data"]
+    assert reopened["status"] == "SUBMITTED"
+    assert reopened["decision_comment"] is None
+    assert any(
+        r["action"] == "REOPEN"
+        and r["status_before"] == "OFFLINE_HANDLED"
+        and r["status_after"] == "SUBMITTED"
+        for r in reopened["approval_records"]
+    )
 
 
 async def test_request_submit_requires_attachment_when_declared(

@@ -26,8 +26,11 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<UserInfo | null>(null)
   const isLoggedIn = computed(() => !!user.value)
 
-  async function wxLogin(code: string) {
-    const resp = await post<TokenResponse>('/auth/wx-login', { code })
+  async function wxLogin(code: string, studentNo?: string) {
+    const resp = await post<TokenResponse>('/auth/wx-login', {
+      code,
+      student_no: studentNo?.trim() || undefined,
+    })
     setToken(resp.data.access_token)
     uni.setStorageSync('sip.refresh_token', resp.data.refresh_token)
     user.value = resp.data.user
