@@ -1,9 +1,18 @@
 <template>
   <view class="container">
     <view v-if="loading" class="loading">加载中...</view>
+    <template v-else>
+      <InlineStateNotice
+        v-if="pageError"
+        :tone="result ? 'warning' : 'error'"
+        :title="result ? '学业数据未完全更新' : '学业数据加载失败'"
+        :description="result ? `${pageError}，当前保留上次加载结果。` : `${pageError}，可点击重试重新同步。`"
+        action-text="重试"
+        @action="reload"
+      />
 
-    <template v-else-if="result">
-      <view class="weak-hint">
+      <template v-if="result">
+        <view class="weak-hint">
         <text class="weak-icon">i</text>
         <view class="weak-copy">
           <text class="weak-title">弱结论免责声明</text>
@@ -142,14 +151,17 @@
           <text class="footer-text">请持续关注教务通知，及时完成相关学习要求。</text>
         </view>
       </view>
-    </template>
+      </template>
 
-    <view v-else class="empty">暂无学业数据</view>
+      <view v-else-if="!pageError" class="empty">暂无学业数据</view>
+    </template>
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { onPullDownRefresh } from '@dcloudio/uni-app'
+import InlineStateNotice from '@/components/InlineStateNotice.vue'
 import {
   getMyAcademicGap,
   uploadTranscriptPdf,
@@ -157,11 +169,14 @@ import {
   type SuggestedCourse,
   type TranscriptPdfUploadResult,
 } from '@/api/report'
+import { getErrorMessage } from '@/utils/error'
 
 const result = ref<AcademicGapResult | null>(null)
 const loading = ref(false)
 const uploadingTranscript = ref(false)
 const transcriptUpload = ref<TranscriptPdfUploadResult | null>(null)
+const pageError = ref('')
+const hasLoaded = ref(false)
 const defaultDisclaimer = '本结果仅为辅助提示，不构成毕业资格、课程替代或教务最终结论；请以学院/学校正式审核结果为准。'
 
 const MODULE_TYPE_LABELS: Record<string, string> = {
@@ -232,16 +247,29 @@ async function onUploadTranscriptPdf() {
 async function reload() {
   loading.value = true
   try {
+    pageError.value = ''
     const resp = await getMyAcademicGap()
     result.value = resp.data
-  } catch {
-    result.value = null
+    hasLoaded.value = true
+  } catch (error) {
+    pageError.value = getErrorMessage(error, '学业数据加载失败')
+    if (!hasLoaded.value) {
+      result.value = null
+    }
   } finally {
     loading.value = false
   }
 }
 
 onMounted(reload)
+
+onPullDownRefresh(async () => {
+  try {
+    await reload()
+  } finally {
+    uni.stopPullDownRefresh()
+  }
+})
 </script>
 
 <style scoped>

@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.models import RoleFieldPolicy
+from app.auth.role_codes import expand_role_codes_for_lookup, normalize_role_codes
 
 BASIC_IDENTITY = "basic_identity"
 CONTACT = "contact"
@@ -123,8 +124,8 @@ def parse_role_codes(roles: Sequence[str] | str | None) -> list[str]:
     if roles is None:
         return []
     if isinstance(roles, str):
-        return [item.strip() for item in roles.split(",") if item.strip()]
-    return [str(item).strip() for item in roles if str(item).strip()]
+        return normalize_role_codes(roles.split(","))
+    return normalize_role_codes(str(item) for item in roles)
 
 
 def _blank_role_matrix(role_code: str) -> dict[tuple[str, str], dict[str, Any]]:
@@ -291,10 +292,11 @@ async def resolve_field_policy(
     if not role_codes:
         return PolicyDecision()
 
+    lookup_role_codes = expand_role_codes_for_lookup(role_codes)
     rows = (
         await db.execute(
             select(RoleFieldPolicy).where(
-                RoleFieldPolicy.role_code.in_(role_codes),
+                RoleFieldPolicy.role_code.in_(lookup_role_codes),
                 RoleFieldPolicy.entity_code == entity_code,
                 RoleFieldPolicy.field_name == field_name,
             )

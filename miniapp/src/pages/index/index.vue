@@ -29,10 +29,10 @@
     </view>
 
     <view class="sync-card">
-      <view class="sync-dot" :class="{ loading }" />
+      <view class="sync-dot" :class="{ loading: isAnySectionLoading }" />
       <view class="sync-copy">
-        <text class="sync-title">{{ loading ? "数据同步中" : "数据同步正常" }}</text>
-        <text class="sync-desc">最近同步时间：{{ latestSyncText }}</text>
+        <text class="sync-title">{{ syncStatusTitle }}</text>
+        <text class="sync-desc">{{ syncStatusDescription }}</text>
       </view>
       <view class="sync-action" hover-class="hover-opacity" @tap="loadDashboard">↻</view>
     </view>
@@ -65,10 +65,10 @@
       <view class="entry-grid">
         <view
           v-for="item in entries"
-          :key="item.path"
+          :key="item.url"
           class="entry-card"
           hover-class="hover-scale"
-          @tap="goTo(item.path)"
+          @tap="goTo(item.url)"
         >
           <view class="entry-mark">{{ item.mark }}</view>
           <text class="entry-label">{{ item.label }}</text>
@@ -81,8 +81,25 @@
         <view>
           <text class="section-title">待办提醒</text>
         </view>
-        <text class="section-link" hover-class="hover-opacity">更多待办 ›</text>
+        <view class="section-actions">
+          <text class="section-action" hover-class="hover-opacity" @tap="refreshSection('requests')">
+            {{ sectionMeta.requests.loading ? "申请同步中" : "刷新申请" }}
+          </text>
+          <text class="section-action" hover-class="hover-opacity" @tap="refreshSection('workflows')">
+            {{ sectionMeta.workflows.loading ? "流程同步中" : "刷新流程" }}
+          </text>
+        </view>
       </view>
+
+      <InlineStateNotice
+        v-if="todoNotice"
+        compact
+        :tone="todoNotice.tone"
+        :title="todoNotice.title"
+        :description="todoNotice.description"
+        action-text="重试"
+        @action="refreshTodoSections"
+      />
 
       <template v-if="focusItems.length">
         <view
@@ -100,7 +117,7 @@
           <text class="focus-arrow">›</text>
         </view>
       </template>
-      <view v-else class="empty-panel">
+      <view v-else-if="!todoSectionUnavailable" class="empty-panel">
         当前暂无待办事项，可直接从下方常用服务进入事务申请或党团进度。
       </view>
     </view>
@@ -110,8 +127,23 @@
         <view>
           <text class="section-title">最新通知</text>
         </view>
-        <text class="section-link" hover-class="hover-opacity" @tap="goTo('/pages/notice/index')">查看全部</text>
+        <view class="section-actions">
+          <text class="section-action" hover-class="hover-opacity" @tap="refreshSection('notices')">
+            {{ sectionMeta.notices.loading ? "通知同步中" : "刷新通知" }}
+          </text>
+          <text class="section-action" hover-class="hover-opacity" @tap="goTo('/pages/notice/index')">查看全部</text>
+        </view>
       </view>
+
+      <InlineStateNotice
+        v-if="noticeSectionNotice"
+        compact
+        :tone="noticeSectionNotice.tone"
+        :title="noticeSectionNotice.title"
+        :description="noticeSectionNotice.description"
+        action-text="重试"
+        @action="refreshSection('notices')"
+      />
 
       <template v-if="recentNotices.length">
         <view
@@ -142,89 +174,152 @@
           </view>
         </view>
       </template>
-      <view v-else class="empty-panel">暂无通知，可稍后下拉刷新。</view>
+      <view v-else-if="!noticeSectionUnavailable" class="empty-panel">暂无通知，可稍后下拉刷新。</view>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, reactive, ref } from "vue";
 import { onPullDownRefresh, onShow } from "@dcloudio/uni-app";
+import InlineStateNotice from "@/components/InlineStateNotice.vue";
 import { useAuthStore } from "@/store/auth";
 import { getMyNotices, type StudentNoticeItem } from "@/api/notice";
-import { getMyRequests } from "@/api/workflow";
-import { getMyWorkflows, type StudentWorkflow } from "@/api/workflow";
+import {
+  getMyRequests,
+  getMyWorkflows,
+  type RequestBrief,
+  type StudentWorkflow,
+} from "@/api/workflow";
+import { getErrorMessage } from "@/utils/error";
 import { openMiniappPage, openNoticeDetail } from "@/utils/navigation";
 
-type SettledResult<T> =
-  | { status: "fulfilled"; value: T }
-  | { status: "rejected"; reason: unknown };
+type HomeSectionKey = "notices" | "requests" | "workflows";
+type HomeSectionMeta = {
+  loading: boolean;
+  error: string;
+  fromCache: boolean;
+  hasLoaded: boolean;
+  lastSuccessAt: string;
+};
+type HomeSectionNotice = {
+  tone: "error" | "warning" | "info";
+  title: string;
+  description: string;
+};
+type HomeDashboardCache = {
+  notices?: {
+    items: StudentNoticeItem[];
+    syncedAt: string;
+  };
+  requests?: {
+    items: RequestBrief[];
+    syncedAt: string;
+  };
+  workflows?: {
+    items: StudentWorkflow[];
+    syncedAt: string;
+  };
+};
+type HomeSectionDataMap = {
+  notices: StudentNoticeItem[];
+  requests: RequestBrief[];
+  workflows: StudentWorkflow[];
+};
+type HomeSectionCacheMap = {
+  notices?: HomeDashboardCache["notices"];
+  requests?: HomeDashboardCache["requests"];
+  workflows?: HomeDashboardCache["workflows"];
+};
+
+const HOME_CACHE_KEY = "sip.home.dashboard.cache.v1";
+const SECTION_KEYS: HomeSectionKey[] = ["notices", "requests", "workflows"];
+const SECTION_LABELS: Record<HomeSectionKey, string> = {
+  notices: "通知",
+  requests: "申请",
+  workflows: "流程",
+};
 
 const entries = [
   {
     mark: "□",
     label: "我的申请",
     desc: "发起请假、证明、盖章等常见申请。",
-    path: "/pages/request/index",
+    url: "/pages/request/index",
   },
   {
     mark: "100",
     label: "成绩证明",
     desc: "查看学业辅助提示与证明办理入口。",
-    path: "/pages/academic/index",
+    url: "/pages/request/create?category=CERTIFICATE&type_code=CERTIFICATE_IN_SCHOOL",
   },
   {
     mark: "¥",
     label: "奖助学金",
     desc: "查看荣誉与奖助学金相关信息。",
-    path: "/pages/honor/index",
+    url: "/pages/honor/index",
   },
   {
     mark: "✓",
     label: "请假审批",
     desc: "进入事务申请并选择请假类服务。",
-    path: "/pages/request/create",
+    url: "/pages/request/create?category=LEAVE&type_code=LEAVE_PERSONAL",
   },
   {
     mark: "床",
     label: "宿舍服务",
     desc: "宿舍调整、住宿证明等事务入口。",
-    path: "/pages/request/create",
+    url: "/pages/request/create?type_code=DORM_SERVICE",
   },
   {
     mark: "¥",
     label: "缴费记录",
     desc: "查询政策、缴费说明和服务指南。",
-    path: "/pages/knowledge/index",
+    url: "/pages/knowledge/index",
   },
   {
     mark: "书",
     label: "课程事务",
     desc: "课程、培养方案和教务政策查询。",
-    path: "/pages/knowledge/index",
+    url: "/pages/knowledge/index",
   },
   {
     mark: "耳",
     label: "帮助中心",
     desc: "查询常见问题和办理指引。",
-    path: "/pages/knowledge/index",
+    url: "/pages/knowledge/index",
   },
 ];
 
 const recentNotices = ref<StudentNoticeItem[]>([]);
 const workflows = ref<StudentWorkflow[]>([]);
-const requests = ref<
-  Array<{
-    id: number;
-    title: string;
-    status: string;
-    request_no: string;
-    updated_at: string;
-  }>
->([]);
-const loading = ref(false);
-const latestSyncText = ref("");
+const requests = ref<RequestBrief[]>([]);
 const displayName = ref("同学");
+const dashboardRefreshing = ref(false);
+const cacheHydrated = ref(false);
+const sectionMeta = reactive<Record<HomeSectionKey, HomeSectionMeta>>({
+  notices: {
+    loading: false,
+    error: "",
+    fromCache: false,
+    hasLoaded: false,
+    lastSuccessAt: "",
+  },
+  requests: {
+    loading: false,
+    error: "",
+    fromCache: false,
+    hasLoaded: false,
+    lastSuccessAt: "",
+  },
+  workflows: {
+    loading: false,
+    error: "",
+    fromCache: false,
+    hasLoaded: false,
+    lastSuccessAt: "",
+  },
+});
 
 const greeting = computed(() => {
   const hour = new Date().getHours();
@@ -248,6 +343,107 @@ const activeWorkflowCount = computed(
       ["ACTIVE", "IN_PROGRESS", "SUSPENDED"].includes(item.status),
     ).length,
 );
+const isAnySectionLoading = computed(
+  () =>
+    dashboardRefreshing.value ||
+    SECTION_KEYS.some((key) => sectionMeta[key].loading),
+);
+const cachedSections = computed(() =>
+  SECTION_KEYS.filter((key) => sectionMeta[key].fromCache),
+);
+const failedSections = computed(() =>
+  SECTION_KEYS.filter((key) => !!sectionMeta[key].error),
+);
+const todoSectionUnavailable = computed(
+  () =>
+    ["requests", "workflows"].every(
+      (key) =>
+        !!sectionMeta[key as HomeSectionKey].error &&
+        !sectionMeta[key as HomeSectionKey].hasLoaded,
+    ),
+);
+const noticeSectionUnavailable = computed(
+  () => !!sectionMeta.notices.error && !sectionMeta.notices.hasLoaded,
+);
+const syncStatusTitle = computed(() => {
+  if (isAnySectionLoading.value) return "数据同步中";
+  if (failedSections.value.length && cachedSections.value.length) {
+    return "展示最近成功数据";
+  }
+  if (failedSections.value.length) return "部分数据暂不可用";
+  if (cachedSections.value.length) return "展示最近成功数据";
+  return "数据同步正常";
+});
+const syncStatusDescription = computed(() => {
+  const latestSuccessAt = getLatestSuccessAt();
+  if (!latestSuccessAt) {
+    return "尚未成功同步首页数据，可点击右侧刷新重试。";
+  }
+  const messages = [
+    `${cachedSections.value.length ? "最近成功同步" : "最近同步时间"}：${formatDateTime(latestSuccessAt)}`,
+  ];
+  if (cachedSections.value.length) {
+    messages.push(`${formatSectionNames(cachedSections.value)} 当前显示缓存数据`);
+  }
+  const unavailableSections = failedSections.value.filter(
+    (key) => !sectionMeta[key].hasLoaded,
+  );
+  if (unavailableSections.length) {
+    messages.push(`${formatSectionNames(unavailableSections)} 暂未拉取成功`);
+  }
+  return messages.join(" · ");
+});
+const todoNotice = computed<HomeSectionNotice | null>(() => {
+  const errors = ["requests", "workflows"].filter(
+    (key) => !!sectionMeta[key as HomeSectionKey].error,
+  ) as HomeSectionKey[];
+  const cached = ["requests", "workflows"].filter(
+    (key) => sectionMeta[key as HomeSectionKey].fromCache,
+  ) as HomeSectionKey[];
+
+  if (errors.length === 0 && cached.length === 0) return null;
+  if (todoSectionUnavailable.value) {
+    return {
+      tone: "error",
+      title: "待办提醒暂不可用",
+      description: `${formatSectionNames(errors)} 加载失败，可点击重试重新同步。`,
+    };
+  }
+  if (errors.length) {
+    return {
+      tone: "warning",
+      title: "待办提醒未完全更新",
+      description: `${formatSectionNames(errors)} 刷新失败，当前保留最近成功数据。`,
+    };
+  }
+  return {
+    tone: "info",
+    title: "待办提醒当前显示缓存",
+    description: `${formatSectionNames(cached)} 暂未完成实时同步，请稍后重试。`,
+  };
+});
+const noticeSectionNotice = computed<HomeSectionNotice | null>(() => {
+  if (!sectionMeta.notices.error && !sectionMeta.notices.fromCache) return null;
+  if (noticeSectionUnavailable.value) {
+    return {
+      tone: "error",
+      title: "通知暂不可用",
+      description: `${sectionMeta.notices.error || "通知列表加载失败"}，可点击重试重新同步。`,
+    };
+  }
+  if (sectionMeta.notices.error) {
+    return {
+      tone: "warning",
+      title: "通知未完全更新",
+      description: "通知同步失败，当前保留最近成功数据。",
+    };
+  }
+  return {
+    tone: "info",
+    title: "通知当前显示缓存",
+    description: "弱网下已回退到最近成功数据，请留意同步时间。",
+  };
+});
 
 const dashboardMetrics = computed(() => [
   {
@@ -330,6 +526,10 @@ const focusItems = computed(() => {
   return items;
 });
 
+function formatSectionNames(keys: HomeSectionKey[]) {
+  return keys.map((key) => SECTION_LABELS[key]).join("、");
+}
+
 function isUnread(notice: StudentNoticeItem) {
   return !notice.read_at;
 }
@@ -350,21 +550,120 @@ function formatDate(value?: string | null) {
   return normalized.length >= 16 ? normalized.slice(0, 16) : normalized;
 }
 
-function settleAll<T extends readonly Promise<unknown>[]>(
-  promises: T,
-): Promise<{
-  [K in keyof T]: T[K] extends Promise<infer R> ? SettledResult<R> : never;
-}> {
-  return Promise.all(
-    promises.map((promise) =>
-      promise.then(
-        (value) => ({ status: "fulfilled", value }),
-        (reason) => ({ status: "rejected", reason }),
-      ),
-    ),
-  ) as Promise<{
-    [K in keyof T]: T[K] extends Promise<infer R> ? SettledResult<R> : never;
-  }>;
+function formatDateTime(value?: string | null) {
+  if (!value) return "";
+  const normalized = value.replace("T", " ").replace("Z", "");
+  return normalized.length >= 16 ? normalized.slice(0, 16) : normalized;
+}
+
+function getLatestSuccessAt() {
+  const timestamps = SECTION_KEYS
+    .map((key) => sectionMeta[key].lastSuccessAt)
+    .filter(Boolean)
+    .map((value) => new Date(value).getTime())
+    .filter((value) => Number.isFinite(value));
+  if (!timestamps.length) return "";
+  return new Date(Math.max(...timestamps)).toISOString();
+}
+
+function readDashboardCache(): HomeDashboardCache {
+  const raw = uni.getStorageSync(HOME_CACHE_KEY);
+  if (!raw || typeof raw !== "string") return {};
+  try {
+    const parsed = JSON.parse(raw) as HomeDashboardCache;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeDashboardCache(cache: HomeDashboardCache) {
+  uni.setStorageSync(HOME_CACHE_KEY, JSON.stringify(cache));
+}
+
+function setSectionItems<K extends HomeSectionKey>(
+  key: K,
+  items: HomeSectionDataMap[K],
+) {
+  if (key === "notices") {
+    recentNotices.value = items as StudentNoticeItem[];
+    return;
+  }
+  if (key === "requests") {
+    requests.value = items as RequestBrief[];
+    return;
+  }
+  workflows.value = items as StudentWorkflow[];
+}
+
+function applyCachedSection<K extends HomeSectionKey>(
+  key: K,
+  cache: HomeSectionCacheMap[K],
+) {
+  if (!cache || !Array.isArray(cache.items) || !cache.syncedAt) return;
+  setSectionItems(key, cache.items as HomeSectionDataMap[K]);
+  sectionMeta[key].fromCache = true;
+  sectionMeta[key].hasLoaded = true;
+  sectionMeta[key].lastSuccessAt = cache.syncedAt;
+}
+
+function hydrateDashboardCache() {
+  if (cacheHydrated.value) return;
+  const cache = readDashboardCache();
+  applyCachedSection("notices", cache.notices);
+  applyCachedSection("requests", cache.requests);
+  applyCachedSection("workflows", cache.workflows);
+  cacheHydrated.value = true;
+}
+
+function persistSectionCache<K extends HomeSectionKey>(
+  key: K,
+  items: HomeSectionDataMap[K],
+  syncedAt: string,
+) {
+  const cache = readDashboardCache();
+  cache[key] = {
+    items,
+    syncedAt,
+  } as HomeDashboardCache[K];
+  writeDashboardCache(cache);
+}
+
+function markSectionSuccess<K extends HomeSectionKey>(
+  key: K,
+  items: HomeSectionDataMap[K],
+) {
+  const syncedAt = new Date().toISOString();
+  setSectionItems(key, items);
+  sectionMeta[key].error = "";
+  sectionMeta[key].fromCache = false;
+  sectionMeta[key].hasLoaded = true;
+  sectionMeta[key].lastSuccessAt = syncedAt;
+  persistSectionCache(key, items, syncedAt);
+}
+
+async function syncDisplayName() {
+  let auth: ReturnType<typeof useAuthStore> | null = null;
+  try {
+    auth = useAuthStore();
+    if (auth.user?.display_name) {
+      displayName.value = auth.user.display_name;
+      return;
+    }
+  } catch {
+    auth = null;
+  }
+
+  if (auth && !auth.user) {
+    try {
+      const user = await auth.fetchMe();
+      if (user.display_name) {
+        displayName.value = user.display_name;
+      }
+    } catch {
+      // ignore profile fetch failures on home hydration
+    }
+  }
 }
 
 async function goTo(path: string) {
@@ -383,45 +682,51 @@ async function openNotice(notice: StudentNoticeItem) {
   }
 }
 
-async function loadDashboard() {
-  loading.value = true;
+async function refreshSection(key: HomeSectionKey) {
+  sectionMeta[key].loading = true;
   try {
-    let auth: ReturnType<typeof useAuthStore> | null = null;
-    try {
-      auth = useAuthStore();
-      if (auth.user?.display_name) {
-        displayName.value = auth.user.display_name;
-      }
-    } catch {
-      auth = null;
+    if (key === "notices") {
+      const response = await getMyNotices({ page: 1, size: 5 });
+      markSectionSuccess("notices", response.data.items || []);
+      return;
     }
-
-    if (auth && !auth.user) {
-      try {
-        const user = await auth.fetchMe();
-        if (user.display_name) {
-          displayName.value = user.display_name;
-        }
-      } catch {
-        // ignore
-      }
+    if (key === "requests") {
+      const response = await getMyRequests({ page: 1, size: 20 });
+      markSectionSuccess("requests", response.data.items || []);
+      return;
     }
-
-    const [noticesResp, requestsResp, workflowsResp] = await settleAll([
-      getMyNotices({ page: 1, size: 5 }),
-      getMyRequests({ page: 1, size: 20 }),
-      getMyWorkflows(),
-    ] as const);
-
-    recentNotices.value =
-      noticesResp.status === "fulfilled" ? noticesResp.value.data.items || [] : [];
-    requests.value =
-      requestsResp.status === "fulfilled" ? requestsResp.value.data.items || [] : [];
-    workflows.value =
-      workflowsResp.status === "fulfilled" ? workflowsResp.value.data || [] : [];
-    latestSyncText.value = new Date().toISOString().slice(0, 16).replace("T", " ");
+    const response = await getMyWorkflows();
+    markSectionSuccess("workflows", response.data || []);
+  } catch (error) {
+    sectionMeta[key].error = getErrorMessage(
+      error,
+      `${SECTION_LABELS[key]}同步失败`,
+    );
+    sectionMeta[key].fromCache = sectionMeta[key].hasLoaded;
   } finally {
-    loading.value = false;
+    sectionMeta[key].loading = false;
+  }
+}
+
+async function refreshTodoSections() {
+  await Promise.all([
+    refreshSection("requests"),
+    refreshSection("workflows"),
+  ]);
+}
+
+async function loadDashboard() {
+  hydrateDashboardCache();
+  dashboardRefreshing.value = true;
+  try {
+    await syncDisplayName();
+    await Promise.all([
+      refreshSection("notices"),
+      refreshSection("requests"),
+      refreshSection("workflows"),
+    ]);
+  } finally {
+    dashboardRefreshing.value = false;
   }
 }
 
@@ -771,6 +1076,18 @@ onPullDownRefresh(async () => {
   color: #b2959e;
 }
 
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+}
+
+.section-action {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  color: #b2959e;
+}
+
 .entry-grid {
   display: flex;
   flex-wrap: wrap;
@@ -983,5 +1300,9 @@ onPullDownRefresh(async () => {
   font-size: 24rpx;
   line-height: 1.7;
   text-align: center;
+}
+
+:deep(.notice.compact) {
+  margin-bottom: 18rpx;
 }
 </style>

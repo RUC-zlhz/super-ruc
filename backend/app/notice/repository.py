@@ -8,6 +8,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import Student, User, UserRole
+from app.auth.role_codes import expand_role_codes_for_lookup
 from app.core.sql import order_by_nulls_last_desc
 from app.notice.models import (
     DELIVERY_STATUS_READ,
@@ -92,6 +93,9 @@ async def resolve_target_students(
     if normalized_rule.get("political_status"):
         stmt = stmt.where(Student.political_status.in_(normalized_rule["political_status"]))
     if normalized_rule.get("role_codes"):
+        lookup_role_codes = expand_role_codes_for_lookup(
+            normalized_rule["role_codes"]
+        )
         stmt = (
             stmt.join(
                 User,
@@ -102,7 +106,7 @@ async def resolve_target_students(
                 ),
             )
             .join(UserRole, UserRole.user_id == User.id)
-            .where(UserRole.role_code.in_(normalized_rule["role_codes"]))
+            .where(UserRole.role_code.in_(lookup_role_codes))
         )
     stmt = stmt.order_by(Student.id)
     return list((await db.execute(stmt)).scalars().all())

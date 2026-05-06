@@ -16,6 +16,7 @@ from app.exchange.models import (
     ImportBatch,
     StudentCourseRecord,
 )
+from app.report import service as report_service
 from app.workflow.models import Request, RequestType
 
 
@@ -190,6 +191,15 @@ async def test_report_routes_use_canonical_contract(
     )
     assert term_summary["total"] == 1
 
+    invalid_term = await admin_client.get(
+        "/api/v1/admin/report/overview",
+        params={"term_code": "2025-AUTUMN"},
+    )
+    assert invalid_term.status_code == 422, invalid_term.text
+    invalid_payload = invalid_term.json()
+    assert invalid_payload["code"] == 42210
+    assert "term_code" in invalid_payload["message"]
+
     admin_gap = await admin_client.get(f"/api/v1/admin/report/academic-gap/{student_id}")
     assert admin_gap.status_code == 200, admin_gap.text
     admin_gap_data = admin_gap.json()["data"]
@@ -228,6 +238,49 @@ async def test_student_transcript_pdf_upload_creates_review_record_without_forma
     assert batch.summary["formal_records_written"] == 0
     assert batch.object_key
 
+    records = (
+        await db.execute(
+            select(StudentCourseRecord).where(
+                StudentCourseRecord.student_id == student_id
+            )
+        )
+    ).scalars().all()
+    assert records == []
+
+
+async def test_student_transcript_pdf_upload_maps_object_storage_failure_to_biz_error(
+    client: AsyncClient,
+    db: AsyncSession,
+    monkeypatch,
+) -> None:
+    token, student_id = await _login_as_student(
+        client, db, student_no="A100003", wx_code="wx_a100003"
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    def _broken_put_object(**_kwargs):
+        raise RuntimeError("object storage unavailable")
+
+    monkeypatch.setattr(report_service, "put_object", _broken_put_object)
+
+    upload = await client.post(
+        "/api/v1/report/transcript-pdf",
+        headers=headers,
+        files={"file": ("transcript.pdf", b"%PDF-1.4\n%%EOF", "application/pdf")},
+    )
+    assert upload.status_code == 500, upload.text
+    payload = upload.json()
+    assert payload["code"] == 50072
+    assert "成绩单 PDF 上传失败" in payload["message"]
+
+    batch_rows = (
+        await db.execute(
+            select(ImportBatch).where(
+                ImportBatch.import_type == IMPORT_TYPE_TRANSCRIPT_PDF_REVIEW
+            )
+        )
+    ).scalars().all()
+    assert batch_rows == []
     records = (
         await db.execute(
             select(StudentCourseRecord).where(

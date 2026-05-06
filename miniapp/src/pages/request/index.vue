@@ -102,7 +102,22 @@
       <text class="create-arrow">›</text>
     </view>
 
-    <view v-if="requests.length" class="list">
+    <InlineStateNotice
+      v-if="pageError"
+      :tone="requests.length ? 'warning' : 'error'"
+      :title="requests.length ? '申请列表未完全更新' : '申请列表加载失败'"
+      :description="requests.length ? `${pageError}，当前保留上次加载结果。` : `${pageError}，可点击重试重新同步。`"
+      action-text="重试"
+      @action="reload"
+    />
+
+    <view v-if="loading && !requests.length" class="empty-panel">
+      <text class="empty-icon">…</text>
+      <text class="empty-title">申请列表加载中</text>
+      <text class="empty-desc">正在同步你的申请记录，请稍候。</text>
+    </view>
+
+    <view v-else-if="requests.length" class="list">
       <view
         v-for="request in requests"
         :key="request.id"
@@ -156,7 +171,7 @@
       </view>
     </view>
 
-    <view v-else-if="!loading" class="empty-panel">
+    <view v-else-if="!loading && !pageError" class="empty-panel">
       <text class="empty-icon">🗂</text>
       <text class="empty-title">当前筛选下暂无申请记录</text>
       <text class="empty-desc">可切换状态筛选，或直接发起新的事务申请。</text>
@@ -168,11 +183,13 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { onPullDownRefresh, onShow } from "@dcloudio/uni-app";
+import InlineStateNotice from "@/components/InlineStateNotice.vue";
 import {
   getMyRequests,
   getRequestStatusLabel,
   type RequestBrief,
 } from "@/api/workflow";
+import { getErrorMessage } from "@/utils/error";
 import { openMiniappPage } from "@/utils/navigation";
 
 const STATUS_TABS = [
@@ -187,6 +204,9 @@ const STATUS_TABS = [
 const tab = ref("");
 const requests = ref<RequestBrief[]>([]);
 const loading = ref(false);
+const pageError = ref("");
+const hasLoaded = ref(false);
+const lastLoadedTab = ref("");
 
 const activeTabLabel = computed(
   () => STATUS_TABS.find((item) => item.value === tab.value)?.label || "全部",
@@ -274,6 +294,7 @@ function formatDateTime(value?: string | null) {
 async function reload() {
   loading.value = true;
   try {
+    pageError.value = "";
     const statusParam = tab.value.includes(",") ? undefined : tab.value || undefined;
     const response = await getMyRequests({ status: statusParam, page: 1, size: 20 });
     let items = response.data.items;
@@ -282,9 +303,13 @@ async function reload() {
       items = items.filter((item) => allowed.has(item.status));
     }
     requests.value = items;
-  } catch {
-    requests.value = [];
-    uni.showToast({ title: "申请列表加载失败", icon: "none" });
+    hasLoaded.value = true;
+    lastLoadedTab.value = tab.value;
+  } catch (error) {
+    pageError.value = getErrorMessage(error, "申请列表加载失败");
+    if (!hasLoaded.value || lastLoadedTab.value !== tab.value) {
+      requests.value = [];
+    }
   } finally {
     loading.value = false;
   }

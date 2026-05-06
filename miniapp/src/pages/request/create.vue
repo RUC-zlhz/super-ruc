@@ -34,6 +34,15 @@
           <text class="panel-meta">{{ loadingTypes ? "加载中" : `${types.length} 类` }}</text>
         </view>
 
+        <InlineStateNotice
+          v-if="showPresetFallbackNotice"
+          class="preset-notice"
+          tone="warning"
+          compact
+          title="未找到预设事务类型"
+          :description="presetFallbackDescription"
+        />
+
         <view v-if="loadingTypes" class="empty">加载中...</view>
 
         <view v-else class="type-grid">
@@ -65,6 +74,14 @@
     </view>
 
     <view v-else class="form-wrap">
+      <InlineStateNotice
+        v-if="showPresetMatchedNotice"
+        tone="info"
+        compact
+        title="已按快捷入口为你预选事务类型"
+        :description="presetMatchedDescription"
+      />
+
       <view class="hero-card form-hero">
         <view class="hero-orb hero-orb-left" />
         <view class="hero-orb hero-orb-right" />
@@ -308,6 +325,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import InlineStateNotice from "@/components/InlineStateNotice.vue";
 import DynamicForm from "@/components/DynamicForm.vue";
 import {
   createRequest,
@@ -337,6 +355,10 @@ const draftId = ref<number | null>(null);
 const draftStatus = ref<RequestStatus | null>(null);
 const draftDetail = ref<RequestDetail | null>(null);
 const routeRequestId = ref<number | null>(null);
+const presetCategory = ref<string | null>(null);
+const presetTypeCode = ref<string | null>(null);
+const presetMatchedTypeName = ref("");
+const presetFallbackTarget = ref("");
 
 const dynamicFormRef = ref<InstanceType<typeof DynamicForm> | null>(null);
 const saving = ref(false);
@@ -450,6 +472,21 @@ const submitDialogRows = computed(() => [
     value: formErrors.value.length ? `${formErrors.value.length} 项` : "无",
   },
 ]);
+const showPresetMatchedNotice = computed(
+  () => !!activeType.value && !!presetMatchedTypeName.value,
+);
+const presetMatchedDescription = computed(
+  () => `${presetMatchedTypeName.value} 已自动展开，你可以直接填写申请内容。`,
+);
+const showPresetFallbackNotice = computed(
+  () =>
+    !activeType.value &&
+    !loadingTypes.value &&
+    !!presetFallbackTarget.value,
+);
+const presetFallbackDescription = computed(() =>
+  `${presetFallbackTarget.value} 当前未配置可直接命中的事务类型，已为你展开全部可选事务。`,
+);
 
 function categoryLabel(category: string) {
   return getRequestCategoryLabel(category);
@@ -489,6 +526,19 @@ function resetDraftState() {
   draftStatus.value = null;
   draftDetail.value = null;
   formErrors.value = [];
+}
+
+function normalizeRouteParam(value: unknown) {
+  if (typeof value !== "string") return null;
+  const normalized = decodeURIComponent(value).trim();
+  return normalized ? normalized.toUpperCase() : null;
+}
+
+function clearRoutePreset() {
+  presetCategory.value = null;
+  presetTypeCode.value = null;
+  presetMatchedTypeName.value = "";
+  presetFallbackTarget.value = "";
 }
 
 function setFormErrors(errors: string[]) {
@@ -536,13 +586,39 @@ async function loadEditableDraft(id: number) {
 function onPickType(type: RequestType) {
   resetDraftState();
   routeRequestId.value = null;
+  clearRoutePreset();
   activeType.value = type;
 }
 
 function onReset() {
   resetDraftState();
   routeRequestId.value = null;
+  clearRoutePreset();
   activeType.value = null;
+}
+
+function applyPresetType() {
+  const typeCode = presetTypeCode.value;
+  const category = presetCategory.value;
+  if (!typeCode && !category) return;
+
+  const exactMatch = typeCode
+    ? types.value.find((item) => item.code.toUpperCase() === typeCode)
+    : null;
+  const fallbackMatch = category
+    ? types.value.find((item) => item.category.toUpperCase() === category)
+    : null;
+  const matched = exactMatch || fallbackMatch || null;
+
+  if (matched) {
+    presetMatchedTypeName.value = matched.name;
+    presetFallbackTarget.value = "";
+    activeType.value = matched;
+    return;
+  }
+
+  presetMatchedTypeName.value = "";
+  presetFallbackTarget.value = typeCode || category || "";
 }
 
 function validateForm() {
@@ -689,11 +765,16 @@ onMounted(async () => {
   const current = pages[pages.length - 1] as any;
   const options = current?.options || {};
   routeRequestId.value = options.id ? Number(options.id) : null;
+  presetCategory.value = normalizeRouteParam(options.category);
+  presetTypeCode.value = normalizeRouteParam(options.type_code);
 
   await loadTypes();
   if (routeRequestId.value != null && Number.isFinite(routeRequestId.value)) {
     await loadEditableDraft(routeRequestId.value);
+    clearRoutePreset();
+    return;
   }
+  applyPresetType();
 });
 </script>
 
@@ -902,6 +983,10 @@ onMounted(async () => {
 .section-block,
 .notice-card {
   padding: 24rpx;
+}
+
+.preset-notice {
+  margin-bottom: 18rpx;
 }
 
 .panel-head,

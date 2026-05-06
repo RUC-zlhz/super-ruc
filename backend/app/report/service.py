@@ -11,6 +11,7 @@ FR-016：
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 import uuid
 from datetime import UTC, datetime
@@ -68,10 +69,13 @@ from app.workflow.models import (
     WorkflowTemplate,
 )
 
+logger = logging.getLogger(__name__)
+
 # ============================================================
 # FR-014 学业缺口
 # ============================================================
 _TRANSCRIPT_PDF_MAX_BYTES = 10 * 1024 * 1024
+_TERM_CODE_PATTERN = re.compile(r"(\d{4})-(SPRING|SUMMER|FALL|WINTER)")
 
 
 def _generate_transcript_pdf_batch_no() -> str:
@@ -87,6 +91,20 @@ def _safe_filename(filename: str | None) -> str:
     if not value.lower().endswith(".pdf"):
         value = f"{value}.pdf"
     return value[:180]
+
+
+def _normalize_term_code(term_code: str | None) -> str | None:
+    if term_code is None:
+        return None
+    normalized = term_code.strip().upper()
+    if not normalized or not _TERM_CODE_PATTERN.fullmatch(normalized):
+        raise BizError(
+            "term_code 格式必须为 YYYY-SPRING|SUMMER|FALL|WINTER",
+            code=42210,
+            http_status=422,
+            data={"term_code": term_code},
+        )
+    return normalized
 
 
 async def upload_transcript_pdf_for_review(
@@ -121,13 +139,17 @@ async def upload_transcript_pdf_for_review(
     checksum = hashlib.sha256(content).hexdigest()
     object_bucket = settings.MINIO_BUCKET_ATTACHMENT
     object_key = f"transcripts/pdf-review/{student.id}/{uuid.uuid4().hex}_{safe_name}"
-    put_object(
-        bucket=object_bucket,
-        object_key=object_key,
-        data=content,
-        length=len(content),
-        content_type=content_type or "application/pdf",
-    )
+    try:
+        put_object(
+            bucket=object_bucket,
+            object_key=object_key,
+            data=content,
+            length=len(content),
+            content_type=content_type or "application/pdf",
+        )
+    except Exception as e:
+        logger.exception("Transcript PDF object storage upload failed")
+        raise BizError("成绩单 PDF 上传失败，请稍后重试或联系管理员", code=50072, http_status=500) from e
 
     analysis = analyze_transcript_pdf(
         content,
@@ -494,11 +516,11 @@ async def list_academic_gap_overview(
 # FR-016 运营看板
 # ============================================================
 def _term_code_date_range(term_code: str | None) -> tuple[datetime, datetime] | None:
-    if not term_code:
+    normalized = _normalize_term_code(term_code)
+    if normalized is None:
         return None
-    match = re.fullmatch(r"(\d{4})-(SPRING|SUMMER|FALL|WINTER)", term_code.upper())
-    if not match:
-        return None
+    match = _TERM_CODE_PATTERN.fullmatch(normalized)
+    assert match is not None
     year = int(match.group(1))
     season = match.group(2)
     ranges = {
@@ -516,7 +538,8 @@ def _term_code_date_range(term_code: str | None) -> tuple[datetime, datetime] | 
 
 
 async def build_overview(db: AsyncSession, *, term_code: str | None = None) -> OverviewResult:
-    term_range = _term_code_date_range(term_code)
+    normalized_term_code = _normalize_term_code(term_code)
+    term_range = _term_code_date_range(normalized_term_code)
     # --- requests 按类型 × 状态聚合 ---
     stmt = (
         select(
@@ -651,7 +674,7 @@ async def build_overview(db: AsyncSession, *, term_code: str | None = None) -> O
     ]
 
     return OverviewResult(
-        term_code=term_code,
+        term_code=normalized_term_code,
         metrics=metrics,
         requests=requests_summary,
         notices=notices_summary,

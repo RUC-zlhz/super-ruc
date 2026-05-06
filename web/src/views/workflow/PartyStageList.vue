@@ -25,6 +25,8 @@
           :columns="templateCols"
           :data-source="templates"
           :loading="tplLoading"
+          :custom-row="templateRowProps"
+          :row-class-name="templateRowClassName"
           row-key="id"
         >
           <template #bodyCell="{ column, record }">
@@ -82,89 +84,96 @@
           class="mb16"
           type="info"
           show-icon
-          message="提醒记录由后端按待办节点实时生成；当前页面保留手动生成入口和最近生成结果。"
+          message="提醒规则查询接口暂未接通；当前页面仅保留手动生成入口和最近一次生成结果。"
         />
         <a-button type="primary" :loading="reminderLoading" @click="generateReminders">
           <template #icon><BellOutlined /></template>
           生成待办提醒
         </a-button>
-        <a-table
-          class="mt16"
-          :columns="reminderCols"
-          :data-source="reminders"
-          :loading="reminderLoading"
-          row-key="id"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'is_active'">
-              <a-tag :color="record.is_active ? 'blue' : 'default'">
-                {{ record.is_active ? '启用' : '停用' }}
-              </a-tag>
-            </template>
+        <a-card class="mt16" title="最近一次生成结果" :bordered="false">
+          <template v-if="lastReminderRun">
+            <div class="reminder-result-grid">
+              <div>
+                <span>生成条数</span>
+                <strong>{{ lastReminderRun.created }}</strong>
+              </div>
+              <div>
+                <span>渠道</span>
+                <strong>{{ lastReminderRun.channel }}</strong>
+              </div>
+              <div>
+                <span>生成时间</span>
+                <strong>{{ lastReminderRun.generatedAt }}</strong>
+              </div>
+            </div>
           </template>
-        </a-table>
+          <a-empty v-else description="尚未执行手动提醒生成" />
+        </a-card>
       </a-tab-pane>
     </a-tabs>
 
     <aside class="stage-side-panel">
       <div class="side-panel-head">
         <strong>流程配置面板</strong>
-        <span>×</span>
+        <a-button type="text" size="small" :disabled="!selectedTemplatePreview" @click="clearSelectedTemplate">
+          <template #icon><CloseOutlined /></template>
+        </a-button>
       </div>
-
-      <div class="stage-type-card">
-        <BranchesOutlined />
-        <div>
-          <p>当前模板</p>
-          <h3>{{ selectedTemplatePreview?.name || '暂无模板' }}</h3>
-          <span>{{ selectedTemplatePreview?.code || '请先新建或选择流程模板' }}</span>
-        </div>
-      </div>
-
-      <section class="side-section">
-        <h3>流程概览</h3>
-        <div class="stage-progress-row">
-          <span>模板状态</span>
-          <a-tag :color="selectedTemplatePreview?.is_active ? 'green' : 'default'">
-            {{ selectedTemplatePreview?.is_active ? '生效' : '未生效' }}
-          </a-tag>
-        </div>
-        <div class="stage-progress-row">
-          <span>学生流程</span>
-          <strong>{{ flowPagination.total || flows.length }}</strong>
-        </div>
-        <div class="stage-progress-row">
-          <span>提醒规则</span>
-          <strong>{{ reminders.length }}</strong>
-        </div>
-      </section>
-
-      <section class="side-section">
-        <h3>节点预览</h3>
-        <div v-if="nodes.length" class="node-timeline">
-          <div v-for="node in nodes.slice(0, 5)" :key="node.id">
-            <i />
-            <span>{{ node.name }}</span>
-            <em>{{ node.due_rule_days || 0 }} 天</em>
+      <template v-if="selectedTemplatePreview">
+        <div class="stage-type-card">
+          <BranchesOutlined />
+          <div>
+            <p>当前模板</p>
+            <h3>{{ selectedTemplatePreview.name }}</h3>
+            <span>{{ selectedTemplatePreview.code }}</span>
           </div>
         </div>
-        <p v-else class="side-muted">点击“查看节点”后展示模板节点结构。</p>
-      </section>
 
-      <div class="side-actions vertical">
-          <a-button @click="showTemplateDrawer = true">
-            <template #icon><PlusOutlined /></template>
-            新建模板
-          </a-button>
-          <a-button
-            type="primary"
-            :disabled="!selectedTemplatePreview"
-            @click="selectedTemplatePreview && viewNodes(selectedTemplatePreview)"
-          >
-            <template #icon><EyeOutlined /></template>
-            查看节点
-          </a-button>
-        </div>
+        <section class="side-section">
+          <h3>流程概览</h3>
+          <div class="stage-progress-row">
+            <span>模板状态</span>
+            <a-tag :color="selectedTemplatePreview.is_active ? 'green' : 'default'">
+              {{ selectedTemplatePreview.is_active ? '生效' : '未生效' }}
+            </a-tag>
+          </div>
+          <div class="stage-progress-row">
+            <span>学生流程</span>
+            <strong>{{ flowPagination.total || flows.length }}</strong>
+          </div>
+          <div class="stage-progress-row">
+            <span>最近提醒生成</span>
+            <strong>{{ lastReminderRun?.created ?? 0 }}</strong>
+          </div>
+        </section>
+
+        <section class="side-section">
+          <h3>节点预览</h3>
+          <div v-if="nodes.length" class="node-timeline">
+            <div v-for="node in nodes.slice(0, 5)" :key="node.id">
+              <i />
+              <span>{{ node.name }}</span>
+              <em>{{ node.due_rule_days || 0 }} 天</em>
+            </div>
+          </div>
+          <p v-else class="side-muted">当前模板暂无节点配置。</p>
+        </section>
+
+        <div class="side-actions vertical">
+            <a-button @click="showTemplateDrawer = true">
+              <template #icon><PlusOutlined /></template>
+              新建模板
+            </a-button>
+            <a-button
+              type="primary"
+              @click="viewNodes(selectedTemplatePreview)"
+            >
+              <template #icon><EyeOutlined /></template>
+              查看节点
+            </a-button>
+          </div>
+      </template>
+      <a-empty v-else description="请选择记录" />
     </aside>
 
     <!-- 模板新建/编辑抽屉 -->
@@ -198,7 +207,7 @@
     <!-- 节点列表 Modal -->
     <a-modal
       v-model:open="showNodesModal"
-      :title="`流程节点 — ${selectedTemplate?.name || ''}`"
+      :title="`流程节点 — ${selectedTemplatePreview?.name || ''}`"
       width="720"
       :footer="null"
     >
@@ -221,6 +230,7 @@ import { message } from 'ant-design-vue'
 import {
   BellOutlined,
   BranchesOutlined,
+  CloseOutlined,
   NodeIndexOutlined,
   TeamOutlined,
   SearchOutlined,
@@ -234,7 +244,11 @@ import type { Paginated } from '@/api/types'
 import StatusTag from '@/components/StatusTag.vue'
 
 const activeTab = ref('templates')
-const selectedTemplatePreview = computed(() => selectedTemplate.value || templates.value[0] || null)
+const selectedTemplateId = ref<number | null>(null)
+const selectedTemplatePreview = computed(() => {
+  if (selectedTemplateId.value == null) return null
+  return templates.value.find((item) => item.id === selectedTemplateId.value) ?? null
+})
 const metrics = computed(() => [
   {
     key: 'templates',
@@ -247,7 +261,7 @@ const metrics = computed(() => [
     key: 'nodes',
     label: '节点总数',
     value: nodes.value.length,
-    sub: selectedTemplate.value ? selectedTemplate.value.name : '最近查看模板',
+    sub: selectedTemplatePreview.value ? selectedTemplatePreview.value.name : '请先选择模板',
     icon: NodeIndexOutlined,
   },
   {
@@ -259,9 +273,9 @@ const metrics = computed(() => [
   },
   {
     key: 'reminders',
-    label: '提醒规则数',
-    value: reminders.value.length,
-    sub: '节点提醒配置',
+    label: '最近提醒生成',
+    value: lastReminderRun.value?.created ?? 0,
+    sub: lastReminderRun.value ? `最近生成于 ${lastReminderRun.value.generatedAt}` : '尚未执行手动提醒生成',
     icon: BellOutlined,
   },
 ])
@@ -307,19 +321,44 @@ const templateCols = [
   { title: '操作', key: 'actions', width: 100 },
 ]
 const templates = ref<WorkflowTemplate[]>([])
+const nodes = computed(() => {
+  const current = selectedTemplatePreview.value?.nodes ?? []
+  return [...current].sort((a, b) => a.sort_order - b.sort_order)
+})
 const tplLoading = ref(false)
+const lastReminderRun = ref<{ created: number; generatedAt: string; channel: string } | null>(null)
 
 async function loadTemplates() {
   tplLoading.value = true
   try {
     const resp = await get<ApiEnvelope<WorkflowTemplate[]>>('/admin/workflow/templates')
     templates.value = resp.data
-    if (!selectedTemplate.value && templates.value[0]) {
-      viewNodes(templates.value[0], false)
+    if (selectedTemplateId.value != null && !templates.value.some((item) => item.id === selectedTemplateId.value)) {
+      clearSelectedTemplate()
     }
   } finally {
     tplLoading.value = false
   }
+}
+
+function clearSelectedTemplate() {
+  selectedTemplateId.value = null
+  showNodesModal.value = false
+}
+
+function templateRowProps(record: WorkflowTemplate) {
+  return {
+    class: 'selectable-template-row',
+    onClick: () => {
+      selectedTemplateId.value = record.id
+    },
+  }
+}
+
+function templateRowClassName(record: WorkflowTemplate) {
+  return record.id === selectedTemplateId.value
+    ? 'selectable-template-row selected-template-row'
+    : 'selectable-template-row'
 }
 
 const showTemplateDrawer = ref(false)
@@ -346,13 +385,10 @@ const nodeCols = [
   { title: '状态', key: 'is_active', width: 80 },
 ]
 const showNodesModal = ref(false)
-const selectedTemplate = ref<WorkflowTemplate | null>(null)
-const nodes = ref<WorkflowNode[]>([])
 
 function viewNodes(tpl: WorkflowTemplate | Record<string, any>, openModal = true) {
   const normalized = tpl as WorkflowTemplate
-  selectedTemplate.value = normalized
-  nodes.value = [...(normalized.nodes || [])].sort((a, b) => a.sort_order - b.sort_order)
+  selectedTemplateId.value = normalized.id
   showNodesModal.value = openModal
 }
 
@@ -397,13 +433,6 @@ function onFlowTableChange(p: any) {
 }
 
 // ---------- 提醒 ----------
-const reminderCols = [
-  { title: '结果', dataIndex: 'name', key: 'name' },
-  { title: '渠道', dataIndex: 'channel', key: 'channel', width: 120 },
-  { title: '生成数', dataIndex: 'created', key: 'created', width: 100 },
-  { title: '状态', key: 'is_active', width: 80 },
-]
-const reminders = ref<{ id: number; name: string; channel: string; created: number; is_active: boolean }[]>([])
 const reminderLoading = ref(false)
 
 async function generateReminders() {
@@ -412,13 +441,11 @@ async function generateReminders() {
     const resp = await post<ApiEnvelope<{ created: number }>>('/admin/workflow/reminders/generate', {
       channel: 'IN_APP',
     })
-    reminders.value = [{
-      id: Date.now(),
-      name: '最近一次待办提醒生成',
-      channel: 'IN_APP',
+    lastReminderRun.value = {
       created: resp.data.created,
-      is_active: true,
-    }]
+      channel: 'IN_APP',
+      generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+    }
     message.success(`已生成 ${resp.data.created} 条提醒`)
   } finally {
     reminderLoading.value = false

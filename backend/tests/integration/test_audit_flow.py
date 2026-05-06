@@ -7,7 +7,9 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit import repository as audit_repo
 from app.audit.models import AuditLog, AuditLogHistory
+from app.audit.policies import CONTACT, resolve_field_policy
 from app.auth.models import User, UserRole
 from app.core.security import create_token
 
@@ -266,3 +268,25 @@ async def test_role_policies_endpoint_requires_super_admin_and_supports_filter(
     assert items
     assert {item["role_code"] for item in items} == {"COUNSELOR"}
     assert {"can_read", "can_write", "mask_strategy"}.issubset(items[0])
+
+
+async def test_class_cadre_alias_resolves_to_class_monitor_policies(
+    db: AsyncSession,
+) -> None:
+    legacy_decision = await resolve_field_policy(
+        db,
+        ["CLASS_CADRE"],
+        entity_code=CONTACT,
+        field_name="email",
+    )
+    canonical_decision = await resolve_field_policy(
+        db,
+        ["CLASS_MONITOR"],
+        entity_code=CONTACT,
+        field_name="email",
+    )
+    assert legacy_decision == canonical_decision
+
+    items = await audit_repo.list_role_policies(db, role_code="CLASS_CADRE")
+    assert items
+    assert {item["role_code"] for item in items} == {"CLASS_MONITOR"}

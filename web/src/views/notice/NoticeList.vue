@@ -41,6 +41,8 @@
       :data-source="rows"
       :loading="loading"
       :pagination="pagination"
+      :custom-row="noticeRowProps"
+      :row-class-name="noticeRowClassName"
       row-key="id"
       @change="onTableChange"
     >
@@ -116,7 +118,9 @@
     <aside class="notice-side-panel">
       <div class="side-panel-head">
         <strong>通知编辑器</strong>
-        <span>×</span>
+        <a-button type="text" size="small" :disabled="!selectedNotice" @click="clearSelectedNotice">
+          <template #icon><CloseOutlined /></template>
+        </a-button>
       </div>
 
       <div class="side-mini-stats">
@@ -127,57 +131,101 @@
         </div>
       </div>
 
-      <template v-if="primaryNotice">
-        <section class="side-section notice-preview">
-          <div>
-            <p>当前选中通知</p>
-            <h3>{{ primaryNotice.title }}</h3>
-          </div>
-          <a-tag :color="statusColor(primaryNotice.status)">{{ primaryNotice.status }}</a-tag>
-        </section>
+      <template v-if="selectedNotice">
+        <a-spin :spinning="selectedNoticeLoading || selectedNoticeBatchesLoading">
+          <section class="side-section notice-preview">
+            <div>
+              <p>当前选中通知</p>
+              <h3>{{ selectedNotice.title }}</h3>
+            </div>
+            <a-tag :color="statusColor(selectedNotice.status)">{{ selectedNotice.status }}</a-tag>
+          </section>
 
-        <section class="side-section">
-          <h3>发布信息</h3>
-          <div class="side-kv">
-            <span>分类</span>
-            <strong>{{ primaryNotice.category || '-' }}</strong>
-          </div>
-          <div class="side-kv">
-            <span>更新时间</span>
-            <strong>{{ formatDateTime(primaryNotice.updated_at) }}</strong>
-          </div>
-          <div class="tag-strip">
-            <a-tag v-for="tag in primaryNotice.tags" :key="tag">{{ tag }}</a-tag>
-            <span v-if="!primaryNotice.tags.length" class="muted">暂无标签</span>
-          </div>
-        </section>
+          <section class="side-section">
+            <h3>发布信息</h3>
+            <div class="side-kv">
+              <span>分类</span>
+              <strong>{{ selectedNotice.category || '-' }}</strong>
+            </div>
+            <div class="side-kv">
+              <span>更新时间</span>
+              <strong>{{ formatDateTime(selectedNotice.updated_at) }}</strong>
+            </div>
+            <div class="side-kv">
+              <span>来源</span>
+              <strong>{{ selectedNoticeDetail ? sourceLabel(selectedNoticeDetail.source_type) : '-' }}</strong>
+            </div>
+            <div class="side-kv">
+              <span>渠道</span>
+              <strong>{{ selectedNoticeChannelsLabel }}</strong>
+            </div>
+            <div class="tag-strip">
+              <a-tag v-for="tag in selectedNotice.tags" :key="tag">{{ tag }}</a-tag>
+              <span v-if="!selectedNotice.tags.length" class="muted">暂无标签</span>
+            </div>
+          </section>
 
-        <section class="side-section">
-          <h3>投递闭环</h3>
-          <div class="delivery-ring" :style="{ '--notice-progress': `${noticeProgress}%` }">
-            <div>{{ noticeProgress }}%</div>
-          </div>
-          <p class="side-muted">
-            依据当前筛选页状态估算发布完成度；批次与投递明细仍通过原有“批次 / 投递明细”抽屉查看。
-          </p>
-        </section>
+          <section class="side-section">
+            <h3>投递闭环</h3>
+            <template v-if="selectedNotice.status === 'DRAFT'">
+              <p class="side-muted">草稿通知尚未产生发送批次。</p>
+            </template>
+            <template v-else-if="latestSelectedBatch">
+              <div class="delivery-summary-grid">
+                <div>
+                  <span>目标人数</span>
+                  <strong>{{ latestSelectedBatch.target_count }}</strong>
+                </div>
+                <div>
+                  <span>成功送达</span>
+                  <strong>{{ latestSelectedBatch.success_count }}</strong>
+                </div>
+                <div>
+                  <span>失败数</span>
+                  <strong>{{ latestSelectedBatch.failed_count }}</strong>
+                </div>
+              </div>
+              <p class="side-muted">
+                最近批次：{{ latestSelectedBatch.batch_no }} · {{ formatDateTime(latestSelectedBatch.started_at) }}
+              </p>
+            </template>
+            <p v-else class="side-muted">当前通知暂无发送批次，请通过“发送通知”创建首个投递批次。</p>
+          </section>
 
-        <div class="side-actions">
-          <a-button @click="openEditor(primaryNotice)">
-            <template #icon><EditOutlined /></template>
-            编辑内容
-          </a-button>
-          <a-button
-            type="primary"
-            :disabled="primaryNotice.status !== 'PUBLISHED'"
-            @click="openDispatch(primaryNotice)"
-          >
-            <template #icon><SendOutlined /></template>
-            发送通知
-          </a-button>
-        </div>
+          <section class="side-section">
+            <h3>触达范围</h3>
+            <p>{{ selectedNoticeDetail?.target_summary || '全体在读学生' }}</p>
+          </section>
+
+          <div class="side-actions">
+            <a-button @click="openEditor(selectedNotice)">
+              <template #icon><EditOutlined /></template>
+              编辑内容
+            </a-button>
+            <a-button
+              type="primary"
+              :disabled="selectedNotice.status !== 'PUBLISHED'"
+              @click="openDispatch(selectedNotice)"
+            >
+              <template #icon><SendOutlined /></template>
+              发送通知
+            </a-button>
+            <a-button :disabled="selectedNotice.status === 'DRAFT'" @click="openBatches(selectedNotice)">
+              <template #icon><FolderOpenOutlined /></template>
+              查看批次
+            </a-button>
+            <a-button
+              danger
+              :disabled="selectedNotice.status !== 'PUBLISHED'"
+              @click="onArchive(selectedNotice.id)"
+            >
+              <template #icon><InboxOutlined /></template>
+              归档通知
+            </a-button>
+          </div>
+        </a-spin>
       </template>
-      <a-empty v-else description="暂无通知可预览" />
+      <a-empty v-else description="请选择记录" />
     </aside>
 
     <a-drawer
@@ -980,11 +1028,21 @@ const filters = reactive<{ q?: string; status?: NoticeStatus }>({})
 const rows = ref<NoticeBrief[]>([])
 const loading = ref(false)
 const pagination = reactive({ current: 1, pageSize: 20, total: 0 })
-const primaryNotice = computed(() => rows.value[0] ?? null)
-const noticeProgress = computed(() => {
-  if (!rows.value.length) return 0
-  const done = rows.value.filter((item) => item.status === 'PUBLISHED' || item.status === 'ARCHIVED').length
-  return Math.round((done / rows.value.length) * 100)
+const selectedNoticeId = ref<number | null>(null)
+const selectedNotice = computed(() => {
+  if (selectedNoticeId.value == null) return null
+  return rows.value.find((item) => item.id === selectedNoticeId.value) ?? null
+})
+const selectedNoticeLoading = ref(false)
+const selectedNoticeDetail = ref<NoticeOut | null>(null)
+const selectedNoticeBatchesLoading = ref(false)
+const selectedNoticeBatches = ref<NoticeBatch[]>([])
+const batchCache = new Map<number, NoticeBatch[]>()
+const latestSelectedBatch = computed(() => selectedNoticeBatches.value[0] ?? null)
+const selectedNoticeChannelsLabel = computed(() => {
+  if (!selectedNoticeDetail.value) return '-'
+  const labels = parseChannels(selectedNoticeDetail.value.channels).map((item) => channelLabel(item))
+  return labels.length ? labels.join(' / ') : '-'
 })
 
 const metrics = computed(() => [
@@ -1029,6 +1087,7 @@ async function reload() {
     })
     rows.value = resp.data.items
     pagination.total = resp.data.meta.total
+    syncSelectedNotice()
   } finally {
     loading.value = false
   }
@@ -1043,6 +1102,97 @@ function onTableChange(p: { current?: number; pageSize?: number }) {
   pagination.current = p.current ?? pagination.current
   pagination.pageSize = p.pageSize ?? pagination.pageSize
   reload()
+}
+
+function clearSelectedNotice() {
+  selectedNoticeId.value = null
+  selectedNoticeDetail.value = null
+  selectedNoticeBatches.value = []
+  selectedNoticeLoading.value = false
+  selectedNoticeBatchesLoading.value = false
+}
+
+async function loadSelectedNoticeDetail(id: number, force = false) {
+  selectedNoticeLoading.value = true
+  try {
+    const detail = await loadNoticeDetail(id, force)
+    if (selectedNoticeId.value === id) {
+      selectedNoticeDetail.value = detail
+    }
+  } catch {
+    if (selectedNoticeId.value === id) {
+      selectedNoticeDetail.value = null
+    }
+  } finally {
+    if (selectedNoticeId.value === id) {
+      selectedNoticeLoading.value = false
+    }
+  }
+}
+
+async function loadSelectedNoticeBatches(id: number, status: NoticeStatus, force = false) {
+  if (status === 'DRAFT') {
+    selectedNoticeBatchesLoading.value = false
+    selectedNoticeBatches.value = []
+    return
+  }
+  if (!force && batchCache.has(id)) {
+    selectedNoticeBatchesLoading.value = false
+    selectedNoticeBatches.value = batchCache.get(id) ?? []
+    return
+  }
+  selectedNoticeBatchesLoading.value = true
+  try {
+    const resp = await listNoticeBatches(id)
+    const items = sortBatches(resp.data)
+    batchCache.set(id, items)
+    if (selectedNoticeId.value === id) {
+      selectedNoticeBatches.value = items
+    }
+  } catch {
+    if (selectedNoticeId.value === id) {
+      selectedNoticeBatches.value = []
+    }
+  } finally {
+    if (selectedNoticeId.value === id) {
+      selectedNoticeBatchesLoading.value = false
+    }
+  }
+}
+
+async function selectNotice(record: NoticeBrief, force = false) {
+  selectedNoticeId.value = record.id
+  selectedNoticeDetail.value = force ? null : (detailCache.get(record.id) ?? null)
+  selectedNoticeBatches.value = force ? [] : (batchCache.get(record.id) ?? [])
+  await Promise.all([
+    loadSelectedNoticeDetail(record.id, force),
+    loadSelectedNoticeBatches(record.id, record.status, force),
+  ])
+}
+
+function syncSelectedNotice() {
+  if (selectedNoticeId.value == null) return
+  const current = rows.value.find((item) => item.id === selectedNoticeId.value)
+  if (!current) {
+    clearSelectedNotice()
+    return
+  }
+  void selectNotice(current, true)
+}
+
+function noticeRowProps(record: NoticeBrief) {
+  return {
+    class: 'selectable-notice-row',
+    onClick: () => {
+      void selectNotice(record)
+    },
+  }
+}
+
+function noticeRowClassName(record: NoticeBrief) {
+  return record.id === selectedNoticeId.value
+    ? 'selectable-notice-row selected-notice-row'
+    : 'selectable-notice-row'
 }
 
 const showDrawer = ref(false)
@@ -1067,12 +1217,16 @@ async function openEditor(record?: NoticeBrief) {
     return
   }
 
+  selectedNoticeId.value = record.id
   editingId.value = record.id
   drawerLoading.value = true
   try {
     const detail = await loadNoticeDetail(record.id)
     currentDetail.value = detail
     editorStatus.value = detail.status
+    if (selectedNoticeId.value === record.id) {
+      selectedNoticeDetail.value = detail
+    }
     assignForm(buildFormFromNotice(detail))
   } finally {
     drawerLoading.value = false
@@ -1128,6 +1282,7 @@ async function onSubmit() {
 async function onPublish(id: number) {
   const resp = await publishNotice(id)
   detailCache.set(resp.data.id, resp.data)
+  batchCache.delete(id)
   if (editingId.value === id) {
     currentDetail.value = resp.data
     editorStatus.value = resp.data.status
@@ -1139,6 +1294,7 @@ async function onPublish(id: number) {
 async function onArchive(id: number) {
   const resp = await archiveNotice(id)
   detailCache.set(resp.data.id, resp.data)
+  batchCache.delete(id)
   if (editingId.value === id) {
     currentDetail.value = resp.data
     editorStatus.value = resp.data.status
@@ -1158,6 +1314,7 @@ const dispatchModal = reactive({
 })
 
 async function openDispatch(record: NoticeBrief) {
+  selectedNoticeId.value = record.id
   dispatchModal.open = true
   dispatchModal.loading = true
   dispatchModal.noticeId = record.id
@@ -1221,6 +1378,7 @@ function sortBatches(items: NoticeBatch[]) {
 }
 
 async function openBatches(record: NoticeBrief) {
+  selectedNoticeId.value = record.id
   await openBatchesForNotice(record.id, record.title)
 }
 
@@ -1233,6 +1391,11 @@ async function openBatchesForNotice(id: number, title: string) {
     const [detail, batchesResp] = await Promise.all([loadNoticeDetail(id), listNoticeBatches(id)])
     batchesDrawer.notice = detail
     batchesDrawer.items = sortBatches(batchesResp.data)
+    batchCache.set(id, batchesDrawer.items)
+    if (selectedNoticeId.value === id) {
+      selectedNoticeDetail.value = detail
+      selectedNoticeBatches.value = batchesDrawer.items
+    }
   } finally {
     batchesDrawer.loading = false
   }
@@ -1404,9 +1567,8 @@ onMounted(reload)
   font-size: 16px;
 }
 
-.side-panel-head span {
+.side-panel-head :deep(.ant-btn) {
   color: var(--text-3);
-  font-size: 18px;
 }
 
 .side-mini-stats {
@@ -1495,6 +1657,35 @@ onMounted(reload)
   margin-top: 8px;
 }
 
+.delivery-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.delivery-summary-grid div {
+  padding: 10px;
+  background: #fff7f8;
+  border: 1px solid #ffe4e8;
+  border-radius: 10px;
+}
+
+.delivery-summary-grid span {
+  display: block;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.delivery-summary-grid strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--ruc-red);
+  font-family: var(--font-number);
+  font-size: 22px;
+  line-height: 1;
+}
+
 .delivery-ring {
   display: grid;
   width: 118px;
@@ -1515,11 +1706,22 @@ onMounted(reload)
 }
 
 .side-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
   margin-top: 16px;
 }
 
 .side-actions .ant-btn {
-  flex: 1;
+  width: 100%;
+}
+
+:deep(.selectable-notice-row > td) {
+  cursor: pointer;
+}
+
+:deep(.selected-notice-row > td) {
+  background: #fff4f5 !important;
 }
 
 @media (max-width: 1320px) {
@@ -1533,6 +1735,11 @@ onMounted(reload)
     margin-top: 14px;
     border: 1px solid var(--line-soft);
     border-radius: 12px;
+  }
+
+  .delivery-summary-grid,
+  .side-actions {
+    grid-template-columns: 1fr;
   }
 }
 </style>

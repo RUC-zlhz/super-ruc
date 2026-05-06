@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit.enforcement import audit_forbidden_and_raise
 from app.audit.service import build_audit_detail, log_action
 from app.auth.models import Student
+from app.auth.role_codes import ROLE_CODE_CLASS_MONITOR, normalize_role_codes
 from app.core.config import settings
 from app.core.exceptions import BizError, ConflictError, NotFoundError
 from app.core.storage import put_object
@@ -263,8 +264,8 @@ async def get_workflow_for_student(
     # 学生仅能查看本人；老师/管理员按角色已放行（路由层做）
     if viewer_student_id is not None and sw.student_id != viewer_student_id:
         allowed = {"SUPER_ADMIN", "COLLEGE_LEADER", "COUNSELOR", "HEAD_TEACHER",
-                   "YOUTH_LEAGUE_TEACHER", "PARTY_BUILD_TEACHER", "CLASS_CADRE"}
-        if not (set(viewer_roles) & allowed):
+                   "YOUTH_LEAGUE_TEACHER", "PARTY_BUILD_TEACHER", ROLE_CODE_CLASS_MONITOR}
+        if not (set(normalize_role_codes(viewer_roles)) & allowed):
             raise BizError("无权查看该流程", code=40301, http_status=403)
     return _workflow_to_detail(sw)
 
@@ -772,9 +773,11 @@ async def get_request_detail(
     # 学生仅能查看自己提交的，其他角色按路由层放行
     admin_roles = {
         "SUPER_ADMIN", "COLLEGE_LEADER", "COUNSELOR", "HEAD_TEACHER",
-        "YOUTH_LEAGUE_TEACHER", "PARTY_BUILD_TEACHER", "CLASS_CADRE",
+        "YOUTH_LEAGUE_TEACHER", "PARTY_BUILD_TEACHER", ROLE_CODE_CLASS_MONITOR,
     }
-    if req.applicant_user_id != viewer_user_id and not (set(viewer_roles) & admin_roles):
+    if req.applicant_user_id != viewer_user_id and not (
+        set(normalize_role_codes(viewer_roles)) & admin_roles
+    ):
         await audit_forbidden_and_raise(
             db,
             event_type="REQUEST",
@@ -810,8 +813,8 @@ async def get_request_detail(
 def _approver_has_role(rt, roles: list[str]) -> bool:
     if not rt or not rt.approver_roles:
         return True
-    allowed = {r.strip() for r in rt.approver_roles.split(",") if r.strip()}
-    return bool(set(roles) & allowed)
+    allowed = set(normalize_role_codes(rt.approver_roles.split(",")))
+    return bool(set(normalize_role_codes(roles)) & allowed)
 
 
 async def decide_request(

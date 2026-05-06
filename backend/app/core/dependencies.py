@@ -11,6 +11,7 @@ from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.role_codes import normalize_role_codes
 from app.core.database import get_db
 from app.core.exceptions import AuthError, PermissionError
 from app.core.security import decode_token
@@ -36,7 +37,7 @@ class CurrentUser:
         self.raw_claims = raw_claims
 
     def has_role(self, *required: str) -> bool:
-        return bool(set(self.roles) & set(required))
+        return bool(set(self.roles) & set(normalize_role_codes(required)))
 
     def __repr__(self) -> str:
         return f"CurrentUser(user_id={self.user_id}, roles={self.roles})"
@@ -58,7 +59,7 @@ async def get_current_user(
         user_id = int(claims["sub"])
     except (KeyError, ValueError) as e:
         raise AuthError("Token 主体缺失") from e
-    roles: list[str] = claims.get("roles", [])
+    roles = normalize_role_codes(claims.get("roles", []))
     student_id = claims.get("sid")
     cu = CurrentUser(
         user_id=user_id,

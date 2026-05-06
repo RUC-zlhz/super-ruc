@@ -10,7 +10,18 @@
       >{{ t.label }}</view>
     </view>
 
-    <view v-if="visibleNotices.length" class="list">
+    <InlineStateNotice
+      v-if="pageError"
+      :tone="notices.length ? 'warning' : 'error'"
+      :title="notices.length ? '通知列表未完全更新' : '通知列表加载失败'"
+      :description="notices.length ? `${pageError}，当前保留上次加载结果。` : `${pageError}，可点击重试重新同步。`"
+      action-text="重试"
+      @action="reload"
+    />
+
+    <view v-if="loading && !notices.length" class="empty">通知加载中...</view>
+
+    <view v-else-if="visibleNotices.length" class="list">
       <view
         v-for="n in visibleNotices"
         :key="noticeKey(n)"
@@ -41,7 +52,7 @@
       </view>
     </view>
 
-    <view v-else-if="!loading" class="empty">暂无通知</view>
+    <view v-else-if="!loading && !pageError" class="empty">暂无通知</view>
 
     <view v-if="hasMore" class="load-more" hover-class="hover-opacity" @tap="loadMore">加载更多</view>
     <view v-else-if="!loading && notices.length" class="load-end">没有更多了</view>
@@ -50,8 +61,11 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
+import InlineStateNotice from '@/components/InlineStateNotice.vue'
 import { getMyNotices, type StudentNoticeItem } from '@/api/notice'
+import { getErrorMessage } from '@/utils/error'
+import { openNoticeDetail } from '@/utils/navigation'
 
 type NoticeTab = 'all' | 'unread' | 'read'
 
@@ -74,6 +88,8 @@ const page = ref(1)
 const size = 20
 const total = ref(0)
 const loading = ref(false)
+const pageError = ref('')
+const hasLoaded = ref(false)
 const hasMore = computed(() => notices.value.length < total.value)
 
 function isUnread(notice: StudentNoticeItem) {
@@ -105,14 +121,25 @@ const visibleNotices = computed(() => {
   return notices.value
 })
 
-async function reload(reset = true) {
+async function reload(reset = true, targetPage = 1) {
   if (loading.value) return
-  if (reset) { page.value = 1; notices.value = [] }
   loading.value = true
   try {
-    const resp = await getMyNotices({ page: page.value, size })
+    pageError.value = ''
+    const resp = await getMyNotices({ page: targetPage, size })
     notices.value = reset ? resp.data.items : [...notices.value, ...resp.data.items]
     total.value = resp.data.meta?.total || notices.value.length
+    page.value = targetPage
+    hasLoaded.value = true
+  } catch (error) {
+    pageError.value = getErrorMessage(
+      error,
+      reset ? '通知列表加载失败' : '加载更多通知失败',
+    )
+    if (!hasLoaded.value && reset) {
+      notices.value = []
+      total.value = 0
+    }
   } finally {
     loading.value = false
   }
@@ -120,23 +147,30 @@ async function reload(reset = true) {
 
 function loadMore() {
   if (loading.value || !hasMore.value) return
-  page.value += 1
-  reload(false)
+  void reload(false, page.value + 1)
 }
 
 function onTab(v: NoticeTab) {
   tab.value = v
 }
 
-function onDetail(notice: StudentNoticeItem) {
-  const query = [`noticeId=${notice.id}`]
-  if (notice.delivery_id != null) {
-    query.push(`deliveryId=${notice.delivery_id}`)
+async function onDetail(notice: StudentNoticeItem) {
+  try {
+    await openNoticeDetail(notice.id, notice.delivery_id)
+  } catch {
+    uni.showToast({ title: '通知打开失败', icon: 'none' })
   }
-  uni.navigateTo({ url: `/pages/notice/detail?${query.join('&')}` })
 }
 
 onShow(() => reload())
+
+onPullDownRefresh(async () => {
+  try {
+    await reload()
+  } finally {
+    uni.stopPullDownRefresh()
+  }
+})
 </script>
 
 <style scoped>

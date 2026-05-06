@@ -104,17 +104,20 @@
               <a-empty v-else description="overview 暂无事务申请分布" />
             </a-card>
 
-            <a-card title="通知触达概况" :bordered="false" class="visual-card trend-card">
+            <a-card title="通知触达概况" :bordered="false" class="visual-card notice-card">
               <template v-if="dashboard.noticeDelivery.length">
-                <svg class="trend-svg" viewBox="0 0 320 150" role="img" aria-label="通知触达折线">
-                  <line v-for="y in [25, 55, 85, 115]" :key="y" x1="18" :y1="y" x2="304" :y2="y" />
-                  <polyline points="20,96 68,84 116,92 164,62 212,58 260,50 302,46" />
-                  <circle v-for="point in trendPoints" :key="point" :cx="point.split(',')[0]" :cy="point.split(',')[1]" r="4" />
-                </svg>
-                <div class="trend-summary">
-                  <div v-for="item in dashboard.noticeDelivery.slice(0, 2)" :key="item.key">
-                    <strong>{{ item.value }}</strong>
-                    <span>{{ item.label }}</span>
+                <div class="delivery-list">
+                  <div v-for="item in dashboard.noticeDelivery" :key="item.key" class="delivery-row">
+                    <div class="delivery-row__meta">
+                      <strong>{{ item.label }}</strong>
+                      <span>{{ item.helper }}</span>
+                    </div>
+                    <div class="delivery-row__value">
+                      <strong>{{ item.value }}</strong>
+                      <div class="delivery-row__track">
+                        <i :style="{ width: `${noticeDeliveryPercent(item)}%` }" />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </template>
@@ -140,23 +143,22 @@
           </div>
 
           <div class="dashboard-lower">
-            <a-card title="当前结论置信度不足，建议结合人工复核" :bordered="false" class="visual-card risk-card">
-              <div class="risk-card-body">
-                <AlertOutlined />
-                <div>
-                  <strong>风险等级：中风险</strong>
-                  <p>{{ dashboard.disclaimer || dashboard.academicGap.description }}</p>
-                  <ul>
-                    <li>部分课程成绩未同步或存在延迟</li>
-                    <li>学生个体情况未充分考虑</li>
-                    <li>建议人工复核关键案例，确保结论准确性</li>
-                  </ul>
-                  <div class="confidence">
-                    <span>置信度：62%</span>
-                    <i />
+            <a-card title="学业缺口概览" :bordered="false" class="visual-card summary-card">
+              <template v-if="dashboard.academicGap.items.length">
+                <p class="summary-intro">{{ dashboard.disclaimer }}</p>
+                <div class="summary-grid">
+                  <div
+                    v-for="item in dashboard.academicGap.items"
+                    :key="item.key"
+                    :class="['summary-tile', item.key]"
+                  >
+                    <span>{{ item.title }}</span>
+                    <strong>{{ item.count ?? 0 }}</strong>
+                    <p>{{ item.description }}</p>
                   </div>
                 </div>
-              </div>
+              </template>
+              <a-empty v-else description="当前筛选条件下暂无学业缺口摘要" />
             </a-card>
 
             <a-card class="gap-table-card" :title="dashboard.academicGap.title" :bordered="false">
@@ -221,6 +223,8 @@
                   total: academicGapPagination.total,
                   showSizeChanger: true,
                 }"
+                :custom-row="academicGapRowProps"
+                :row-class-name="academicGapRowClassName"
                 row-key="student_id"
                 size="small"
                 @change="onAcademicGapTableChange"
@@ -268,56 +272,71 @@
         <aside class="dashboard-side-panel">
           <div class="side-head">
             <strong>学业缺口详情</strong>
-            <span>×</span>
+            <a-button type="text" size="small" :disabled="!selectedGapRow" @click="clearSelectedGap">
+              <template #icon><CloseOutlined /></template>
+            </a-button>
           </div>
-          <template v-if="primaryGapRow">
+          <template v-if="selectedGapRow">
             <div class="side-section student-card">
-              <div class="side-avatar">{{ primaryGapRow.student_name.slice(0, 1) }}</div>
+              <div class="side-avatar">{{ selectedGapRow.student_name.slice(0, 1) }}</div>
               <div>
-                <strong>{{ primaryGapRow.student_name }}</strong>
-                <p>{{ primaryGapRow.student_no }}</p>
-                <p>{{ primaryGapRow.major_code || '-' }} · {{ primaryGapRow.grade_code || '-' }}</p>
+                <strong>{{ selectedGapRow.student_name }}</strong>
+                <p>{{ selectedGapRow.student_no }}</p>
+                <p>{{ selectedGapRow.major_code || '-' }} · {{ selectedGapRow.grade_code || '-' }}</p>
               </div>
             </div>
-            <div class="side-section">
-              <h3>缺口描述</h3>
-              <p>
-                当前参考要求 {{ formatCredits(primaryGapRow.total_credits_required) }}，
-                已获 {{ formatCredits(primaryGapRow.total_credits_earned) }}，
-                差额参考 {{ formatCredits(primaryGapRow.credits_gap) }}。
-              </p>
-            </div>
-            <div class="side-section">
-              <h3>相关课程</h3>
-              <p>高等数学A(1) · 必修 · {{ academicRiskLabel(primaryGapRow) }}</p>
-            </div>
-            <div class="side-section">
-              <h3>风险趋势</h3>
-              <svg class="side-trend" viewBox="0 0 260 118">
-                <polyline points="8,58 46,72 84,82 122,76 160,66 198,52 246,20" />
-                <circle cx="246" cy="20" r="5" />
-              </svg>
-            </div>
-            <div class="side-section">
-              <h3>处理建议</h3>
-              <ul>
-                <li>建议补修缺口课程，或选择替代课程。</li>
-                <li>尽快完成课程学习并取得合格成绩。</li>
-                <li>特殊情况请联系学院教务复核。</li>
-              </ul>
-            </div>
-            <div class="side-actions">
-              <a-button @click="openAcademicGapDetail(primaryGapRow.student_id)">
-                <template #icon><CheckCircleOutlined /></template>
-                标记已跟进
-              </a-button>
-              <a-button type="primary">
-                <template #icon><SendOutlined /></template>
-                发起通知
-              </a-button>
-            </div>
+            <a-spin :spinning="selectedGapDetailLoading">
+              <div class="side-section">
+                <h3>缺口描述</h3>
+                <p>
+                  当前参考要求 {{ formatCredits(selectedGapRow.total_credits_required) }}，
+                  已获 {{ formatCredits(selectedGapRow.total_credits_earned) }}，
+                  差额参考 {{ formatCredits(selectedGapRow.credits_gap) }}。
+                </p>
+                <p class="detail-muted">
+                  风险等级：{{ academicRiskLabel(selectedGapRow) }} · 生成时间：{{ formatDateTime(selectedGapRow.generated_at) }}
+                </p>
+              </div>
+              <div class="side-section">
+                <h3>培养方案</h3>
+                <p>{{ selectedGapDetail?.plan_name || '当前明细未返回培养方案名称' }}</p>
+              </div>
+              <div class="side-section">
+                <h3>数据提示</h3>
+                <ul v-if="selectedGapWarnings.length">
+                  <li v-for="warning in selectedGapWarnings" :key="warning">{{ warning }}</li>
+                </ul>
+                <p v-else class="detail-muted">当前未返回额外 warning。</p>
+              </div>
+              <div class="side-section">
+                <h3>模块概况</h3>
+                <div v-if="selectedGapModules.length" class="module-list">
+                  <div v-for="module in selectedGapModules.slice(0, 5)" :key="module.module_code" class="module-row">
+                    <div>
+                      <strong>{{ module.module_name }}</strong>
+                      <p>{{ module.module_code }} · {{ module.module_type }}</p>
+                    </div>
+                    <div class="module-metrics">
+                      <span>差额 {{ formatCredits(module.credits_gap) }}</span>
+                      <span>已获 {{ formatCredits(module.credits_earned) }}</span>
+                    </div>
+                  </div>
+                </div>
+                <p v-else class="detail-muted">当前明细未返回模块差额。</p>
+              </div>
+              <div class="side-actions">
+                <a-button @click="openAcademicGapDetail(selectedGapRow.student_id)">
+                  <template #icon><EyeOutlined /></template>
+                  查看完整明细
+                </a-button>
+                <a-button type="primary" @click="goToStudentProfile(selectedGapRow.student_id)">
+                  <template #icon><CheckCircleOutlined /></template>
+                  查看学生画像
+                </a-button>
+              </div>
+            </a-spin>
           </template>
-          <a-empty v-else description="暂无学业缺口详情" />
+          <a-empty v-else description="请选择记录" />
         </aside>
       </div>
     </a-spin>
@@ -410,9 +429,11 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   AlertOutlined,
   BellOutlined,
+  CloseOutlined,
   FileDoneOutlined,
   FormOutlined,
   TeamOutlined,
@@ -420,11 +441,11 @@ import {
   ReloadOutlined,
   EyeOutlined,
   CheckCircleOutlined,
-  SendOutlined,
 } from '@ant-design/icons-vue'
 import {
   buildDashboardViewModel,
   deriveAcademicRiskLevel,
+  type DashboardNoticeDatum,
   fetchAcademicGap,
   fetchAcademicGapList,
   fetchOverview,
@@ -434,6 +455,7 @@ import {
   type OverviewResult,
 } from '@/api/report'
 
+const router = useRouter()
 const overview = ref<OverviewResult | null>(null)
 const loadingOverview = ref(false)
 const loadingAcademicGap = ref(false)
@@ -459,6 +481,10 @@ const academicGapPagination = reactive({
 const academicGapDrawerOpen = ref(false)
 const academicGapDetailLoading = ref(false)
 const academicGapDetail = ref<AcademicGapResult | null>(null)
+const selectedGapStudentId = ref<number | null>(null)
+const selectedGapDetailLoading = ref(false)
+const selectedGapDetail = ref<AcademicGapResult | null>(null)
+const academicGapDetailCache = new Map<number, AcademicGapResult>()
 
 const academicGapColumns = [
   { title: '学生', key: 'student', width: 180 },
@@ -481,8 +507,20 @@ const academicGapDetailColumns = [
 ]
 
 const dashboard = computed(() => buildDashboardViewModel(overview.value, academicGapRows.value))
-const primaryGapRow = computed(() => academicGapRows.value[0] ?? null)
-const trendPoints = ["20,96", "68,84", "116,92", "164,62", "212,58", "260,50", "302,46"]
+const selectedGapRow = computed(() => {
+  if (selectedGapStudentId.value == null) return null
+  return academicGapRows.value.find((item) => item.student_id === selectedGapStudentId.value) ?? null
+})
+const selectedGapWarnings = computed(() => {
+  if (selectedGapDetail.value?.data_warnings?.length) {
+    return selectedGapDetail.value.data_warnings
+  }
+  return selectedGapRow.value?.data_warnings ?? []
+})
+const selectedGapModules = computed(() => {
+  const modules = selectedGapDetail.value?.modules ?? []
+  return modules.filter((item) => item.credits_gap > 0 || Boolean(item.note))
+})
 
 const METRIC_ICON: Record<string, unknown> = {
   students: TeamOutlined,
@@ -495,6 +533,12 @@ const METRIC_ICON: Record<string, unknown> = {
 
 function metricIcon(key: string) {
   return METRIC_ICON[key] || FormOutlined
+}
+
+function noticeDeliveryPercent(item: DashboardNoticeDatum) {
+  const maxValue = Math.max(...dashboard.value.noticeDelivery.map((row) => row.value), 0)
+  if (maxValue <= 0) return 0
+  return Math.max(0, Math.min(100, Math.round((item.value / maxValue) * 100)))
 }
 
 function formatDateTime(value?: string | null) {
@@ -537,9 +581,11 @@ async function loadAcademicGapList() {
     })
     academicGapRows.value = resp.data.items
     academicGapPagination.total = resp.data.meta.total
+    syncSelectedGap()
   } catch {
     academicGapRows.value = []
     academicGapPagination.total = 0
+    clearSelectedGap()
     academicGapError.value = '请检查 academic-gap 聚合接口是否可用，或稍后重试。'
   } finally {
     loadingAcademicGap.value = false
@@ -587,12 +633,75 @@ function academicRiskClass(item: AcademicGapAggregateItem) {
   return 'low'
 }
 
+function clearSelectedGap() {
+  selectedGapStudentId.value = null
+  selectedGapDetail.value = null
+  selectedGapDetailLoading.value = false
+}
+
+function syncSelectedGap() {
+  if (selectedGapStudentId.value == null) return
+  if (!academicGapRows.value.some((item) => item.student_id === selectedGapStudentId.value)) {
+    clearSelectedGap()
+  }
+}
+
+async function loadGapDetailIntoPanel(studentId: number, force = false) {
+  if (!force && academicGapDetailCache.has(studentId)) {
+    selectedGapDetail.value = academicGapDetailCache.get(studentId) ?? null
+    return
+  }
+  selectedGapDetailLoading.value = true
+  try {
+    const resp = await fetchAcademicGap(studentId)
+    academicGapDetailCache.set(studentId, resp.data)
+    if (selectedGapStudentId.value === studentId) {
+      selectedGapDetail.value = resp.data
+    }
+  } catch {
+    if (selectedGapStudentId.value === studentId) {
+      selectedGapDetail.value = null
+    }
+  } finally {
+    if (selectedGapStudentId.value === studentId) {
+      selectedGapDetailLoading.value = false
+    }
+  }
+}
+
+async function selectAcademicGap(studentId: number, force = false) {
+  selectedGapStudentId.value = studentId
+  selectedGapDetail.value = academicGapDetailCache.get(studentId) ?? null
+  await loadGapDetailIntoPanel(studentId, force)
+}
+
+function academicGapRowProps(record: AcademicGapAggregateItem) {
+  return {
+    class: 'selectable-gap-row',
+    onClick: () => {
+      void selectAcademicGap(record.student_id)
+    },
+  }
+}
+
+function academicGapRowClassName(record: AcademicGapAggregateItem) {
+  return record.student_id === selectedGapStudentId.value
+    ? 'selectable-gap-row selected-gap-row'
+    : 'selectable-gap-row'
+}
+
 async function openAcademicGapDetail(studentId: number) {
+  await selectAcademicGap(studentId)
   academicGapDrawerOpen.value = true
   academicGapDetailLoading.value = true
   try {
+    if (academicGapDetailCache.has(studentId)) {
+      academicGapDetail.value = academicGapDetailCache.get(studentId) ?? null
+      return
+    }
     const resp = await fetchAcademicGap(studentId)
     academicGapDetail.value = resp.data
+    academicGapDetailCache.set(studentId, resp.data)
   } catch {
     academicGapDetail.value = null
   } finally {
@@ -603,6 +712,10 @@ async function openAcademicGapDetail(studentId: number) {
 function closeAcademicGapDrawer() {
   academicGapDrawerOpen.value = false
   academicGapDetail.value = null
+}
+
+function goToStudentProfile(studentId: number) {
+  void router.push({ name: 'student-profile', params: { studentId } })
 }
 
 onMounted(async () => {
@@ -651,6 +764,114 @@ onMounted(async () => {
 
 .visual-card {
   min-height: 100%;
+}
+
+.delivery-list {
+  display: grid;
+  gap: 12px;
+}
+
+.delivery-row {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #fbfcfe;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+}
+
+.delivery-row__meta,
+.delivery-row__value,
+.module-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.delivery-row__meta strong,
+.module-row strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.delivery-row__meta span,
+.module-row p,
+.summary-tile p {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.delivery-row__value strong {
+  color: var(--ruc-red);
+  font-family: var(--font-number);
+  font-size: 20px;
+}
+
+.delivery-row__track {
+  flex: 1;
+  min-width: 0;
+  height: 8px;
+  overflow: hidden;
+  background: #edf0f5;
+  border-radius: 999px;
+}
+
+.delivery-row__track i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--ruc-red), #ef7f62);
+  border-radius: inherit;
+}
+
+.summary-intro {
+  margin: 0 0 12px;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summary-tile {
+  min-height: 148px;
+  padding: 14px;
+  background: #fbfcfe;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+}
+
+.summary-tile span {
+  display: block;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.summary-tile strong {
+  display: block;
+  margin: 10px 0 8px;
+  color: var(--text);
+  font-family: var(--font-number);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.summary-tile.high strong {
+  color: #c40018;
+}
+
+.summary-tile.medium strong {
+  color: #d46b08;
+}
+
+.summary-tile.low strong {
+  color: #389e0d;
 }
 
 .donut-row {
@@ -898,9 +1119,8 @@ onMounted(async () => {
   font-size: 16px;
 }
 
-.side-head span {
+.side-head :deep(.ant-btn) {
   color: var(--text-3);
-  font-size: 20px;
 }
 
 .side-section {
@@ -957,6 +1177,35 @@ onMounted(async () => {
   margin-top: 16px;
 }
 
+.module-list {
+  display: grid;
+  gap: 10px;
+}
+
+.module-row {
+  align-items: flex-start;
+  padding: 12px;
+  background: #fbfcfe;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+}
+
+.module-metrics {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+:deep(.selectable-gap-row > td) {
+  cursor: pointer;
+}
+
+:deep(.selected-gap-row > td) {
+  background: #fff4f5 !important;
+}
+
 @media (max-width: 1320px) {
   .operation-dashboard {
     padding-right: 0;
@@ -967,6 +1216,10 @@ onMounted(async () => {
     width: auto;
     border: 1px solid var(--line-soft);
     border-radius: 12px;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
   }
 }
 

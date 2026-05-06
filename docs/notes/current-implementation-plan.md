@@ -361,6 +361,19 @@
 - `S8.1 ~ S8.4` 已完成代码与文档收口；历史 `2026-04-22` tabBar “6 个 PNG”记录保留为当时三栏旧基线，当前有效口径以 `S6.12 / S7.2 / S8` 的四栏 tabBar、8 个图标为准。
 - 验证：已通过 `web vue-tsc`、`miniapp vue-tsc`、`pnpm -C web build`、`pnpm -C miniapp build:mp-weixin` 与 `backend` 下 `uv run --no-sync ruff check app tests`；S8 定向后端集成测试在隔离 Kingbase `127.0.0.1:54323` 下通过 `34 passed in 24.78s`，结果记录在 `docs/notes/refinements/2026-05-04-s8-requirements-gap-closure.md`。
 
+### S9 并行 ABC 优化
+
+- [x] `S9.1` Web 管理端可信展示：运营看板去除硬编码趋势、固定风险/置信度、假课程与假动作；通知、知识库、党团流程等右侧面板改为显式选择驱动。
+- [x] `S9.2` Miniapp 微信端体验：首页增加最近成功数据缓存、分区刷新、同步时间/缓存提示；服务入口直达事务类型；关键页补页内错误态与重试。
+- [x] `S9.3` Backend 契约/权限收口：`term_code` 非法值返回业务错误，成绩单 PDF 上传对象存储失败映射为稳定业务错误，`CLASS_CADRE` 历史角色码收口为 `CLASS_MONITOR` 兼容别名。
+- [x] `S9.4` DB 小步优化：`audit_log_history` 补充与活跃审计表对齐的高价值复合索引迁移。
+- [!] `S9.DB` 后端定向集成测试：本轮 `ruff`、`py_compile` 通过，但 `localhost:54322/sip_db_test` 与显式 `127.0.0.1:54323/sip_db_test` 均拒连，未能进入测试断言层。
+
+当前结论：
+
+- `S9.1 ~ S9.4` 代码已落地，并通过 `web vue-tsc`、`miniapp vue-tsc`、`pnpm -C web build`、`pnpm -C miniapp build:mp-weixin`、`backend ruff`、`backend py_compile` 与 `git diff --check`。
+- `S9.DB` 仍需在可用隔离 Kingbase/Postgres 测试库上补跑 `test_report_contract_flow.py` 与 `test_audit_flow.py` 定向集成测试；当前阻塞是本机数据库端口拒连，不是测试断言失败。
+
 ## 细化文件登记
 
 > 规则：每个新细化文件都要写入本表，且必须关联一个或多个主计划条目编号。
@@ -409,6 +422,7 @@
 | 2026-04-28 | Web / Miniapp 按钮图标语义补齐 Round 7 | `docs/notes/refinements/2026-04-28-s6-button-icon-semantics-round7.md` | `S6.21` | `[x]` | 补登记已完成的按钮图标语义增强；当前 S6 状态范围为 `S6.1 ~ S6.21` |
 | 2026-05-02 | S7 全量需求 Gap 闭环修复 | `docs/notes/refinements/2026-05-02-s7-requirements-gap-closure.md` | `S7.1, S7.2, S7.3, S7.4, S7.5, S7.6, S7.DB` | `[x]` | 六路实现已落地并通过静态/构建验证；隔离 Kingbase gate 已闭合，集成回归 52 passed |
 | 2026-05-04 | S8 全量需求 Gap 闭环推进 | `docs/notes/refinements/2026-05-04-s8-requirements-gap-closure.md` | `S8.1, S8.2, S8.3, S8.4` | `[x]` | 已补齐知识库自助、转线下通知、短信脱敏、学期看板、非在读列表口径、文档漂移与 lint 基线，并通过双端构建、ruff 与 S8 定向集成回归 |
+| 2026-05-06 | S9 并行 ABC 优化 | `docs/notes/refinements/2026-05-06-s9-parallel-abc-optimization.md` | `S9.1, S9.2, S9.3, S9.4, S9.DB` | `[!]` | Web/Miniapp/Backend/DB 小步优化已落地并通过静态与双端构建；后端定向集成测试受本机测试库拒连阻塞 |
 
 ## 会话更新要求
 

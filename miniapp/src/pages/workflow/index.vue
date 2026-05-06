@@ -49,7 +49,22 @@
       <view class="section-badge">{{ attentionWorkflowCount }} 项待关注</view>
     </view>
 
-    <template v-if="workflows.length">
+    <InlineStateNotice
+      v-if="pageError"
+      :tone="workflows.length ? 'warning' : 'error'"
+      :title="workflows.length ? '流程列表未完全更新' : '流程列表加载失败'"
+      :description="workflows.length ? `${pageError}，当前保留上次加载结果。` : `${pageError}，可点击重试重新同步。`"
+      action-text="重试"
+      @action="reload"
+    />
+
+    <view v-if="loading && !workflows.length" class="empty-panel">
+      <view class="empty-badge">同步中</view>
+      <text class="empty-title">流程列表加载中</text>
+      <text class="empty-desc">正在同步你的党团发展进度，请稍候。</text>
+    </view>
+
+    <template v-else-if="workflows.length">
       <view
         v-for="workflow in workflows"
         :key="workflow.id"
@@ -108,7 +123,7 @@
       </view>
     </template>
 
-    <view v-else class="empty-panel">
+    <view v-else-if="!pageError" class="empty-panel">
       <view class="empty-badge">暂无进度</view>
       <text class="empty-title">当前暂无党团流程记录</text>
       <text class="empty-desc">如已报名相关流程，可稍后下拉刷新或联系负责老师确认。</text>
@@ -119,10 +134,15 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { onPullDownRefresh, onShow } from "@dcloudio/uni-app";
+import InlineStateNotice from "@/components/InlineStateNotice.vue";
 import { getMyWorkflows, type StudentWorkflow } from "@/api/workflow";
+import { getErrorMessage } from "@/utils/error";
 import { openMiniappPage } from "@/utils/navigation";
 
 const workflows = ref<StudentWorkflow[]>([]);
+const loading = ref(false);
+const pageError = ref("");
+const hasLoaded = ref(false);
 
 const STATUS_MAP: Record<string, string> = {
   ACTIVE: "进行中",
@@ -187,11 +207,19 @@ async function goQuiz() {
 }
 
 async function reload() {
+  loading.value = true;
   try {
+    pageError.value = "";
     const response = await getMyWorkflows();
     workflows.value = response.data;
-  } catch {
-    workflows.value = [];
+    hasLoaded.value = true;
+  } catch (error) {
+    pageError.value = getErrorMessage(error, "流程列表加载失败");
+    if (!hasLoaded.value) {
+      workflows.value = [];
+    }
+  } finally {
+    loading.value = false;
   }
 }
 

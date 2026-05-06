@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.models import AuditLog, AuditLogHistory, RoleFieldPolicy
 from app.audit.policies import iter_default_role_field_policies
+from app.auth.role_codes import expand_role_codes_for_lookup, normalize_role_code
 
 _AUDIT_SCOPE_ACTIVE = "active"
 _AUDIT_SCOPE_HISTORY = "history"
@@ -97,19 +98,33 @@ async def list_role_policies(
     db: AsyncSession,
     role_code: str | None = None,
 ) -> Sequence[dict[str, Any]]:
+    normalized_role_code = normalize_role_code(role_code)
     defaults = {
-        (row["role_code"], row["entity_code"], row["field_name"]): dict(row)
+        (
+            normalize_role_code(row["role_code"]),
+            row["entity_code"],
+            row["field_name"],
+        ): {
+            **dict(row),
+            "role_code": normalize_role_code(row["role_code"]),
+        }
         for row in iter_default_role_field_policies()
-        if role_code is None or row["role_code"] == role_code
+        if normalized_role_code is None
+        or normalize_role_code(row["role_code"]) == normalized_role_code
     }
     stmt = select(RoleFieldPolicy)
-    if role_code:
-        stmt = stmt.where(RoleFieldPolicy.role_code == role_code)
+    if normalized_role_code:
+        stmt = stmt.where(
+            RoleFieldPolicy.role_code.in_(
+                expand_role_codes_for_lookup([normalized_role_code])
+            )
+        )
     rows = (await db.execute(stmt)).scalars().all()
     for row in rows:
-        defaults[(row.role_code, row.entity_code, row.field_name)] = {
+        canonical_role_code = normalize_role_code(row.role_code)
+        defaults[(canonical_role_code, row.entity_code, row.field_name)] = {
             "id": row.id,
-            "role_code": row.role_code,
+            "role_code": canonical_role_code,
             "entity_code": row.entity_code,
             "field_name": row.field_name,
             "can_read": row.can_read,

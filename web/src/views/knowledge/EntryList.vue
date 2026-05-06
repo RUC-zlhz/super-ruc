@@ -37,6 +37,8 @@
               :data-source="entries"
               :loading="entryLoading"
               :pagination="entryPagination"
+              :custom-row="entryRowProps"
+              :row-class-name="entryRowClassName"
               row-key="id"
               size="small"
               @change="onEntryTableChange"
@@ -86,12 +88,12 @@
               </template>
             </a-table>
 
-            <a-card class="template-preview-card" title="模板文件列表" :bordered="false">
+            <a-card class="template-preview-card" :title="selectedEntry ? '关联模板' : '请选择知识条目'" :bordered="false">
               <a-table
                 :columns="templatePreviewColumns"
-                :data-source="visibleTemplates"
-                :loading="templateLoading"
-                row-key="id"
+                :data-source="selectedEntryTemplateRows"
+                :loading="selectedEntryLoading"
+                row-key="template_id"
                 size="small"
                 :pagination="false"
               >
@@ -101,22 +103,24 @@
                     <div class="table-secondary">{{ record.applicable_scenario || '未填写适用场景' }}</div>
                   </template>
                   <template v-else-if="column.key === 'status'">
-                    <a-tag :color="record.status === 'ACTIVE' ? 'green' : 'default'">
-                      {{ record.status === 'ACTIVE' ? '可用' : '已停用' }}
-                    </a-tag>
+                    <a-tag color="blue">已关联</a-tag>
                   </template>
-                  <template v-else-if="column.key === 'file_size'">
-                    {{ formatSize(record.file_size) }}
+                  <template v-else-if="column.key === 'version_label'">
+                    {{ record.version_label || '-' }}
                   </template>
                 </template>
               </a-table>
+              <a-empty v-if="!selectedEntry && !selectedEntryLoading" description="请选择记录" />
+              <a-empty v-else-if="selectedEntry && !selectedEntryTemplateRows.length && !selectedEntryLoading" description="当前条目未关联模板" />
             </a-card>
           </section>
 
           <aside class="knowledge-editor-panel">
             <div class="editor-panel-head">
               <strong>编辑知识条目</strong>
-              <span>×</span>
+              <a-button type="text" size="small" :disabled="!selectedEntry" @click="clearSelectedEntry">
+                <template #icon><CloseOutlined /></template>
+              </a-button>
             </div>
             <div class="mini-metrics">
               <div v-for="metric in metrics" :key="metric.key">
@@ -125,46 +129,66 @@
                 <span>{{ metric.label }}</span>
               </div>
             </div>
-            <template v-if="previewEntry">
+            <template v-if="selectedEntry">
+              <a-spin :spinning="selectedEntryLoading">
               <label class="panel-field">
                 <span>标题</span>
-                <div>{{ previewEntry.title }}</div>
+                <div>{{ selectedEntry.title }}</div>
               </label>
               <label class="panel-field">
                 <span>分类</span>
-                <div>{{ previewEntry.category_code || '-' }}</div>
+                <div>{{ selectedEntry.category_code || '-' }}</div>
               </label>
               <label class="panel-field">
                 <span>标签</span>
                 <div class="panel-tags">
-                  <a-tag v-for="tag in previewEntry.tags" :key="tag">{{ tag }}</a-tag>
-                  <span v-if="!previewEntry.tags.length" class="muted">-</span>
+                  <a-tag v-for="tag in selectedEntry.tags" :key="tag">{{ tag }}</a-tag>
+                  <span v-if="!selectedEntry.tags.length" class="muted">-</span>
                 </div>
               </label>
               <label class="panel-field">
                 <span>摘要</span>
-                <p>{{ previewEntry.summary || '暂无摘要' }}</p>
+                <p>{{ selectedEntry.summary || '暂无摘要' }}</p>
               </label>
               <label class="panel-field">
                 <span>状态</span>
-                <a-switch :checked="previewEntry.status === 'PUBLISHED'" disabled />
-                <em>{{ entryStatusLabel(previewEntry.status) }}</em>
+                <div class="panel-status">
+                  <a-tag :color="entryStatusColor(selectedEntry.status)">{{ entryStatusLabel(selectedEntry.status) }}</a-tag>
+                  <em>{{ selectedEntryDetail?.published_at ? `发布于 ${formatDateTime(selectedEntryDetail.published_at)}` : '尚未发布到学生端' }}</em>
+                </div>
               </label>
-              <div class="cover-uploader">
-                <FileTextOutlined />
-                <span>点击上传或拖拽文件到此处</span>
-                <small>支持 JPG、PNG 格式，大小不超过 5MB</small>
-              </div>
+              <label class="panel-field">
+                <span>官方来源</span>
+                <p>{{ selectedEntryDetail?.source?.source_name || '未绑定官方来源' }}</p>
+              </label>
               <label class="panel-field">
                 <span>备注</span>
-                <p>版本 {{ previewEntry.version_label || '-' }} · {{ formatDateTime(previewEntry.updated_at) }}</p>
+                <p>版本 {{ selectedEntry.version_label || '-' }} · {{ formatDateTime(selectedEntry.updated_at) }}</p>
+              </label>
+              <label class="panel-field">
+                <span>人工咨询提示</span>
+                <p>{{ selectedEntryDetail?.manual_consult_hint || '当前未配置人工咨询提示' }}</p>
               </label>
               <div class="panel-actions">
-                <a-button @click="openEntryEditor(previewEntry.id)">保存草稿</a-button>
-                <a-button type="primary" @click="onPublishEntry(previewEntry.id)">保存并发布</a-button>
+                <a-button @click="openEntryEditor(selectedEntry.id)">编辑条目</a-button>
+                <a-button type="primary" @click="openRevisions(selectedEntry.id)">查看版本</a-button>
+                <a-button
+                  v-if="selectedEntry.status !== 'PUBLISHED'"
+                  @click="onPublishEntry(selectedEntry.id)"
+                >
+                  发布条目
+                </a-button>
+                <a-button
+                  v-if="selectedEntry.status !== 'DEPRECATED'"
+                  danger
+                  @click="onDeprecateEntry(selectedEntry.id)"
+                >
+                  停用条目
+                </a-button>
               </div>
+              </a-spin>
             </template>
-            <a-empty v-else description="暂无条目可预览" />
+            <a-empty v-else description="请选择记录" />
           </aside>
         </div>
       </a-tab-pane>
@@ -336,6 +360,7 @@ import { message, Modal } from 'ant-design-vue'
 import {
   BookOutlined,
   CheckCircleOutlined,
+  CloseOutlined,
   FileTextOutlined,
   HistoryOutlined,
 } from '@ant-design/icons-vue'
@@ -345,6 +370,7 @@ import {
   deprecateEntry,
   deprecateTemplate,
   getEntry,
+  type KnowledgeEntryDetail,
   listEntries,
   listEntryRevisions,
   listSources,
@@ -384,7 +410,7 @@ const templateColumns = [
 const templatePreviewColumns = [
   { title: '模板名称', key: 'template_name' },
   { title: '类型', dataIndex: 'template_type', key: 'template_type', width: 110 },
-  { title: '大小', key: 'file_size', width: 100 },
+  { title: '版本', key: 'version_label', width: 120 },
   { title: '状态', key: 'status', width: 100 },
 ]
 
@@ -461,8 +487,15 @@ const revisionModalOpen = ref(false)
 const revisions = ref<KnowledgeRevision[]>([])
 
 const activeTemplates = computed(() => templates.value.filter((item) => item.status === 'ACTIVE'))
-const visibleTemplates = computed(() => templates.value.slice(0, 5))
-const previewEntry = computed(() => entries.value[0] ?? null)
+const selectedEntryId = ref<number | null>(null)
+const selectedEntry = computed(() => {
+  if (selectedEntryId.value == null) return null
+  return entries.value.find((item) => item.id === selectedEntryId.value) ?? null
+})
+const selectedEntryLoading = ref(false)
+const selectedEntryDetail = ref<KnowledgeEntryDetail | null>(null)
+const entryDetailCache = new Map<number, KnowledgeEntryDetail>()
+const selectedEntryTemplateRows = computed(() => selectedEntryDetail.value?.templates ?? [])
 
 const metrics = computed(() => [
   {
@@ -489,11 +522,11 @@ const metrics = computed(() => [
   {
     key: 'versions',
     label: '版本记录',
-    value: revisions.value.length,
-    sub: '最近打开条目',
-    icon: HistoryOutlined,
-  },
-])
+      value: revisions.value.length,
+      sub: selectedEntry.value ? selectedEntry.value.title : '当前未选条目',
+      icon: HistoryOutlined,
+    },
+  ])
 
 function entryStatusLabel(status: string) {
   return ({ DRAFT: '草稿', PUBLISHED: '已发布', DEPRECATED: '已停用' } as Record<string, string>)[status] || status
@@ -526,6 +559,7 @@ async function reloadEntries() {
     })
     entries.value = resp.data.items
     entryPagination.total = resp.data.meta.total
+    syncSelectedEntry()
   } finally {
     entryLoading.value = false
   }
@@ -564,6 +598,66 @@ function onEntryTableChange(pagination: any) {
   reloadEntries()
 }
 
+function clearSelectedEntry() {
+  selectedEntryId.value = null
+  selectedEntryLoading.value = false
+  selectedEntryDetail.value = null
+}
+
+async function loadEntryDetail(id: number, force = false) {
+  if (!force && entryDetailCache.has(id)) {
+    return entryDetailCache.get(id) as KnowledgeEntryDetail
+  }
+  const resp = await getEntry(id)
+  entryDetailCache.set(id, resp.data)
+  return resp.data
+}
+
+async function selectEntry(id: number, force = false) {
+  selectedEntryId.value = id
+  selectedEntryDetail.value = force ? null : (entryDetailCache.get(id) ?? null)
+  selectedEntryLoading.value = true
+  try {
+    const detail = await loadEntryDetail(id, force)
+    if (selectedEntryId.value === id) {
+      selectedEntryDetail.value = detail
+    }
+  } catch {
+    if (selectedEntryId.value === id) {
+      selectedEntryDetail.value = null
+    }
+  } finally {
+    if (selectedEntryId.value === id) {
+      selectedEntryLoading.value = false
+    }
+  }
+}
+
+function syncSelectedEntry() {
+  if (selectedEntryId.value == null) return
+  const current = entries.value.find((item) => item.id === selectedEntryId.value)
+  if (!current) {
+    clearSelectedEntry()
+    return
+  }
+  void selectEntry(current.id, true)
+}
+
+function entryRowProps(record: KnowledgeEntryBrief) {
+  return {
+    class: 'selectable-entry-row',
+    onClick: () => {
+      void selectEntry(record.id)
+    },
+  }
+}
+
+function entryRowClassName(record: KnowledgeEntryBrief) {
+  return record.id === selectedEntryId.value
+    ? 'selectable-entry-row selected-entry-row'
+    : 'selectable-entry-row'
+}
+
 function onTemplateTableChange(pagination: any) {
   templatePagination.current = pagination.current
   templatePagination.pageSize = pagination.pageSize
@@ -594,12 +688,15 @@ function resetEntryForm() {
 async function openEntryEditor(id?: number) {
   resetEntryForm()
   if (id) {
+    selectedEntryId.value = id
     editingEntryId.value = id
     entryDrawerOpen.value = true
     entryDrawerLoading.value = true
     try {
-      const resp = await getEntry(id)
-      const detail = resp.data
+      const detail = await loadEntryDetail(id)
+      if (selectedEntryId.value === id) {
+        selectedEntryDetail.value = detail
+      }
       Object.assign(entryForm, {
         title: detail.title,
         summary: detail.summary || undefined,
@@ -633,6 +730,7 @@ async function onSubmitEntry() {
     }
     if (editingEntryId.value) {
       await updateEntry(editingEntryId.value, payload)
+      entryDetailCache.delete(editingEntryId.value)
       message.success('知识条目已更新')
     } else {
       await createEntry(payload)
@@ -692,6 +790,7 @@ function onDeprecateEntry(id: number) {
 }
 
 async function openRevisions(id: number) {
+  selectedEntryId.value = id
   const resp = await listEntryRevisions(id)
   revisions.value = resp.data
   revisionModalOpen.value = true
@@ -814,9 +913,8 @@ onMounted(async () => {
   font-size: 16px;
 }
 
-.editor-panel-head span {
+.editor-panel-head :deep(.ant-btn) {
   color: var(--text-3);
-  font-size: 18px;
 }
 
 .mini-metrics {
@@ -886,6 +984,13 @@ onMounted(async () => {
   font-size: 12px;
 }
 
+.panel-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .panel-tags {
   display: flex;
   flex-wrap: wrap;
@@ -930,6 +1035,14 @@ onMounted(async () => {
 .table-secondary { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: #8c8c8c; font-size: 12px; margin-top: 4px; }
 .muted { color: #bfbfbf; }
 .upload-name { margin-left: 12px; color: #595959; }
+
+:deep(.selectable-entry-row > td) {
+  cursor: pointer;
+}
+
+:deep(.selected-entry-row > td) {
+  background: #fff4f5 !important;
+}
 
 @media (max-width: 1320px) {
   .knowledge-page {

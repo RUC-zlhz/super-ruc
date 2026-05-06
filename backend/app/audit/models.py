@@ -36,6 +36,8 @@ class AuditLog(Base):
 
     __table_args__ = (
         Index("ix_audit_logs_entity", "entity_code", "entity_id"),
+        Index("ix_audit_logs_entity_code_occurred_at", "entity_code", "occurred_at"),
+        Index("ix_audit_logs_actor_user_id_occurred_at", "actor_user_id", "occurred_at"),
     )
 
 
@@ -70,6 +72,16 @@ class AuditLogHistory(Base):
 
     __table_args__ = (
         Index("ix_audit_log_history_entity", "entity_code", "entity_id"),
+        Index(
+            "ix_audit_log_history_entity_code_occurred_at",
+            "entity_code",
+            "occurred_at",
+        ),
+        Index(
+            "ix_audit_log_history_actor_user_id_occurred_at",
+            "actor_user_id",
+            "occurred_at",
+        ),
     )
 
 

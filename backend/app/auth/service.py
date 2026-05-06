@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit.service import log_action
 from app.auth import repository as repo
 from app.auth.models import User
+from app.auth.role_codes import normalize_role_code, normalize_role_codes
 from app.auth.schemas import RoleInfo, TokenResponse, UserInfo
 from app.core.config import settings
 from app.core.exceptions import AuthError, BizError, NotFoundError
@@ -53,12 +54,25 @@ async def wx_code2session(code: str) -> dict:
 # ---------- Token 构建 ----------
 async def _build_token_response(db: AsyncSession, user: User) -> TokenResponse:
     roles_rows = await repo.list_user_roles(db, user.id)
-    role_codes = [r.role_code for r in roles_rows]
+    role_codes = normalize_role_codes(r.role_code for r in roles_rows)
     claims: dict = {"roles": role_codes}
     if user.student_id:
         claims["sid"] = user.student_id
     access = create_token(str(user.id), "access", extra_claims=claims)
     refresh = create_token(str(user.id), "refresh")
+    normalized_roles: list[RoleInfo] = []
+    seen_role_scope: set[tuple[str, str | None]] = set()
+    for row in roles_rows:
+        normalized_code = normalize_role_code(row.role_code)
+        if normalized_code is None:
+            continue
+        dedupe_key = (normalized_code, row.scope_code)
+        if dedupe_key in seen_role_scope:
+            continue
+        seen_role_scope.add(dedupe_key)
+        normalized_roles.append(
+            RoleInfo(code=normalized_code, scope_code=row.scope_code)
+        )
     user_info = UserInfo(
         id=user.id,
         display_name=user.display_name,
@@ -67,7 +81,7 @@ async def _build_token_response(db: AsyncSession, user: User) -> TokenResponse:
         work_no=user.work_no,
         student_id=user.student_id,
         student_no=user.student.student_no if user.student else None,
-        roles=[RoleInfo(code=r.role_code, scope_code=r.scope_code) for r in roles_rows],
+        roles=normalized_roles,
     )
     return TokenResponse(
         access_token=access,
