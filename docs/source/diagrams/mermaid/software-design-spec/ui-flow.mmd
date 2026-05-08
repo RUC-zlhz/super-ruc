@@ -1,0 +1,23 @@
+flowchart TB
+  subgraph Web[管理端页面流]
+    Login[登录] --> Dashboard[运营看板]
+    Dashboard --> Approval[审批工作台]
+    Dashboard --> Notice[通知中心]
+    Dashboard --> Knowledge[知识库管理]
+    Dashboard --> Import[导入导出中心]
+    Dashboard --> Audit[审计日志]
+    Dashboard --> User[用户管理]
+    Dashboard --> Honor[荣誉公示管理]
+  end
+  subgraph Mini[学生端页面流]
+    Home[首页] --> K[知识查询]
+    Home --> Req[事务申请]
+    Home --> Wf[党团进度]
+    Home --> N[通知中心]
+    Home --> A[学业查看]
+    Home --> H[荣誉榜]
+    Home --> P[我的画像]
+    Req --> ReqDetail[申请详情]
+    Wf --> Quiz[理论自测]
+    N --> NoticeDetail[通知详情]
+  end

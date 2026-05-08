@@ -1,0 +1,47 @@
+flowchart TB
+  subgraph Client[用户接入层]
+    Web[Vue 3 管理端\nweb/src/views]
+    Mini[uni-app 微信学生端\nminiapp/src/pages]
+  end
+  subgraph Api[后端应用层 FastAPI]
+    Auth[auth 身份与角色]
+    Knowledge[knowledge 知识库]
+    Workflow[workflow 流程与申请]
+    Notice[notice 通知触达]
+    Exchange[exchange 文件交换]
+    Report[report 学业与看板]
+    Honor[honor 荣誉]
+    Profile[profile 画像]
+    Audit[audit 权限与审计]
+  end
+  subgraph Infra[基础设施层]
+    DB[(Kingbase ES / PostgreSQL 兼容)]
+    Redis[(Redis 锁与缓存)]
+    Minio[(MinIO / 本地对象存储)]
+    Mail[SMTP / MailHog]
+    SMS[短信通道]
+  end
+  Web --> Auth
+  Web --> Knowledge
+  Web --> Workflow
+  Web --> Notice
+  Web --> Exchange
+  Web --> Report
+  Web --> Honor
+  Web --> Profile
+  Web --> Audit
+  Mini --> Auth
+  Mini --> Knowledge
+  Mini --> Workflow
+  Mini --> Notice
+  Mini --> Report
+  Mini --> Honor
+  Mini --> Profile
+  Api --> DB
+  Notice --> Mail
+  Notice --> SMS
+  Api --> Redis
+  Exchange --> Minio
+  Workflow --> Minio
+  Knowledge --> Minio
+  Audit --> DB

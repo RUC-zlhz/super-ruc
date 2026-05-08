@@ -1,0 +1,11 @@
+flowchart TB
+  Browser[PC 浏览器\n管理端] --> Nginx[Nginx / 静态资源与反向代理]
+  Wechat[微信客户端\n学生端小程序] --> Gateway[HTTPS API 网关]
+  Nginx --> FastAPI[FastAPI 后端服务\nuvicorn app.main:app]
+  Gateway --> FastAPI
+  FastAPI --> Kingbase[(Kingbase ES\n54322/54323)]
+  FastAPI --> Redis[(Redis 6379)]
+  FastAPI --> MinIO[(MinIO 9010)]
+  FastAPI --> SMTP[SMTP / MailHog 1025]
+  FastAPI --> SMS[短信服务商]
+  FastAPI --> WechatAPI[微信 code2session]

@@ -1,0 +1,46 @@
+classDiagram
+  class AuthModule {
+    User
+    Role
+    UserRole
+    Student
+  }
+  class KnowledgeModule {
+    KnowledgeEntry
+    KnowledgeSource
+    TemplateAsset
+    KnowledgeRevision
+  }
+  class WorkflowModule {
+    Request
+    RequestAttachment
+    RequestApprovalRecord
+    WorkflowTemplate
+  }
+  class NoticeModule {
+    Notice
+    NoticeDeliveryBatch
+    NoticeDelivery
+  }
+  class ExchangeModule {
+    ImportBatch
+    CurriculumPlan
+    StudentCourseRecord
+  }
+  class ProfileHonorModule {
+    ProfileFact
+    ProfileCorrection
+    HonorRecord
+    HonorRecipient
+  }
+  class AuditModule {
+    AuditLog
+    AuditLogHistory
+    RoleFieldPolicy
+  }
+  AuthModule --> WorkflowModule : actor and student binding
+  AuthModule --> NoticeModule : audience and delivery
+  AuthModule --> AuditModule : actor identity
+  ExchangeModule --> ReportModule : academic data
+  WorkflowModule --> AuditModule : action log
+  ProfileHonorModule --> AuditModule : sensitive read and export

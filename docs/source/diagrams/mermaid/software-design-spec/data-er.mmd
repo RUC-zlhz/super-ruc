@@ -1,0 +1,17 @@
+erDiagram
+  User ||--o{ UserRole : has
+  Role ||--o{ UserRole : grants
+  User ||--o| Student : binds
+  Student ||--o{ Request : submits
+  Request ||--o{ RequestAttachment : owns
+  Request ||--o{ RequestApprovalRecord : records
+  Student ||--o{ NoticeDelivery : receives
+  Notice ||--o{ NoticeDeliveryBatch : dispatches
+  NoticeDeliveryBatch ||--o{ NoticeDelivery : contains
+  Student ||--o{ StudentCourseRecord : has
+  CurriculumPlan ||--o{ CurriculumModule : defines
+  HonorRecord ||--o{ HonorRecipient : includes
+  Student ||--o{ HonorRecipient : wins
+  Student ||--o{ ProfileFact : aggregates
+  AuditLog ||--o{ AuditLogHistory : archives
+  Role ||--o{ RoleFieldPolicy : controls

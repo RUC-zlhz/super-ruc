@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：在 `S1 ~ S5` 已闭合基础上，继续推进 `S6` 的 `web + miniapp` 前端体验增量优化，并保持双端构建与微信小程序出包可验证
+- 当前目标：在 `S1 ~ S8` 已闭合、`S9.DB` 数据库测试环境仍阻塞的基础上，维护已完成交付件并补充 `S10` 软件设计规格说明书出件
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -374,6 +374,17 @@
 - `S9.1 ~ S9.4` 代码已落地，并通过 `web vue-tsc`、`miniapp vue-tsc`、`pnpm -C web build`、`pnpm -C miniapp build:mp-weixin`、`backend ruff`、`backend py_compile` 与 `git diff --check`。
 - `S9.DB` 仍需在可用隔离 Kingbase/Postgres 测试库上补跑 `test_report_contract_flow.py` 与 `test_audit_flow.py` 定向集成测试；当前阻塞是本机数据库端口拒连，不是测试断言失败。
 
+### S10 软件设计规格说明书出件
+
+- [x] `S10.1` 按根目录 `软件设计规格说明书.doc` 转换并复用模板版式。
+- [x] `S10.2` 基于当前仓库代码、需求文档、SRS 与计划证据生成软件设计规格说明书正文。
+- [x] `S10.3` 生成并嵌入体系结构、界面流、用例顺序、类关系、数据关系、部署设计 6 张 Mermaid 图，并完成 Word/PDF/PNG 渲染检查。
+
+当前结论：
+
+- `S10.1 ~ S10.3` 已完成；输出文件为 `output/doc/软件设计规格说明书-信息学院学生综合服务与党团管理平台-v1.0.docx`。
+- 受控 Mermaid 图源已迁移到 `docs/source/diagrams/mermaid/software-design-spec/`；渲染检查已通过 Word COM 更新目录并导出 PDF，再由 `pdftoppm` 渲染 `12` 页 PNG，未发现明显重叠、截断或空白页。
+
 ## 细化文件登记
 
 > 规则：每个新细化文件都要写入本表，且必须关联一个或多个主计划条目编号。
@@ -423,6 +434,7 @@
 | 2026-05-02 | S7 全量需求 Gap 闭环修复 | `docs/notes/refinements/2026-05-02-s7-requirements-gap-closure.md` | `S7.1, S7.2, S7.3, S7.4, S7.5, S7.6, S7.DB` | `[x]` | 六路实现已落地并通过静态/构建验证；隔离 Kingbase gate 已闭合，集成回归 52 passed |
 | 2026-05-04 | S8 全量需求 Gap 闭环推进 | `docs/notes/refinements/2026-05-04-s8-requirements-gap-closure.md` | `S8.1, S8.2, S8.3, S8.4` | `[x]` | 已补齐知识库自助、转线下通知、短信脱敏、学期看板、非在读列表口径、文档漂移与 lint 基线，并通过双端构建、ruff 与 S8 定向集成回归 |
 | 2026-05-06 | S9 并行 ABC 优化 | `docs/notes/refinements/2026-05-06-s9-parallel-abc-optimization.md` | `S9.1, S9.2, S9.3, S9.4, S9.DB` | `[!]` | Web/Miniapp/Backend/DB 小步优化已落地并通过静态与双端构建；后端定向集成测试受本机测试库拒连阻塞 |
+| 2026-05-08 | 软件设计规格说明书出件 | `docs/notes/refinements/2026-05-08-software-design-spec-delivery.md` | `S10.1, S10.2, S10.3` | `[x]` | 已按模板生成 SDS docx，迁移 6 张 Mermaid 图源，并完成 Word/PDF/PNG 渲染检查 |
 
 ## 会话更新要求
 

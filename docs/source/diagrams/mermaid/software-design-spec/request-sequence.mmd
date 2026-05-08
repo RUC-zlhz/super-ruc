@@ -1,0 +1,16 @@
+sequenceDiagram
+  autonumber
+  participant Student as 学生小程序
+  participant API as workflow API
+  participant Storage as 对象存储
+  participant Teacher as 管理端审批人
+  participant Audit as 审计服务
+  Student->>API: 创建事务申请草稿
+  Student->>API: 上传附件
+  API->>Storage: 保存附件对象
+  Student->>API: 提交申请
+  API->>Audit: 记录提交动作
+  Teacher->>API: 查看申请详情
+  Teacher->>API: 审批通过/驳回/转线下
+  API->>Audit: 记录审批动作
+  API-->>Student: 返回最新状态与意见
