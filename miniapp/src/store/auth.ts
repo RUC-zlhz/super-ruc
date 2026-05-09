@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { post, get, setToken } from '@/utils/request'
+import { post, get, getToken, isAuthRequiredError, setToken } from '@/utils/request'
 
 interface RoleInfo {
   code: string
@@ -24,7 +24,15 @@ interface TokenResponse {
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<UserInfo | null>(null)
-  const isLoggedIn = computed(() => !!user.value)
+  const tokenPresent = ref(!!getToken())
+  const isLoggedIn = computed(() => tokenPresent.value && !!user.value)
+  let meInFlight: Promise<UserInfo | null> | null = null
+
+  const eventBus = uni as unknown as { $on?: (event: string, callback: () => void) => void }
+  eventBus.$on?.('sip:auth-invalid', () => {
+    tokenPresent.value = false
+    user.value = null
+  })
 
   async function wxLogin(code: string, studentNo?: string) {
     const resp = await post<TokenResponse>('/auth/wx-login', {
@@ -33,17 +41,43 @@ export const useAuthStore = defineStore('auth', () => {
     })
     setToken(resp.data.access_token)
     uni.setStorageSync('sip.refresh_token', resp.data.refresh_token)
+    tokenPresent.value = true
     user.value = resp.data.user
   }
 
   async function fetchMe() {
-    const resp = await get<UserInfo>('/auth/me')
-    user.value = resp.data
-    return resp.data
+    if (!getToken()) {
+      tokenPresent.value = false
+      user.value = null
+      return null
+    }
+    tokenPresent.value = true
+    if (user.value) return user.value
+    if (!meInFlight) {
+      meInFlight = get<UserInfo>('/auth/me')
+        .then((resp) => {
+          user.value = resp.data
+          return resp.data
+        })
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : ''
+          if (isAuthRequiredError(error) || message === '登录已失效') {
+            tokenPresent.value = false
+            user.value = null
+            return null
+          }
+          throw error
+        })
+        .finally(() => {
+          meInFlight = null
+        })
+    }
+    return meInFlight
   }
 
   function logout() {
     user.value = null
+    tokenPresent.value = false
     setToken(null)
     uni.removeStorageSync('sip.refresh_token')
   }

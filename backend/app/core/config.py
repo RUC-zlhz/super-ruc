@@ -115,11 +115,12 @@ class Settings(BaseSettings):
                 errors.append("JWT_SECRET_KEY 仍为开发默认值，必须在生产环境替换")
             if self.FIELD_ENCRYPTION_KEY == _DEV_FERNET_KEY:
                 errors.append("FIELD_ENCRYPTION_KEY 仍为开发默认值，必须在生产环境替换")
-            if not self.WECHAT_MOCK_ENABLED:
-                if not self.WECHAT_APPID or not self.WECHAT_SECRET:
-                    errors.append(
-                        "生产环境启用真实微信登录时必须配置 WECHAT_APPID / WECHAT_SECRET"
-                    )
+            if self.WECHAT_MOCK_ENABLED:
+                errors.append("生产环境必须关闭 WECHAT_MOCK_ENABLED")
+            if not self.WECHAT_APPID or not self.WECHAT_SECRET:
+                errors.append(
+                    "生产环境启用真实微信登录时必须配置 WECHAT_APPID / WECHAT_SECRET"
+                )
 
         # 非生产也生效的功能开关守卫
         if self.AI_QA_ENABLED and not self.ANTHROPIC_API_KEY:

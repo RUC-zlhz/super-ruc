@@ -657,7 +657,7 @@ async function syncDisplayName() {
   if (auth && !auth.user) {
     try {
       const user = await auth.fetchMe();
-      if (user.display_name) {
+      if (user?.display_name) {
         displayName.value = user.display_name;
       }
     } catch {
@@ -720,6 +720,8 @@ async function loadDashboard() {
   dashboardRefreshing.value = true;
   try {
     await syncDisplayName();
+    const auth = useAuthStore();
+    if (!auth.isLoggedIn) return;
     await Promise.all([
       refreshSection("notices"),
       refreshSection("requests"),

@@ -5,10 +5,36 @@ WECHAT_MOCK_ENABLED=true（code 直接作为 mock openid）。
 """
 from __future__ import annotations
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import service
 from app.auth.models import Student
+from app.core.exceptions import AuthError, BizError
+
+
+class _FakeWechatResponse:
+    def __init__(self, status_code: int, payload: dict) -> None:
+        self.status_code = status_code
+        self._payload = payload
+
+    def json(self) -> dict:
+        return self._payload
+
+
+class _FakeWechatClient:
+    def __init__(self, response: _FakeWechatResponse) -> None:
+        self.response = response
+
+    async def __aenter__(self) -> _FakeWechatClient:
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        return None
+
+    async def get(self, *_: object, **__: object) -> _FakeWechatResponse:
+        return self.response
 
 
 async def test_wx_login_creates_user_and_binds_student(
@@ -114,3 +140,61 @@ async def test_wx_login_with_unknown_student_no_returns_404(
         json={"code": "wx_code_nobody", "student_no": "NOSUCH"},
     )
     assert resp.status_code == 404
+
+
+async def test_wx_code2session_requires_real_secret_when_mock_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service.settings, "WECHAT_MOCK_ENABLED", False)
+    monkeypatch.setattr(service.settings, "WECHAT_APPID", "wx_test")
+    monkeypatch.setattr(service.settings, "WECHAT_SECRET", "")
+
+    with pytest.raises(BizError, match="WECHAT_APPID / WECHAT_SECRET"):
+        await service.wx_code2session("wx_code_missing_secret")
+
+
+async def test_wx_code2session_maps_wechat_invalid_code_to_auth_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service.settings, "WECHAT_MOCK_ENABLED", False)
+    monkeypatch.setattr(service.settings, "WECHAT_APPID", "wx_test")
+    monkeypatch.setattr(service.settings, "WECHAT_SECRET", "secret")
+    response = _FakeWechatResponse(
+        200,
+        {"errcode": 40029, "errmsg": "invalid code"},
+    )
+    monkeypatch.setattr(
+        service.httpx,
+        "AsyncClient",
+        lambda **_: _FakeWechatClient(response),
+    )
+
+    with pytest.raises(AuthError, match="无效或已过期"):
+        await service.wx_code2session("wx_code_bad")
+
+
+async def test_wx_code2session_returns_official_identifiers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service.settings, "WECHAT_MOCK_ENABLED", False)
+    monkeypatch.setattr(service.settings, "WECHAT_APPID", "wx_test")
+    monkeypatch.setattr(service.settings, "WECHAT_SECRET", "secret")
+    response = _FakeWechatResponse(
+        200,
+        {
+            "openid": "openid_real",
+            "unionid": "unionid_real",
+            "session_key": "session_key_real",
+        },
+    )
+    monkeypatch.setattr(
+        service.httpx,
+        "AsyncClient",
+        lambda **_: _FakeWechatClient(response),
+    )
+
+    data = await service.wx_code2session("wx_code_real")
+
+    assert data["openid"] == "openid_real"
+    assert data["unionid"] == "unionid_real"
+    assert data["session_key"] == "session_key_real"

@@ -1,4 +1,15 @@
-import { buildApiUrl, download, get, getAuthHeader, post, request, setToken, type ApiEnvelope } from '@/utils/request'
+import {
+  AuthRequiredError,
+  buildApiUrl,
+  download,
+  get,
+  getAuthHeader,
+  handleUnauthorized,
+  hasToken,
+  post,
+  request,
+  type ApiEnvelope,
+} from '@/utils/request'
 
 export interface StudentWorkflowNode {
   id: number
@@ -212,6 +223,11 @@ export function getRequestDetail(id: number) {
 
 export function uploadRequestAttachment(requestId: number, filePath: string) {
   return new Promise<RequestAttachment>((resolve, reject) => {
+    if (!hasToken()) {
+      handleUnauthorized(true)
+      reject(new AuthRequiredError())
+      return
+    }
     uni.uploadFile({
       url: buildApiUrl(`/requests/${requestId}/attachments`),
       filePath,
@@ -229,8 +245,7 @@ export function uploadRequestAttachment(requestId: number, filePath: string) {
           return
         }
         if (res.statusCode === 401) {
-          setToken(null)
-          uni.reLaunch({ url: '/pages/profile/index' })
+          handleUnauthorized(true)
           reject(new Error('登录已失效'))
           return
         }

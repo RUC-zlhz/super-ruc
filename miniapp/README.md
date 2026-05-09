@@ -107,11 +107,17 @@ $env:VITE_MINIAPP_API_BASE_URL = 'https://example.edu.cn/api/v1'
 pnpm build:mp-weixin
 ```
 
+临时 IP `123.57.54.195` 联调可直接使用仓库脚本：
+
+```powershell
+& ..\deploy\temp-ip\build-miniapp.ps1
+```
+
 如需在微信开发者工具本地临时切换，可写入运行时覆盖值 `sip.api_base_url`；清理该 storage 后会回到构建环境变量或本地默认值。
 
 ### 微信 AppID 口径
 
-当前微信小程序 AppID 统一为 `wxcf977479348ca1d3`，需要同时保持在 `src/manifest.json` 的 `mp-weixin.appid` 与根目录 `project.config.json` 中一致。`pnpm build:mp-weixin` 生成的 `dist/build/mp-weixin/project.config.json` 会从 manifest 带出该 AppID。
+当前微信小程序 AppID 统一为 `wxcb6352a74505bc41`，需要同时保持在 `src/manifest.json` 的 `mp-weixin.appid` 与根目录 `project.config.json` 中一致。`pnpm build:mp-weixin` 生成的 `dist/build/mp-weixin/project.config.json` 会从 manifest 带出该 AppID。
 
 ---
 

@@ -1,6 +1,6 @@
 """add audit history composite indexes and align class monitor role code
 
-Revision ID: 0010_audit_history_role_alignment
+Revision ID: 0010_audit_role_align
 Revises: 0009_s4b_targeted_indexes
 Create Date: 2026-05-06
 """
@@ -11,7 +11,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0010_audit_history_role_alignment"
+revision: str = "0010_audit_role_align"
 down_revision: str | None = "0009_s4b_targeted_indexes"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -40,13 +40,13 @@ def _sync_role_code(*, source_code: str, target_code: str) -> None:
 
     if target_exists is None:
         if source_exists is not None:
-            bind.execute(
+            _ = bind.execute(
                 sa.update(roles)
                 .where(roles.c.code == source_code)
                 .values(code=target_code, name="班长", level=4, description="L4")
             )
         else:
-            bind.execute(
+            _ = bind.execute(
                 sa.insert(roles).values(
                     code=target_code,
                     name="班长",
@@ -56,13 +56,13 @@ def _sync_role_code(*, source_code: str, target_code: str) -> None:
                 )
             )
     else:
-        bind.execute(
+        _ = bind.execute(
             sa.update(roles)
             .where(roles.c.code == target_code)
             .values(name="班长", level=4, description="L4")
         )
 
-    bind.execute(
+    _ = bind.execute(
         sa.text(
             """
             DELETE FROM user_roles
@@ -84,7 +84,7 @@ def _sync_role_code(*, source_code: str, target_code: str) -> None:
         ),
         {"source_code": source_code, "target_code": target_code},
     )
-    bind.execute(
+    _ = bind.execute(
         sa.text(
             """
             UPDATE user_roles
@@ -95,7 +95,7 @@ def _sync_role_code(*, source_code: str, target_code: str) -> None:
         {"source_code": source_code, "target_code": target_code},
     )
 
-    bind.execute(
+    _ = bind.execute(
         sa.text(
             """
             DELETE FROM role_field_policies
@@ -111,7 +111,7 @@ def _sync_role_code(*, source_code: str, target_code: str) -> None:
         ),
         {"source_code": source_code, "target_code": target_code},
     )
-    bind.execute(
+    _ = bind.execute(
         sa.text(
             """
             UPDATE role_field_policies
@@ -122,7 +122,7 @@ def _sync_role_code(*, source_code: str, target_code: str) -> None:
         {"source_code": source_code, "target_code": target_code},
     )
 
-    bind.execute(
+    _ = bind.execute(
         sa.text("DELETE FROM roles WHERE code = :source_code"),
         {"source_code": source_code},
     )

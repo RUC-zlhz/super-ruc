@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：在 `S1 ~ S8` 已闭合、`S9.DB` 数据库测试环境仍阻塞的基础上，维护已完成交付件并补充 `S10` 软件设计规格说明书出件
+- 当前目标：在 `S1 ~ S10`、`S11.1 ~ S11.6` 已闭合、`S9.DB` 已补测关闭的基础上，完成临时 IP 部署联调收口
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -367,12 +367,12 @@
 - [x] `S9.2` Miniapp 微信端体验：首页增加最近成功数据缓存、分区刷新、同步时间/缓存提示；服务入口直达事务类型；关键页补页内错误态与重试。
 - [x] `S9.3` Backend 契约/权限收口：`term_code` 非法值返回业务错误，成绩单 PDF 上传对象存储失败映射为稳定业务错误，`CLASS_CADRE` 历史角色码收口为 `CLASS_MONITOR` 兼容别名。
 - [x] `S9.4` DB 小步优化：`audit_log_history` 补充与活跃审计表对齐的高价值复合索引迁移。
-- [!] `S9.DB` 后端定向集成测试：本轮 `ruff`、`py_compile` 通过，但 `localhost:54322/sip_db_test` 与显式 `127.0.0.1:54323/sip_db_test` 均拒连，未能进入测试断言层。
+- [x] `S9.DB` 后端定向集成测试：已恢复隔离 Kingbase `127.0.0.1:54323/sip_db_test` 并补跑 `test_report_contract_flow.py` 与 `test_audit_flow.py`，结果 `8 passed in 7.80s`。
 
 当前结论：
 
 - `S9.1 ~ S9.4` 代码已落地，并通过 `web vue-tsc`、`miniapp vue-tsc`、`pnpm -C web build`、`pnpm -C miniapp build:mp-weixin`、`backend ruff`、`backend py_compile` 与 `git diff --check`。
-- `S9.DB` 仍需在可用隔离 Kingbase/Postgres 测试库上补跑 `test_report_contract_flow.py` 与 `test_audit_flow.py` 定向集成测试；当前阻塞是本机数据库端口拒连，不是测试断言失败。
+- `S9.DB` 已在恢复后的隔离 Kingbase `127.0.0.1:54323/sip_db_test` 上关闭；补跑 `uv run --no-sync pytest tests\integration\test_report_contract_flow.py tests\integration\test_audit_flow.py -q --basetemp=.tmp\pytest-s9-db`，结果 `8 passed in 7.80s`。
 
 ### S10 软件设计规格说明书出件
 
@@ -384,6 +384,20 @@
 
 - `S10.1 ~ S10.3` 已完成；输出文件为 `output/doc/软件设计规格说明书-信息学院学生综合服务与党团管理平台-v1.0.docx`。
 - 受控 Mermaid 图源已迁移到 `docs/source/diagrams/mermaid/software-design-spec/`；渲染检查已通过 Word COM 更新目录并导出 PDF，再由 `pdftoppm` 渲染 `12` 页 PNG，未发现明显重叠、截断或空白页。
+
+### S11 临时 IP 直连部署联调
+
+- [x] `S11.1` 确认 `123.57.54.195` SSH、Docker、Compose 与端口状态。
+- [x] `S11.2` 新增临时部署资产，支持 PostgreSQL / Redis / MinIO / FastAPI / Nginx Web 一体化编排。
+- [x] `S11.3` 在服务器部署数据库、后端与 Web，并执行数据库迁移与初始种子。
+- [x] `S11.4` 将教师/管理端 Web 与微信小程序 API 基址接到 `http://123.57.54.195/api/v1`，小程序 AppID 切换为 `wxcb6352a74505bc41` 并重构建。
+- [x] `S11.5` 完成健康检查、API smoke、Web 静态访问和小程序出包验证。
+- [x] `S11.6` 对接微信官方登录鉴权并治理未登录频发请求；代码、构建、后端同步、真实微信配置切换、日志脱敏与无效 code smoke 已完成。
+
+当前结论：
+
+- `S11.1 ~ S11.5` 已完成；临时部署细化见 `docs/notes/refinements/2026-05-09-temporary-ip-deployment.md`。
+- `S11.6` 已完成代码与部署加固，小程序未登录请求循环已在本地产物中消除；服务器已配置真实微信 AppSecret 并关闭 mock，真实 `code2Session` 路径已用无效 code smoke 验证，且已压低 `httpx/httpcore` 日志避免输出微信查询串，细化见 `docs/notes/refinements/2026-05-09-wechat-auth-login-hardening.md`。
 
 ## 细化文件登记
 
@@ -433,8 +447,10 @@
 | 2026-04-28 | Web / Miniapp 按钮图标语义补齐 Round 7 | `docs/notes/refinements/2026-04-28-s6-button-icon-semantics-round7.md` | `S6.21` | `[x]` | 补登记已完成的按钮图标语义增强；当前 S6 状态范围为 `S6.1 ~ S6.21` |
 | 2026-05-02 | S7 全量需求 Gap 闭环修复 | `docs/notes/refinements/2026-05-02-s7-requirements-gap-closure.md` | `S7.1, S7.2, S7.3, S7.4, S7.5, S7.6, S7.DB` | `[x]` | 六路实现已落地并通过静态/构建验证；隔离 Kingbase gate 已闭合，集成回归 52 passed |
 | 2026-05-04 | S8 全量需求 Gap 闭环推进 | `docs/notes/refinements/2026-05-04-s8-requirements-gap-closure.md` | `S8.1, S8.2, S8.3, S8.4` | `[x]` | 已补齐知识库自助、转线下通知、短信脱敏、学期看板、非在读列表口径、文档漂移与 lint 基线，并通过双端构建、ruff 与 S8 定向集成回归 |
-| 2026-05-06 | S9 并行 ABC 优化 | `docs/notes/refinements/2026-05-06-s9-parallel-abc-optimization.md` | `S9.1, S9.2, S9.3, S9.4, S9.DB` | `[!]` | Web/Miniapp/Backend/DB 小步优化已落地并通过静态与双端构建；后端定向集成测试受本机测试库拒连阻塞 |
+| 2026-05-06 | S9 并行 ABC 优化 | `docs/notes/refinements/2026-05-06-s9-parallel-abc-optimization.md` | `S9.1, S9.2, S9.3, S9.4, S9.DB` | `[x]` | Web/Miniapp/Backend/DB 小步优化已落地并通过静态与双端构建；后端定向集成测试已在隔离 Kingbase 上补跑通过 `8 passed` |
 | 2026-05-08 | 软件设计规格说明书出件 | `docs/notes/refinements/2026-05-08-software-design-spec-delivery.md` | `S10.1, S10.2, S10.3` | `[x]` | 已按模板生成 SDS docx，迁移 6 张 Mermaid 图源，并完成 Word/PDF/PNG 渲染检查 |
+| 2026-05-09 | 临时 IP 直连部署联调 | `docs/notes/refinements/2026-05-09-temporary-ip-deployment.md` | `S11.1, S11.2, S11.3, S11.4, S11.5` | `[x]` | 已完成临时服务器部署、数据库迁移与种子、Web 与小程序重构建、HTTP/API smoke 验证 |
+| 2026-05-09 | 微信小程序登录鉴权与未登录请求治理 | `docs/notes/refinements/2026-05-09-wechat-auth-login-hardening.md` | `S11.6` | `[x]` | 已按微信官方登录流程加固后端与小程序请求层，并同步重建远端后端；续跑复核通过类型检查、后端静态校验、临时 IP 小程序出包、真实模式无效 code smoke 与日志脱敏检查 |
 
 ## 会话更新要求
 

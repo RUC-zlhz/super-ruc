@@ -36,7 +36,15 @@
             placeholder="首次登录请输入学号完成绑定"
             confirm-type="done"
           />
-          <button class="primary-button" :type="UNI_BUTTON_TYPE.primary" size="default" hover-class="hover-scale" @tap="onWxLogin">
+          <button
+            class="primary-button"
+            :type="UNI_BUTTON_TYPE.primary"
+            size="default"
+            hover-class="hover-scale"
+            :loading="loginSubmitting"
+            :disabled="loginSubmitting"
+            @tap="onWxLogin"
+          >
             <text class="btn-icon">❖</text> 微信一键登录
           </button>
           <text class="login-note">已绑定微信可直接登录；未绑定时填写学号后自动绑定。</text>
@@ -502,6 +510,7 @@ const corrections = ref<CorrectionOut[]>([])
 const factSubmissions = ref<ProfileFactSubmissionOut[]>([])
 const fullViewRequests = ref<ProfileFullViewRequestOut[]>([])
 const factSubmissionsSupported = ref(true)
+const loginSubmitting = ref(false)
 const appealSubmitting = ref(false)
 const growthSubmitting = ref(false)
 const fullViewSubmitting = ref('')
@@ -706,13 +715,35 @@ function ensureEditable() {
   return false
 }
 
+function getWxLoginCode(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    uni.login({
+      provider: 'weixin',
+      success(res) {
+        const code = (res as { code?: string }).code
+        if (code) {
+          resolve(code)
+          return
+        }
+        reject(new Error((res as { errMsg?: string }).errMsg || '微信登录未返回 code'))
+      },
+      fail: reject,
+    })
+  })
+}
+
 async function onWxLogin() {
+  if (loginSubmitting.value) return
+  loginSubmitting.value = true
   try {
-    const loginRes = await uni.login({ provider: 'weixin' })
-    await auth.wxLogin((loginRes as any).code, studentNoForBinding.value)
+    const code = await getWxLoginCode()
+    await auth.wxLogin(code, studentNoForBinding.value)
     await loadAll()
-  } catch {
-    uni.showToast({ title: '登录失败', icon: 'none' })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '登录失败'
+    uni.showToast({ title: message || '登录失败', icon: 'none' })
+  } finally {
+    loginSubmitting.value = false
   }
 }
 

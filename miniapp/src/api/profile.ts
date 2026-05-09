@@ -1,4 +1,13 @@
-import { buildApiUrl, get, getAuthHeader, post, setToken, type ApiEnvelope } from '@/utils/request'
+import {
+  AuthRequiredError,
+  buildApiUrl,
+  get,
+  getAuthHeader,
+  handleUnauthorized,
+  hasToken,
+  post,
+  type ApiEnvelope,
+} from '@/utils/request'
 
 export interface ProfileStudent {
   id: number
@@ -141,6 +150,11 @@ function optionalRequest<T>(
   params?: Record<string, any>,
 ) {
   return new Promise<T | null>((resolve, reject) => {
+    if (!hasToken()) {
+      handleUnauthorized(true)
+      reject(new AuthRequiredError())
+      return
+    }
     uni.request({
       url: buildApiUrl(url, params),
       method,
@@ -152,8 +166,7 @@ function optionalRequest<T>(
       success(res) {
         const payload = res.data as ApiEnvelope<T>
         if (res.statusCode === 401) {
-          setToken(null)
-          uni.reLaunch({ url: '/pages/profile/index' })
+          handleUnauthorized(true)
           reject(new Error('登录已失效'))
           return
         }

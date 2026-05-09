@@ -28,6 +28,9 @@ WX_CODE2SESSION_URL = "https://api.weixin.qq.com/sns/jscode2session"
 
 # ---------- 微信 ----------
 async def wx_code2session(code: str) -> dict:
+    if not code or not code.strip():
+        raise AuthError("微信登录凭证不能为空")
+
     if settings.WECHAT_MOCK_ENABLED:
         # 开发模式：code 直接当作 openid，便于测试
         return {"openid": f"mock_{code}", "unionid": None, "session_key": "mock"}
@@ -41,13 +44,45 @@ async def wx_code2session(code: str) -> dict:
         "js_code": code,
         "grant_type": "authorization_code",
     }
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.get(WX_CODE2SESSION_URL, params=params)
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(WX_CODE2SESSION_URL, params=params)
+    except httpx.RequestError as exc:
+        logger.warning("wechat code2session request failed: %s", exc)
+        raise BizError(
+            "微信登录服务暂不可用，请稍后重试",
+            code=50201,
+            http_status=502,
+        ) from exc
     if resp.status_code != 200:
-        raise AuthError(f"微信接口异常 HTTP {resp.status_code}")
-    data = resp.json()
-    if "errcode" in data and data.get("errcode"):
-        raise AuthError(f"微信登录失败：{data.get('errmsg', data)}")
+        logger.warning("wechat code2session returned HTTP %s", resp.status_code)
+        raise BizError(
+            "微信登录服务暂不可用，请稍后重试",
+            code=50201,
+            http_status=502,
+        )
+    try:
+        data = resp.json()
+    except ValueError as exc:
+        logger.warning("wechat code2session returned non-json payload")
+        raise BizError(
+            "微信登录服务暂不可用，请稍后重试",
+            code=50201,
+            http_status=502,
+        ) from exc
+    errcode = data.get("errcode")
+    if errcode:
+        logger.info(
+            "wechat code2session rejected code: errcode=%s errmsg=%s",
+            errcode,
+            data.get("errmsg"),
+        )
+        if errcode in {40029, 40163}:
+            raise AuthError("微信登录凭证无效或已过期，请重新登录")
+        raise AuthError("微信登录失败，请稍后重试")
+    if not data.get("openid"):
+        logger.warning("wechat code2session response missing openid")
+        raise AuthError("微信登录失败，请稍后重试")
     return data
 
 
