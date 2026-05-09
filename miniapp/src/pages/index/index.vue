@@ -616,6 +616,19 @@ function hydrateDashboardCache() {
   cacheHydrated.value = true;
 }
 
+function clearDashboardData() {
+  recentNotices.value = [];
+  requests.value = [];
+  workflows.value = [];
+  SECTION_KEYS.forEach((key) => {
+    sectionMeta[key].loading = false;
+    sectionMeta[key].error = "";
+    sectionMeta[key].fromCache = false;
+    sectionMeta[key].hasLoaded = false;
+    sectionMeta[key].lastSuccessAt = "";
+  });
+}
+
 function persistSectionCache<K extends HomeSectionKey>(
   key: K,
   items: HomeSectionDataMap[K],
@@ -646,6 +659,10 @@ async function syncDisplayName() {
   let auth: ReturnType<typeof useAuthStore> | null = null;
   try {
     auth = useAuthStore();
+    if (auth.user && !auth.user.student_id) {
+      displayName.value = "访客";
+      return;
+    }
     if (auth.user?.display_name) {
       displayName.value = auth.user.display_name;
       return;
@@ -657,6 +674,10 @@ async function syncDisplayName() {
   if (auth && !auth.user) {
     try {
       const user = await auth.fetchMe();
+      if (user && !user.student_id) {
+        displayName.value = "访客";
+        return;
+      }
       if (user?.display_name) {
         displayName.value = user.display_name;
       }
@@ -716,12 +737,15 @@ async function refreshTodoSections() {
 }
 
 async function loadDashboard() {
-  hydrateDashboardCache();
   dashboardRefreshing.value = true;
   try {
     await syncDisplayName();
     const auth = useAuthStore();
-    if (!auth.isLoggedIn) return;
+    if (!auth.isLoggedIn || !auth.user?.student_id) {
+      clearDashboardData();
+      return;
+    }
+    hydrateDashboardCache();
     await Promise.all([
       refreshSection("notices"),
       refreshSection("requests"),

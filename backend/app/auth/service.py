@@ -24,6 +24,8 @@ from app.core.security import create_token, verify_password
 logger = logging.getLogger(__name__)
 
 WX_CODE2SESSION_URL = "https://api.weixin.qq.com/sns/jscode2session"
+ROLE_STUDENT = "STUDENT"
+ROLE_GUEST = "GUEST"
 
 
 # ---------- 微信 ----------
@@ -136,34 +138,41 @@ async def login_with_wechat(
 ) -> TokenResponse:
     session_data = await wx_code2session(code)
     openid = session_data["openid"]
+    normalized_student_no = student_no.strip() if student_no else None
 
     user = await repo.get_user_by_openid(db, openid)
     if user is None:
         user = await repo.create_user_from_wechat(
             db, openid=openid, unionid=session_data.get("unionid")
         )
-        # 默认授予学生角色；若通过 student_no 绑定成功会保持该角色
-        await repo.add_user_role(db, user_id=user.id, role_code="STUDENT")
 
-    # 学号绑定：若本次请求带 student_no 且 user 尚未绑定，尝试绑定
-    if student_no and user.student_id is None:
-        student = await repo.get_student_by_no(db, student_no)
-        if student is None:
-            raise NotFoundError(f"学号 {student_no} 未在学生主档中，无法绑定")
-        user.student_id = student.id
-        user.display_name = student.full_name or user.display_name
-        await db.flush()
-        await log_action(
-            db,
-            event_type="AUTH",
-            entity_code="USER",
-            action="BIND_STUDENT",
-            entity_id=user.id,
-            actor_user_id=user.id,
-            ip_address=ip,
-            detail={"student_no": student_no},
-            auto_flush=False,
-        )
+    if user.student_id is None:
+        if normalized_student_no:
+            student = await repo.get_student_by_no(db, normalized_student_no)
+            if student is None:
+                raise NotFoundError(f"学号 {normalized_student_no} 未在学生主档中，无法绑定")
+            user.student_id = student.id
+            user.student = student
+            user.display_name = student.full_name or user.display_name
+            await db.flush()
+            await repo.ensure_user_role(db, user_id=user.id, role_code=ROLE_STUDENT)
+            await repo.remove_user_role(db, user_id=user.id, role_code=ROLE_GUEST)
+            await log_action(
+                db,
+                event_type="AUTH",
+                entity_code="USER",
+                action="BIND_STUDENT",
+                entity_id=user.id,
+                actor_user_id=user.id,
+                ip_address=ip,
+                detail={"student_no": normalized_student_no},
+                auto_flush=False,
+            )
+        else:
+            await repo.ensure_user_role(db, user_id=user.id, role_code=ROLE_GUEST)
+    else:
+        await repo.ensure_user_role(db, user_id=user.id, role_code=ROLE_STUDENT)
+        await repo.remove_user_role(db, user_id=user.id, role_code=ROLE_GUEST)
 
     await repo.update_last_login(db, user)
     await log_action(

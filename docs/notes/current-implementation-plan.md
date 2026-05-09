@@ -392,12 +392,12 @@
 - [x] `S11.3` 在服务器部署数据库、后端与 Web，并执行数据库迁移与初始种子。
 - [x] `S11.4` 将教师/管理端 Web 与微信小程序 API 基址接到 `http://123.57.54.195/api/v1`，小程序 AppID 切换为 `wxcb6352a74505bc41` 并重构建。
 - [x] `S11.5` 完成健康检查、API smoke、Web 静态访问和小程序出包验证。
-- [x] `S11.6` 对接微信官方登录鉴权并治理未登录频发请求；代码、构建、后端同步、真实微信配置切换、日志脱敏与无效 code smoke 已完成。
+- [x] `S11.6` 对接微信官方登录鉴权并治理未登录频发请求；代码、构建、后端同步、真实微信配置切换、日志脱敏、无效 code smoke、访客登录、学号绑定续修、退出登录确认与输入框宽度修复已完成。
 
 当前结论：
 
 - `S11.1 ~ S11.5` 已完成；临时部署细化见 `docs/notes/refinements/2026-05-09-temporary-ip-deployment.md`。
-- `S11.6` 已完成代码与部署加固，小程序未登录请求循环已在本地产物中消除；服务器已配置真实微信 AppSecret 并关闭 mock，真实 `code2Session` 路径已用无效 code smoke 验证，且已压低 `httpx/httpcore` 日志避免输出微信查询串，细化见 `docs/notes/refinements/2026-05-09-wechat-auth-login-hardening.md`。
+- `S11.6` 已完成代码与部署加固，小程序未登录请求循环已在本地产物中消除；服务器已配置真实微信 AppSecret 并关闭 mock，真实 `code2Session` 路径已用无效 code smoke 验证；后续已按当前用户要求改为“无学号仅访客身份登录”，补齐访客态前端分流、退出登录确认、输入框宽度修复、`2024201534 / 2024202721` 远端学生主档，并通过本地静态/构建/定向集成测试与远端健康检查，细化见 `docs/notes/refinements/2026-05-09-wechat-auth-login-hardening.md`。
 
 ## 细化文件登记
 
@@ -450,7 +450,7 @@
 | 2026-05-06 | S9 并行 ABC 优化 | `docs/notes/refinements/2026-05-06-s9-parallel-abc-optimization.md` | `S9.1, S9.2, S9.3, S9.4, S9.DB` | `[x]` | Web/Miniapp/Backend/DB 小步优化已落地并通过静态与双端构建；后端定向集成测试已在隔离 Kingbase 上补跑通过 `8 passed` |
 | 2026-05-08 | 软件设计规格说明书出件 | `docs/notes/refinements/2026-05-08-software-design-spec-delivery.md` | `S10.1, S10.2, S10.3` | `[x]` | 已按模板生成 SDS docx，迁移 6 张 Mermaid 图源，并完成 Word/PDF/PNG 渲染检查 |
 | 2026-05-09 | 临时 IP 直连部署联调 | `docs/notes/refinements/2026-05-09-temporary-ip-deployment.md` | `S11.1, S11.2, S11.3, S11.4, S11.5` | `[x]` | 已完成临时服务器部署、数据库迁移与种子、Web 与小程序重构建、HTTP/API smoke 验证 |
-| 2026-05-09 | 微信小程序登录鉴权与未登录请求治理 | `docs/notes/refinements/2026-05-09-wechat-auth-login-hardening.md` | `S11.6` | `[x]` | 已按微信官方登录流程加固后端与小程序请求层，并同步重建远端后端；续跑复核通过类型检查、后端静态校验、临时 IP 小程序出包、真实模式无效 code smoke 与日志脱敏检查 |
+| 2026-05-09 | 微信小程序登录鉴权与未登录请求治理 | `docs/notes/refinements/2026-05-09-wechat-auth-login-hardening.md` | `S11.6` | `[x]` | 已按微信官方登录流程加固后端与小程序请求层，并同步重建远端后端；续跑复核通过类型检查、后端静态校验、临时 IP 小程序出包、真实模式无效 code smoke、日志脱敏检查、访客登录/绑定续修、退出确认和输入框宽度修复 |
 
 ## 会话更新要求
 

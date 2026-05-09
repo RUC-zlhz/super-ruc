@@ -33,7 +33,7 @@
           <input
             class="bind-input"
             v-model="studentNoForBinding"
-            placeholder="首次登录请输入学号完成绑定"
+            placeholder="填写学号绑定，留空以访客登录"
             confirm-type="done"
           />
           <button
@@ -47,7 +47,7 @@
           >
             <text class="btn-icon">❖</text> 微信一键登录
           </button>
-          <text class="login-note">已绑定微信可直接登录；未绑定时填写学号后自动绑定。</text>
+          <text class="login-note">已绑定微信可直接登录；不填学号将以访客身份进入。</text>
         </view>
       </view>
     </view>
@@ -65,13 +65,14 @@
           <view class="avatar-row">
             <image v-if="auth.user?.avatar_url" :src="auth.user.avatar_url" class="avatar" />
             <view v-else class="avatar fallback">
-              <text>{{ (auth.user?.display_name || '学')[0] }}</text>
+              <text>{{ (isGuest ? '访' : auth.user?.display_name || '学')[0] }}</text>
             </view>
             <view class="summary-text">
               <view class="summary-head">
-                <text class="name">{{ auth.user?.display_name || '同学' }}</text>
+                <text class="name">{{ isGuest ? '访客' : auth.user?.display_name || '同学' }}</text>
+                <text v-if="isGuest" class="summary-status inactive">访客</text>
                 <text
-                  v-if="profile?.student.enrollment_status"
+                  v-else-if="profile?.student.enrollment_status"
                   class="summary-status"
                   :class="{ inactive: !canEditProfile }"
                 >
@@ -100,7 +101,36 @@
         </view>
       </view>
 
-      <view v-if="profile" class="section metric-section">
+      <view v-if="isGuest" class="section guest-section">
+        <view class="section-head">
+          <view class="section-copy">
+            <text class="section-title">访客身份</text>
+            <text class="section-tip">填写学生主档中的学号后，可绑定并查看个人画像。</text>
+          </view>
+        </view>
+        <input
+          class="bind-input guest-bind-input"
+          v-model="studentNoForBinding"
+          placeholder="请输入学号完成绑定"
+          confirm-type="done"
+        />
+        <button
+          class="primary-button"
+          :type="UNI_BUTTON_TYPE.primary"
+          size="default"
+          hover-class="hover-scale"
+          :loading="loginSubmitting"
+          :disabled="loginSubmitting"
+          @tap="onBindStudent"
+        >
+          <text class="btn-icon">❖</text> 绑定学号
+        </button>
+        <view class="guest-logout" hover-class="hover-opacity" @tap="onLogout">
+          <text class="logout-text">退出登录</text>
+        </view>
+      </view>
+
+      <view v-if="!isGuest && profile" class="section metric-section">
         <view class="section-head">
           <view class="section-copy">
             <text class="section-title">成长统计</text>
@@ -117,7 +147,7 @@
         </view>
       </view>
 
-      <view v-if="profile" class="section service-section">
+      <view v-if="!isGuest && profile" class="section service-section">
         <view class="section-head">
           <view class="section-copy">
             <text class="section-title">功能与服务</text>
@@ -201,7 +231,7 @@
         </view>
       </view>
 
-      <view v-if="profile && profile.facts?.length" class="section archive-section">
+      <view v-if="!isGuest && profile && profile.facts?.length" class="section archive-section">
         <view class="section-head">
           <view class="section-copy">
             <text class="section-title">成长档案</text>
@@ -222,7 +252,7 @@
         </view>
       </view>
 
-      <view class="section">
+      <view v-if="!isGuest" class="section">
         <view class="section-head">
           <view class="section-copy">
             <text class="section-title">我的纠错申诉</text>
@@ -247,7 +277,7 @@
         <view v-else class="empty-inline">暂无纠错申诉记录</view>
       </view>
 
-      <view class="section">
+      <view v-if="!isGuest" class="section">
         <view class="section-head">
           <view class="section-copy">
             <text class="section-title">完整查看申请</text>
@@ -272,7 +302,7 @@
         <view v-else class="empty-inline">暂无完整查看申请</view>
       </view>
 
-      <view class="section">
+      <view v-if="!isGuest" class="section">
         <view class="section-head">
           <view class="section-copy">
             <text class="section-title">我的成长补录</text>
@@ -303,7 +333,7 @@
         <view v-else class="empty-inline">成长补录功能将在后端接口上线后自动接通</view>
       </view>
 
-      <view class="section action-panel">
+      <view v-if="!isGuest" class="section action-panel">
         <view class="section-head">
           <view class="section-copy">
             <text class="section-title">操作区</text>
@@ -331,7 +361,7 @@
         </view>
       </view>
 
-      <view v-if="appealVisible" class="sheet-mask" @tap="closeAppeal">
+      <view v-if="!isGuest && appealVisible" class="sheet-mask" @tap="closeAppeal">
         <view class="popup-panel" @tap.stop>
           <view class="popup-handle"></view>
           <view class="popup-header">
@@ -385,7 +415,7 @@
         </view>
       </view>
 
-      <view v-if="growthVisible" class="sheet-mask" @tap="closeGrowthSubmission">
+      <view v-if="!isGuest && growthVisible" class="sheet-mask" @tap="closeGrowthSubmission">
         <view class="popup-panel" @tap.stop>
           <view class="popup-handle"></view>
           <view class="popup-header">
@@ -588,6 +618,8 @@ const studentStatusLabel = computed(() => {
   return ENROLLMENT_STATUS_LABELS[status] || status || '未知'
 })
 
+const isGuest = computed(() => auth.isLoggedIn && !auth.user?.student_id)
+
 const canEditProfile = computed(() => {
   const status = profile.value?.student.enrollment_status
   return !!status && ACTIVE_ENROLLMENT_STATUSES.has(status)
@@ -710,9 +742,20 @@ function settleAll<T extends readonly Promise<unknown>[]>(
 }
 
 function ensureEditable() {
+  if (isGuest.value) {
+    uni.showToast({ title: '请先绑定学号', icon: 'none' })
+    return false
+  }
   if (canEditProfile.value) return true
   uni.showToast({ title: '当前学籍状态仅支持只读查看', icon: 'none' })
   return false
+}
+
+function clearProfileData() {
+  profile.value = null
+  corrections.value = []
+  factSubmissions.value = []
+  fullViewRequests.value = []
 }
 
 function getWxLoginCode(): Promise<string> {
@@ -737,8 +780,15 @@ async function onWxLogin() {
   loginSubmitting.value = true
   try {
     const code = await getWxLoginCode()
-    await auth.wxLogin(code, studentNoForBinding.value)
-    await loadAll()
+    const normalizedStudentNo = studentNoForBinding.value.trim()
+    await auth.wxLogin(code, normalizedStudentNo || undefined)
+    if (auth.user?.student_id) {
+      await loadAll()
+      uni.showToast({ title: '登录成功', icon: 'none' })
+    } else {
+      clearProfileData()
+      uni.showToast({ title: '已以访客身份登录', icon: 'none' })
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : '登录失败'
     uni.showToast({ title: message || '登录失败', icon: 'none' })
@@ -747,7 +797,19 @@ async function onWxLogin() {
   }
 }
 
+async function onBindStudent() {
+  if (!studentNoForBinding.value.trim()) {
+    uni.showToast({ title: '请先填写学号', icon: 'none' })
+    return
+  }
+  await onWxLogin()
+}
+
 async function loadAll() {
+  if (isGuest.value) {
+    clearProfileData()
+    return
+  }
   const [profileResp, correctionsResp, submissionsResp, fullViewResp] = await settleAll([
     getMyProfile(),
     getMyCorrections({ page: 1, size: 10 }),
@@ -935,12 +997,20 @@ async function onSubmitGrowth() {
 }
 
 function onLogout() {
-  auth.logout()
-  uni.showToast({ title: '已退出', icon: 'none' })
-  profile.value = null
-  corrections.value = []
-  factSubmissions.value = []
-  fullViewRequests.value = []
+  uni.showModal({
+    title: '退出登录',
+    content: '确认退出当前账号？',
+    confirmText: '退出',
+    cancelText: '取消',
+    confirmColor: '#c11729',
+    success(res) {
+      if (!res.confirm) return
+      auth.logout()
+      uni.showToast({ title: '已退出', icon: 'none' })
+      clearProfileData()
+      studentNoForBinding.value = ''
+    },
+  })
 }
 
 onMounted(async () => {
@@ -1146,6 +1216,13 @@ onMounted(async () => {
   margin: 18rpx 0 28rpx;
 }
 
+.login-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .btn-icon {
   margin-right: 8rpx;
   font-size: 32rpx;
@@ -1153,6 +1230,8 @@ onMounted(async () => {
 }
 
 .primary-button {
+  width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1161,6 +1240,8 @@ onMounted(async () => {
 }
 
 .bind-input {
+  width: 100%;
+  min-width: 0;
   height: 84rpx;
   margin-bottom: 18rpx;
   padding: 0 26rpx;
@@ -1171,6 +1252,27 @@ onMounted(async () => {
   font-size: 27rpx;
   box-sizing: border-box;
   text-align: left;
+}
+
+.guest-section {
+  margin-top: 6rpx;
+}
+
+.guest-bind-input {
+  margin-bottom: 18rpx;
+}
+
+.guest-logout {
+  width: 100%;
+  min-height: 80rpx;
+  margin-top: 18rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20rpx;
+  background: #fff6f6;
+  border: 1rpx solid #f3d7dc;
+  box-sizing: border-box;
 }
 
 .profile-hero {
@@ -1964,6 +2066,9 @@ onMounted(async () => {
 .input,
 .textarea,
 .picker-value {
+  width: 100%;
+  min-width: 0;
+  display: block;
   background: #fbf8f8;
   border-radius: 18rpx;
   padding: 20rpx 20rpx;
@@ -1980,10 +2085,15 @@ onMounted(async () => {
 
 .double-row {
   display: flex;
+  flex-direction: column;
   gap: 16rpx;
 }
 
-.half { flex: 1; }
+.half {
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+}
 
 .popup-footer {
   display: flex;

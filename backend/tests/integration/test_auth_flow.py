@@ -118,18 +118,45 @@ async def test_refresh_token_returns_new_access(
     assert body["data"]["access_token"]
 
 
-async def test_wx_login_without_student_no_still_works(
+async def test_wx_login_without_student_no_returns_guest_session(
     client: AsyncClient,
 ) -> None:
-    """首次登录可不传 student_no（后续再绑）。"""
     resp = await client.post(
         "/api/v1/auth/wx-login", json={"code": "wx_code_unbound"}
     )
     assert resp.status_code == 200, resp.text
-    user = resp.json()["data"]["user"]
+    body = resp.json()
+    assert body["code"] == 0
+    user = body["data"]["user"]
+    assert user["student_id"] is None
     assert user["student_no"] is None
-    # 已授予 STUDENT 角色
+    assert any(r["code"] == "GUEST" for r in user["roles"])
+    assert not any(r["code"] == "STUDENT" for r in user["roles"])
+
+
+async def test_guest_wx_login_can_bind_student_later(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    db.add(Student(student_no="2022110104", full_name="测试学生D"))
+    await db.commit()
+
+    guest_resp = await client.post(
+        "/api/v1/auth/wx-login", json={"code": "wx_code_guest_bind"}
+    )
+    assert guest_resp.status_code == 200, guest_resp.text
+    assert guest_resp.json()["data"]["user"]["student_id"] is None
+
+    bind_resp = await client.post(
+        "/api/v1/auth/wx-login",
+        json={"code": "wx_code_guest_bind", "student_no": "2022110104"},
+    )
+
+    assert bind_resp.status_code == 200, bind_resp.text
+    user = bind_resp.json()["data"]["user"]
+    assert user["student_no"] == "2022110104"
+    assert user["display_name"] == "测试学生D"
     assert any(r["code"] == "STUDENT" for r in user["roles"])
+    assert not any(r["code"] == "GUEST" for r in user["roles"])
 
 
 async def test_wx_login_with_unknown_student_no_returns_404(

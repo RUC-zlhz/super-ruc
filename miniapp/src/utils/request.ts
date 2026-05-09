@@ -78,9 +78,23 @@ function isLoginPageActive(): boolean {
   return getCurrentRoute() === LOGIN_PAGE_URL.replace(/^\//, '')
 }
 
-function isAuthEndpoint(url: string): boolean {
+function getApiPath(url: string): string {
   const path = (url.startsWith('/') ? url : `/${url}`).split('?')[0]
-  return path.startsWith('/auth/')
+  return path
+}
+
+function isAuthEndpoint(url: string): boolean {
+  return getApiPath(url).startsWith('/auth/')
+}
+
+function isLoginEndpoint(url: string): boolean {
+  const path = getApiPath(url)
+  return path === '/auth/wx-login' || path === '/auth/login'
+}
+
+function getEnvelopeMessage<T>(payload: ApiEnvelope<T> | undefined, fallback: string): string {
+  const message = typeof payload?.message === 'string' ? payload.message.trim() : ''
+  return message || fallback
 }
 
 function redirectToLoginOnce() {
@@ -124,6 +138,7 @@ export function request<T>(
       reject(new AuthRequiredError())
       return
     }
+    const loginEndpoint = isLoginEndpoint(url)
     uni.request({
       url: buildApiUrl(url),
       // uni-app runtime accepts PATCH here, but the shipped type definition does not.
@@ -136,15 +151,17 @@ export function request<T>(
       success(res) {
         const payload = res.data as ApiEnvelope<T>
         if (res.statusCode === 401) {
-          handleUnauthorized(true)
-          reject(new Error('登录已失效'))
+          const message = getEnvelopeMessage(payload, loginEndpoint ? '登录失败' : '登录已失效')
+          if (!loginEndpoint) handleUnauthorized(true)
+          reject(new Error(message))
           return
         }
         if (payload && payload.code === 0) {
           resolve(payload)
         } else {
-          uni.showToast({ title: payload?.message || '请求失败', icon: 'none' })
-          reject(payload)
+          const message = getEnvelopeMessage(payload, '请求失败')
+          if (!loginEndpoint) uni.showToast({ title: message, icon: 'none' })
+          reject(new Error(message))
         }
       },
       fail(err) {

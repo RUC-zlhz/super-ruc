@@ -1,7 +1,7 @@
 # 2026-05-09 微信小程序登录鉴权与未登录请求治理
 
 - 关联主计划条目：`S11.6`
-- 状态：`[x]` 代码、部署加固、真实微信配置切换、日志脱敏与无效 code smoke 已完成；端侧最终验收需由微信开发者工具生成真实 `wx.login()` code。
+- 状态：`[x]` 代码、部署加固、真实微信配置切换、日志脱敏、访客登录、学号绑定续修、远端学生主档补录与无效 code smoke 已完成；端侧最终验收需由微信开发者工具生成真实 `wx.login()` code。
 - 背景：前后端已部署到 `123.57.54.195` 后，小程序学生端需要按微信官方登录流程完成 `wx.login()` -> `code2Session` -> 自定义登录态，同时消除未登录状态下反复触发 `/auth/me` 与业务接口 401 的刷新循环。
 
 ## 官方依据
@@ -18,6 +18,9 @@
 - [x] `S11.6.5` 更新临时部署配置：`deploy/temp-ip/docker-compose.yml` 的 mock 默认值改为 `false`，部署说明要求真实联调必须配置 `WECHAT_SECRET`。
 - [x] `S11.6.6` 已将后端加固代码同步到 `123.57.54.195` 并重建 `super-ruc-temp-backend-1`。
 - [x] `S11.6.7` 远端切换真实微信登录：服务器 `.env` 已配置真实 AppSecret，并将 `WECHAT_MOCK_ENABLED=false` 后重建 `super-ruc-temp-backend-1`。
+- [x] `S11.6.8` 按当前用户确认调整为“无学号仅访客身份登录”：后端签发 `GUEST` token，学生画像/通知/申请等学生专属接口不再由访客态主动请求。
+- [x] `S11.6.9` 画像页增加访客绑定学号入口、退出登录确认弹窗，并加宽登录/绑定/弹层表单输入框。
+- [x] `S11.6.10` 远端学生主档补录 `2024201534`、`2024202721`，并同步重建远端后端。
 
 ## 验证结果
 
@@ -50,3 +53,20 @@
 - 已在 `backend/app/main.py` 将 `httpx/httpcore` 日志级别压到 `WARNING`，避免微信 `code2Session` 查询串进入 INFO 日志。
 - 已重建远端后端并清空当前 backend 容器日志；再次无效 code smoke 后，`docker compose logs --tail=80 backend` 未出现 `secret=`、`sns/jscode2session` 或 `api.weixin.qq.com`。
 - 剩余人工验收：在微信开发者工具或真机中触发 `wx.login()` 生成真实 code，验证首次绑定学号与后续免填学号登录。
+
+## 登录失败续修（2026-05-09）
+
+- 已按阶段性排障将后端首次微信登录规则短暂收紧为“必须绑定已有学生主档学号”，用于确认登录失败根因；该口径已在后续访客登录续修中替代。
+- 已调整小程序请求层：`/auth/wx-login` 的 401 / 404 等后端错误会原样传递给登录页，不再被统一吞成“登录失败”或“登录已失效”。
+- 已重新执行 `miniapp vue-tsc`、后端 `ruff check`、后端 `py_compile` 与 `deploy/temp-ip/build-miniapp.ps1`，均通过。
+- 已同步 `backend/app/auth/service.py` 与 `backend/app/main.py` 到 `123.57.54.195` 并重建 backend；远端健康检查通过，`WECHAT_MOCK_ENABLED=false`、`WECHAT_SECRET_SET=yes`。
+
+## 访客登录与绑定续修（2026-05-09）
+
+- 后端 `login_with_wechat` 已改为：未传学号且当前 openid 未绑定学生时创建/复用 `GUEST` 用户并签发访客 token；后续同一 openid 传入有效学号时绑定学生主档、授予 `STUDENT` 角色并移除 `GUEST` 角色。
+- 小程序画像页已区分访客态：访客不再调用 `/profile/me`、纠错、补录、完整查看等学生专属接口；访客页仅展示绑定学号入口和退出登录入口。
+- 小程序首页已在访客态或未登录态清空首页学生数据，并跳过通知、申请、流程等受保护请求，避免再次产生未登录/无学生档案的频发刷新。
+- 已为退出登录增加确认弹窗；已将登录学号输入框、访客绑定输入框、画像弹层输入框/日期选择区域统一设置为全宽，避免窄屏下输入区域过窄。
+- 已在远端数据库补录 `2024201534`、`2024202721` 两条学生主档，年级 `2024`，预计毕业 `2028`，学籍状态 `ACTIVE`。
+- 验证：`miniapp vue-tsc` 通过；后端 `ruff check` 与 `py_compile` 通过；隔离 Kingbase `127.0.0.1:54323/sip_db_test` 定向执行 `test_auth_flow.py`，结果 `10 passed`；`deploy/temp-ip/build-miniapp.ps1` 出包通过。
+- 远端验证：已同步 `backend/app/auth/service.py` 与 `backend/app/auth/repository.py` 到 `123.57.54.195` 并重建 `super-ruc-temp-backend-1`；`/healthz` 返回正常；容器环境仍为 `WECHAT_MOCK_ENABLED=false`、`WECHAT_SECRET_SET=yes`；无效 code smoke 返回微信凭证无效的 `401`。

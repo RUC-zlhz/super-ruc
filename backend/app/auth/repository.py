@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import Role, Student, User, UserRole
@@ -61,6 +61,57 @@ async def add_user_role(
     db.add(ur)
     await db.flush()
     return ur
+
+
+async def ensure_user_role(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    role_code: str,
+    scope_code: str | None = None,
+    granted_by: int | None = None,
+) -> UserRole:
+    scope_condition = (
+        UserRole.scope_code.is_(None)
+        if scope_code is None
+        else UserRole.scope_code == scope_code
+    )
+    stmt = select(UserRole).where(
+        UserRole.user_id == user_id,
+        UserRole.role_code == role_code,
+        scope_condition,
+    )
+    existing = (await db.execute(stmt)).scalar_one_or_none()
+    if existing is not None:
+        return existing
+    return await add_user_role(
+        db,
+        user_id=user_id,
+        role_code=role_code,
+        scope_code=scope_code,
+        granted_by=granted_by,
+    )
+
+
+async def remove_user_role(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    role_code: str,
+    scope_code: str | None = None,
+) -> None:
+    scope_condition = (
+        UserRole.scope_code.is_(None)
+        if scope_code is None
+        else UserRole.scope_code == scope_code
+    )
+    stmt = delete(UserRole).where(
+        UserRole.user_id == user_id,
+        UserRole.role_code == role_code,
+        scope_condition,
+    )
+    await db.execute(stmt)
+    await db.flush()
 
 
 async def get_student_by_no(db: AsyncSession, student_no: str) -> Student | None:
