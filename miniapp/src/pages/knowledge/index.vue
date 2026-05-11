@@ -2,7 +2,7 @@
   <view class="container">
     <view class="search-panel">
       <view class="search-bar">
-        <text class="search-icon">⌕</text>
+        <text class="search-icon">查</text>
         <input
           class="search-input"
           v-model="query"
@@ -11,7 +11,7 @@
           @confirm="onSearch"
         />
         <button class="search-btn" hover-class="hover-opacity" @tap="onSearch" size="mini" :type="UNI_BUTTON_TYPE.primary">
-          <text class="btn-icon">🔍</text> 搜索
+          <text class="btn-icon">搜</text> 搜索
         </button>
       </view>
 
@@ -51,7 +51,7 @@
         :disabled="aiLoading"
         @tap="onAiMatch"
       >
-        <text class="btn-icon">✨</text>{{ aiLoading ? '匹配中' : '智能匹配' }}
+        <text class="btn-icon">智</text>{{ aiLoading ? '匹配中' : '智能匹配' }}
       </button>
     </view>
 
@@ -83,10 +83,10 @@
         <view class="result-main">
           <view class="result-head">
             <text class="result-title">{{ item.title }}</text>
-            <text class="result-arrow">›</text>
+            <view class="result-arrow"><view class="mini-chevron" /></view>
           </view>
           <view class="result-meta" v-if="item.category_code || item.version_label">
-            <text class="meta-school">🏛</text>
+            <text class="meta-school">校</text>
             <text class="result-category">
               {{ [item.category_code, item.version_label].filter(Boolean).join(' · ') }}
             </text>
@@ -350,9 +350,19 @@ onMounted(async () => {
 .search-icon {
   position: absolute;
   z-index: 1;
-  margin-left: 24rpx;
-  font-size: 36rpx;
-  color: #9aa0a6;
+  left: 24rpx;
+  top: 24rpx;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  font-weight: 900;
+  background: rgba(148, 163, 184, 0.14);
+  border: 1rpx solid rgba(148, 163, 184, 0.26);
+  color: rgba(71, 85, 105, 0.9);
 }
 .search-input {
   flex: 1;
@@ -364,9 +374,27 @@ onMounted(async () => {
   background: #fff;
 }
 .btn-icon {
-  margin-right: 6rpx;
-  font-size: 26rpx;
-  vertical-align: middle;
+  width: 36rpx;
+  height: 36rpx;
+  margin-right: 10rpx;
+  border-radius: 14rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  font-weight: 900;
+  background: rgba(183, 15, 36, 0.08);
+  border: 1rpx solid rgba(183, 15, 36, 0.18);
+}
+
+.search-btn .btn-icon {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.ai-btn .btn-icon {
+  background: rgba(183, 15, 36, 0.08);
+  border-color: rgba(183, 15, 36, 0.18);
 }
 
 .search-btn {
@@ -532,7 +560,14 @@ onMounted(async () => {
   color: #202124;
   display: block;
 }
-.result-arrow { color: #a6a6a6; font-size: 34rpx; }
+.result-arrow {
+  width: 44rpx;
+  height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a6a6a6;
+}
 .result-meta {
   display: flex;
   align-items: center;
@@ -543,6 +578,19 @@ onMounted(async () => {
 .result-category {
   font-size: 23rpx;
   color: #b70f24;
+}
+
+.meta-school {
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 14rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  font-weight: 900;
+  background: rgba(183, 15, 36, 0.08);
+  border: 1rpx solid rgba(183, 15, 36, 0.16);
 }
 .result-body {
   font-size: 25rpx;

@@ -1,6 +1,13 @@
 <template>
   <view class="container">
-    <view v-if="loading" class="loading">加载中...</view>
+    <EmptyState
+      v-if="loading"
+      icon="◷"
+      tone="muted"
+      title="通知加载中"
+      description="正在获取通知详情，请稍候。"
+      compact
+    />
 
     <template v-else-if="notice">
       <view class="notice-hero">
@@ -53,19 +60,29 @@
 
       <view class="bottom-spacer" />
       <view class="bottom-actions safe-area-inset-bottom">
-        <view class="bottom-action secondary" @tap="toggleFavorite">
+        <view class="bottom-action secondary" hover-class="hover-opacity" @tap="toggleFavorite">
           {{ favorited ? '★' : '☆' }}<text>{{ favorited ? '已收藏' : '收藏' }}</text>
         </view>
-        <view class="bottom-action primary" @tap="shareNotice">↗<text>分享</text></view>
+        <view class="bottom-action primary" hover-class="hover-opacity" @tap="shareNotice">↗<text>分享</text></view>
       </view>
     </template>
 
-    <view v-else class="empty">未找到通知</view>
+    <EmptyState
+      v-else
+      icon="?"
+      tone="danger"
+      title="未找到通知"
+      description="该通知可能已失效或无权访问，可返回列表重试。"
+      action-text="返回列表"
+      @action="goBack"
+      compact
+    />
   </view>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { getNoticeDetail, markRead, type NoticeDetail } from '@/api/notice'
 
 const notice = ref<NoticeDetail | null>(null)
@@ -120,6 +137,10 @@ function shareNotice() {
   })
 }
 
+function goBack() {
+  uni.navigateBack({ delta: 1 })
+}
+
 async function loadDetail() {
   if (noticeId.value == null) return
   loading.value = true
@@ -170,7 +191,6 @@ onMounted(() => {
     linear-gradient(180deg, #b70f24 0, #b70f24 228rpx, #f8f3f4 462rpx),
     #f7f1f2;
 }
-.loading, .empty { text-align: center; padding: 80rpx 0; color: #999; font-size: 28rpx; }
 .empty-tiny { text-align: center; padding: 16rpx 0; color: #bbb; font-size: 24rpx; }
 
 .notice-hero {

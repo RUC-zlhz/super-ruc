@@ -1,6 +1,13 @@
 <template>
   <view class="container">
-    <view v-if="loading" class="loading">加载中...</view>
+    <EmptyState
+      v-if="loading"
+      icon="◷"
+      tone="muted"
+      title="申请详情加载中"
+      description="正在获取申请记录，请稍候。"
+      compact
+    />
 
     <template v-else-if="detail">
       <view class="hero-card">
@@ -67,12 +74,19 @@
             hover-class="hover-opacity"
             @tap="onPreviewProof"
           >
-            <text class="btn-icon">🔍</text>
+            <text class="btn-icon">查</text>
             <text>预览 PDF</text>
           </button>
         </view>
         <view class="pdf-card">
-          <view class="pdf-cover">PDF</view>
+          <view
+            class="pdf-cover"
+            :class="{ disabled: !canPreviewProof }"
+            hover-class="hover-opacity"
+            @tap="onPreviewProof"
+          >
+            PDF
+          </view>
           <view class="pdf-copy">
             <text class="pdf-title">证明材料 PDF 预览</text>
             <text class="pdf-meta">
@@ -119,7 +133,7 @@
             :key="attachment.id"
             class="attachment-card"
           >
-            <view class="attachment-icon">📄</view>
+            <view class="attachment-icon">文</view>
             <view class="attachment-main">
               <text class="att-name">{{ attachment.filename }}</text>
               <text class="att-meta">
@@ -184,7 +198,7 @@
               hover-class="hover-opacity"
               @tap="onWithdraw"
             >
-              <text class="btn-icon">↩️</text>
+              <text class="btn-icon">撤</text>
               <text>撤回申请</text>
             </button>
             <button
@@ -194,7 +208,7 @@
               hover-class="hover-scale"
               @tap="onEdit"
             >
-              <text class="btn-icon">✏️</text>
+              <text class="btn-icon">改</text>
               <text>{{ editButtonText }}</text>
             </button>
           </view>
@@ -203,7 +217,16 @@
       <view v-if="canEdit || canWithdraw" class="bottom-spacer" />
     </template>
 
-    <view v-else class="empty">未找到申请记录</view>
+    <EmptyState
+      v-else
+      icon="?"
+      tone="danger"
+      title="未找到申请记录"
+      description="该申请可能已失效或无权访问，可返回列表重试。"
+      action-text="返回列表"
+      @action="goBack"
+      compact
+    />
 
     <view v-if="withdrawDialogVisible" class="dialog-mask" @tap="resolveWithdrawDialog(false)">
       <view class="dialog-card" @tap.stop>
@@ -229,6 +252,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import EmptyState from "@/components/EmptyState.vue";
 import {
   getRequestActionLabel,
   getRequestDetail,
@@ -247,6 +271,10 @@ const requestId = ref<number | null>(null);
 const withdrawDialogVisible = ref(false);
 
 let withdrawDialogResolver: ((value: boolean) => void) | null = null;
+
+function goBack() {
+  uni.navigateBack({ delta: 1 })
+}
 
 function statusLabel(status: string) {
   return getRequestStatusLabel(status);
@@ -449,14 +477,6 @@ onMounted(() => {
     radial-gradient(circle at 100% 8%, rgba(183, 15, 36, 0.08), transparent 180rpx),
     linear-gradient(180deg, #fff 0, #fff6f7 220rpx, #f7f1f2 100%),
     #f6f0f1;
-}
-
-.loading,
-.empty {
-  text-align: center;
-  padding: 80rpx 0;
-  color: #94a3b8;
-  font-size: 28rpx;
 }
 
 .empty-tiny {
@@ -724,6 +744,11 @@ onMounted(() => {
   font-size: 24rpx;
   font-weight: 800;
   flex-shrink: 0;
+}
+
+.pdf-cover.disabled {
+  background: linear-gradient(135deg, #cbd5e1, #94a3b8);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .pdf-copy {
@@ -1035,9 +1060,22 @@ onMounted(() => {
 }
 
 .btn-icon {
-  margin-right: 8rpx;
-  font-size: 26rpx;
-  vertical-align: middle;
+  width: 36rpx;
+  height: 36rpx;
+  margin-right: 10rpx;
+  border-radius: 14rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  font-weight: 900;
+  background: rgba(183, 15, 36, 0.08);
+  border: 1rpx solid rgba(183, 15, 36, 0.18);
+}
+
+.action-btn.primary .btn-icon {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.28);
 }
 
 .action-btn {

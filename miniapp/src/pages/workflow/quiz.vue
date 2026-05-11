@@ -38,6 +38,7 @@
             :key="topic.value"
             class="topic-card"
             :class="{ active: form.topic === topic.value }"
+            hover-class="hover-scale"
             @tap="pickTopic(topic.value)"
           >
             <text class="topic-icon">{{ topic.icon }}</text>
@@ -58,6 +59,7 @@
             :key="limit"
             class="limit-pill"
             :class="{ active: form.limit === limit }"
+            hover-class="hover-opacity"
             @tap="form.limit = limit"
           >
             {{ limit }}题
@@ -89,7 +91,7 @@
       </view>
 
       <button :type="UNI_BUTTON_TYPE.primary" class="primary-btn" hover-class="hover-scale" @tap="startQuiz">
-        <text class="btn-icon">⚡</text> 开始自测
+        <text class="btn-icon">测</text> 开始自测
       </button>
       <text class="hint">
         本结果仅为学习辅助，分数不作为党团发展正式依据。
@@ -197,7 +199,8 @@
             hover-class="hover-opacity"
             @tap="prevQ"
           >
-            <text class="btn-icon">‹</text> 上一题
+            <view class="btn-icon"><view class="mini-chevron mini-chevron-left" /></view>
+            <text>上一题</text>
           </button>
           <button
             v-if="currentIdx < questions.length - 1"
@@ -207,7 +210,8 @@
             hover-class="hover-opacity"
             @tap="nextQ"
           >
-            下一题 <text class="btn-icon">›</text>
+            <text>下一题</text>
+            <view class="btn-icon"><view class="mini-chevron" /></view>
           </button>
           <button
             v-else
@@ -263,8 +267,8 @@
         </view>
       </view>
       <button :type="UNI_BUTTON_TYPE.primary" class="primary-btn" hover-class="hover-scale" @tap="restart">
-            <text class="btn-icon">↺</text> 再来一轮
-          </button>
+        <text class="btn-icon">重</text> 再来一轮
+      </button>
     </view>
   </view>
 </template>
@@ -778,7 +782,14 @@ onMounted(loadHistory);
 }
 
 .btn-icon {
-  font-size: 32rpx;
+  width: 34rpx;
+  height: 34rpx;
+  border-radius: 14rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  font-weight: 900;
 }
 
 .hint {

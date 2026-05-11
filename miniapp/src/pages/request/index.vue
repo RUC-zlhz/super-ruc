@@ -99,7 +99,7 @@
           被驳回或需补充的申请，会在列表中以红色提醒卡突出展示。
         </text>
       </view>
-      <text class="create-arrow">›</text>
+      <view class="create-arrow"><view class="mini-chevron" /></view>
     </view>
 
     <InlineStateNotice
@@ -111,11 +111,13 @@
       @action="reload"
     />
 
-    <view v-if="loading && !requests.length" class="empty-panel">
-      <text class="empty-icon">…</text>
-      <text class="empty-title">申请列表加载中</text>
-      <text class="empty-desc">正在同步你的申请记录，请稍候。</text>
-    </view>
+    <EmptyState
+      v-if="loading && !requests.length"
+      icon="…"
+      tone="muted"
+      title="申请列表加载中"
+      description="正在同步你的申请记录，请稍候。"
+    />
 
     <view v-else-if="requests.length" class="list">
       <view
@@ -166,17 +168,23 @@
             <text class="req-note-icon">{{ requestNoteIcon(request.status) }}</text>
             <text class="req-note-text">{{ requestStatusNote(request.status) }}</text>
           </view>
-          <text class="req-action">{{ requestActionText(request.status) }} ›</text>
+          <view class="req-action">
+            <text>{{ requestActionText(request.status) }}</text>
+            <view class="mini-chevron" />
+          </view>
         </view>
       </view>
     </view>
 
-    <view v-else-if="!loading && !pageError" class="empty-panel">
-      <text class="empty-icon">🗂</text>
-      <text class="empty-title">当前筛选下暂无申请记录</text>
-      <text class="empty-desc">可切换状态筛选，或直接发起新的事务申请。</text>
-      <view class="empty-action" hover-class="hover-opacity" @tap="goCreate">立即发起</view>
-    </view>
+    <EmptyState
+      v-else-if="!loading && !pageError"
+      icon="档"
+      tone="primary"
+      title="当前筛选下暂无申请记录"
+      description="可切换状态筛选，或直接发起新的事务申请。"
+      action-text="立即发起"
+      @action="goCreate"
+    />
   </view>
 </template>
 
@@ -184,6 +192,7 @@
 import { computed, ref } from "vue";
 import { onPullDownRefresh, onShow } from "@dcloudio/uni-app";
 import InlineStateNotice from "@/components/InlineStateNotice.vue";
+import EmptyState from "@/components/EmptyState.vue";
 import {
   getMyRequests,
   getRequestStatusLabel,
@@ -755,9 +764,15 @@ onPullDownRefresh(async () => {
 }
 
 .create-arrow {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 18rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(183, 15, 36, 0.08);
+  border: 1rpx solid rgba(183, 15, 36, 0.16);
   color: #b70f24;
-  font-size: 36rpx;
-  font-weight: 700;
 }
 
 .list {
@@ -975,52 +990,12 @@ onPullDownRefresh(async () => {
 
 .req-action {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
   color: #b70f24;
   font-size: 24rpx;
   font-weight: 700;
 }
 
-.empty-panel {
-  padding: 48rpx 32rpx;
-  border-radius: 28rpx;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1rpx solid rgba(232, 237, 243, 0.94);
-  box-shadow: var(--shadow-soft);
-  text-align: center;
-}
-
-.empty-icon {
-  display: block;
-  font-size: 66rpx;
-}
-
-.empty-title {
-  display: block;
-  margin-top: 14rpx;
-  font-size: 28rpx;
-  font-weight: 700;
-  color: #1e293b;
-}
-
-.empty-desc {
-  display: block;
-  margin-top: 10rpx;
-  font-size: 22rpx;
-  line-height: 1.7;
-  color: #64748b;
-}
-
-.empty-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 24rpx;
-  min-width: 200rpx;
-  padding: 16rpx 30rpx;
-  border-radius: 999rpx;
-  background: linear-gradient(135deg, #d51f35, #b70f24);
-  color: #fff;
-  font-size: 24rpx;
-  font-weight: 700;
-}
 </style>

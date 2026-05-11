@@ -19,7 +19,14 @@
       @action="reload"
     />
 
-    <view v-if="loading && !notices.length" class="empty">通知加载中...</view>
+    <EmptyState
+      v-if="loading && !notices.length"
+      icon="◷"
+      tone="muted"
+      title="通知加载中"
+      description="正在同步你的通知列表，请稍候。"
+      compact
+    />
 
     <view v-else-if="visibleNotices.length" class="list">
       <view
@@ -46,13 +53,20 @@
           <text class="notice-preview" v-if="n.summary">{{ n.summary.slice(0, 80) }}</text>
           <view class="notice-footer">
             <text class="notice-date">◷ {{ n.published_at?.slice(0, 16).replace('T', ' ') }}</text>
-            <text class="notice-arrow">›</text>
+            <view class="notice-arrow"><view class="mini-chevron" /></view>
           </view>
         </view>
       </view>
     </view>
 
-    <view v-else-if="!loading && !pageError" class="empty">暂无通知</view>
+    <EmptyState
+      v-else-if="!loading && !pageError"
+      icon="铃"
+      tone="primary"
+      title="暂无通知"
+      description="当前没有新的通知，可稍后下拉刷新。"
+      compact
+    />
 
     <view v-if="hasMore" class="load-more" hover-class="hover-opacity" @tap="loadMore">加载更多</view>
     <view v-else-if="!loading && notices.length" class="load-end">没有更多了</view>
@@ -63,6 +77,7 @@
 import { computed, ref } from 'vue'
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 import InlineStateNotice from '@/components/InlineStateNotice.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { getMyNotices, type StudentNoticeItem } from '@/api/notice'
 import { getErrorMessage } from '@/utils/error'
 import { openNoticeDetail } from '@/utils/navigation'
@@ -335,16 +350,14 @@ onPullDownRefresh(async () => {
   color: #b8bdc5;
 }
 .notice-arrow {
-  font-size: 30rpx;
+  width: 44rpx;
+  height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #c0a7ae;
 }
 
-.empty {
-  text-align: center;
-  padding: 96rpx 0;
-  color: #999;
-  font-size: 28rpx;
-}
 .load-more {
   width: 300rpx;
   margin: 18rpx auto 0;

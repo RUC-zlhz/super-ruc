@@ -92,7 +92,7 @@
           <text v-if="honor.summary" class="card-summary">{{ honor.summary.slice(0, 60) }}</text>
           <text v-if="isHistoricalRecord(honor)" class="archived-mark">{{ historyReasonLabel(honor) }}</text>
         </view>
-        <text class="card-arrow">›</text>
+        <view class="card-arrow"><view class="mini-chevron" /></view>
       </view>
     </view>
 
@@ -878,11 +878,11 @@ onMounted(() => {
   height: 44rpx;
   margin-top: -22rpx;
   border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: #fff;
   color: #8d9096;
-  font-size: 34rpx;
-  line-height: 44rpx;
-  text-align: center;
   box-shadow: 0 6rpx 16rpx rgba(38, 38, 38, 0.08);
 }
 

@@ -37,7 +37,7 @@
       </view>
       <view class="hero-side">
         <text class="hero-side-label">立即进入</text>
-        <text class="hero-arrow">›</text>
+        <view class="hero-arrow"><view class="mini-chevron" /></view>
       </view>
     </view>
 
@@ -58,11 +58,13 @@
       @action="reload"
     />
 
-    <view v-if="loading && !workflows.length" class="empty-panel">
-      <view class="empty-badge">同步中</view>
-      <text class="empty-title">流程列表加载中</text>
-      <text class="empty-desc">正在同步你的党团发展进度，请稍候。</text>
-    </view>
+    <EmptyState
+      v-if="loading && !workflows.length"
+      icon="◷"
+      tone="muted"
+      title="流程列表加载中"
+      description="正在同步你的党团发展进度，请稍候。"
+    />
 
     <template v-else-if="workflows.length">
       <view
@@ -118,16 +120,18 @@
 
         <view class="flow-footer">
           <text class="flow-link">查看完整时间轴与节点要求</text>
-          <text class="flow-arrow">›</text>
+          <view class="flow-arrow"><view class="mini-chevron" /></view>
         </view>
       </view>
     </template>
 
-    <view v-else-if="!pageError" class="empty-panel">
-      <view class="empty-badge">暂无进度</view>
-      <text class="empty-title">当前暂无党团流程记录</text>
-      <text class="empty-desc">如已报名相关流程，可稍后下拉刷新或联系负责老师确认。</text>
-    </view>
+    <EmptyState
+      v-else-if="!pageError"
+      icon="团"
+      tone="primary"
+      title="当前暂无党团流程记录"
+      description="如已报名相关流程，可稍后下拉刷新或联系负责老师确认。"
+    />
   </view>
 </template>
 
@@ -135,6 +139,7 @@
 import { computed, ref } from "vue";
 import { onPullDownRefresh, onShow } from "@dcloudio/uni-app";
 import InlineStateNotice from "@/components/InlineStateNotice.vue";
+import EmptyState from "@/components/EmptyState.vue";
 import { getMyWorkflows, type StudentWorkflow } from "@/api/workflow";
 import { getErrorMessage } from "@/utils/error";
 import { openMiniappPage } from "@/utils/navigation";
@@ -407,7 +412,11 @@ onPullDownRefresh(async () => {
 }
 
 .hero-arrow {
-  font-size: 36rpx;
+  width: 44rpx;
+  height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #b70f24;
 }
 
@@ -665,42 +674,12 @@ onPullDownRefresh(async () => {
 }
 
 .flow-arrow {
-  font-size: 30rpx;
+  width: 44rpx;
+  height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #a61e2d;
 }
 
-.empty-panel {
-  padding: 42rpx 32rpx;
-  border-radius: 28rpx;
-  background: #fff;
-  border: 1rpx solid #e8edf3;
-  box-shadow: var(--shadow-card);
-  text-align: center;
-}
-
-.empty-badge {
-  display: inline-flex;
-  padding: 8rpx 18rpx;
-  border-radius: 999rpx;
-  background: #fff1f2;
-  color: #b70f24;
-  font-size: 20rpx;
-  font-weight: 700;
-}
-
-.empty-title {
-  display: block;
-  margin-top: 18rpx;
-  font-size: 28rpx;
-  font-weight: 700;
-  color: #1e293b;
-}
-
-.empty-desc {
-  display: block;
-  margin-top: 10rpx;
-  font-size: 22rpx;
-  line-height: 1.7;
-  color: #64748b;
-}
 </style>

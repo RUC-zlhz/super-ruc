@@ -251,6 +251,7 @@
 - [x] `S6.19` Web / Miniapp 前端体验增量优化 Round 6 (交互增强)
 - [x] `S6.20` Miniapp 小程序主图标资产制作
 - [x] `S6.21` Web / Miniapp 按钮图标语义补齐 Round 7
+- [x] `S6.22` Miniapp 图标与空态收口 Round 8
 
 出口条件：
 
@@ -296,6 +297,8 @@
 - `S6.19`：已新增并完成 `docs/notes/refinements/2026-04-28-s6-frontend-optimization-round6.md`。本轮对 Web 增加全局卡片进入动画、路由切换过渡与 hover 态提升；对 Miniapp 增加统一的 `.hover-opacity` 与 `.hover-scale` 触摸反馈并在首页、事务申请、党团流程、通知页面全面覆盖。
 - `S6.20`：已新增并完成 `docs/notes/refinements/2026-04-28-s6-miniapp-app-icon-asset.md`。本轮新增 `scripts/miniapp/generate_app_icon.ps1`，生成 `miniapp/src/static/app-icon.png`、`app-icon-512.png`、`app-icon-144.png` 三个小程序主图标 PNG 资产，并在 `miniapp/README.md` 说明微信公众平台后台上传边界。
 - `S6.21`：已新增并完成 `docs/notes/refinements/2026-04-28-s6-button-icon-semantics-round7.md`。本轮对 Web 16 个核心视图中约 50 处 `<a-button>` 补充了 `@ant-design/icons-vue` 组件，大幅提升管理后台查询、操作和导出的直观语义；对 Miniapp 使用纯文本和 Emoji 图标强化了学生端的提交、重选、开始自测和退出操作。
+- `S6.22`：已新增并完成 `docs/notes/refinements/2026-05-11-s6-miniapp-icon-empty-state-round8.md`。本轮保留恢复 Git 历史后识别出的有效 Miniapp UI 优化：新增复用 `EmptyState`，统一高频页加载/空态/未找到状态，保留实际使用的 `mini-chevron` 基础箭头，收口首页服务单字语义徽章与按钮小图标，并删除未接入的全局样式占位和页面级旧空态样式；同时修正 `.gitignore`，避免正式 `output/` 交付件被静默忽略。
+- `2026-05-11` Miniapp 图标与空态收口验证：执行 `git diff --check` 通过；执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；执行 `pnpm -C miniapp build:mp-weixin` 通过，输出 `miniapp/dist/build/mp-weixin`。
 - 验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p web\tsconfig.json` 与 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 均通过；执行 `uv run --extra dev python -m py_compile app\knowledge\router.py app\knowledge\service.py tests\integration\test_knowledge_flow.py` 通过；本轮 `pytest tests\integration\test_knowledge_flow.py -q` 因本地测试数据库拒连未进入断言阶段。
 - `2026-04-27` 补充验证：执行 `UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache uv run --project backend --no-sync --with pypdf --with pdfplumber --with rapidocr-onnxruntime --with pillow python -m py_compile scripts\knowledge\extract_pdf_documents.py` 通过；执行 `UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache uv run --project backend --no-sync --with pypdf --with pdfplumber --with rapidocr-onnxruntime --with pillow python scripts\knowledge\extract_pdf_documents.py data --output-dir output\pdf\extracted --ocr` 通过，生成 4 份 JSON、4 份 Markdown 与 `manifest.json`；团员发展流程 PDF OCR 后正文字符数 `8925`、OCR 字符数 `3366`、chunk 数 `8`。
 - `2026-04-27` Miniapp JPG 视觉对齐验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；沙箱内 `pnpm -C miniapp build:mp-weixin` 因 esbuild `spawn EPERM` 失败，提权环境下重跑通过并输出 `dist\build\mp-weixin`；复核 `miniapp/dist/build/mp-weixin/app.json`、`project.config.json` 及页面级 JSON 存在。
@@ -330,6 +333,7 @@
 - `S6.19` 已完成双端交互增强：Web 端增加页面转场、卡片悬浮与载入动画，Miniapp 补充全局通用的触摸反馈机制，显著提升用户操作的确认感。
 - `S6.20` 已完成小程序主图标资产制作：`miniapp/src/static/app-icon.png` 可用于微信公众平台后台上传，`scripts/miniapp/generate_app_icon.ps1` 可稳定再生主图标与尺寸变体。
 - `S6.21` 已完成 Web 与 Miniapp 双端按钮图标语义补齐，解决了纯文字操作按钮的识别效率问题。
+- `S6.22` 已完成 Miniapp 图标与空态收口：学生端高频页加载/空态/未找到状态改用 `EmptyState`，页面箭头和按钮小图标切到可控样式，首页服务入口语义更清晰，且 `.gitignore` 不再遮蔽正式 `output/` 交付件。
 - `S6.6` 已证明 3 份文字型校级 PDF 可以直接结构化抽取，团员发展流程 PDF 的图片化页面可通过 `--ocr` 自动补齐；OCR 结果仍需人工校对后才能作为权威知识库条目。
 - 后续若继续推进，优先做知识库管理端真实数据走查、PDF OCR / 知识库草稿导入映射、短信 provider 适配或申请流程小程序真机验收。
 
@@ -451,6 +455,7 @@
 | 2026-05-08 | 软件设计规格说明书出件 | `docs/notes/refinements/2026-05-08-software-design-spec-delivery.md` | `S10.1, S10.2, S10.3` | `[x]` | 已按模板生成 SDS docx，迁移 6 张 Mermaid 图源，并完成 Word/PDF/PNG 渲染检查 |
 | 2026-05-09 | 临时 IP 直连部署联调 | `docs/notes/refinements/2026-05-09-temporary-ip-deployment.md` | `S11.1, S11.2, S11.3, S11.4, S11.5` | `[x]` | 已完成临时服务器部署、数据库迁移与种子、Web 与小程序重构建、HTTP/API smoke 验证 |
 | 2026-05-09 | 微信小程序登录鉴权与未登录请求治理 | `docs/notes/refinements/2026-05-09-wechat-auth-login-hardening.md` | `S11.6` | `[x]` | 已按微信官方登录流程加固后端与小程序请求层，并同步重建远端后端；续跑复核通过类型检查、后端静态校验、临时 IP 小程序出包、真实模式无效 code smoke、日志脱敏检查、访客登录/绑定续修、退出确认和输入框宽度修复 |
+| 2026-05-11 | Miniapp 图标与空态收口 Round 8 | `docs/notes/refinements/2026-05-11-s6-miniapp-icon-empty-state-round8.md` | `S6.22` | `[x]` | 已保留有效 Miniapp UI 优化、补 `EmptyState` 复用、清理未使用全局与页面级旧空态样式，并通过 `miniapp vue-tsc` 与 `mp-weixin` 出包 |
 
 ## 会话更新要求
 
@@ -509,3 +514,4 @@
 - `2026-04-28`：新增并完成 `S6.18` Miniapp 原生弹层运行时修复；知识、荣誉、画像页不再依赖未安装的 `uni-popup`，重新出包后产物无 `uni-popup` / `resolveComponent` 命中，并通过微信开发者工具 CLI `open / preview` 与日志过滤复核。
 - `2026-04-28`：新增并完成 `S6.19` Web / Miniapp 前端体验增量优化 Round 6 (交互增强)；对 Web 增加页面转场、卡片悬浮与载入动画，对 Miniapp 补充全局触摸反馈并覆盖首页、申请、流程、通知等高频入口，进一步提升双端操作平滑度。
 - `2026-04-28`：新增并完成 `S6.20` Miniapp 小程序主图标资产制作；生成 `app-icon.png`、`app-icon-512.png`、`app-icon-144.png`，补可复现生成脚本和 README 说明，并确认 `mp-weixin` 构建产物已带出图标资源。
+- `2026-05-11`：新增并完成 `S6.22` Miniapp 图标与空态收口 Round 8；恢复 Git 历史后保留有效学生端 UI 优化，补 `EmptyState` 复用、可控箭头/按钮小图标、首页服务单字语义徽章，清理未使用全局样式和页面级旧空态样式，并修正 `.gitignore` 对正式 `output/` 交付件的遮蔽风险。

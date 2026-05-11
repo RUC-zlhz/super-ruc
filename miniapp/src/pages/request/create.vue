@@ -7,7 +7,7 @@
         <view class="hero-main">
           <view class="hero-copy">
             <view class="hero-icon-wrap">
-              <text class="hero-icon">📝</text>
+              <text class="hero-icon">申</text>
             </view>
             <view class="hero-text">
               <text class="hero-eyebrow">事务申请中心</text>
@@ -43,13 +43,21 @@
           :description="presetFallbackDescription"
         />
 
-        <view v-if="loadingTypes" class="empty">加载中...</view>
+        <EmptyState
+          v-if="loadingTypes"
+          icon="◷"
+          tone="muted"
+          title="类型加载中"
+          description="正在同步可发起的事务类型，请稍候。"
+          compact
+        />
 
-        <view v-else class="type-grid">
+        <view v-else-if="types.length" class="type-grid">
           <view
             v-for="t in types"
             :key="t.id"
             class="type-item"
+            hover-class="hover-scale"
             @tap="onPickType(t)"
           >
             <view class="type-item-top">
@@ -64,12 +72,19 @@
             </text>
             <view class="type-cta">
               <text>选择并填写</text>
-              <text class="type-cta-arrow">›</text>
+              <view class="type-cta-arrow"><view class="mini-chevron" /></view>
             </view>
           </view>
         </view>
 
-        <view v-if="!loadingTypes && !types.length" class="empty">暂无可发起的事务</view>
+        <EmptyState
+          v-else
+          icon="申"
+          tone="primary"
+          title="暂无可发起的事务"
+          description="当前没有可用的事务类型配置，可稍后重试或联系管理员。"
+          compact
+        />
       </view>
     </view>
 
@@ -199,14 +214,14 @@
             hover-class="hover-opacity"
             @tap="onUploadAttachment"
           >
-            <text class="btn-icon">📎</text>
+            <text class="btn-icon">附</text>
             <text>上传附件</text>
           </button>
         </view>
 
         <view v-if="attachments.length" class="attachment-list">
           <view v-for="attachment in attachments" :key="attachment.id" class="attachment-row">
-            <view class="attachment-icon">📄</view>
+            <view class="attachment-icon">文</view>
             <view class="attachment-main">
               <text class="att-name">{{ attachment.filename }}</text>
               <text class="att-meta">{{ formatSize(attachment.file_size) }}</text>
@@ -267,7 +282,7 @@
               hover-class="hover-opacity"
               @tap="onReset"
             >
-              <text class="btn-icon">↺</text>
+              <text class="btn-icon">重</text>
               <text>重选</text>
             </button>
             <button
@@ -277,7 +292,7 @@
               :loading="saving"
               @tap="onSave"
             >
-              <text class="btn-icon">💾</text>
+              <text class="btn-icon">存</text>
               <text>{{ draftId ? "保存修改" : "保存草稿" }}</text>
             </button>
             <button
@@ -287,7 +302,7 @@
               :loading="submitting"
               @tap="onSubmit"
             >
-              <text class="btn-icon">🚀</text>
+              <text class="btn-icon">交</text>
               <text>{{ submitButtonText }}</text>
             </button>
           </view>
@@ -326,6 +341,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import InlineStateNotice from "@/components/InlineStateNotice.vue";
+import EmptyState from "@/components/EmptyState.vue";
 import DynamicForm from "@/components/DynamicForm.vue";
 import {
   createRequest,
@@ -1108,15 +1124,12 @@ onMounted(async () => {
 }
 
 .type-cta-arrow {
-  font-size: 30rpx;
-  line-height: 1;
-}
-
-.empty {
-  text-align: center;
-  padding: 80rpx 0;
-  color: #94a3b8;
-  font-size: 28rpx;
+  width: 44rpx;
+  height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(183, 15, 36, 0.6);
 }
 
 .step-track {
@@ -1507,9 +1520,27 @@ onMounted(async () => {
 }
 
 .btn-icon {
-  margin-right: 8rpx;
-  font-size: 26rpx;
-  vertical-align: middle;
+  width: 36rpx;
+  height: 36rpx;
+  margin-right: 10rpx;
+  border-radius: 14rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  font-weight: 900;
+  background: rgba(183, 15, 36, 0.08);
+  border: 1rpx solid rgba(183, 15, 36, 0.18);
+}
+
+.action-btn.primary .btn-icon {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.action-btn.light .btn-icon {
+  background: rgba(148, 163, 184, 0.14);
+  border-color: rgba(148, 163, 184, 0.26);
 }
 
 .action-btn {

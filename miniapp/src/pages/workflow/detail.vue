@@ -1,6 +1,13 @@
 <template>
   <view class="container">
-    <view v-if="loading" class="loading">加载中...</view>
+    <EmptyState
+      v-if="loading"
+      icon="◷"
+      tone="muted"
+      title="流程详情加载中"
+      description="正在获取当前流程节点与待办说明，请稍候。"
+      compact
+    />
 
     <template v-else-if="workflow">
       <view class="page-hero">
@@ -132,18 +139,28 @@
             {{ workflow.next_action_hint || "查看当前节点详情并及时准备材料。" }}
           </text>
         </view>
-        <view class="bottom-button" @tap="scrollToCurrentTask">查看待办</view>
+        <view class="bottom-button" hover-class="hover-opacity" @tap="scrollToCurrentTask">查看待办</view>
       </view>
       <view class="bottom-spacer" />
     </template>
 
-    <view v-else class="empty">未找到流程记录</view>
+    <EmptyState
+      v-else
+      icon="?"
+      tone="danger"
+      title="未找到流程记录"
+      description="该流程可能已失效或无权访问，可返回列表重试。"
+      action-text="返回列表"
+      @action="goBack"
+      compact
+    />
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { onPullDownRefresh } from "@dcloudio/uni-app";
+import EmptyState from "@/components/EmptyState.vue";
 import {
   getWorkflowDetail,
   type StudentWorkflow,
@@ -154,6 +171,10 @@ const workflow = ref<StudentWorkflow | null>(null);
 const nodes = ref<StudentWorkflowNode[]>([]);
 const loading = ref(false);
 const workflowId = ref<number | null>(null);
+
+function goBack() {
+  uni.navigateBack({ delta: 1 })
+}
 
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE: "进行中",
@@ -254,14 +275,6 @@ onPullDownRefresh(async () => {
   display: flex;
   flex-direction: column;
   gap: 18rpx;
-}
-
-.loading,
-.empty {
-  text-align: center;
-  padding: 80rpx 0;
-  color: #64748b;
-  font-size: 28rpx;
 }
 
 .empty-tiny {

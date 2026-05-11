@@ -45,7 +45,7 @@
             :disabled="loginSubmitting"
             @tap="onWxLogin"
           >
-            <text class="btn-icon">❖</text> 微信一键登录
+            <text class="btn-icon">微</text> 微信一键登录
           </button>
           <text class="login-note">已绑定微信可直接登录；不填学号将以访客身份进入。</text>
         </view>
@@ -123,7 +123,7 @@
           :disabled="loginSubmitting"
           @tap="onBindStudent"
         >
-          <text class="btn-icon">❖</text> 绑定学号
+          <text class="btn-icon">绑</text> 绑定学号
         </button>
         <view class="guest-logout" hover-class="hover-opacity" @tap="onLogout">
           <text class="logout-text">退出登录</text>
@@ -154,13 +154,13 @@
             <text class="section-tip">围绕画像查看、档案维护与进度追踪</text>
           </view>
         </view>
-        <view class="service-card">
+        <view class="service-card" hover-class="hover-opacity" @tap="showComingSoon('学籍信息')">
           <text class="service-icon">籍</text>
           <view class="service-copy">
             <text class="service-title">学籍信息</text>
             <text class="service-desc">查看学籍基本信息、学籍异动记录</text>
           </view>
-          <text class="service-arrow">›</text>
+          <view class="service-arrow"><view class="mini-chevron" /></view>
         </view>
         <view class="info-list">
           <view class="info-row">
@@ -346,14 +346,14 @@
               <text class="action-title">信息纠错申诉</text>
               <text class="action-desc">发起信息纠错并查看处理进度</text>
             </view>
-            <text class="action-arrow">›</text>
+            <view class="action-arrow"><view class="mini-chevron" /></view>
           </view>
           <view class="action-btn" :class="{ disabled: !canEditProfile }" @tap="openGrowthSubmission">
             <view class="action-copy">
               <text class="action-title">成长补录</text>
               <text class="action-desc">补充尚未归档的成长经历记录</text>
             </view>
-            <text class="action-arrow">›</text>
+            <view class="action-arrow"><view class="mini-chevron" /></view>
           </view>
           <view class="action-btn action-btn-logout" hover-class="hover-opacity" @tap="onLogout">
             <text class="action-title logout-text">退出登录</text>
@@ -502,7 +502,7 @@
               :loading="growthSubmitting"
               @tap="onSubmitGrowth"
             >
-              <text class="btn-icon">🚀</text> 提交补录
+              <text class="btn-icon">交</text> 提交补录
             </button>
           </view>
         </view>
@@ -857,6 +857,10 @@ function closeGrowthSubmission() {
 
 function showUploadHint() {
   uni.showToast({ title: '纠错申诉暂不支持附件', icon: 'none' })
+}
+
+function showComingSoon(label: string) {
+  uni.showToast({ title: `${label} 将随接口上线自动接通`, icon: 'none' })
 }
 
 function formatAttachmentSize(size?: number | null) {
@@ -1224,9 +1228,18 @@ onMounted(async () => {
 }
 
 .btn-icon {
-  margin-right: 8rpx;
-  font-size: 32rpx;
-  vertical-align: middle;
+  width: 44rpx;
+  height: 44rpx;
+  margin-right: 10rpx;
+  border-radius: 16rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  font-weight: 900;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1rpx solid rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .primary-button {
@@ -1582,9 +1595,12 @@ onMounted(async () => {
 }
 
 .service-arrow {
+  width: 44rpx;
+  height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #c4a4ab;
-  font-size: 30rpx;
-  font-weight: 700;
 }
 
 .info-list {
@@ -1870,7 +1886,11 @@ onMounted(async () => {
 }
 
 .action-arrow {
-  font-size: 30rpx;
+  width: 44rpx;
+  height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #c2a0a8;
 }
 

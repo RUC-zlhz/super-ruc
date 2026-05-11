@@ -59,7 +59,10 @@
         <view>
           <text class="section-title">常用服务</text>
         </view>
-        <text class="section-link" hover-class="hover-opacity">全部服务 ›</text>
+        <view class="section-link" hover-class="hover-opacity" @tap="goTo('/pages/request/index')">
+          <text>全部服务</text>
+          <view class="mini-chevron" />
+        </view>
       </view>
 
       <view class="entry-grid">
@@ -70,8 +73,9 @@
           hover-class="hover-scale"
           @tap="goTo(item.url)"
         >
-          <view class="entry-mark">{{ item.mark }}</view>
+          <view class="entry-mark" :class="item.tone">{{ item.mark }}</view>
           <text class="entry-label">{{ item.label }}</text>
+          <text v-if="item.desc" class="entry-desc">{{ item.desc }}</text>
         </view>
       </view>
     </view>
@@ -114,7 +118,7 @@
             <text class="focus-title">{{ item.title }}</text>
             <text class="focus-desc">{{ item.desc }}</text>
           </view>
-          <text class="focus-arrow">›</text>
+          <view class="focus-arrow"><view class="mini-chevron" /></view>
         </view>
       </template>
       <view v-else-if="!todoSectionUnavailable" class="empty-panel">
@@ -170,7 +174,7 @@
             <text class="notice-state" :class="{ unread: isUnread(notice) }">
               {{ isUnread(notice) ? "未读" : "已读" }}
             </text>
-            <text class="notice-arrow">›</text>
+            <view class="notice-arrow"><view class="mini-chevron" /></view>
           </view>
         </view>
       </template>
@@ -240,51 +244,65 @@ const SECTION_LABELS: Record<HomeSectionKey, string> = {
   workflows: "流程",
 };
 
-const entries = [
+const entries: Array<{
+  mark: string;
+  tone: "primary" | "blue" | "gold" | "green" | "orange" | "slate";
+  label: string;
+  desc: string;
+  url: string;
+}> = [
   {
-    mark: "□",
+    mark: "申",
+    tone: "primary",
     label: "我的申请",
     desc: "发起请假、证明、盖章等常见申请。",
     url: "/pages/request/index",
   },
   {
-    mark: "100",
+    mark: "绩",
+    tone: "blue",
     label: "成绩证明",
     desc: "查看学业辅助提示与证明办理入口。",
     url: "/pages/request/create?category=CERTIFICATE&type_code=CERTIFICATE_IN_SCHOOL",
   },
   {
-    mark: "¥",
+    mark: "奖",
+    tone: "gold",
     label: "奖助学金",
     desc: "查看荣誉与奖助学金相关信息。",
     url: "/pages/honor/index",
   },
   {
-    mark: "✓",
+    mark: "假",
+    tone: "green",
     label: "请假审批",
     desc: "进入事务申请并选择请假类服务。",
     url: "/pages/request/create?category=LEAVE&type_code=LEAVE_PERSONAL",
   },
   {
-    mark: "床",
+    mark: "宿",
+    tone: "slate",
     label: "宿舍服务",
     desc: "宿舍调整、住宿证明等事务入口。",
     url: "/pages/request/create?type_code=DORM_SERVICE",
   },
   {
-    mark: "¥",
+    mark: "费",
+    tone: "orange",
     label: "缴费记录",
     desc: "查询政策、缴费说明和服务指南。",
     url: "/pages/knowledge/index",
   },
   {
-    mark: "书",
+    mark: "课",
+    tone: "blue",
     label: "课程事务",
     desc: "课程、培养方案和教务政策查询。",
     url: "/pages/knowledge/index",
   },
   {
-    mark: "耳",
+    mark: "问",
+    tone: "primary",
     label: "帮助中心",
     desc: "查询常见问题和办理指引。",
     url: "/pages/knowledge/index",
@@ -1098,6 +1116,9 @@ onPullDownRefresh(async () => {
 
 .section-link {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
   font-size: 24rpx;
   color: #b2959e;
 }
@@ -1133,16 +1154,53 @@ onPullDownRefresh(async () => {
 .entry-mark {
   width: 78rpx;
   height: 78rpx;
-  border-radius: 18rpx;
-  background: #fff;
-  color: #b70f24;
-  border: 2rpx solid #d1d5db;
-  box-shadow: inset 0 -8rpx 0 rgba(183, 15, 36, 0.04);
+  border-radius: 22rpx;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1rpx solid rgba(240, 226, 229, 0.92);
+  box-shadow: 0 14rpx 30rpx rgba(41, 18, 23, 0.12);
+  color: var(--primary-color);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26rpx;
-  font-weight: 700;
+  font-size: 28rpx;
+  font-weight: 900;
+  letter-spacing: 2rpx;
+}
+
+.entry-mark.primary {
+  background: linear-gradient(135deg, rgba(183, 15, 36, 0.12), rgba(255, 255, 255, 0.96));
+  border-color: rgba(183, 15, 36, 0.16);
+  color: var(--primary-color);
+}
+
+.entry-mark.blue {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(255, 255, 255, 0.96));
+  border-color: rgba(37, 99, 235, 0.18);
+  color: var(--accent-blue);
+}
+
+.entry-mark.gold {
+  background: linear-gradient(135deg, rgba(215, 154, 43, 0.16), rgba(255, 255, 255, 0.96));
+  border-color: rgba(215, 154, 43, 0.22);
+  color: var(--accent-gold);
+}
+
+.entry-mark.green {
+  background: linear-gradient(135deg, rgba(22, 163, 74, 0.12), rgba(255, 255, 255, 0.96));
+  border-color: rgba(22, 163, 74, 0.18);
+  color: var(--accent-green);
+}
+
+.entry-mark.orange {
+  background: linear-gradient(135deg, rgba(234, 122, 34, 0.14), rgba(255, 255, 255, 0.96));
+  border-color: rgba(234, 122, 34, 0.2);
+  color: var(--accent-orange);
+}
+
+.entry-mark.slate {
+  background: linear-gradient(135deg, rgba(51, 65, 85, 0.1), rgba(255, 255, 255, 0.96));
+  border-color: rgba(51, 65, 85, 0.16);
+  color: rgba(51, 65, 85, 0.9);
 }
 
 .entry-label {
@@ -1152,6 +1210,20 @@ onPullDownRefresh(async () => {
   color: #374151;
   text-align: center;
   line-height: 1.45;
+}
+
+.entry-desc {
+  display: block;
+  margin-top: 6rpx;
+  max-width: 152rpx;
+  font-size: 20rpx;
+  line-height: 1.55;
+  color: #9b8b90;
+  text-align: center;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .focus-item {
@@ -1216,8 +1288,12 @@ onPullDownRefresh(async () => {
 
 .focus-arrow {
   flex-shrink: 0;
+  width: 44rpx;
+  height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #94a3b8;
-  font-size: 34rpx;
 }
 
 .notice-row {
@@ -1315,7 +1391,11 @@ onPullDownRefresh(async () => {
 
 .notice-arrow {
   color: #b7a5aa;
-  font-size: 30rpx;
+  width: 44rpx;
+  height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .empty-panel {

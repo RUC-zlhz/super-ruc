@@ -98,6 +98,18 @@ button::after {
   animation: fade-in-up 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
 }
 
+.mini-chevron {
+  width: 18rpx;
+  height: 18rpx;
+  border-right: 3rpx solid currentColor;
+  border-bottom: 3rpx solid currentColor;
+  transform: rotate(-45deg);
+}
+
+.mini-chevron-left {
+  transform: rotate(135deg);
+}
+
 @keyframes fade-in-up {
   from {
     opacity: 0;
