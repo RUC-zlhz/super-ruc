@@ -38,6 +38,7 @@ class SeedResult:
 
 # Import submodules *after* SeedResult is defined — they depend on it.
 from . import (  # noqa: E402
+    admin_user,
     audit_policies,
     honor_categories,
     knowledge_categories,
@@ -49,6 +50,7 @@ from . import (  # noqa: E402
 # 依赖顺序：先角色，再流程/类目字典
 SEEDERS = (
     roles,
+    admin_user,
     audit_policies,
     knowledge_categories,
     honor_categories,

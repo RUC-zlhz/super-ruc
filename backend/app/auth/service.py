@@ -14,18 +14,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import log_action
 from app.auth import repository as repo
+from app.auth.bootstrap import INITIAL_ADMIN_PLAIN, INITIAL_ADMIN_WORK_NO
 from app.auth.models import User
 from app.auth.role_codes import normalize_role_code, normalize_role_codes
 from app.auth.schemas import RoleInfo, TokenResponse, UserInfo
 from app.core.config import settings
 from app.core.exceptions import AuthError, BizError, NotFoundError
-from app.core.security import create_token, verify_password
+from app.core.security import create_token, hash_password, verify_password
 
 logger = logging.getLogger(__name__)
 
 WX_CODE2SESSION_URL = "https://api.weixin.qq.com/sns/jscode2session"
 ROLE_STUDENT = "STUDENT"
 ROLE_GUEST = "GUEST"
+
+
+def _is_initial_admin_password(user: User) -> bool:
+    return (
+        user.work_no == INITIAL_ADMIN_WORK_NO
+        and bool(user.password_hash)
+        and verify_password(INITIAL_ADMIN_PLAIN, user.password_hash)
+    )
 
 
 # ---------- 微信 ----------
@@ -89,14 +98,8 @@ async def wx_code2session(code: str) -> dict:
 
 
 # ---------- Token 构建 ----------
-async def _build_token_response(db: AsyncSession, user: User) -> TokenResponse:
+async def build_user_info(db: AsyncSession, user: User) -> UserInfo:
     roles_rows = await repo.list_user_roles(db, user.id)
-    role_codes = normalize_role_codes(r.role_code for r in roles_rows)
-    claims: dict = {"roles": role_codes}
-    if user.student_id:
-        claims["sid"] = user.student_id
-    access = create_token(str(user.id), "access", extra_claims=claims)
-    refresh = create_token(str(user.id), "refresh")
     normalized_roles: list[RoleInfo] = []
     seen_role_scope: set[tuple[str, str | None]] = set()
     for row in roles_rows:
@@ -110,7 +113,7 @@ async def _build_token_response(db: AsyncSession, user: User) -> TokenResponse:
         normalized_roles.append(
             RoleInfo(code=normalized_code, scope_code=row.scope_code)
         )
-    user_info = UserInfo(
+    return UserInfo(
         id=user.id,
         display_name=user.display_name,
         avatar_url=user.avatar_url,
@@ -119,12 +122,23 @@ async def _build_token_response(db: AsyncSession, user: User) -> TokenResponse:
         student_id=user.student_id,
         student_no=user.student.student_no if user.student else None,
         roles=normalized_roles,
+        must_change_password=_is_initial_admin_password(user),
     )
+
+
+async def _build_token_response(db: AsyncSession, user: User) -> TokenResponse:
+    roles_rows = await repo.list_user_roles(db, user.id)
+    role_codes = normalize_role_codes(r.role_code for r in roles_rows)
+    claims: dict = {"roles": role_codes}
+    if user.student_id:
+        claims["sid"] = user.student_id
+    access = create_token(str(user.id), "access", extra_claims=claims)
+    refresh = create_token(str(user.id), "refresh")
     return TokenResponse(
         access_token=access,
         refresh_token=refresh,
         expires_in=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user=user_info,
+        user=await build_user_info(db, user),
     )
 
 
@@ -228,6 +242,53 @@ async def login_with_work_no(
     )
     await db.commit()
     return await _build_token_response(db, user)
+
+
+async def change_password(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    old_password: str,
+    new_password: str,
+    ip: str | None = None,
+) -> UserInfo:
+    user = await repo.get_user_by_id(db, user_id)
+    if user is None or user.deleted_at is not None:
+        raise AuthError("用户不存在")
+    if not user.password_hash or not verify_password(old_password, user.password_hash):
+        await log_action(
+            db,
+            event_type="AUTH",
+            entity_code="USER",
+            action="CHANGE_PASSWORD",
+            entity_id=user_id,
+            actor_user_id=user_id,
+            result_code="FAIL",
+            ip_address=ip,
+            message="原密码错误",
+            auto_flush=False,
+        )
+        await db.commit()
+        raise AuthError("原密码错误")
+    if verify_password(new_password, user.password_hash):
+        raise BizError("新密码不能与当前密码相同", code=40070)
+    if user.work_no == INITIAL_ADMIN_WORK_NO and new_password == INITIAL_ADMIN_PLAIN:
+        raise BizError("新密码不能继续使用初始密码", code=40071)
+
+    user.password_hash = hash_password(new_password)
+    await log_action(
+        db,
+        event_type="AUTH",
+        entity_code="USER",
+        action="CHANGE_PASSWORD",
+        entity_id=user.id,
+        actor_user_id=user.id,
+        ip_address=ip,
+        auto_flush=False,
+    )
+    await db.commit()
+    await db.refresh(user)
+    return await build_user_info(db, user)
 
 
 async def update_enrollment_status(

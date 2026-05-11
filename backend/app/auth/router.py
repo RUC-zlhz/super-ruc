@@ -7,9 +7,9 @@ from fastapi import APIRouter, Depends, Request
 
 from app.auth import service
 from app.auth.schemas import (
+    ChangePasswordRequest,
     EnrollmentStatusUpdate,
     RefreshTokenRequest,
-    RoleInfo,
     TokenResponse,
     UserInfo,
     WorkNoLoginRequest,
@@ -55,6 +55,23 @@ async def refresh(payload: RefreshTokenRequest, db: DBDep) -> ApiResponse[TokenR
     return ok(token)
 
 
+@router.post("/change-password", response_model=ApiResponse[UserInfo], summary="修改当前账号密码")
+async def change_password(
+    payload: ChangePasswordRequest,
+    db: DBDep,
+    user: CurrentUserDep,
+    request: Request,
+) -> ApiResponse[UserInfo]:
+    info = await service.change_password(
+        db,
+        user_id=user.user_id,
+        old_password=payload.old_password,
+        new_password=payload.new_password,
+        ip=_client_ip(request),
+    )
+    return ok(info)
+
+
 @admin_router.patch(
     "/students/{student_id}/enrollment-status",
     response_model=ApiResponse[dict],
@@ -86,15 +103,4 @@ async def me(user: CurrentUserDep, db: DBDep) -> ApiResponse[UserInfo]:
         from app.core.exceptions import NotFoundError
 
         raise NotFoundError("用户不存在")
-    roles = await repo.list_user_roles(db, row.id)
-    info = UserInfo(
-        id=row.id,
-        display_name=row.display_name,
-        avatar_url=row.avatar_url,
-        email=row.email,
-        work_no=row.work_no,
-        student_id=row.student_id,
-        student_no=row.student.student_no if row.student else None,
-        roles=[RoleInfo(code=r.role_code, scope_code=r.scope_code) for r in roles],
-    )
-    return ok(info)
+    return ok(await service.build_user_info(db, row))

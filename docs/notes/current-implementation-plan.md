@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：在 `S1 ~ S10`、`S11.1 ~ S11.6` 已闭合、`S9.DB` 已补测关闭的基础上，完成临时 IP 部署联调收口
+- 当前目标：在 `S1 ~ S10`、`S11.1 ~ S11.7` 已闭合、`S9.DB` 已补测关闭的基础上，完成临时 IP 部署联调收口
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -397,11 +397,13 @@
 - [x] `S11.4` 将教师/管理端 Web 与微信小程序 API 基址接到 `http://123.57.54.195/api/v1`，小程序 AppID 切换为 `wxcb6352a74505bc41` 并重构建。
 - [x] `S11.5` 完成健康检查、API smoke、Web 静态访问和小程序出包验证。
 - [x] `S11.6` 对接微信官方登录鉴权并治理未登录频发请求；代码、构建、后端同步、真实微信配置切换、日志脱敏、无效 code smoke、访客登录、学号绑定续修、退出登录确认与输入框宽度修复已完成。
+- [x] `S11.7` 教师管理端默认管理员与初始密码提醒：后端 seed 默认 `admin/admin123` 超管账号，登录响应返回 `must_change_password`，Web 登录后提醒并在个人信息页提供改密弹窗。
 
 当前结论：
 
 - `S11.1 ~ S11.5` 已完成；临时部署细化见 `docs/notes/refinements/2026-05-09-temporary-ip-deployment.md`。
 - `S11.6` 已完成代码与部署加固，小程序未登录请求循环已在本地产物中消除；服务器已配置真实微信 AppSecret 并关闭 mock，真实 `code2Session` 路径已用无效 code smoke 验证；后续已按当前用户要求改为“无学号仅访客身份登录”，补齐访客态前端分流、退出登录确认、输入框宽度修复、`2024201534 / 2024202721` 远端学生主档，并通过本地静态/构建/定向集成测试与远端健康检查，细化见 `docs/notes/refinements/2026-05-09-wechat-auth-login-hardening.md`。
+- `S11.7` 已完成教师管理端默认管理员与初始密码提醒闭环；本地已通过后端 ruff / py_compile、Web 类型检查与 Web 构建，认证集成测试用例已补齐但因本机 `localhost:54322/sip_db_test` 拒连且 Docker daemon 未运行，本轮未进入断言，细化见 `docs/notes/refinements/2026-05-11-s11-admin-default-password-change.md`。
 
 ## 细化文件登记
 
@@ -456,6 +458,7 @@
 | 2026-05-09 | 临时 IP 直连部署联调 | `docs/notes/refinements/2026-05-09-temporary-ip-deployment.md` | `S11.1, S11.2, S11.3, S11.4, S11.5` | `[x]` | 已完成临时服务器部署、数据库迁移与种子、Web 与小程序重构建、HTTP/API smoke 验证 |
 | 2026-05-09 | 微信小程序登录鉴权与未登录请求治理 | `docs/notes/refinements/2026-05-09-wechat-auth-login-hardening.md` | `S11.6` | `[x]` | 已按微信官方登录流程加固后端与小程序请求层，并同步重建远端后端；续跑复核通过类型检查、后端静态校验、临时 IP 小程序出包、真实模式无效 code smoke、日志脱敏检查、访客登录/绑定续修、退出确认和输入框宽度修复 |
 | 2026-05-11 | Miniapp 图标与空态收口 Round 8 | `docs/notes/refinements/2026-05-11-s6-miniapp-icon-empty-state-round8.md` | `S6.22` | `[x]` | 已保留有效 Miniapp UI 优化、补 `EmptyState` 复用、清理未使用全局与页面级旧空态样式，并通过 `miniapp vue-tsc` 与 `mp-weixin` 出包 |
+| 2026-05-11 | 教师管理端默认管理员与初始密码提醒 | `docs/notes/refinements/2026-05-11-s11-admin-default-password-change.md` | `S11.7` | `[x]` | 已新增 `admin/admin123` 默认超管种子、登录后改密提醒与个人信息页改密弹窗；通过后端静态校验与 Web 构建，集成测试受本机 DB 拒连阻塞 |
 
 ## 会话更新要求
 
@@ -515,3 +518,4 @@
 - `2026-04-28`：新增并完成 `S6.19` Web / Miniapp 前端体验增量优化 Round 6 (交互增强)；对 Web 增加页面转场、卡片悬浮与载入动画，对 Miniapp 补充全局触摸反馈并覆盖首页、申请、流程、通知等高频入口，进一步提升双端操作平滑度。
 - `2026-04-28`：新增并完成 `S6.20` Miniapp 小程序主图标资产制作；生成 `app-icon.png`、`app-icon-512.png`、`app-icon-144.png`，补可复现生成脚本和 README 说明，并确认 `mp-weixin` 构建产物已带出图标资源。
 - `2026-05-11`：新增并完成 `S6.22` Miniapp 图标与空态收口 Round 8；恢复 Git 历史后保留有效学生端 UI 优化，补 `EmptyState` 复用、可控箭头/按钮小图标、首页服务单字语义徽章，清理未使用全局样式和页面级旧空态样式，并修正 `.gitignore` 对正式 `output/` 交付件的遮蔽风险。
+- `2026-05-11`：新增并完成 `S11.7` 教师管理端默认管理员与初始密码提醒；默认种子创建 `admin/admin123` 超管账号，登录响应暴露 `must_change_password`，Web 登录后提醒并在个人信息页提供改密弹窗。

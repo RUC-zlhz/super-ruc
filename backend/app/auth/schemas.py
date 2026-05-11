@@ -17,6 +17,11 @@ class WorkNoLoginRequest(BaseModel):
     password: str = Field(..., min_length=4, max_length=128)
 
 
+class ChangePasswordRequest(BaseModel):
+    old_password: str = Field(..., min_length=4, max_length=128)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
@@ -47,6 +52,7 @@ class UserInfo(BaseModel):
     student_no: str | None = None
     student_id: int | None = None
     roles: list[RoleInfo] = []
+    must_change_password: bool = False
 
 
 class BindStudentRequest(BaseModel):

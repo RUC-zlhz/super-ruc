@@ -14,6 +14,13 @@ export function getMe() {
   return get<ApiEnvelope<UserInfo>>('/auth/me')
 }
 
+export function changePassword(old_password: string, new_password: string) {
+  return post<ApiEnvelope<UserInfo>>('/auth/change-password', {
+    old_password,
+    new_password,
+  })
+}
+
 // v1.5 学籍状态变更
 export interface EnrollmentStatusUpdate {
   status: 'ACTIVE' | 'SUSPENDED' | 'TRANSFERRED' | 'GRADUATED' | 'ARCHIVED'

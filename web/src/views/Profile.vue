@@ -40,6 +40,15 @@
           </div>
         </div>
 
+        <a-alert
+          v-if="user.must_change_password"
+          class="password-alert"
+          type="warning"
+          show-icon
+          message="当前账号仍使用初始密码"
+          description="初始密码为 admin123。请尽快修改为个人密码，避免账号被共用。"
+        />
+
         <a-row :gutter="[18, 18]">
           <a-col :xs="24" :xl="15">
             <a-card title="基础信息" :bordered="false">
@@ -71,7 +80,7 @@
                     <strong>修改密码</strong>
                     <span>定期修改密码可以保障账号安全</span>
                   </div>
-                  <a-button>修改</a-button>
+                  <a-button @click="openPasswordModal">修改</a-button>
                 </div>
                 <div class="security-item">
                   <MobileOutlined />
@@ -96,14 +105,58 @@
             </a-card>
           </a-col>
         </a-row>
+
+        <a-modal
+          v-model:open="passwordModalOpen"
+          title="修改密码"
+          @cancel="closePasswordModal"
+        >
+          <a-alert
+            v-if="user.must_change_password"
+            class="password-modal-tip"
+            type="warning"
+            show-icon
+            message="请不要继续使用初始密码 admin123"
+          />
+          <a-form layout="vertical">
+            <a-form-item label="原密码" required>
+              <a-input-password
+                v-model:value="passwordForm.old_password"
+                autocomplete="current-password"
+                placeholder="请输入当前密码"
+              />
+            </a-form-item>
+            <a-form-item label="新密码" required>
+              <a-input-password
+                v-model:value="passwordForm.new_password"
+                autocomplete="new-password"
+                placeholder="至少 8 位，建议包含字母和数字"
+              />
+            </a-form-item>
+            <a-form-item label="确认新密码" required>
+              <a-input-password
+                v-model:value="passwordForm.confirm_password"
+                autocomplete="new-password"
+                placeholder="再次输入新密码"
+              />
+            </a-form-item>
+          </a-form>
+          <template #footer>
+            <a-button @click="cancelPasswordModal">取消</a-button>
+            <a-button type="primary" :loading="passwordSaving" @click="submitPasswordChange">
+              保存新密码
+            </a-button>
+          </template>
+        </a-modal>
       </template>
     </a-spin>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 import {
   BookOutlined,
   ClockCircleOutlined,
@@ -117,9 +170,72 @@ import { useAuthStore } from '@/store/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 const loading = ref(false)
 const user = computed(() => auth.user)
 const scopeCount = computed(() => new Set(user.value?.roles.map((role) => role.scope_code).filter(Boolean)).size)
+const passwordModalOpen = ref(false)
+const passwordSaving = ref(false)
+const passwordForm = reactive({
+  old_password: '',
+  new_password: '',
+  confirm_password: '',
+})
+
+function openPasswordModal() {
+  passwordModalOpen.value = true
+}
+
+function resetPasswordForm() {
+  passwordForm.old_password = ''
+  passwordForm.new_password = ''
+  passwordForm.confirm_password = ''
+}
+
+function closePasswordModal() {
+  resetPasswordForm()
+  if (route.query.changePassword === '1') {
+    router.replace({ path: '/profile' })
+  }
+}
+
+function cancelPasswordModal() {
+  passwordModalOpen.value = false
+  closePasswordModal()
+}
+
+watch(
+  () => route.query.changePassword,
+  (value) => {
+    if (value === '1') openPasswordModal()
+  },
+  { immediate: true },
+)
+
+async function submitPasswordChange() {
+  if (!passwordForm.old_password || !passwordForm.new_password || !passwordForm.confirm_password) {
+    message.warning('请完整填写原密码和新密码')
+    return
+  }
+  if (passwordForm.new_password.length < 8) {
+    message.warning('新密码至少需要 8 位')
+    return
+  }
+  if (passwordForm.new_password !== passwordForm.confirm_password) {
+    message.warning('两次输入的新密码不一致')
+    return
+  }
+
+  passwordSaving.value = true
+  try {
+    await auth.changePassword(passwordForm.old_password, passwordForm.new_password)
+    message.success('密码已修改')
+    passwordModalOpen.value = false
+    closePasswordModal()
+  } finally {
+    passwordSaving.value = false
+  }
+}
 
 function logout() {
   auth.logout()
@@ -133,6 +249,14 @@ function logout() {
   grid-template-columns: minmax(0, 1.1fr) minmax(420px, 0.9fr);
   gap: 18px;
   margin-bottom: 18px;
+}
+
+.password-alert {
+  margin-bottom: 18px;
+}
+
+.password-modal-tip {
+  margin-bottom: 16px;
 }
 
 .avatar-card {

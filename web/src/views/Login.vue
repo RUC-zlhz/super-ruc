@@ -70,7 +70,7 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import {
   LockOutlined,
   MobileOutlined,
@@ -93,6 +93,21 @@ async function onSubmit() {
     await auth.login(form.work_no, form.password)
     message.success('登录成功')
     const redirect = (route.query.redirect as string) || getDefaultRouteForRoles(auth.roleCodes)
+    if (auth.user?.must_change_password) {
+      Modal.confirm({
+        title: '请尽快修改初始密码',
+        content: '当前账号仍在使用初始密码 admin123。为避免账号被共用，建议登录后立即修改密码。',
+        okText: '立即修改',
+        cancelText: '稍后处理',
+        async onOk() {
+          await router.replace({ path: '/profile', query: { changePassword: '1' } })
+        },
+        async onCancel() {
+          await router.replace(redirect)
+        },
+      })
+      return
+    }
     router.replace(redirect)
   } finally {
     loading.value = false

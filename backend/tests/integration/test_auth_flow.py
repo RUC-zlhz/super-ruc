@@ -118,6 +118,51 @@ async def test_refresh_token_returns_new_access(
     assert body["data"]["access_token"]
 
 
+async def test_default_admin_login_requires_password_change(client: AsyncClient) -> None:
+    resp = await client.post(
+        "/api/v1/auth/login",
+        json={"work_no": "admin", "password": "admin123"},
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["code"] == 0
+    user = body["data"]["user"]
+    assert user["work_no"] == "admin"
+    assert user["must_change_password"] is True
+    assert any(r["code"] == "SUPER_ADMIN" for r in user["roles"])
+
+
+async def test_change_password_clears_default_admin_reminder(client: AsyncClient) -> None:
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"work_no": "admin", "password": "admin123"},
+    )
+    token = login.json()["data"]["access_token"]
+
+    change = await client.post(
+        "/api/v1/auth/change-password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"old_password": "admin123", "new_password": "Admin12345"},
+    )
+
+    assert change.status_code == 200, change.text
+    assert change.json()["data"]["must_change_password"] is False
+
+    old_login = await client.post(
+        "/api/v1/auth/login",
+        json={"work_no": "admin", "password": "admin123"},
+    )
+    assert old_login.status_code == 401
+
+    new_login = await client.post(
+        "/api/v1/auth/login",
+        json={"work_no": "admin", "password": "Admin12345"},
+    )
+    assert new_login.status_code == 200, new_login.text
+    assert new_login.json()["data"]["user"]["must_change_password"] is False
+
+
 async def test_wx_login_without_student_no_returns_guest_session(
     client: AsyncClient,
 ) -> None:

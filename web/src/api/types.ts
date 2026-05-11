@@ -23,6 +23,7 @@ export interface UserInfo {
   student_no?: string | null
   student_id?: number | null
   roles: RoleInfo[]
+  must_change_password?: boolean
 }
 
 export interface TokenResponse {

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { loginByWorkNo, getMe } from '@/api/auth'
+import { changePassword as changePasswordApi, loginByWorkNo, getMe } from '@/api/auth'
 import type { UserInfo } from '@/api/types'
 import { setAccessToken, getAccessToken } from '@/utils/request'
 
@@ -23,6 +23,12 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchMe() {
     if (!accessToken.value) return null
     const resp = await getMe()
+    user.value = resp.data
+    return resp.data
+  }
+
+  async function changePassword(oldPassword: string, newPassword: string) {
+    const resp = await changePasswordApi(oldPassword, newPassword)
     user.value = resp.data
     return resp.data
   }
@@ -50,6 +56,7 @@ export const useAuthStore = defineStore('auth', () => {
     roleCodes,
     login,
     fetchMe,
+    changePassword,
     logout,
   }
 })
