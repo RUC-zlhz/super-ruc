@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：在 `S1 ~ S10`、`S11.1 ~ S11.7` 已闭合、`S9.DB` 已补测关闭的基础上，完成临时 IP 部署联调收口
+- 当前目标：在 `S1 ~ S12` 已闭合的基础上，推进 `S13` 需求文档与实现一致性修复
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -405,6 +405,49 @@
 - `S11.6` 已完成代码与部署加固，小程序未登录请求循环已在本地产物中消除；服务器已配置真实微信 AppSecret 并关闭 mock，真实 `code2Session` 路径已用无效 code smoke 验证；后续已按当前用户要求改为“无学号仅访客身份登录”，补齐访客态前端分流、退出登录确认、输入框宽度修复、`2024201534 / 2024202721` 远端学生主档，并通过本地静态/构建/定向集成测试与远端健康检查，细化见 `docs/notes/refinements/2026-05-09-wechat-auth-login-hardening.md`。
 - `S11.7` 已完成教师管理端默认管理员与初始密码提醒闭环；本地已通过后端 ruff / py_compile、Web 类型检查与 Web 构建，认证集成测试用例已补齐但因本机 `localhost:54322/sip_db_test` 拒连且 Docker daemon 未运行，本轮未进入断言，细化见 `docs/notes/refinements/2026-05-11-s11-admin-default-password-change.md`。
 
+### S12 需求缺口闭环与默认数据导入
+
+- [x] `S12.1` 默认数据导入：新增 `students.xlsx` 与 `2024_information.md` 的一键导入接口和管理端入口；学生只导核心字段，培养方案写入 `2024-default` 默认版本与课程白名单。
+- [x] `S12.2` 成绩单 PDF 核验：学生上传只生成候选批次，教师核验提交后才写正式成绩。
+- [x] `S12.3` 学业缺口与课程推荐增强：补齐培养方案 `courses` 落库、推荐排序和“数据未配置”边界提示。
+- [x] `S12.4` 模板下载与知识官方链接：新增独立模板列表、收紧学生下载权限、知识匹配同等相关度下优先官方链接。
+- [x] `S12.5` 统一进度中心：新增 `GET /progress/my` 聚合事务申请和党团流程。
+- [x] `S12.6` 受控通知抓取：新增公开 URL/RSS 来源、手工抓取和抓取历史，抓取结果只生成草稿通知。
+- [x] `S12.7` 短信投递治理：新增 mock/local provider、投递 attempt、失败重试和 mock 回执。
+- [x] `S12.8` Web 管理端接入：证明 PDF 预览、默认导入、成绩单核验、模板下载、抓取历史与短信重试。
+- [x] `S12.9` Miniapp 学生端接入：学业入口、PDF 候选明细、常用模板、进度中心与 AI 官方链接展示。
+- [x] `S12.DOC` 文档出件：已补 S12 相关 SRS/FR/追踪矩阵增量文本，导出 SRS v1.7 普通版与 EMF 变体 DOCX/PDF。
+
+当前结论：
+
+- `S12` 已完成；后端定向集成回归 `5 passed`、原 report 合约回归 `4 passed`，Web 构建与小程序 `mp-weixin` 出包均通过，SRS v1.7 三组 DOCX/PDF 已导出并完成页数与关键页可读性抽检。
+
+### S13 需求文档与实现一致性修复
+
+- [x] `S13.1` 主计划与追踪矩阵状态对齐：将当前目标推进到 S13，并把 S12 追踪状态从进行中改为完成，补充 v1.7 出件、测试和文档 QC 证据。
+- [x] `S13.2` FR 验收项语义统一：将功能需求文件中的验收项从待办复选框改为普通 bullet，完成证据集中保留在主计划、细化计划和追踪矩阵中。
+- [x] `S13.3` 需求边界补强：明确成绩单 PDF、通知抓取、短信、进度中心和证明 PDF 的一期边界。
+- [x] `S13.4` 官方来源优先实现：为知识来源新增结构化官方标识，搜索和 AI/关键词匹配在同等相关度下优先官方来源。
+- [x] `S13.5` 验证与回写：运行后端定向测试、必要前端构建和文档轻量一致性检查。
+
+出口条件：
+
+- `docs/srs/traceability-matrix.md` 不再保留 `S12` 进行中或 v1.7 准备中的过期表述。
+- 功能需求验收项作为需求条目展示，不再误呈现为待办状态。
+- 知识来源官方标识进入后端模型、接口、管理端维护入口和排序逻辑。
+- S13 细化文件和主计划记录验证证据。
+
+当前结论：
+
+- `S13` 已完成；S12 状态漂移、FR 验收项语义、成绩单 PDF/通知抓取/短信/进度中心/证明 PDF 边界、知识来源官方标识与同分优先排序均已收口。
+
+证据：
+
+- 后端静态校验：`backend` 下设置 `UV_CACHE_DIR=.tmp/uv-cache-s13` 后执行 `uv run --extra dev ruff check app/knowledge tests/integration/test_s12_gap_closure.py alembic/versions/0012_s13_knowledge_source_official_flag.py` 通过；同环境执行 `uv run --extra dev python -m py_compile app\knowledge\models.py app\knowledge\schemas.py app\knowledge\repository.py app\knowledge\service.py app\knowledge\ai_matcher.py app\knowledge\router.py alembic\versions\0012_s13_knowledge_source_official_flag.py tests\integration\test_s12_gap_closure.py` 通过。
+- 后端定向集成回归：启动既有隔离 Kingbase `127.0.0.1:54323/sip_db_test`，并将 `LOCAL_OBJECT_STORAGE_ROOT` 指向 `backend\.tmp\local-object-storage-s13` 后执行 `uv run --extra dev pytest tests/integration/test_s12_gap_closure.py -q -o cache_dir=.tmp/pytest-cache-s13-run --basetemp=.tmp/pytest-tmp-s13-run`，结果 `5 passed in 8.05s`；验证后已停止隔离 Kingbase。
+- 前端构建：`pnpm -C web build` 通过；`pnpm -C miniapp build:mp-weixin` 通过。
+- 文档轻量检查：`docs/srs` 的 FR/NFR 文件不再存在 `- [ ]` 验收项；`docs/srs`、`scripts/srs`、`docs/source` 不再命中 `S12` 进行中、`v1.7` 准备中、旧式证明 PDF 或通知抓取过度承诺表述。
+
 ## 细化文件登记
 
 > 规则：每个新细化文件都要写入本表，且必须关联一个或多个主计划条目编号。
@@ -459,6 +502,8 @@
 | 2026-05-09 | 微信小程序登录鉴权与未登录请求治理 | `docs/notes/refinements/2026-05-09-wechat-auth-login-hardening.md` | `S11.6` | `[x]` | 已按微信官方登录流程加固后端与小程序请求层，并同步重建远端后端；续跑复核通过类型检查、后端静态校验、临时 IP 小程序出包、真实模式无效 code smoke、日志脱敏检查、访客登录/绑定续修、退出确认和输入框宽度修复 |
 | 2026-05-11 | Miniapp 图标与空态收口 Round 8 | `docs/notes/refinements/2026-05-11-s6-miniapp-icon-empty-state-round8.md` | `S6.22` | `[x]` | 已保留有效 Miniapp UI 优化、补 `EmptyState` 复用、清理未使用全局与页面级旧空态样式，并通过 `miniapp vue-tsc` 与 `mp-weixin` 出包 |
 | 2026-05-11 | 教师管理端默认管理员与初始密码提醒 | `docs/notes/refinements/2026-05-11-s11-admin-default-password-change.md` | `S11.7` | `[x]` | 已新增 `admin/admin123` 默认超管种子、登录后改密提醒与个人信息页改密弹窗；通过后端静态校验与 Web 构建，集成测试受本机 DB 拒连阻塞 |
+| 2026-05-11 | S12 需求缺口闭环与默认数据导入 | `docs/notes/refinements/2026-05-11-s12-requirements-gap-closure.md` | `S12.1, S12.2, S12.3, S12.4, S12.5, S12.6, S12.7, S12.8, S12.9, S12.DOC` | `[x]` | 已完成默认导入、PDF 核验、模板下载、进度中心、通知抓取、短信治理、Web/Miniapp 接入与 SRS v1.7 出件；后端 S12 回归、Web 构建、小程序出包和文档 QC 均通过 |
+| 2026-05-12 | S13 需求文档与实现一致性修复 | `docs/notes/refinements/2026-05-12-s13-requirements-doc-implementation-alignment.md` | `S13.1, S13.2, S13.3, S13.4, S13.5` | `[x]` | 已完成 S12 状态漂移、FR 验收项语义、需求边界和官方来源结构化标识修复，并通过后端静态/定向集成、双端构建与文档 grep 验证 |
 
 ## 会话更新要求
 
@@ -519,3 +564,7 @@
 - `2026-04-28`：新增并完成 `S6.20` Miniapp 小程序主图标资产制作；生成 `app-icon.png`、`app-icon-512.png`、`app-icon-144.png`，补可复现生成脚本和 README 说明，并确认 `mp-weixin` 构建产物已带出图标资源。
 - `2026-05-11`：新增并完成 `S6.22` Miniapp 图标与空态收口 Round 8；恢复 Git 历史后保留有效学生端 UI 优化，补 `EmptyState` 复用、可控箭头/按钮小图标、首页服务单字语义徽章，清理未使用全局样式和页面级旧空态样式，并修正 `.gitignore` 对正式 `output/` 交付件的遮蔽风险。
 - `2026-05-11`：新增并完成 `S11.7` 教师管理端默认管理员与初始密码提醒；默认种子创建 `admin/admin123` 超管账号，登录响应暴露 `must_change_password`，Web 登录后提醒并在个人信息页提供改密弹窗。
+- `2026-05-11`：新增 `S12` 需求缺口闭环与默认数据导入条目及细化文件，开始推进默认导入、成绩单 PDF 核验、统一进度、受控抓取、短信治理、官方链接优先与 SRS v1.7 出件；本轮已补齐 S12 上游 SRS 增量文本与 v1.7 脚本骨架。
+- `2026-05-11`：完成 `S12` 闭环；修复学业推荐排序使默认信息安全课程 `BISYMS0012` 进入缺口建议，完成后端 S12 定向集成测试、Web 构建、小程序 `mp-weixin` 出包，并生成含 S12 增量说明的 SRS v1.7 三组 DOCX/PDF。
+- `2026-05-12`：新增 `S13` 需求文档与实现一致性修复条目及细化文件，开始修正 S12 文档状态漂移、FR 验收项语义、边界表述与知识来源官方标识实现。
+- `2026-05-12`：完成 `S13` 修复；知识来源已具备结构化官方标识和同分优先排序，Web/Miniapp 已消费该标识，文档边界与追踪矩阵已对齐；随后通过后端 ruff / py_compile、隔离 Kingbase 定向集成回归 `5 passed`、Web 构建、小程序 `mp-weixin` 出包和文档 grep 检查。

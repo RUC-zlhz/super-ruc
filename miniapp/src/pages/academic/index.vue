@@ -86,6 +86,75 @@
         </view>
       </view>
 
+      <view v-if="transcriptUpload" class="review-card">
+        <view class="review-head">
+          <view class="review-head-main">
+            <text class="review-title">候选课程与教师核验边界</text>
+            <text class="review-desc">
+              {{ transcriptBoundaryText }}
+            </text>
+          </view>
+          <text class="review-pill" :class="{ warned: transcriptUpload.review_required }">
+            {{ transcriptUpload.review_required ? '待教师核验' : '已核验' }}
+          </text>
+        </view>
+
+        <view class="review-metrics">
+          <view class="review-metric">
+            <text class="review-metric-value">{{ transcriptUpload.parsed_courses_count }}</text>
+            <text class="review-metric-label">候选课程</text>
+          </view>
+          <view class="review-metric">
+            <text class="review-metric-value">{{ transcriptUpload.formal_records_written }}</text>
+            <text class="review-metric-label">正式写入</text>
+          </view>
+          <view class="review-metric">
+            <text class="review-metric-value">{{ transcriptUpload.data_warnings.length }}</text>
+            <text class="review-metric-label">提示信息</text>
+          </view>
+        </view>
+
+        <view v-if="candidateCourses.length" class="candidate-list">
+          <view
+            v-for="course in candidateCourses"
+            :key="candidateCourseKey(course)"
+            class="candidate-card"
+          >
+            <view class="candidate-head">
+              <view class="candidate-main">
+                <text class="candidate-title">
+                  {{ course.course_code || '待识别课程' }} · {{ course.course_name || '待识别名称' }}
+                </text>
+                <text class="candidate-raw">原始行 {{ course.line_no }}：{{ course.raw_text }}</text>
+              </view>
+              <text class="candidate-confidence">{{ confidenceLabel(course.confidence) }}</text>
+            </view>
+
+            <view class="candidate-meta">
+              <text v-if="course.credits != null" class="candidate-chip">学分 {{ formatCredits(course.credits) }}</text>
+              <text v-if="course.term_code" class="candidate-chip">学期 {{ course.term_code }}</text>
+              <text v-if="course.score != null" class="candidate-chip">成绩 {{ course.score }}</text>
+              <text v-if="course.grade_letter" class="candidate-chip">等级 {{ course.grade_letter }}</text>
+              <text class="candidate-chip" :class="{ pass: course.pass_flag }">
+                {{ course.pass_flag ? '判定通过' : '待教师确认' }}
+              </text>
+            </view>
+          </view>
+        </view>
+        <view v-else class="empty-tiny">暂无解析出的候选课程</view>
+
+        <view v-if="transcriptUpload.data_warnings.length" class="review-warnings">
+          <text class="review-warnings-title">核验提示</text>
+          <text
+            v-for="warning in transcriptUpload.data_warnings"
+            :key="warning"
+            class="review-warning-item"
+          >
+            {{ warning }}
+          </text>
+        </view>
+      </view>
+
       <view class="section">
         <view class="section-head">
           <text class="section-title">模块完成情况</text>
@@ -164,6 +233,7 @@ import { onPullDownRefresh } from '@dcloudio/uni-app'
 import InlineStateNotice from '@/components/InlineStateNotice.vue'
 import {
   getMyAcademicGap,
+  type TranscriptPdfCandidateCourse,
   uploadTranscriptPdf,
   type AcademicGapResult,
   type SuggestedCourse,
@@ -192,6 +262,14 @@ const totalGapCredits = computed(() => {
 })
 
 const totalGapPositive = computed(() => (totalGapCredits.value == null ? 0 : totalGapCredits.value) > 0)
+const candidateCourses = computed(() => transcriptUpload.value?.parsed_courses || [])
+const transcriptBoundaryText = computed(() => {
+  if (!transcriptUpload.value) return ''
+  if (transcriptUpload.value.review_required) {
+    return '这些解析结果仅作为教师人工核验的候选项，正式成绩不会因学生上传直接写入。'
+  }
+  return '当前结果已通过人工核验；如后续重新上传，仍会进入教师复核流程。'
+})
 
 function formatCredits(value?: number | null) {
   if (value == null) return '-'
@@ -216,6 +294,14 @@ function suggestedCourseKey(course: SuggestedCourse) {
     course.course_code || course.course_name || 'course',
     course.course_type || 'type',
   ].join('-')
+}
+
+function candidateCourseKey(course: TranscriptPdfCandidateCourse) {
+  return [course.line_no, course.course_code || course.course_name || course.raw_text].join('-')
+}
+
+function confidenceLabel(confidence: string) {
+  return confidence ? confidence.toUpperCase() : 'LOW'
 }
 
 async function onUploadTranscriptPdf() {
@@ -456,6 +542,180 @@ onPullDownRefresh(async () => {
   color: #9f1239;
   font-size: 23rpx;
   line-height: 1.55;
+}
+
+.review-card {
+  margin-bottom: 28rpx;
+  padding: 24rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(180deg, #fffdfd, #fff7f8);
+  border: 1rpx solid #f0d7dd;
+  box-shadow: var(--shadow-card);
+}
+
+.review-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18rpx;
+}
+
+.review-head-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.review-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #202124;
+}
+
+.review-desc {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.65;
+  color: #6b7280;
+}
+
+.review-pill {
+  flex-shrink: 0;
+  padding: 10rpx 18rpx;
+  border-radius: 999rpx;
+  background: #f0fdf4;
+  color: #15803d;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.review-pill.warned {
+  background: #fff7ed;
+  color: #b45309;
+}
+
+.review-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14rpx;
+  margin-top: 18rpx;
+}
+
+.review-metric {
+  padding: 16rpx 14rpx;
+  border-radius: 20rpx;
+  background: #fff;
+  border: 1rpx solid #f0e2e5;
+  text-align: center;
+}
+
+.review-metric-value {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #b70f24;
+}
+
+.review-metric-label {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
+.candidate-list {
+  margin-top: 20rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.candidate-card {
+  padding: 20rpx;
+  border-radius: 22rpx;
+  background: #fff;
+  border: 1rpx solid #f0e2e5;
+}
+
+.candidate-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14rpx;
+  align-items: flex-start;
+}
+
+.candidate-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.candidate-title {
+  display: block;
+  font-size: 27rpx;
+  font-weight: 800;
+  color: #1f2937;
+}
+
+.candidate-raw {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: #6b7280;
+}
+
+.candidate-confidence {
+  flex-shrink: 0;
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  background: #fff1f2;
+  color: #b70f24;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.candidate-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 14rpx;
+}
+
+.candidate-chip {
+  padding: 6rpx 12rpx;
+  border-radius: 999rpx;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 20rpx;
+}
+
+.candidate-chip.pass {
+  background: #ecfdf3;
+  color: #15803d;
+}
+
+.review-warnings {
+  margin-top: 18rpx;
+  padding: 18rpx;
+  border-radius: 20rpx;
+  background: #fff7ed;
+  border: 1rpx solid #fed7aa;
+}
+
+.review-warnings-title {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 800;
+  color: #b45309;
+}
+
+.review-warning-item {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: #9a5b00;
 }
 
 .suggest-card {

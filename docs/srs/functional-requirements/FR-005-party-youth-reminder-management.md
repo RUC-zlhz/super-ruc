@@ -20,9 +20,9 @@ The platform shall allow authorized operators to maintain party and youth workfl
 
 ## Acceptance Criteria
 
-- [ ] 授权角色可维护节点名称、顺序、触发条件和提醒时间。
-- [ ] 系统可生成待提醒对象清单或提醒记录。
-- [ ] 运营人员可标记节点已完成、已延期或需人工跟进。
+- 授权角色可维护节点名称、顺序、触发条件和提醒时间。
+- 系统可生成待提醒对象清单或提醒记录。
+- 运营人员可标记节点已完成、已延期或需人工跟进。
 
 ## Notes
 
@@ -30,5 +30,5 @@ The platform shall allow authorized operators to maintain party and youth workfl
 
 ---
 *Created: 2026-04-13*  
-*Last Updated: 2026-04-13*  
+*Last Updated: 2026-05-12*
 *Author: Codex*

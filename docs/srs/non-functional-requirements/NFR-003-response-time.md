@@ -27,10 +27,10 @@ The platform shall return common student queries and workflow status views withi
 
 ## Acceptance Criteria
 
-- [ ] 政策查询和党团进度页在预期负载下满足目标时间。
-- [ ] 常见审核列表和通知批次列表在预期负载下满足目标时间。
-- [ ] 响应时间结果可被监测或抽样验证。
-- [ ] 标准格式 Excel 主数据 100 条批量导入在 60 秒内完成成功提交或整批失败回滚，并在回滚时输出可精确定位错误行的可下载错误报告。
+- 政策查询和党团进度页在预期负载下满足目标时间。
+- 常见审核列表和通知批次列表在预期负载下满足目标时间。
+- 响应时间结果可被监测或抽样验证。
+- 标准格式 Excel 主数据 100 条批量导入在 60 秒内完成成功提交或整批失败回滚，并在回滚时输出可精确定位错误行的可下载错误报告。
 
 ## Implementation Notes
 
@@ -38,4 +38,4 @@ The platform shall return common student queries and workflow status views withi
 
 ---
 *Created: 2026-04-13*  
-*Last Updated: 2026-04-17*
+*Last Updated: 2026-05-12*

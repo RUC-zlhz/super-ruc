@@ -9,7 +9,7 @@
 
 ### Statement
 
-The platform shall display unmet curriculum modules, related risk hints, and course-type recommendation hints for a student based on uploaded transcript data, maintained training-plan rules and available term course data without asserting final graduation eligibility.
+The platform shall display unmet curriculum modules, related risk hints, and course-type recommendation hints for a student based on verified transcript data, maintained training-plan rules and available term course data without asserting final graduation eligibility. If capacity, timetable, prerequisite, or preference data is missing, the platform shall explicitly surface that the data is not configured.
 
 ## Traceability
 
@@ -20,10 +20,11 @@ The platform shall display unmet curriculum modules, related risk hints, and cou
 
 ## Acceptance Criteria
 
-- [ ] 学生上传或导入成绩数据后可查看未满足的培养方案模块。
-- [ ] 页面明确标识结果为风险提示而非毕业结论。
-- [ ] 若规则或数据不足，系统提示需要人工核验。
-- [ ] 当学期开课信息可用时，页面可展示课程类型级建议，但不得展示动态选课人数或毕业结论。
+- 学生上传或导入成绩数据后可查看未满足的培养方案模块。
+- 页面明确标识结果为风险提示而非毕业结论。
+- 若规则或数据不足，系统提示需要人工核验。
+- 当学期开课信息可用时，页面可展示课程类型级建议，但不得展示动态选课人数或毕业结论。
+- 课程类型建议仅基于已核验成绩、培养方案规则与可用开课数据生成；若容量、课表、先修或偏好数据缺失，页面需明确提示“数据未配置”。
 
 ## Notes
 
@@ -31,5 +32,5 @@ The platform shall display unmet curriculum modules, related risk hints, and cou
 
 ---
 *Created: 2026-04-13*  
-*Last Updated: 2026-04-13*  
+*Last Updated: 2026-05-12*
 *Author: Codex*

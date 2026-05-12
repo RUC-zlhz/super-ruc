@@ -42,6 +42,10 @@ logger = logging.getLogger(__name__)
 
 
 # ---------- 展示转换 ----------
+def _entry_source_is_official(entry: KnowledgeEntry) -> bool:
+    return bool(entry.source and entry.source.is_official)
+
+
 def entry_to_brief(entry: KnowledgeEntry) -> EntryBrief:
     return EntryBrief(
         id=entry.id,
@@ -57,6 +61,9 @@ def entry_to_brief(entry: KnowledgeEntry) -> EntryBrief:
         version_label=entry.version_label,
         updated_at=entry.updated_at,
         tags=[t.tag for t in (entry.tags or [])],
+        source_name=entry.source.source_name if entry.source else None,
+        source_url=entry.source.source_url if entry.source else None,
+        source_is_official=_entry_source_is_official(entry),
     )
 
 
@@ -125,6 +132,24 @@ async def search_for_student(
     return [entry_to_brief(r) for r in rows], total
 
 
+async def list_templates_for_student(
+    db: AsyncSession,
+    *,
+    q: str | None,
+    category_code: str | None,
+    page: int,
+    size: int,
+) -> tuple[list[TemplateAsset], int]:
+    rows, total = await repo.list_published_templates_for_student(
+        db,
+        q=q,
+        category_code=category_code,
+        page=page,
+        size=size,
+    )
+    return list(rows), total
+
+
 async def get_for_student(db: AsyncSession, entry_id: int) -> EntryDetail:
     entry = await repo.get_entry(db, entry_id)
     if entry is None or entry.status != ENTRY_STATUS_PUBLISHED:
@@ -172,6 +197,7 @@ async def ai_match(db: AsyncSession, query: str, top_k: int) -> AiMatchResponse:
                         reason=item.get("reason"),
                         source_name=e.source.source_name if e.source else None,
                         source_url=e.source.source_url if e.source else None,
+                        source_is_official=_entry_source_is_official(e),
                         version_label=e.version_label,
                         ambiguity_flag=e.ambiguity_flag,
                     )
@@ -191,6 +217,7 @@ async def ai_match(db: AsyncSession, query: str, top_k: int) -> AiMatchResponse:
                     reason="关键词命中",
                     source_name=e.source.source_name if e.source else None,
                     source_url=e.source.source_url if e.source else None,
+                    source_is_official=_entry_source_is_official(e),
                     version_label=e.version_label,
                     ambiguity_flag=e.ambiguity_flag,
                 )
@@ -498,12 +525,33 @@ async def deprecate_template(
     return tpl
 
 
+def _can_admin_download_template(operator_role: str | None) -> bool:
+    roles = {role.strip() for role in (operator_role or "").split(",") if role.strip()}
+    return bool(
+        roles
+        & {
+            "SUPER_ADMIN",
+            "COLLEGE_LEADER",
+            "COUNSELOR",
+            "HEAD_TEACHER",
+            "YOUTH_LEAGUE_TEACHER",
+            "PARTY_BUILD_TEACHER",
+        }
+    )
+
+
 async def template_download_url(
-    db: AsyncSession, template_id: int, operator_id: int | None = None, operator_role: str | None = None
+    db: AsyncSession,
+    template_id: int,
+    operator_id: int | None = None,
+    operator_role: str | None = None,
 ) -> tuple[TemplateAsset, str, int]:
     tpl = await repo.get_template(db, template_id)
     if tpl is None or tpl.status != TEMPLATE_STATUS_ACTIVE:
         raise NotFoundError("模板不存在或已停用")
+    if not _can_admin_download_template(operator_role):
+        if not await repo.template_has_published_entry(db, template_id):
+            raise NotFoundError("模板不存在或未发布")
     expires_minutes = 10
     try:
         url = presigned_get(tpl.object_bucket, tpl.object_key, expires_minutes=expires_minutes)

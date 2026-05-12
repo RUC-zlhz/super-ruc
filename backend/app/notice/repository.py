@@ -6,6 +6,7 @@ from datetime import UTC
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.auth.models import Student, User, UserRole
 from app.auth.role_codes import expand_role_codes_for_lookup
@@ -15,7 +16,10 @@ from app.notice.models import (
     NOTICE_STATUS_PUBLISHED,
     Notice,
     NoticeDelivery,
+    NoticeDeliveryAttempt,
     NoticeDeliveryBatch,
+    NoticeIngestRun,
+    NoticeSource,
     NoticeTag,
 )
 
@@ -72,6 +76,74 @@ async def set_notice_tags(db: AsyncSession, notice_id: int, tags: list[str]) -> 
     for tag in {t.strip() for t in tags if t and t.strip()}:
         db.add(NoticeTag(notice_id=notice_id, tag=tag))
     await db.flush()
+
+
+async def get_notice_by_source_url(db: AsyncSession, source_url: str) -> Notice | None:
+    stmt = select(Notice).where(Notice.source_url == source_url)
+    return (await db.execute(stmt.limit(1))).scalar_one_or_none()
+
+
+# ---------- Controlled ingest sources ----------
+async def create_notice_source(db: AsyncSession, **fields) -> NoticeSource:
+    row = NoticeSource(**fields)
+    db.add(row)
+    await db.flush()
+    return row
+
+
+async def get_notice_source(db: AsyncSession, source_id: int) -> NoticeSource | None:
+    return await db.get(NoticeSource, source_id)
+
+
+async def list_notice_sources(
+    db: AsyncSession,
+    *,
+    is_active: bool | None = None,
+    source_type: str | None = None,
+    page: int = 1,
+    size: int = 20,
+) -> tuple[Sequence[NoticeSource], int]:
+    stmt = select(NoticeSource)
+    if is_active is not None:
+        stmt = stmt.where(NoticeSource.is_active.is_(is_active))
+    if source_type:
+        stmt = stmt.where(NoticeSource.source_type == source_type)
+    total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
+    stmt = (
+        stmt.order_by(NoticeSource.updated_at.desc(), NoticeSource.id.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+    )
+    return (await db.execute(stmt)).scalars().all(), total
+
+
+async def create_ingest_run(db: AsyncSession, **fields) -> NoticeIngestRun:
+    row = NoticeIngestRun(**fields)
+    db.add(row)
+    await db.flush()
+    return row
+
+
+async def list_ingest_runs(
+    db: AsyncSession,
+    *,
+    source_id: int | None = None,
+    status: str | None = None,
+    page: int = 1,
+    size: int = 20,
+) -> tuple[Sequence[NoticeIngestRun], int]:
+    stmt = select(NoticeIngestRun).options(selectinload(NoticeIngestRun.source))
+    if source_id is not None:
+        stmt = stmt.where(NoticeIngestRun.source_id == source_id)
+    if status:
+        stmt = stmt.where(NoticeIngestRun.status == status)
+    total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
+    stmt = (
+        stmt.order_by(NoticeIngestRun.started_at.desc(), NoticeIngestRun.id.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+    )
+    return (await db.execute(stmt)).scalars().all(), total
 
 
 # ---------- Target resolution ----------
@@ -145,6 +217,30 @@ async def add_delivery(db: AsyncSession, **fields) -> NoticeDelivery:
     db.add(row)
     await db.flush()
     return row
+
+
+async def get_delivery(db: AsyncSession, delivery_id: int) -> NoticeDelivery | None:
+    stmt = (
+        select(NoticeDelivery)
+        .where(NoticeDelivery.id == delivery_id)
+        .options(selectinload(NoticeDelivery.attempts))
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def add_delivery_attempt(db: AsyncSession, **fields) -> NoticeDeliveryAttempt:
+    row = NoticeDeliveryAttempt(**fields)
+    db.add(row)
+    await db.flush()
+    return row
+
+
+async def next_delivery_attempt_no(db: AsyncSession, delivery_id: int) -> int:
+    stmt = select(func.coalesce(func.max(NoticeDeliveryAttempt.attempt_no), 0)).where(
+        NoticeDeliveryAttempt.delivery_id == delivery_id
+    )
+    current = (await db.execute(stmt)).scalar_one()
+    return int(current or 0) + 1
 
 
 async def list_deliveries_for_batch(

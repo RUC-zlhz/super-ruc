@@ -12,10 +12,16 @@ import smtplib
 import uuid
 from datetime import UTC, datetime
 from email.mime.text import MIMEText
+from html.parser import HTMLParser
+from typing import Any
+from urllib.parse import urlparse
+from xml.etree import ElementTree as ET
 
+import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import log_action
+from app.auth.models import Student, User
 from app.core.config import settings
 from app.core.exceptions import BizError, ConflictError, NotFoundError
 from app.core.security import decrypt_field, mask_phone
@@ -24,20 +30,35 @@ from app.notice.models import (
     CHANNEL_EMAIL,
     CHANNEL_IN_APP,
     CHANNEL_SMS,
+    DELIVERY_ATTEMPT_STATUS_FAILED,
+    DELIVERY_ATTEMPT_STATUS_SENT,
+    DELIVERY_ATTEMPT_STATUS_SKIPPED,
     DELIVERY_STATUS_FAILED,
     DELIVERY_STATUS_SENT,
     DELIVERY_STATUS_SKIPPED,
+    INGEST_RUN_STATUS_FAILED,
+    INGEST_RUN_STATUS_PARTIAL,
+    INGEST_RUN_STATUS_SUCCESS,
+    NOTICE_SOURCE_TYPE_RSS,
+    NOTICE_SOURCE_TYPE_URL,
     NOTICE_STATUS_ARCHIVED,
     NOTICE_STATUS_DRAFT,
     NOTICE_STATUS_PUBLISHED,
     Notice,
     NoticeDelivery,
     NoticeDeliveryBatch,
+    NoticeIngestRun,
+    NoticeSource,
 )
 from app.notice.schemas import (
     NoticeBrief,
+    NoticeDeliveryAttemptOut,
     NoticeIn,
+    NoticeIngestRunOut,
     NoticeOut,
+    NoticeSourceIn,
+    NoticeSourceOut,
+    NoticeSourcePatchIn,
     StudentNoticeItem,
     TargetPreviewResult,
     TargetRule,
@@ -95,6 +116,29 @@ def notice_to_brief(notice: Notice) -> NoticeBrief:
     )
 
 
+def source_to_out(source: NoticeSource) -> NoticeSourceOut:
+    return NoticeSourceOut.model_validate(source)
+
+
+def ingest_run_to_out(run: NoticeIngestRun) -> NoticeIngestRunOut:
+    return NoticeIngestRunOut.model_validate(run)
+
+
+def _normalize_source_type(value: str) -> str:
+    normalized = (value or "").strip().upper()
+    if normalized not in {NOTICE_SOURCE_TYPE_URL, NOTICE_SOURCE_TYPE_RSS}:
+        raise BizError("通知抓取来源仅支持公开 URL/RSS", code=40080)
+    return normalized
+
+
+def _ensure_public_http_url(value: str) -> str:
+    url = (value or "").strip()
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise BizError("抓取来源必须是公开 http/https URL", code=40081)
+    return url
+
+
 # ---------- Target preview ----------
 async def preview_target(
     db: AsyncSession, rule: TargetRule | None
@@ -142,6 +186,74 @@ async def create_notice(
     await db.commit()
     await db.refresh(row)
     return notice_to_out(row)
+
+
+async def create_notice_source(
+    db: AsyncSession,
+    payload: NoticeSourceIn,
+    *,
+    operator_id: int,
+    operator_role: str | None,
+) -> NoticeSourceOut:
+    row = await repo.create_notice_source(
+        db,
+        name=payload.name.strip(),
+        source_type=_normalize_source_type(payload.source_type),
+        source_url=_ensure_public_http_url(payload.source_url),
+        category=payload.category,
+        target_rule=payload.target_rule.model_dump() if payload.target_rule else None,
+        is_active=payload.is_active,
+        created_by=operator_id,
+        updated_by=operator_id,
+    )
+    await log_action(
+        db,
+        event_type="NOTICE",
+        entity_code="NOTICE_SOURCE",
+        action="CREATE",
+        entity_id=row.id,
+        actor_user_id=operator_id,
+        actor_role=operator_role,
+    )
+    await db.commit()
+    await db.refresh(row)
+    return source_to_out(row)
+
+
+async def update_notice_source(
+    db: AsyncSession,
+    source_id: int,
+    payload: NoticeSourcePatchIn,
+    *,
+    operator_id: int,
+    operator_role: str | None,
+) -> NoticeSourceOut:
+    row = await repo.get_notice_source(db, source_id)
+    if row is None:
+        raise NotFoundError("通知抓取来源不存在")
+    updates = payload.model_dump(exclude_unset=True)
+    if "source_type" in updates and updates["source_type"] is not None:
+        updates["source_type"] = _normalize_source_type(updates["source_type"])
+    if "source_url" in updates and updates["source_url"] is not None:
+        updates["source_url"] = _ensure_public_http_url(updates["source_url"])
+    if "target_rule" in updates:
+        target_rule = updates["target_rule"]
+        updates["target_rule"] = target_rule.model_dump() if target_rule else None
+    for key, value in updates.items():
+        setattr(row, key, value)
+    row.updated_by = operator_id
+    await log_action(
+        db,
+        event_type="NOTICE",
+        entity_code="NOTICE_SOURCE",
+        action="UPDATE",
+        entity_id=row.id,
+        actor_user_id=operator_id,
+        actor_role=operator_role,
+    )
+    await db.commit()
+    await db.refresh(row)
+    return source_to_out(row)
 
 
 async def update_notice(
@@ -239,6 +351,160 @@ async def archive_notice(
     return notice_to_out(row)
 
 
+class _TitleParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self._in_title = False
+        self.title_parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.lower() == "title":
+            self._in_title = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() == "title":
+            self._in_title = False
+
+    def handle_data(self, data: str) -> None:
+        if self._in_title:
+            self.title_parts.append(data.strip())
+
+    @property
+    def title(self) -> str | None:
+        text = " ".join(part for part in self.title_parts if part).strip()
+        return text or None
+
+
+def _extract_rss_items(content: bytes, fallback_url: str) -> list[dict[str, str | None]]:
+    root = ET.fromstring(content)  # noqa: S314 - Sources are admin-configured public RSS URLs.
+    items = root.findall(".//item")
+    if not items:
+        items = root.findall(".//{http://www.w3.org/2005/Atom}entry")
+    parsed: list[dict[str, str | None]] = []
+    for item in items[:50]:
+        title = item.findtext("title") or item.findtext("{http://www.w3.org/2005/Atom}title")
+        link = item.findtext("link")
+        if link is None:
+            atom_link = item.find("{http://www.w3.org/2005/Atom}link")
+            if atom_link is not None:
+                link = atom_link.attrib.get("href")
+        summary = (
+            item.findtext("description")
+            or item.findtext("summary")
+            or item.findtext("{http://www.w3.org/2005/Atom}summary")
+        )
+        parsed.append(
+            {
+                "title": (title or "未命名通知").strip(),
+                "source_url": (link or fallback_url).strip(),
+                "summary": (summary or "").strip() or None,
+            }
+        )
+    return parsed
+
+
+def _extract_url_item(content: bytes, source_url: str) -> list[dict[str, str | None]]:
+    parser = _TitleParser()
+    try:
+        parser.feed(content[:256 * 1024].decode("utf-8", errors="ignore"))
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("failed to parse notice source title url=%s error=%s", source_url, exc)
+    title = parser.title or source_url
+    return [{"title": title[:256], "source_url": source_url, "summary": None}]
+
+
+async def run_notice_source_ingest(
+    db: AsyncSession,
+    source_id: int,
+    *,
+    operator_id: int,
+    operator_role: str | None,
+) -> NoticeIngestRunOut:
+    source = await repo.get_notice_source(db, source_id)
+    if source is None:
+        raise NotFoundError("通知抓取来源不存在")
+    if not source.is_active:
+        raise BizError("通知抓取来源已停用", code=40082)
+
+    started_at = datetime.now(UTC)
+    run = await repo.create_ingest_run(
+        db,
+        source_id=source.id,
+        status=INGEST_RUN_STATUS_SUCCESS,
+        started_at=started_at,
+        created_by=operator_id,
+    )
+    fetched = created = skipped = 0
+    error_message: str | None = None
+    try:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+            response = await client.get(source.source_url)
+            response.raise_for_status()
+        content = response.content
+        if source.source_type == NOTICE_SOURCE_TYPE_RSS:
+            items = _extract_rss_items(content, source.source_url)
+        else:
+            items = _extract_url_item(content, source.source_url)
+        fetched = len(items)
+        for item in items:
+            item_url = _ensure_public_http_url(item["source_url"] or source.source_url)
+            if await repo.get_notice_by_source_url(db, item_url):
+                skipped += 1
+                continue
+            summary = item.get("summary")
+            body = (summary or item["title"] or "抓取通知").strip()
+            body_md = f"{body}\n\n来源链接：{item_url}"
+            await repo.create_notice(
+                db,
+                title=(item["title"] or "抓取通知")[:256],
+                body_md=body_md,
+                summary=(summary or item["title"])[:512] if (summary or item["title"]) else None,
+                category=source.category,
+                status=NOTICE_STATUS_DRAFT,
+                source_type="INGESTED",
+                source_url=item_url,
+                target_rule=source.target_rule,
+                target_summary="抓取来源生成草稿，需管理员审核后发布",
+                channels=CHANNEL_IN_APP,
+                created_by=operator_id,
+                updated_by=operator_id,
+            )
+            created += 1
+    except Exception as exc:  # noqa: BLE001
+        error_message = str(exc)[:512]
+        logger.warning("notice source ingest failed source_id=%s error=%s", source.id, error_message)
+
+    run.fetched_count = fetched
+    run.created_count = created
+    run.skipped_count = skipped
+    run.error_message = error_message
+    run.finished_at = datetime.now(UTC)
+    if error_message:
+        run.status = INGEST_RUN_STATUS_FAILED if created == 0 else INGEST_RUN_STATUS_PARTIAL
+    else:
+        run.status = INGEST_RUN_STATUS_SUCCESS
+    source.last_run_at = run.finished_at
+    await log_action(
+        db,
+        event_type="NOTICE",
+        entity_code="NOTICE_SOURCE",
+        action="INGEST_RUN",
+        entity_id=source.id,
+        actor_user_id=operator_id,
+        actor_role=operator_role,
+        detail={
+            "run_id": run.id,
+            "fetched": fetched,
+            "created": created,
+            "skipped": skipped,
+            "status": run.status,
+        },
+    )
+    await db.commit()
+    await db.refresh(run)
+    return ingest_run_to_out(run)
+
+
 # ---------- Dispatch ----------
 def _send_email(to_addr: str, subject: str, body: str) -> tuple[bool, str | None]:
     """简化：直接 SMTP。生产环境应走任务队列。"""
@@ -257,19 +523,65 @@ def _send_email(to_addr: str, subject: str, body: str) -> tuple[bool, str | None
         return False, str(e)[:256]
 
 
-def _send_sms(_to_number: str, _body: str) -> tuple[bool, str | None]:
-    """SMS 网关占位。实际集成按甲方选择的运营商。"""
+def _sms_provider_code() -> str:
+    return (settings.SMS_PROVIDER or "mock").strip().lower()
+
+
+def _send_sms(_to_number: str, _body: str) -> tuple[bool, str | None, str | None]:
+    """SMS provider 接口。
+
+    一期仅实现 mock/local；真实厂商接入保留到 provider 分支。
+    """
     if not settings.SMS_ENABLED:
-        return False, "SMS_DISABLED"
-    # 生产集成点：阿里云/腾讯云/中兴/玄武等 SMS 网关
-    logger.info("[SMS mock] to=%s body_len=%d", _to_number, len(_body))
-    return True, None
+        return False, "SMS_DISABLED", None
+    provider = _sms_provider_code()
+    if provider in {"mock", "local"}:
+        message_id = f"mock-{uuid.uuid4().hex[:12]}"
+        logger.info("[SMS %s] to=%s body_len=%d msg=%s", provider, _to_number, len(_body), message_id)
+        return True, None, message_id
+    return False, "SMS_PROVIDER_NOT_CONFIGURED", None
+
+
+def _coerce_sms_result(result: Any) -> tuple[bool, str | None, str | None]:
+    """Keep old tests/monkeypatches compatible with the provider result shape."""
+    if not isinstance(result, tuple):
+        return False, "SMS_PROVIDER_INVALID_RESULT", None
+    if len(result) == 2:
+        ok, err = result
+        return bool(ok), err, None
+    if len(result) >= 3:
+        ok, err, provider_message_id = result[:3]
+        return bool(ok), err, provider_message_id
+    return False, "SMS_PROVIDER_INVALID_RESULT", None
 
 
 def _resolve_sms_number(user, student) -> str | None:
     """Resolve raw phone number for SMS gateway; never returns email fallback."""
     return decrypt_field(getattr(user, "phone_enc", None)) or decrypt_field(
         getattr(student, "phone_enc", None)
+    )
+
+
+async def _record_sms_attempt(
+    db: AsyncSession,
+    *,
+    delivery: NoticeDelivery,
+    status: str,
+    target_handle: str | None,
+    provider_message_id: str | None = None,
+    error_code: str | None = None,
+    error_message: str | None = None,
+) -> None:
+    await repo.add_delivery_attempt(
+        db,
+        delivery_id=delivery.id,
+        provider=_sms_provider_code(),
+        attempt_no=await repo.next_delivery_attempt_no(db, delivery.id),
+        status=status,
+        target_handle=target_handle,
+        provider_message_id=provider_message_id,
+        error_code=error_code,
+        error_message=error_message,
     )
 
 
@@ -372,6 +684,7 @@ async def dispatch_notice(
             err_code: str | None = None
             err_msg: str | None = None
             target_handle: str | None = None
+            provider_msg_id: str | None = None
 
             if ch == CHANNEL_IN_APP:
                 sent_ok = True  # 入库即送达
@@ -394,10 +707,12 @@ async def dispatch_notice(
                         err_code = "NO_PHONE"
                     else:
                         target_handle = mask_phone(raw_phone)
-                        ok_, err = _send_sms(raw_phone, notice.summary or notice.title)
+                        ok_, err, provider_msg_id = _coerce_sms_result(
+                            _send_sms(raw_phone, notice.summary or notice.title)
+                        )
                         sent_ok = ok_
                         if not ok_:
-                            err_code = "SMS_ERROR"
+                            err_code = err or "SMS_ERROR"
                             err_msg = err
             else:
                 err_code = "UNSUPPORTED_CHANNEL"
@@ -411,7 +726,7 @@ async def dispatch_notice(
             elif status == DELIVERY_STATUS_FAILED:
                 failed += 1
 
-            await repo.add_delivery(
+            delivery = await repo.add_delivery(
                 db,
                 batch_id=batch.id,
                 notice_id=notice.id,
@@ -424,6 +739,24 @@ async def dispatch_notice(
                 error_code=err_code,
                 error_message=err_msg,
             )
+            if ch == CHANNEL_SMS:
+                await _record_sms_attempt(
+                    db,
+                    delivery=delivery,
+                    status=(
+                        DELIVERY_ATTEMPT_STATUS_SENT
+                        if sent_ok
+                        else (
+                            DELIVERY_ATTEMPT_STATUS_SKIPPED
+                            if status == DELIVERY_STATUS_SKIPPED
+                            else DELIVERY_ATTEMPT_STATUS_FAILED
+                        )
+                    ),
+                    target_handle=target_handle,
+                    provider_message_id=provider_msg_id,
+                    error_code=err_code,
+                    error_message=None if sent_ok else err_msg,
+                )
 
     batch.success_count = success
     batch.failed_count = failed
@@ -454,6 +787,124 @@ async def dispatch_notice(
     await db.commit()
     await db.refresh(batch)
     return batch
+
+
+async def retry_notice_delivery(
+    db: AsyncSession,
+    delivery_id: int,
+    *,
+    operator_id: int,
+    operator_role: str | None,
+) -> NoticeDelivery:
+    delivery = await repo.get_delivery(db, delivery_id)
+    if delivery is None:
+        raise NotFoundError("投递记录不存在")
+    if delivery.channel != CHANNEL_SMS:
+        raise BizError("仅 SMS 投递支持重试", code=40083)
+    user = await db.get(User, delivery.user_id) if delivery.user_id else None
+    student = await db.get(Student, delivery.student_id)
+    if student is None:
+        raise NotFoundError("投递目标学生不存在")
+
+    raw_phone = _resolve_sms_number(user, student)
+    target_handle = mask_phone(raw_phone) if raw_phone else None
+    sent_ok = False
+    err_code: str | None = None
+    err_msg: str | None = None
+    provider_msg_id: str | None = None
+    if not settings.SMS_ENABLED:
+        err_code = "SMS_DISABLED"
+    elif not raw_phone:
+        err_code = "NO_PHONE"
+    else:
+        sent_ok, err_msg, provider_msg_id = _coerce_sms_result(
+            _send_sms(raw_phone, "通知短信重试")
+        )
+        if not sent_ok:
+            err_code = err_msg or "SMS_ERROR"
+
+    if sent_ok:
+        delivery.status = DELIVERY_STATUS_SENT
+        delivery.sent_at = datetime.now(UTC)
+        delivery.error_code = None
+        delivery.error_message = None
+        attempt_status = DELIVERY_ATTEMPT_STATUS_SENT
+    else:
+        delivery.status = DELIVERY_STATUS_SKIPPED if err_code in {"SMS_DISABLED", "NO_PHONE"} else DELIVERY_STATUS_FAILED
+        delivery.error_code = err_code
+        delivery.error_message = err_msg
+        attempt_status = (
+            DELIVERY_ATTEMPT_STATUS_SKIPPED
+            if delivery.status == DELIVERY_STATUS_SKIPPED
+            else DELIVERY_ATTEMPT_STATUS_FAILED
+        )
+    delivery.target_handle = target_handle
+    await _record_sms_attempt(
+        db,
+        delivery=delivery,
+        status=attempt_status,
+        target_handle=target_handle,
+        provider_message_id=provider_msg_id,
+        error_code=err_code,
+        error_message=err_msg,
+    )
+    await log_action(
+        db,
+        event_type="NOTICE",
+        entity_code="NOTICE_DELIVERY",
+        action="RETRY_SMS",
+        entity_id=delivery.id,
+        actor_user_id=operator_id,
+        actor_role=operator_role,
+        detail={"status": delivery.status, "error_code": err_code},
+    )
+    await db.commit()
+    await db.refresh(delivery)
+    return delivery
+
+
+async def mock_delivery_receipt(
+    db: AsyncSession,
+    delivery_id: int,
+    *,
+    receipt_status: str,
+    operator_id: int,
+    operator_role: str | None,
+) -> NoticeDeliveryAttemptOut:
+    delivery = await repo.get_delivery(db, delivery_id)
+    if delivery is None:
+        raise NotFoundError("投递记录不存在")
+    if delivery.channel != CHANNEL_SMS:
+        raise BizError("仅 SMS 投递支持回执回写", code=40084)
+    attempts = sorted(delivery.attempts or [], key=lambda row: row.attempt_no, reverse=True)
+    if attempts:
+        attempt = attempts[0]
+    else:
+        attempt = await repo.add_delivery_attempt(
+            db,
+            delivery_id=delivery.id,
+            provider=_sms_provider_code(),
+            attempt_no=1,
+            status=DELIVERY_ATTEMPT_STATUS_SKIPPED,
+            target_handle=delivery.target_handle,
+            error_code=delivery.error_code,
+            error_message=delivery.error_message,
+        )
+    attempt.receipt_status = receipt_status
+    attempt.receipt_at = datetime.now(UTC)
+    await log_action(
+        db,
+        event_type="NOTICE",
+        entity_code="NOTICE_DELIVERY",
+        action="MOCK_RECEIPT",
+        entity_id=delivery.id,
+        actor_user_id=operator_id,
+        actor_role=operator_role,
+        detail={"attempt_id": attempt.id, "receipt_status": receipt_status},
+    )
+    await db.commit()
+    await db.refresh(attempt)
+    return NoticeDeliveryAttemptOut.model_validate(attempt)
 
 
 # ---------- Student inbox ----------

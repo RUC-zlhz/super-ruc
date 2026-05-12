@@ -54,6 +54,21 @@ class ImportPreviewResult(BaseModel):
     rows: list[ImportBatchRowOut]
 
 
+class DefaultImportResult(BaseModel):
+    import_type: str
+    total_rows: int = 0
+    created_count: int = 0
+    updated_count: int = 0
+    skipped_count: int = 0
+    warning_count: int = 0
+    warnings: list[str] = []
+
+
+class DefaultImportAllResult(BaseModel):
+    students: DefaultImportResult
+    curriculum: DefaultImportResult
+
+
 # ============================================================
 # 培养方案
 # ============================================================

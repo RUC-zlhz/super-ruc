@@ -9,7 +9,7 @@
 
 ### Statement
 
-The platform shall allow authorized operators to maintain curriculum requirements, module rules, course-equivalence mappings, and term course-offering data used for academic risk analysis and course-type recommendations.
+The platform shall allow authorized operators to maintain curriculum requirements, module rules, course-equivalence mappings, and term course-offering data used for academic risk analysis and course-type recommendations, while keeping the default `2024-default` import as a demo-only version that does not overwrite later teacher-maintained versions.
 
 ## Traceability
 
@@ -20,10 +20,11 @@ The platform shall allow authorized operators to maintain curriculum requirement
 
 ## Acceptance Criteria
 
-- [ ] 授权人员可维护年级、专业对应的培养方案规则。
-- [ ] 授权人员可维护课程替代或等价关系。
-- [ ] 授权人员可维护本学期开课清单或课程类型映射信息。
-- [ ] 规则变更后可被后续学业缺口展示使用。
+- 授权人员可维护年级、专业对应的培养方案规则。
+- 授权人员可维护课程替代或等价关系。
+- 授权人员可维护本学期开课清单或课程类型映射信息。
+- 规则变更后可被后续学业缺口展示使用。
+- 默认培养方案导入只维护 `version_label=2024-default` 的演示版本并写入课程白名单，不覆盖教师后续维护的非默认版本。
 
 ## Notes
 
@@ -31,5 +32,5 @@ The platform shall allow authorized operators to maintain curriculum requirement
 
 ---
 *Created: 2026-04-13*  
-*Last Updated: 2026-04-13*  
+*Last Updated: 2026-05-12*
 *Author: Codex*

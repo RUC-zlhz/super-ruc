@@ -39,8 +39,8 @@ from app.audit.service import build_audit_detail, log_action
 from app.core.dependencies import CurrentUserDep, DBDep, require_role
 from app.core.exceptions import BizError, NotFoundError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
+from app.exchange import default_imports, service
 from app.exchange import repository as repo
-from app.exchange import service
 from app.exchange.models import (
     IMPORT_TYPE_COURSE_EQUIV,
     IMPORT_TYPE_COURSE_OFFERING,
@@ -57,6 +57,8 @@ from app.exchange.schemas import (
     CurriculumPlanBrief,
     CurriculumPlanDetail,
     CurriculumPlanIn,
+    DefaultImportAllResult,
+    DefaultImportResult,
     ImportBatchBrief,
     ImportBatchDetail,
     ImportBatchRowOut,
@@ -79,6 +81,59 @@ _VALID_IMPORT_TYPES = {
 _MAX_UPLOAD_BYTES = 30 * 1024 * 1024
 
 router = APIRouter(prefix="/admin", tags=["exchange"])
+
+
+@router.post(
+    "/default-imports/students",
+    response_model=ApiResponse[DefaultImportResult],
+)
+async def import_default_students(
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+) -> ApiResponse[DefaultImportResult]:
+    result = await default_imports.import_default_students(
+        db,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    return ok(result)
+
+
+@router.post(
+    "/default-imports/curriculum",
+    response_model=ApiResponse[DefaultImportResult],
+)
+async def import_default_curriculum(
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+) -> ApiResponse[DefaultImportResult]:
+    result = await default_imports.import_default_curriculum(
+        db,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    return ok(result)
+
+
+@router.post(
+    "/default-imports/all",
+    response_model=ApiResponse[DefaultImportAllResult],
+)
+async def import_all_defaults(
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+) -> ApiResponse[DefaultImportAllResult]:
+    students = await default_imports.import_default_students(
+        db,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    curriculum = await default_imports.import_default_curriculum(
+        db,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    return ok(DefaultImportAllResult(students=students, curriculum=curriculum))
 
 
 # ============================================================

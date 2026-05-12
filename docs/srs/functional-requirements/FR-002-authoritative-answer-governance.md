@@ -9,7 +9,7 @@
 
 ### Statement
 
-The platform shall display the official source, version, and last-updated information for each published knowledge answer and provide a manual-consultation fallback for ambiguous or sensitive cases.
+The platform shall display the source name, official-source flag or official link, version, and last-updated information for each published knowledge answer and provide a manual-consultation fallback for ambiguous or sensitive cases. When multiple candidates are equally relevant, official sources shall be preferred.
 
 ## Traceability
 
@@ -20,9 +20,10 @@ The platform shall display the official source, version, and last-updated inform
 
 ## Acceptance Criteria
 
-- [ ] 每条知识内容均显示来源名称或官方链接。
-- [ ] 每条知识内容均显示版本或最近更新时间。
-- [ ] 对标记为模糊、特殊或高风险的内容，页面提供转人工咨询入口或提示。
+- 每条知识内容均显示来源名称或官方链接。
+- 每条知识内容均显示版本或最近更新时间。
+- 对标记为模糊、特殊或高风险的内容，页面提供转人工咨询入口或提示。
+- 同等相关度的候选中优先展示官方来源，并可回链到对应的 `source_url`。
 
 ## Notes
 
@@ -30,5 +31,5 @@ The platform shall display the official source, version, and last-updated inform
 
 ---
 *Created: 2026-04-13*  
-*Last Updated: 2026-04-13*  
+*Last Updated: 2026-05-12*
 *Author: Codex*

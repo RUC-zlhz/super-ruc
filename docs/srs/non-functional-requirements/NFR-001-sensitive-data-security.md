@@ -27,9 +27,9 @@ The platform shall protect sensitive student data with encryption at rest and in
 
 ## Acceptance Criteria
 
-- [ ] 未授权角色无法在页面或导出结果中看到完整敏感字段。
-- [ ] 授权访问和导出动作均可被记录并追踪。
-- [ ] 数据传输和存储状态满足既定加密策略。
+- 未授权角色无法在页面或导出结果中看到完整敏感字段。
+- 授权访问和导出动作均可被记录并追踪。
+- 数据传输和存储状态满足既定加密策略。
 
 ## Implementation Notes
 
@@ -37,4 +37,4 @@ The platform shall protect sensitive student data with encryption at rest and in
 
 ---
 *Created: 2026-04-13*  
-*Last Updated: 2026-04-13*
+*Last Updated: 2026-05-12*

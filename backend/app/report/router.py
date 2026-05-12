@@ -22,6 +22,8 @@ from app.report.schemas import (
     AcademicGapAggregateItem,
     AcademicGapResult,
     OverviewResult,
+    TranscriptPdfReviewCommitIn,
+    TranscriptPdfReviewCommitResult,
     TranscriptPdfUploadResult,
 )
 
@@ -128,3 +130,23 @@ async def admin_academic_gap(
     _user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
 ) -> ApiResponse[AcademicGapResult]:
     return ok(await service.compute_academic_gap(db, student_id))
+
+
+@router.post(
+    "/admin/report/transcript-pdf-reviews/{batch_id}/commit",
+    response_model=ApiResponse[TranscriptPdfReviewCommitResult],
+)
+async def admin_commit_transcript_pdf_review(
+    batch_id: int,
+    payload: TranscriptPdfReviewCommitIn,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
+) -> ApiResponse[TranscriptPdfReviewCommitResult]:
+    result = await service.commit_transcript_pdf_review(
+        db,
+        batch_id,
+        payload,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    return ok(result)

@@ -20,9 +20,9 @@ The platform shall support request rejection, applicant withdrawal within config
 
 ## Acceptance Criteria
 
-- [ ] 审批老师可对申请执行通过或驳回，并填写处理意见。
-- [ ] 申请人可在允许的撤回期限内撤回待处理申请。
-- [ ] 被驳回或撤回的申请可基于原有填写内容修改并再次提交。
+- 审批老师可对申请执行通过或驳回，并填写处理意见。
+- 申请人可在允许的撤回期限内撤回待处理申请。
+- 被驳回或撤回的申请可基于原有填写内容修改并再次提交。
 
 ## Notes
 
@@ -30,5 +30,5 @@ The platform shall support request rejection, applicant withdrawal within config
 
 ---
 *Created: 2026-04-13*  
-*Last Updated: 2026-04-13*  
+*Last Updated: 2026-05-12*
 *Author: Codex*

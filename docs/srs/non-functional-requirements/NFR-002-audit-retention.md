@@ -27,10 +27,10 @@ The platform shall retain searchable administrator and approval audit records fo
 
 ## Acceptance Criteria
 
-- [ ] 学期内的关键审批、配置和导出操作均可被查询。
-- [ ] 日志查询结果包含事件先后顺序所需信息。
-- [ ] 日志保留策略不会在约定周期内提前清除关键记录。
-- [ ] 架构设计上提供定时任务（例如定期冷数据迁移脚本），将超出保留期的日志从高频查询表迁移至历史库，保证生产主表不无限膨胀。
+- 学期内的关键审批、配置和导出操作均可被查询。
+- 日志查询结果包含事件先后顺序所需信息。
+- 日志保留策略不会在约定周期内提前清除关键记录。
+- 架构设计上提供定时任务（例如定期冷数据迁移脚本），将超出保留期的日志从高频查询表迁移至历史库，保证生产主表不无限膨胀。
 
 ## Implementation Notes
 
@@ -38,4 +38,4 @@ The platform shall retain searchable administrator and approval audit records fo
 
 ---
 *Created: 2026-04-13*  
-*Last Updated: 2026-04-17*
+*Last Updated: 2026-05-12*

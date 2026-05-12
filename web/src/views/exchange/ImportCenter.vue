@@ -14,6 +14,54 @@
     <a-tabs v-model:activeKey="activeTab">
       <!-- 导入 -->
       <a-tab-pane key="import" tab="数据导入">
+        <a-card :bordered="false" class="mb16 default-import-card">
+          <div class="default-import-head">
+            <div>
+              <div class="default-import-title">默认数据导入</div>
+              <div class="default-import-sub">一键导入仓库内默认学生花名册与默认培养方案，保留原有手工导入流程。</div>
+            </div>
+            <a-space wrap>
+              <a-button :loading="defaultImportLoading.students" @click="onDefaultImport('students')">
+                <template #icon><UserAddOutlined /></template>
+                导入默认学生
+              </a-button>
+              <a-button :loading="defaultImportLoading.curriculum" @click="onDefaultImport('curriculum')">
+                <template #icon><ReadOutlined /></template>
+                导入默认培养方案
+              </a-button>
+              <a-button type="primary" :loading="defaultImportLoading.all" @click="onDefaultImport('all')">
+                <template #icon><DatabaseOutlined /></template>
+                导入全部默认
+              </a-button>
+            </a-space>
+          </div>
+
+          <a-alert
+            v-if="defaultImportSummary"
+            class="mt16"
+            type="success"
+            show-icon
+            :message="defaultImportSummary.title"
+          >
+            <template #description>
+              <a-descriptions :column="1" bordered size="small">
+                <a-descriptions-item
+                  v-for="item in defaultImportSummary.results"
+                  :key="item.import_type"
+                  :label="defaultImportLabel(item.import_type)"
+                >
+                  <div>{{ formatDefaultImportResult(item) }}</div>
+                  <div v-if="item.warnings.length" class="import-warnings">
+                    <div v-for="warning in item.warnings.slice(0, 3)" :key="warning">
+                      {{ warning }}
+                    </div>
+                  </div>
+                </a-descriptions-item>
+              </a-descriptions>
+            </template>
+          </a-alert>
+        </a-card>
+
         <a-card :bordered="false" class="mb16 import-hero">
           <div class="upload-zone">
             <div class="upload-icon"><CloudUploadOutlined /></div>
@@ -191,19 +239,27 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   CloudUploadOutlined,
+  DatabaseOutlined,
   ExclamationCircleOutlined,
   FileTextOutlined,
+  ReadOutlined,
+  UserAddOutlined,
 } from '@ant-design/icons-vue'
 import {
+  importAllDefaults,
+  importDefaultCurriculum,
+  importDefaultStudents,
   uploadImport, commitImport, listImports,
   downloadErrorReport, downloadStudents, downloadTranscripts, downloadCurriculum,
-  type ImportType, type ImportPreviewResult, type ImportBatchBrief,
+  type DefaultImportResult, type ImportType, type ImportPreviewResult, type ImportBatchBrief,
 } from '@/api/exchange'
 import StatusTag from '@/components/StatusTag.vue'
 
 const activeTab = ref('import')
 const importType = ref<ImportType>('student')
 const preview = ref<ImportPreviewResult | null>(null)
+const defaultImportLoading = reactive({ students: false, curriculum: false, all: false })
+const defaultImportSummary = ref<{ title: string; results: DefaultImportResult[] } | null>(null)
 const latestBatch = computed(() => preview.value?.batch || batches.value[0] || null)
 const qualityPercent = computed(() => {
   const batch = latestBatch.value
@@ -259,6 +315,54 @@ const rowCols = [
 
 function severityColor(s: string) {
   return s === 'FATAL' ? 'red' : s === 'WARN' ? 'orange' : 'green'
+}
+
+function defaultImportLabel(importType: string) {
+  if (importType === 'DEFAULT_STUDENTS') return '默认学生'
+  if (importType === 'DEFAULT_CURRICULUM') return '默认培养方案'
+  return importType
+}
+
+function formatDefaultImportResult(result: DefaultImportResult) {
+  return [
+    `总计 ${result.total_rows} 条`,
+    `新增 ${result.created_count}`,
+    `更新 ${result.updated_count}`,
+    `跳过 ${result.skipped_count}`,
+    `警告 ${result.warning_count}`,
+  ].join(' · ')
+}
+
+async function onDefaultImport(kind: 'students' | 'curriculum' | 'all') {
+  defaultImportLoading[kind] = true
+  try {
+    if (kind === 'students') {
+      const resp = await importDefaultStudents()
+      defaultImportSummary.value = {
+        title: '默认学生花名册导入完成',
+        results: [resp.data],
+      }
+      message.success('默认学生导入完成')
+    } else if (kind === 'curriculum') {
+      const resp = await importDefaultCurriculum()
+      defaultImportSummary.value = {
+        title: '默认培养方案导入完成',
+        results: [resp.data],
+      }
+      message.success('默认培养方案导入完成')
+    } else {
+      const resp = await importAllDefaults()
+      defaultImportSummary.value = {
+        title: '全部默认数据导入完成',
+        results: [resp.data.students, resp.data.curriculum],
+      }
+      message.success('全部默认数据导入完成')
+    }
+  } catch {
+    message.error('默认数据导入失败')
+  } finally {
+    defaultImportLoading[kind] = false
+  }
 }
 
 async function onBeforeUpload(file: File) {
@@ -339,6 +443,38 @@ onMounted(loadBatches)
 
 .mb16 { margin-bottom: 16px; }
 .mt8 { margin-top: 8px; }
+.mt16 { margin-top: 16px; }
+
+.default-import-card :deep(.ant-card-body) {
+  padding: 18px 20px;
+}
+
+.default-import-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.default-import-title {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.default-import-sub {
+  margin-top: 6px;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.import-warnings {
+  margin-top: 8px;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.6;
+}
 
 .import-hero :deep(.ant-card-body) {
   display: flex;
@@ -524,6 +660,12 @@ onMounted(loadBatches)
 @media (max-width: 1320px) {
   .exchange-page {
     padding-right: 0;
+  }
+
+  .default-import-head,
+  .import-hero :deep(.ant-card-body) {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .exchange-side-panel {

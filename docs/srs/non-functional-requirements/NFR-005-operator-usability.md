@@ -27,9 +27,9 @@ The platform shall allow a trained student to complete a common request submissi
 
 ## Acceptance Criteria
 
-- [ ] 学生完成标准申请时无需跨多个不相关页面重复录入相同信息。
-- [ ] 审批老师可在单一审核视图完成主要判断动作。
-- [ ] 用户试用结果表明核心流程可在目标时长内完成。
+- 学生完成标准申请时无需跨多个不相关页面重复录入相同信息。
+- 审批老师可在单一审核视图完成主要判断动作。
+- 用户试用结果表明核心流程可在目标时长内完成。
 
 ## Implementation Notes
 
@@ -37,4 +37,4 @@ The platform shall allow a trained student to complete a common request submissi
 
 ---
 *Created: 2026-04-13*  
-*Last Updated: 2026-04-13*
+*Last Updated: 2026-05-12*

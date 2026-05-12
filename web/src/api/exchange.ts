@@ -10,6 +10,21 @@ export type ImportType =
   | 'course-equiv'
   | 'course-offering'
 
+export interface DefaultImportResult {
+  import_type: string
+  total_rows: number
+  created_count: number
+  updated_count: number
+  skipped_count: number
+  warning_count: number
+  warnings: string[]
+}
+
+export interface DefaultImportAllResult {
+  students: DefaultImportResult
+  curriculum: DefaultImportResult
+}
+
 export interface ImportBatchBrief {
   id: number
   batch_no: string
@@ -47,6 +62,18 @@ export function uploadImport(type: ImportType, file: File) {
     fd,
     { headers: { 'Content-Type': 'multipart/form-data' } },
   )
+}
+
+export function importDefaultStudents() {
+  return post<ApiEnvelope<DefaultImportResult>>('/admin/default-imports/students')
+}
+
+export function importDefaultCurriculum() {
+  return post<ApiEnvelope<DefaultImportResult>>('/admin/default-imports/curriculum')
+}
+
+export function importAllDefaults() {
+  return post<ApiEnvelope<DefaultImportAllResult>>('/admin/default-imports/all')
 }
 
 export function commitImport(batchId: number, note?: string) {

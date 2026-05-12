@@ -9,7 +9,7 @@
 
 ### Statement
 
-The platform shall allow authorized administrators to create, update, publish, deactivate, and version knowledge entries and template files.
+The platform shall allow authorized administrators to create, update, publish, deactivate, and version knowledge entries, source records, and template files.
 
 ## Traceability
 
@@ -20,9 +20,10 @@ The platform shall allow authorized administrators to create, update, publish, d
 
 ## Acceptance Criteria
 
-- [ ] 授权管理员可新增、编辑和停用知识条目。
-- [ ] 授权管理员可上传模板文件并维护名称、分类和适用场景。
-- [ ] 每次发布或停用都保留版本标识和操作者记录。
+- 授权管理员可新增、编辑和停用知识条目。
+- 授权管理员可上传模板文件并维护名称、分类和适用场景。
+- 每次发布或停用都保留版本标识和操作者记录。
+- 已发布知识条目关联的模板可在学生侧下载或在知识详情中回链到官方来源，未发布或已停用模板不得对学生侧开放。
 
 ## Notes
 
@@ -30,5 +31,5 @@ The platform shall allow authorized administrators to create, update, publish, d
 
 ---
 *Created: 2026-04-13*  
-*Last Updated: 2026-04-13*  
+*Last Updated: 2026-05-12*
 *Author: Codex*

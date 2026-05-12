@@ -38,15 +38,85 @@ NOTICE_STATUS_DRAFT = "DRAFT"
 NOTICE_STATUS_PUBLISHED = "PUBLISHED"
 NOTICE_STATUS_ARCHIVED = "ARCHIVED"
 
+NOTICE_SOURCE_TYPE_URL = "URL"
+NOTICE_SOURCE_TYPE_RSS = "RSS"
+
+INGEST_RUN_STATUS_SUCCESS = "SUCCESS"
+INGEST_RUN_STATUS_FAILED = "FAILED"
+INGEST_RUN_STATUS_PARTIAL = "PARTIAL"
+
 DELIVERY_STATUS_PENDING = "PENDING"
 DELIVERY_STATUS_SENT = "SENT"
 DELIVERY_STATUS_FAILED = "FAILED"
 DELIVERY_STATUS_SKIPPED = "SKIPPED"
 DELIVERY_STATUS_READ = "READ"
 
+DELIVERY_ATTEMPT_STATUS_SENT = "SENT"
+DELIVERY_ATTEMPT_STATUS_FAILED = "FAILED"
+DELIVERY_ATTEMPT_STATUS_SKIPPED = "SKIPPED"
+
 CHANNEL_IN_APP = "IN_APP"
 CHANNEL_EMAIL = "EMAIL"
 CHANNEL_SMS = "SMS"
+
+
+class NoticeSource(Base):
+    """受控通知抓取来源。
+
+    仅支持管理员配置的公开 URL / RSS；不会接入登录态、公众号或绕过反爬。
+    """
+
+    __tablename__ = "notice_sources"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    source_url: Mapped[str] = mapped_column(String(1024), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    target_rule: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    updated_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    runs: Mapped[list[NoticeIngestRun]] = relationship(
+        "NoticeIngestRun",
+        back_populates="source",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+
+class NoticeIngestRun(Base):
+    """一次手工触发的公开来源抓取记录。"""
+
+    __tablename__ = "notice_ingest_runs"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    source_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("notice_sources.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default=INGEST_RUN_STATUS_SUCCESS)
+    fetched_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    skipped_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+
+    source: Mapped[NoticeSource] = relationship("NoticeSource", back_populates="runs")
 
 
 class Notice(Base):
@@ -212,10 +282,51 @@ class NoticeDelivery(Base):
     batch: Mapped[NoticeDeliveryBatch] = relationship(
         "NoticeDeliveryBatch", back_populates="deliveries"
     )
+    attempts: Mapped[list[NoticeDeliveryAttempt]] = relationship(
+        "NoticeDeliveryAttempt",
+        back_populates="delivery",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
     __table_args__ = (
         UniqueConstraint(
             "batch_id", "student_id", "channel", name="uq_notice_deliveries_batch_student_channel"
         ),
         Index("ix_notice_deliveries_notice_student", "notice_id", "student_id"),
+    )
+
+
+class NoticeDeliveryAttempt(Base):
+    """短信等外部通道的单次投递尝试与回执记录。"""
+
+    __tablename__ = "notice_delivery_attempts"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    delivery_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("notice_deliveries.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    attempt_no: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    target_handle: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    provider_message_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    receipt_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    receipt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    delivery: Mapped[NoticeDelivery] = relationship(
+        "NoticeDelivery", back_populates="attempts"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("delivery_id", "attempt_no", name="uq_notice_delivery_attempt_no"),
+        Index("ix_notice_delivery_attempts_status", "status"),
     )
