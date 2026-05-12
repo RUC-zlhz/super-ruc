@@ -13,6 +13,7 @@ from app.core.response import ApiResponse, PageMeta, Paginated, ok
 from app.profile import repository as repo
 from app.profile import service
 from app.profile.schemas import (
+    AcademicCorrectionIn,
     CorrectionDecisionIn,
     CorrectionIn,
     CorrectionOut,
@@ -25,6 +26,7 @@ from app.profile.schemas import (
     ProfileFullViewRequestOut,
     ProfileStudentSelfView,
     ProfileSummary,
+    StudentAcademicInfoPatch,
     StudentBasic,
 )
 
@@ -38,6 +40,7 @@ _AdminRole = require_role(*_ADMIN_ROLES)
 
 router = APIRouter(prefix="/profile", tags=["profile"])
 admin_router = APIRouter(prefix="/admin/profile", tags=["profile-admin"])
+student_admin_router = APIRouter(prefix="/admin/students", tags=["students-admin"])
 
 
 def _file_response(data: bytes, filename: str, media_type: str) -> StreamingResponse:
@@ -73,6 +76,28 @@ async def submit_my_correction(
         db,
         user.student_id,
         payload.model_dump(),
+        viewer_user_id=user.user_id,
+    )
+    return ok(CorrectionOut.model_validate(row))
+
+
+@router.post("/academic-corrections", response_model=ApiResponse[CorrectionOut])
+async def submit_my_academic_correction(
+    payload: AcademicCorrectionIn,
+    db: DBDep,
+    user: ActiveStudentDep,
+) -> ApiResponse[CorrectionOut]:
+    if user.student_id is None:
+        raise BizError("仅学生可提交学籍纠错", code=40305, http_status=403)
+    row = await service.submit_correction(
+        db,
+        user.student_id,
+        {
+            "fact_id": None,
+            "field_name": payload.field_name,
+            "proposed_value": payload.proposed_value,
+            "reason": payload.reason,
+        },
         viewer_user_id=user.user_id,
     )
     return ok(CorrectionOut.model_validate(row))
@@ -513,3 +538,23 @@ async def admin_profile_snapshot_xlsx(
         filename,
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+
+@student_admin_router.patch(
+    "/{student_id}/academic-info",
+    response_model=ApiResponse[StudentBasic],
+)
+async def admin_update_student_academic_info(
+    student_id: int,
+    payload: StudentAcademicInfoPatch,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+) -> ApiResponse[StudentBasic]:
+    row = await service.update_student_academic_info(
+        db,
+        student_id,
+        payload.model_dump(exclude_unset=True),
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    return ok(StudentBasic.model_validate(row))

@@ -20,9 +20,9 @@ The platform shall provide authorized leaders and business owners with semester-
 
 ## Acceptance Criteria
 
-- [ ] 授权角色可查看按学期汇总的申请量、处理进度和处理结果。
-- [ ] 授权角色可查看通知发送批次、覆盖范围和触达状态汇总。
-- [ ] 授权角色可查看党团流程相关工作记录的统计结果。
+- 授权角色可查看按学期汇总的申请量、处理进度和处理结果。
+- 授权角色可查看通知发送批次、覆盖范围和触达状态汇总。
+- 授权角色可查看党团流程相关工作记录的统计结果。
 
 ## Notes
 
@@ -30,5 +30,5 @@ The platform shall provide authorized leaders and business owners with semester-
 
 ---
 *Created: 2026-04-13*  
-*Last Updated: 2026-04-13*  
+*Last Updated: 2026-05-12*
 *Author: Codex*

@@ -9,7 +9,7 @@
 
 ### Statement
 
-The platform shall show each student the current stage, completed actions, and next required step of that student's party or youth workflow.
+The platform shall show each student the current stage, completed actions, and next required step of that student's party or youth workflow, and provide a unified progress view that aggregates party/youth workflows with related request items.
 
 ## Traceability
 
@@ -20,9 +20,10 @@ The platform shall show each student the current stage, completed actions, and n
 
 ## Acceptance Criteria
 
-- [ ] 学生进入对应页面后可查看本人当前阶段名称。
-- [ ] 页面展示已完成事项及其完成时间或状态。
-- [ ] 页面展示下一节点所需动作或待办说明。
+- 学生进入对应页面后可查看本人当前阶段名称。
+- 页面展示已完成事项及其完成时间或状态。
+- 页面展示下一节点所需动作或待办说明。
+- 统一进度中心可并列展示本人党团流程与相关事务申请进度，并保留各项的详情入口。
 
 ## Notes
 
@@ -30,5 +31,5 @@ The platform shall show each student the current stage, completed actions, and n
 
 ---
 *Created: 2026-04-13*  
-*Last Updated: 2026-04-13*  
+*Last Updated: 2026-05-12*
 *Author: Codex*

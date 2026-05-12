@@ -34,6 +34,12 @@
           新建通知
         </a-button>
       </a-form-item>
+      <a-form-item>
+        <a-button @click="openSourceDrawer()">
+          <template #icon><SettingOutlined /></template>
+          来源治理
+        </a-button>
+      </a-form-item>
     </a-form>
 
     <a-table
@@ -733,16 +739,271 @@
             <template v-else-if="column.key === 'read_at'">
               {{ formatDateTime(record.read_at) }}
             </template>
-            <template v-else-if="column.key === 'error_code'">
+        <template v-else-if="column.key === 'error_code'">
               {{ record.error_code || '-' }}
+            </template>
+            <template v-else-if="column.key === 'target_handle'">
+              {{ record.target_handle || '-' }}
             </template>
             <template v-else-if="column.key === 'error_message'">
               <span :class="{ muted: !record.error_message }">{{ record.error_message || '-' }}</span>
+            </template>
+            <template v-else-if="column.key === 'actions'">
+              <a-space size="small" wrap>
+                <a-button
+                  v-if="record.channel === 'SMS'"
+                  type="link"
+                  size="small"
+                  :loading="retryingDeliveryId === record.id"
+                  @click="onRetryDelivery(record as NoticeDelivery)"
+                >
+                  重试
+                </a-button>
+                <a-button
+                  v-if="record.channel === 'SMS'"
+                  type="link"
+                  size="small"
+                  @click="openReceiptModal(record as NoticeDelivery)"
+                >
+                  模拟回执
+                </a-button>
+              </a-space>
             </template>
           </template>
         </a-table>
       </a-spin>
     </a-drawer>
+
+    <a-drawer
+      :open="sourceDrawer.open"
+      title="通知来源治理"
+      width="1040"
+      @close="closeSourceDrawer"
+    >
+      <a-spin :spinning="sourceDrawer.loading">
+        <a-form layout="inline" :model="sourceFilters" class="mb16" @finish="onSourceFilterSubmit">
+          <a-form-item label="类型">
+            <a-select v-model:value="sourceFilters.source_type" allow-clear style="width: 140px">
+              <a-select-option value="URL">URL</a-select-option>
+              <a-select-option value="RSS">RSS</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="状态">
+            <a-select v-model:value="sourceFilters.is_active" allow-clear style="width: 140px">
+              <a-select-option value="true">启用</a-select-option>
+              <a-select-option value="false">停用</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item>
+            <a-button type="primary" html-type="submit">
+              <template #icon><SearchOutlined /></template>
+              查询
+            </a-button>
+          </a-form-item>
+          <a-form-item>
+            <a-button @click="resetSourceFilters">
+              <template #icon><ReloadOutlined /></template>
+              重置
+            </a-button>
+          </a-form-item>
+          <a-form-item>
+            <a-button type="primary" @click="openSourceEditor()">
+              <template #icon><PlusOutlined /></template>
+              新增来源
+            </a-button>
+          </a-form-item>
+        </a-form>
+
+        <a-table
+          :columns="sourceColumns"
+          :data-source="sourceRows"
+          :loading="sourceLoading"
+          :pagination="sourcePagination"
+          row-key="id"
+          size="small"
+          @change="onSourceTableChange"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'name'">
+              <div class="table-title">{{ record.name }}</div>
+              <a class="table-link" :href="record.source_url" target="_blank" rel="noreferrer noopener" @click.stop>
+                {{ record.source_url }}
+              </a>
+            </template>
+            <template v-else-if="column.key === 'source_type'">
+              <a-tag>{{ sourceTypeLabel(record.source_type) }}</a-tag>
+            </template>
+            <template v-else-if="column.key === 'category'">
+              {{ record.category || '-' }}
+            </template>
+            <template v-else-if="column.key === 'is_active'">
+              <a-tag :color="record.is_active ? 'green' : 'default'">
+                {{ record.is_active ? '启用' : '停用' }}
+              </a-tag>
+            </template>
+            <template v-else-if="column.key === 'last_run_at'">
+              {{ formatDateTime(record.last_run_at) }}
+            </template>
+            <template v-else-if="column.key === 'updated_at'">
+              {{ formatDateTime(record.updated_at) }}
+            </template>
+            <template v-else-if="column.key === 'actions'">
+              <a-space size="small" wrap>
+                <a-button type="link" size="small" @click="openSourceEditor(record as NoticeSource)">
+                  编辑
+                </a-button>
+                <a-button
+                  type="link"
+                  size="small"
+                  :loading="sourceRunLoadingId === record.id"
+                  :disabled="!record.is_active"
+                  @click="onRunSource(record as NoticeSource)"
+                >
+                  抓取
+                </a-button>
+                <a-button type="link" size="small" @click="onToggleSourceActive(record as NoticeSource)">
+                  {{ record.is_active ? '停用' : '启用' }}
+                </a-button>
+                <a-button type="link" size="small" @click="showSourceHistory(record as NoticeSource)">
+                  历史
+                </a-button>
+              </a-space>
+            </template>
+          </template>
+        </a-table>
+
+        <a-card class="mt12" :title="sourceHistoryTitle" size="small" :bordered="false">
+          <template #extra>
+            <a-space size="small">
+              <a-button size="small" @click="reloadIngestRuns">刷新</a-button>
+              <a-button v-if="sourceHistory.sourceId" size="small" @click="clearSourceHistoryFilter">
+                查看全部
+              </a-button>
+            </a-space>
+          </template>
+          <a-table
+            :columns="ingestRunColumns"
+            :data-source="ingestRuns"
+            :loading="ingestRunLoading"
+            :pagination="ingestRunPagination"
+            row-key="id"
+            size="small"
+            @change="onIngestRunTableChange"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'status'">
+                <a-tag :color="ingestStatusColor(record.status)">{{ record.status }}</a-tag>
+              </template>
+              <template v-else-if="column.key === 'started_at'">
+                {{ formatDateTime(record.started_at) }}
+              </template>
+              <template v-else-if="column.key === 'finished_at'">
+                {{ formatDateTime(record.finished_at) }}
+              </template>
+              <template v-else-if="column.key === 'error_message'">
+                <span :class="{ muted: !record.error_message }">{{ record.error_message || '-' }}</span>
+              </template>
+            </template>
+          </a-table>
+        </a-card>
+      </a-spin>
+    </a-drawer>
+
+    <a-modal
+      v-model:open="sourceEditor.open"
+      :title="sourceEditor.editingId ? '编辑来源' : '新增来源'"
+      :confirm-loading="sourceEditor.submitting"
+      width="760"
+      @ok="onSubmitSource"
+      @cancel="resetSourceEditor"
+    >
+      <a-form layout="vertical" :model="sourceForm">
+        <a-row :gutter="16">
+          <a-col :span="14">
+            <a-form-item label="来源名称" :rules="[{ required: true, message: '请输入来源名称' }]">
+              <a-input v-model:value="sourceForm.name" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="10">
+            <a-form-item label="来源类型">
+              <a-select v-model:value="sourceForm.source_type">
+                <a-select-option value="URL">URL</a-select-option>
+                <a-select-option value="RSS">RSS</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="16">
+            <a-form-item label="来源链接">
+              <a-input v-model:value="sourceForm.source_url" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="分类">
+              <a-input v-model:value="sourceForm.category" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="grade_codes">
+              <a-select v-model:value="sourceForm.target_rule.grade_codes" mode="tags" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="major_codes">
+              <a-select v-model:value="sourceForm.target_rule.major_codes" mode="tags" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="class_codes">
+              <a-select v-model:value="sourceForm.target_rule.class_codes" mode="tags" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="political_status">
+              <a-select v-model:value="sourceForm.target_rule.political_status" mode="tags" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="role_codes">
+              <a-select v-model:value="sourceForm.target_rule.role_codes" mode="tags" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="状态">
+              <a-switch v-model:checked="sourceForm.is_active" checked-children="启用" un-checked-children="停用" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </a-form>
+    </a-modal>
+
+    <a-modal
+      v-model:open="receiptModal.open"
+      title="模拟短信回执"
+      :confirm-loading="receiptModal.submitting"
+      @ok="onSubmitReceipt"
+      @cancel="resetReceiptModal"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="投递目标">
+          <a-input :value="receiptModal.targetHandle || '-'" disabled />
+        </a-form-item>
+        <a-form-item label="回执状态">
+          <a-select v-model:value="receiptModal.receiptStatus">
+            <a-select-option value="DELIVERED">DELIVERED</a-select-option>
+            <a-select-option value="FAILED">FAILED</a-select-option>
+            <a-select-option value="PENDING">PENDING</a-select-option>
+          </a-select>
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -763,29 +1024,40 @@ import {
   EyeOutlined,
   SaveOutlined,
   CloseOutlined,
+  SettingOutlined,
   UnorderedListOutlined,
   ReloadOutlined
 } from '@ant-design/icons-vue'
 import {
   archiveNotice,
+  createNoticeSource,
   createNotice,
   dispatchNotice,
   getNoticeDetail,
   listBatchDeliveries,
+  listNoticeIngestRuns,
   listNoticeBatches,
   listNotices,
+  listNoticeSources,
+  mockNoticeDeliveryReceipt,
   previewNoticeTarget,
   publishNotice,
+  retryNoticeDelivery,
+  runNoticeSource,
   updateNotice,
+  updateNoticeSource,
   type NoticeBatch,
   type NoticeBatchStatus,
   type NoticeBrief,
   type NoticeChannel,
   type NoticeDelivery,
+  type NoticeIngestRun,
   type NoticeDeliveryStatus,
   type NoticeInput,
   type NoticeOut,
+  type NoticeSource,
   type NoticeStatus,
+  type NoticeSourceType,
   type NoticeTargetPreviewResult,
   type NoticeTargetRule,
 } from '@/api/notice'
@@ -815,6 +1087,15 @@ interface NoticeFormState {
   source_url: string
 }
 
+interface NoticeSourceFormState {
+  name: string
+  source_type: NoticeSourceType
+  source_url: string
+  category: string
+  target_rule: NoticeTargetRuleForm
+  is_active: boolean
+}
+
 const CHANNEL_OPTIONS: Array<{ label: string; value: NoticeChannel }> = [
   { label: '站内信 (IN_APP)', value: 'IN_APP' },
   { label: '邮件 (EMAIL)', value: 'EMAIL' },
@@ -824,6 +1105,9 @@ const CHANNEL_OPTIONS: Array<{ label: string; value: NoticeChannel }> = [
 const SOURCE_LABELS: Record<string, string> = {
   MANUAL: '手工录入',
   CRAWL: '受控抓取',
+  INGESTED: '来源抓取',
+  URL: '公开链接',
+  RSS: 'RSS 源',
 }
 
 const columns = [
@@ -852,13 +1136,41 @@ const deliveryColumns = [
   { title: 'user_id', dataIndex: 'user_id', key: 'user_id', width: 110 },
   { title: 'channel', key: 'channel', width: 110 },
   { title: 'status', key: 'status', width: 110 },
+  { title: 'target_handle', key: 'target_handle', width: 160 },
   { title: 'sent_at', dataIndex: 'sent_at', key: 'sent_at', width: 170 },
   { title: 'read_at', dataIndex: 'read_at', key: 'read_at', width: 170 },
   { title: 'error_code', key: 'error_code', width: 150 },
   { title: 'error_message', key: 'error_message' },
+  { title: '操作', key: 'actions', width: 180 },
+]
+
+const sourceColumns = [
+  { title: '来源', key: 'name' },
+  { title: '类型', key: 'source_type', width: 120 },
+  { title: '分类', key: 'category', width: 140 },
+  { title: '状态', key: 'is_active', width: 100 },
+  { title: '最近抓取', key: 'last_run_at', width: 170 },
+  { title: '更新时间', key: 'updated_at', width: 170 },
+  { title: '操作', key: 'actions', width: 260 },
+]
+
+const ingestRunColumns = [
+  { title: 'ID', dataIndex: 'id', key: 'id', width: 90 },
+  { title: 'source_id', dataIndex: 'source_id', key: 'source_id', width: 100 },
+  { title: '状态', key: 'status', width: 120 },
+  { title: '抓取数', dataIndex: 'fetched_count', key: 'fetched_count', width: 110 },
+  { title: '新建草稿', dataIndex: 'created_count', key: 'created_count', width: 110 },
+  { title: '跳过数', dataIndex: 'skipped_count', key: 'skipped_count', width: 100 },
+  { title: '开始时间', key: 'started_at', width: 170 },
+  { title: '结束时间', key: 'finished_at', width: 170 },
+  { title: '错误信息', key: 'error_message' },
 ]
 
 function sourceLabel(sourceType: string) {
+  return SOURCE_LABELS[sourceType] ?? sourceType
+}
+
+function sourceTypeLabel(sourceType: string) {
   return SOURCE_LABELS[sourceType] ?? sourceType
 }
 
@@ -874,6 +1186,13 @@ function batchStatusColor(status: NoticeBatchStatus | string) {
   if (status === 'COMPLETED') return 'green'
   if (status === 'FAILED') return 'red'
   if (status === 'PARTIAL') return 'orange'
+  return 'blue'
+}
+
+function ingestStatusColor(status: string) {
+  if (status === 'SUCCESS') return 'green'
+  if (status === 'PARTIAL') return 'orange'
+  if (status === 'FAILED') return 'red'
   return 'blue'
 }
 
@@ -966,6 +1285,17 @@ function createEmptyForm(): NoticeFormState {
   }
 }
 
+function createEmptySourceForm(): NoticeSourceFormState {
+  return {
+    name: '',
+    source_type: 'URL',
+    source_url: '',
+    category: '',
+    target_rule: createEmptyTargetRuleForm(),
+    is_active: true,
+  }
+}
+
 function buildFormFromNotice(detail: NoticeOut): NoticeFormState {
   return {
     title: detail.title,
@@ -1009,8 +1339,23 @@ function buildPayload(): NoticeInput {
   }
 }
 
+function buildSourcePayload() {
+  return {
+    name: sourceForm.name.trim(),
+    source_type: sourceForm.source_type,
+    source_url: sourceForm.source_url.trim(),
+    category: sourceForm.category.trim() || null,
+    target_rule: normalizeTargetRule(sourceForm.target_rule),
+    is_active: sourceForm.is_active,
+  }
+}
+
 function assignForm(next: NoticeFormState) {
   Object.assign(form, createEmptyForm(), next)
+}
+
+function assignSourceForm(next: NoticeSourceFormState) {
+  Object.assign(sourceForm, createEmptySourceForm(), next)
 }
 
 const detailCache = new Map<number, NoticeOut>()
@@ -1204,6 +1549,41 @@ const currentDetail = ref<NoticeOut | null>(null)
 const previewLoading = ref(false)
 const previewResult = ref<NoticeTargetPreviewResult | null>(null)
 const form = reactive<NoticeFormState>(createEmptyForm())
+const sourceDrawer = reactive({
+  open: false,
+  loading: false,
+})
+const sourceRows = ref<NoticeSource[]>([])
+const sourceLoading = ref(false)
+const sourcePagination = reactive({ current: 1, pageSize: 20, total: 0 })
+const sourceFilters = reactive<{ source_type?: NoticeSourceType; is_active?: 'true' | 'false' }>({})
+const sourceRunLoadingId = ref<number | null>(null)
+const sourceEditor = reactive({
+  open: false,
+  submitting: false,
+  editingId: null as number | null,
+})
+const sourceForm = reactive<NoticeSourceFormState>(createEmptySourceForm())
+const sourceHistory = reactive({
+  sourceId: null as number | null,
+  sourceName: '',
+})
+const ingestRuns = ref<NoticeIngestRun[]>([])
+const ingestRunLoading = ref(false)
+const ingestRunPagination = reactive({ current: 1, pageSize: 20, total: 0 })
+const retryingDeliveryId = ref<number | null>(null)
+const receiptModal = reactive({
+  open: false,
+  submitting: false,
+  deliveryId: 0,
+  targetHandle: '',
+  receiptStatus: 'DELIVERED',
+})
+
+const sourceHistoryTitle = computed(() => {
+  if (sourceHistory.sourceId == null) return '抓取历史'
+  return `${sourceHistory.sourceName || `来源 ${sourceHistory.sourceId}`} 的抓取历史`
+})
 
 async function openEditor(record?: NoticeBrief) {
   showDrawer.value = true
@@ -1481,6 +1861,213 @@ function closeDeliveriesDrawer() {
   deliveryFilters.channel = undefined
 }
 
+function closeSourceDrawer() {
+  sourceDrawer.open = false
+  sourceDrawer.loading = false
+}
+
+function resetSourceFilters() {
+  sourceFilters.source_type = undefined
+  sourceFilters.is_active = undefined
+  sourcePagination.current = 1
+  void reloadSources()
+}
+
+function onSourceFilterSubmit() {
+  sourcePagination.current = 1
+  void reloadSources()
+}
+
+function onSourceTableChange(p: { current?: number; pageSize?: number }) {
+  sourcePagination.current = p.current ?? sourcePagination.current
+  sourcePagination.pageSize = p.pageSize ?? sourcePagination.pageSize
+  void reloadSources()
+}
+
+function buildSourceFormFromSource(source: NoticeSource): NoticeSourceFormState {
+  return {
+    name: source.name,
+    source_type: source.source_type,
+    source_url: source.source_url,
+    category: source.category || '',
+    target_rule: {
+      grade_codes: normalizeStringList(source.target_rule?.grade_codes),
+      major_codes: normalizeStringList(source.target_rule?.major_codes),
+      class_codes: normalizeStringList(source.target_rule?.class_codes),
+      political_status: normalizeStringList(source.target_rule?.political_status),
+      role_codes: normalizeStringList(source.target_rule?.role_codes),
+      exclude_graduated: source.target_rule?.exclude_graduated ?? true,
+    },
+    is_active: source.is_active,
+  }
+}
+
+function resetSourceEditor() {
+  sourceEditor.open = false
+  sourceEditor.submitting = false
+  sourceEditor.editingId = null
+  assignSourceForm(createEmptySourceForm())
+}
+
+function openSourceDrawer() {
+  sourceDrawer.open = true
+  void Promise.all([reloadSources(), reloadIngestRuns()])
+}
+
+function openSourceEditor(record?: NoticeSource) {
+  sourceEditor.editingId = record?.id ?? null
+  assignSourceForm(record ? buildSourceFormFromSource(record) : createEmptySourceForm())
+  sourceEditor.open = true
+}
+
+async function onSubmitSource() {
+  if (!sourceForm.name.trim()) {
+    message.warning('请填写来源名称')
+    return
+  }
+  if (!sourceForm.source_url.trim()) {
+    message.warning('请填写来源链接')
+    return
+  }
+
+  sourceEditor.submitting = true
+  try {
+    const payload = buildSourcePayload()
+    if (sourceEditor.editingId) {
+      await updateNoticeSource(sourceEditor.editingId, payload)
+      message.success('来源已更新')
+    } else {
+      await createNoticeSource(payload)
+      message.success('来源已创建')
+    }
+    resetSourceEditor()
+    await reloadSources()
+    await reloadIngestRuns()
+  } finally {
+    sourceEditor.submitting = false
+  }
+}
+
+async function reloadSources() {
+  sourceDrawer.loading = true
+  sourceLoading.value = true
+  try {
+    const resp = await listNoticeSources({
+      page: sourcePagination.current,
+      size: sourcePagination.pageSize,
+      source_type: sourceFilters.source_type,
+      is_active:
+        sourceFilters.is_active === 'true'
+          ? true
+          : sourceFilters.is_active === 'false'
+            ? false
+            : undefined,
+    })
+    sourceRows.value = resp.data.items
+    sourcePagination.total = resp.data.meta.total
+  } finally {
+    sourceDrawer.loading = false
+    sourceLoading.value = false
+  }
+}
+
+async function reloadIngestRuns() {
+  ingestRunLoading.value = true
+  try {
+    const resp = await listNoticeIngestRuns({
+      source_id: sourceHistory.sourceId ?? undefined,
+      page: ingestRunPagination.current,
+      size: ingestRunPagination.pageSize,
+    })
+    ingestRuns.value = resp.data.items
+    ingestRunPagination.total = resp.data.meta.total
+  } finally {
+    ingestRunLoading.value = false
+  }
+}
+
+function onIngestRunTableChange(p: { current?: number; pageSize?: number }) {
+  ingestRunPagination.current = p.current ?? ingestRunPagination.current
+  ingestRunPagination.pageSize = p.pageSize ?? ingestRunPagination.pageSize
+  void reloadIngestRuns()
+}
+
+function showSourceHistory(record: NoticeSource) {
+  sourceHistory.sourceId = record.id
+  sourceHistory.sourceName = record.name
+  sourceDrawer.open = true
+  ingestRunPagination.current = 1
+  void reloadIngestRuns()
+}
+
+function clearSourceHistoryFilter() {
+  sourceHistory.sourceId = null
+  sourceHistory.sourceName = ''
+  ingestRunPagination.current = 1
+  void reloadIngestRuns()
+}
+
+async function onRunSource(record: NoticeSource) {
+  sourceRunLoadingId.value = record.id
+  try {
+    sourceHistory.sourceId = record.id
+    sourceHistory.sourceName = record.name
+    sourceDrawer.open = true
+    await runNoticeSource(record.id)
+    message.success('抓取任务已提交')
+    await Promise.all([reloadSources(), reloadIngestRuns(), reload()])
+  } finally {
+    sourceRunLoadingId.value = null
+  }
+}
+
+async function onToggleSourceActive(record: NoticeSource) {
+  await updateNoticeSource(record.id, { is_active: !record.is_active })
+  message.success(record.is_active ? '来源已停用' : '来源已启用')
+  await reloadSources()
+}
+
+async function onRetryDelivery(record: NoticeDelivery) {
+  retryingDeliveryId.value = record.id
+  try {
+    await retryNoticeDelivery(record.id)
+    message.success('短信重试已提交')
+    await reloadDeliveries()
+  } finally {
+    retryingDeliveryId.value = null
+  }
+}
+
+function openReceiptModal(record: NoticeDelivery) {
+  receiptModal.open = true
+  receiptModal.deliveryId = record.id
+  receiptModal.targetHandle = record.target_handle || ''
+  receiptModal.receiptStatus = 'DELIVERED'
+}
+
+function resetReceiptModal() {
+  receiptModal.open = false
+  receiptModal.submitting = false
+  receiptModal.deliveryId = 0
+  receiptModal.targetHandle = ''
+  receiptModal.receiptStatus = 'DELIVERED'
+}
+
+async function onSubmitReceipt() {
+  if (!receiptModal.deliveryId) return
+  receiptModal.submitting = true
+  try {
+    const resp = await mockNoticeDeliveryReceipt(receiptModal.deliveryId, {
+      receipt_status: receiptModal.receiptStatus,
+    })
+    message.success(`回执已写入：${resp.data.receipt_status || receiptModal.receiptStatus}`)
+    resetReceiptModal()
+    await reloadDeliveries()
+  } finally {
+    receiptModal.submitting = false
+  }
+}
+
 onMounted(reload)
 </script>
 
@@ -1504,6 +2091,13 @@ onMounted(reload)
 .table-title {
   font-weight: 600;
   line-height: 22px;
+}
+
+.table-link {
+  display: block;
+  margin-top: 4px;
+  color: var(--ruc-red);
+  word-break: break-all;
 }
 
 .table-secondary {

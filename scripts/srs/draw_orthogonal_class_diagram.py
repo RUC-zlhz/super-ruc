@@ -80,7 +80,7 @@ class Box:
 
 
 BOXES = {
-    "KnowledgeSource": Box(70, 70, 300, "KnowledgeSource", ["+bigserial source_id", "+varchar source_name", "+varchar version_label", "+date effective_date"]),
+    "KnowledgeSource": Box(70, 70, 300, "KnowledgeSource", ["+bigserial source_id", "+varchar source_name", "+boolean is_official", "+varchar version_label", "+date effective_date"]),
     "KnowledgeEntry": Box(70, 390, 300, "KnowledgeEntry", ["+bigserial knowledge_id", "+varchar title", "+varchar status", "+boolean ambiguity_flag", "+timestamp updated_at"]),
     "TemplateAsset": Box(70, 760, 300, "TemplateAsset", ["+bigserial template_id", "+varchar template_name", "+varchar template_type", "+varchar version_label"]),
     "PartyWorkflowNode": Box(470, 70, 300, "PartyWorkflowNode", ["+bigserial node_id", "+varchar node_code", "+varchar node_name", "+integer sequence_no", "+text due_rule_text"]),

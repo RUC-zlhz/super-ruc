@@ -20,9 +20,9 @@ The platform shall enforce role-based access and field-level visibility rules fo
 
 ## Acceptance Criteria
 
-- [ ] 不同角色登录后只能看到其授权范围内的页面与数据。
-- [ ] 敏感字段可按角色显示为隐藏、脱敏或完整可见。
-- [ ] 未授权角色无法执行学院级数据导出操作。
+- 不同角色登录后只能看到其授权范围内的页面与数据。
+- 敏感字段可按角色显示为隐藏、脱敏或完整可见。
+- 未授权角色无法执行学院级数据导出操作。
 
 ## Notes
 
@@ -30,5 +30,5 @@ The platform shall enforce role-based access and field-level visibility rules fo
 
 ---
 *Created: 2026-04-13*  
-*Last Updated: 2026-04-13*  
+*Last Updated: 2026-05-12*
 *Author: Codex*

@@ -9,7 +9,7 @@
 
 ### Statement
 
-The platform shall provide approvers with a review view that shows request details, attached materials, processing history, and current status before an approval decision is made.
+The platform shall provide approvers with a review view that shows request details, attached materials, processing history, and current status before an approval decision is made. Proof-related requests shall preview or download the system-generated PDF produced by the built-in proof layout for the current workflow.
 
 ## Traceability
 
@@ -20,10 +20,11 @@ The platform shall provide approvers with a review view that shows request detai
 
 ## Acceptance Criteria
 
-- [ ] 审批老师可查看申请基本信息、提交人和提交时间。
-- [ ] 审批老师可查看已上传附件或申请说明内容。
-- [ ] 审批老师在处理前可看到既往流转动作和当前状态。
-- [ ] 审批老师可对涉密或敏感事项标记"转线下处理"：系统终止线上流转，保留审批历史，并向学生推送线下办理提示及负责老师联系方式，不生成在线文件。
+- 审批老师可查看申请基本信息、提交人和提交时间。
+- 审批老师可查看已上传附件或申请说明内容。
+- 审批老师在处理前可看到既往流转动作和当前状态。
+- 审批老师可对涉密或敏感事项标记"转线下处理"：系统终止线上流转，保留审批历史，并向学生推送线下办理提示及负责老师联系方式，不生成在线文件。
+- 证明类申请在工作台可预览或下载系统生成的 PDF；若已转线下办理，则工作台明确显示不再生成线上 PDF。
 
 ## Notes
 
@@ -31,5 +32,5 @@ The platform shall provide approvers with a review view that shows request detai
 
 ---
 *Created: 2026-04-13*  
-*Last Updated: 2026-04-17*  
+*Last Updated: 2026-05-12*
 *Author: Codex*

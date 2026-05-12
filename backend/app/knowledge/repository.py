@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import date
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.knowledge.models import (
@@ -48,7 +49,11 @@ async def list_sources(db: AsyncSession, *, active_only: bool = True) -> Sequenc
     stmt = select(KnowledgeSource)
     if active_only:
         stmt = stmt.where(KnowledgeSource.is_active.is_(True))
-    return (await db.execute(stmt.order_by(KnowledgeSource.id.desc()))).scalars().all()
+    return (
+        await db.execute(
+            stmt.order_by(KnowledgeSource.is_official.desc(), KnowledgeSource.id.desc())
+        )
+    ).scalars().all()
 
 
 async def get_source(db: AsyncSession, source_id: int) -> KnowledgeSource | None:
@@ -58,6 +63,16 @@ async def get_source(db: AsyncSession, source_id: int) -> KnowledgeSource | None
 async def create_source(db: AsyncSession, **fields) -> KnowledgeSource:
     row = KnowledgeSource(**fields)
     db.add(row)
+    await db.flush()
+    return row
+
+
+async def update_source(db: AsyncSession, source_id: int, **fields) -> KnowledgeSource | None:
+    row = await get_source(db, source_id)
+    if row is None:
+        return None
+    for key, value in fields.items():
+        setattr(row, key, value)
     await db.flush()
     return row
 
@@ -114,7 +129,12 @@ async def search_published_entries(
     page: int = 1,
     size: int = 20,
 ) -> tuple[Sequence[KnowledgeEntry], int]:
-    stmt = select(KnowledgeEntry).where(KnowledgeEntry.status == ENTRY_STATUS_PUBLISHED)
+    today = date.today()
+    stmt = (
+        select(KnowledgeEntry)
+        .outerjoin(KnowledgeSource, KnowledgeSource.id == KnowledgeEntry.source_id)
+        .where(KnowledgeEntry.status == ENTRY_STATUS_PUBLISHED)
+    )
     if category_code:
         stmt = stmt.where(KnowledgeEntry.category_code == category_code)
     if q:
@@ -138,7 +158,13 @@ async def search_published_entries(
     total = (await db.execute(count_stmt)).scalar_one()
 
     stmt = (
-        stmt.order_by(KnowledgeEntry.updated_at.desc())
+        stmt.order_by(
+            case((KnowledgeSource.is_active.is_(True), 1), else_=0).desc(),
+            case((KnowledgeSource.expires_on.is_(None), 1), (KnowledgeSource.expires_on >= today, 1), else_=0).desc(),
+            case((KnowledgeSource.is_official.is_(True), 1), else_=0).desc(),
+            case((KnowledgeSource.source_url.isnot(None), 1), else_=0).desc(),
+            KnowledgeEntry.updated_at.desc(),
+        )
         .offset((page - 1) * size)
         .limit(size)
     )
@@ -200,6 +226,19 @@ async def get_template(db: AsyncSession, template_id: int) -> TemplateAsset | No
     return await db.get(TemplateAsset, template_id)
 
 
+async def template_has_published_entry(db: AsyncSession, template_id: int) -> bool:
+    stmt = (
+        select(func.count())
+        .select_from(KnowledgeEntryTemplate)
+        .join(KnowledgeEntry, KnowledgeEntry.id == KnowledgeEntryTemplate.entry_id)
+        .where(
+            KnowledgeEntryTemplate.template_id == template_id,
+            KnowledgeEntry.status == ENTRY_STATUS_PUBLISHED,
+        )
+    )
+    return (await db.execute(stmt)).scalar_one() > 0
+
+
 async def list_templates(
     db: AsyncSession,
     *,
@@ -227,3 +266,36 @@ async def list_templates(
     stmt = stmt.order_by(TemplateAsset.uploaded_at.desc()).offset((page - 1) * size).limit(size)
     rows = (await db.execute(stmt)).scalars().all()
     return rows, total
+
+
+async def list_published_templates_for_student(
+    db: AsyncSession,
+    *,
+    category_code: str | None = None,
+    q: str | None = None,
+    page: int = 1,
+    size: int = 20,
+) -> tuple[Sequence[TemplateAsset], int]:
+    stmt = (
+        select(TemplateAsset)
+        .join(KnowledgeEntryTemplate, KnowledgeEntryTemplate.template_id == TemplateAsset.id)
+        .join(KnowledgeEntry, KnowledgeEntry.id == KnowledgeEntryTemplate.entry_id)
+        .where(
+            TemplateAsset.status == "ACTIVE",
+            KnowledgeEntry.status == ENTRY_STATUS_PUBLISHED,
+        )
+        .distinct()
+    )
+    if category_code:
+        stmt = stmt.where(TemplateAsset.category_code == category_code)
+    if q:
+        like = f"%{q}%"
+        stmt = stmt.where(
+            or_(
+                TemplateAsset.template_name.ilike(like),
+                TemplateAsset.applicable_scenario.ilike(like),
+            )
+        )
+    total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
+    stmt = stmt.order_by(TemplateAsset.uploaded_at.desc()).offset((page - 1) * size).limit(size)
+    return (await db.execute(stmt)).scalars().unique().all(), total

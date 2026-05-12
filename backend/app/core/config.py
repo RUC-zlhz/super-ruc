@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     SMTP_FROM: str = "no-reply@sip.example.edu"
 
     SMS_ENABLED: bool = False
-    SMS_PROVIDER: str = ""
+    SMS_PROVIDER: str = "mock"
     SMS_ACCESS_KEY: str = ""
     SMS_SECRET_KEY: str = ""
     SMS_SIGN: str = ""
@@ -125,8 +125,11 @@ class Settings(BaseSettings):
         # 非生产也生效的功能开关守卫
         if self.AI_QA_ENABLED and not self.ANTHROPIC_API_KEY:
             errors.append("AI_QA_ENABLED=True 时必须配置 ANTHROPIC_API_KEY")
-        if self.SMS_ENABLED and not (
-            self.SMS_PROVIDER and self.SMS_ACCESS_KEY and self.SMS_SECRET_KEY
+        sms_provider = (self.SMS_PROVIDER or "").strip().lower()
+        if (
+            self.SMS_ENABLED
+            and sms_provider not in {"mock", "local"}
+            and not (self.SMS_PROVIDER and self.SMS_ACCESS_KEY and self.SMS_SECRET_KEY)
         ):
             errors.append(
                 "SMS_ENABLED=True 时必须配置 SMS_PROVIDER / SMS_ACCESS_KEY / SMS_SECRET_KEY"

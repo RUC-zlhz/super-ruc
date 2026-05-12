@@ -132,6 +132,16 @@
                 :message="statusMeta.label"
                 :description="statusMeta.description"
               />
+              <div v-if="showProofActions" class="proof-action-bar mb16">
+                <a-button :loading="proofPreviewLoading" @click="onPreviewProof">
+                  <template #icon><FilePdfOutlined /></template>
+                  预览证明 PDF
+                </a-button>
+                <a-button :loading="proofDownloadLoading" @click="onDownloadProof">
+                  <template #icon><DownloadOutlined /></template>
+                  下载证明 PDF
+                </a-button>
+              </div>
               <a-descriptions :column="1" bordered size="small">
                 <a-descriptions-item label="处理说明">
                   {{ detail.decision_comment || '当前尚未形成新的处理意见。' }}
@@ -200,10 +210,11 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import {
-  LeftOutlined,
   CheckSquareOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
+  DownloadOutlined,
+  FilePdfOutlined,
   MessageOutlined,
   ReloadOutlined
 } from '@ant-design/icons-vue'
@@ -215,6 +226,7 @@ import {
   getRequestDetail,
   getRequestStatusMeta,
   markRequestOffline,
+  previewRequestProof,
   reopenRequest,
   rejectRequest,
   type RequestDetail,
@@ -236,6 +248,8 @@ const detail = ref<RequestDetail | null>(null)
 const loading = ref(false)
 const claiming = ref(false)
 const actionSubmitting = ref(false)
+const proofPreviewLoading = ref(false)
+const proofDownloadLoading = ref(false)
 
 const actionModal = reactive({
   visible: false,
@@ -253,6 +267,13 @@ const statusSummary = computed(() => {
     chunks.push(`当前意见：${detail.value.decision_comment}`)
   }
   return chunks.join(' ')
+})
+
+const showProofActions = computed(() => {
+  if (!detail.value) return false
+  const typeCode = (detail.value.type_code || '').toUpperCase()
+  return detail.value.status === 'APPROVED'
+    && (detail.value.category === 'CERTIFICATE' || typeCode.startsWith('CERT'))
 })
 
 const formEntries = computed(() => {
@@ -344,6 +365,48 @@ function formatTransition(statusBefore?: string | null, statusAfter?: string | n
   }
   if (statusAfter) return getRequestStatusMeta(statusAfter).label
   return ''
+}
+
+function proofFilename() {
+  return detail.value ? `proof-${detail.value.request_no}.pdf` : `proof-${id}.pdf`
+}
+
+async function onPreviewProof() {
+  if (!showProofActions.value) return
+  proofPreviewLoading.value = true
+  try {
+    const blob = await previewRequestProof(id)
+    const url = URL.createObjectURL(blob)
+    const previewWindow = window.open(url, '_blank', 'noopener,noreferrer')
+    if (!previewWindow) {
+      message.warning('浏览器阻止了预览窗口，请允许弹窗后重试')
+    }
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  } catch {
+    message.error('证明 PDF 预览失败')
+  } finally {
+    proofPreviewLoading.value = false
+  }
+}
+
+async function onDownloadProof() {
+  if (!showProofActions.value) return
+  proofDownloadLoading.value = true
+  try {
+    const blob = await previewRequestProof(id)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = proofFilename()
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  } catch {
+    message.error('证明 PDF 下载失败')
+  } finally {
+    proofDownloadLoading.value = false
+  }
 }
 
 async function loadDetail() {
@@ -515,6 +578,12 @@ onMounted(loadDetail)
 
 .action-buttons {
   display: grid;
+  gap: 12px;
+}
+
+.proof-action-bar {
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 

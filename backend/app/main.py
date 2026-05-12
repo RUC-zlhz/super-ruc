@@ -29,6 +29,8 @@ from app.notice.router import admin_router as notice_admin_router
 from app.notice.router import router as notice_router
 from app.profile.router import admin_router as profile_admin_router
 from app.profile.router import router as profile_router
+from app.profile.router import student_admin_router as profile_student_admin_router
+from app.progress.router import router as progress_router
 from app.report.router import router as report_router
 from app.workflow.router import admin_router as workflow_admin_router
 from app.workflow.router import quiz_router as quiz_router
@@ -113,6 +115,8 @@ def create_app() -> FastAPI:
     app.include_router(honor_admin_router, prefix=prefix)
     app.include_router(profile_router, prefix=prefix)
     app.include_router(profile_admin_router, prefix=prefix)
+    app.include_router(profile_student_admin_router, prefix=prefix)
+    app.include_router(progress_router, prefix=prefix)
     app.include_router(audit_router, prefix=prefix)
 
     return app

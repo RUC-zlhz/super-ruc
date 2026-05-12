@@ -28,8 +28,13 @@ from app.notice.schemas import (
     NoticeBatchOut,
     NoticeBrief,
     NoticeDeliveryOut,
+    NoticeDeliveryReceiptMockIn,
     NoticeIn,
+    NoticeIngestRunOut,
     NoticeOut,
+    NoticeSourceIn,
+    NoticeSourceOut,
+    NoticeSourcePatchIn,
     StudentNoticeItem,
     TargetPreviewRequest,
     TargetPreviewResult,
@@ -221,3 +226,118 @@ async def admin_list_deliveries(
     return ok(Paginated[NoticeDeliveryOut](
         items=items, meta=PageMeta(page=page, size=size, total=total)
     ))
+
+
+@admin_router.get("/sources", response_model=ApiResponse[Paginated[NoticeSourceOut]])
+async def admin_list_notice_sources(
+    db: DBDep,
+    _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+    is_active: bool | None = None,
+    source_type: str | None = None,
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+) -> ApiResponse[Paginated[NoticeSourceOut]]:
+    rows, total = await repo.list_notice_sources(
+        db, is_active=is_active, source_type=source_type, page=page, size=size
+    )
+    return ok(Paginated[NoticeSourceOut](
+        items=[service.source_to_out(row) for row in rows],
+        meta=PageMeta(page=page, size=size, total=total),
+    ))
+
+
+@admin_router.post("/sources", response_model=ApiResponse[NoticeSourceOut])
+async def admin_create_notice_source(
+    payload: NoticeSourceIn,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+) -> ApiResponse[NoticeSourceOut]:
+    return ok(await service.create_notice_source(
+        db,
+        payload,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    ))
+
+
+@admin_router.patch("/sources/{source_id}", response_model=ApiResponse[NoticeSourceOut])
+async def admin_update_notice_source(
+    source_id: int,
+    payload: NoticeSourcePatchIn,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+) -> ApiResponse[NoticeSourceOut]:
+    return ok(await service.update_notice_source(
+        db,
+        source_id,
+        payload,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    ))
+
+
+@admin_router.post("/sources/{source_id}/run", response_model=ApiResponse[NoticeIngestRunOut])
+async def admin_run_notice_source(
+    source_id: int,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+) -> ApiResponse[NoticeIngestRunOut]:
+    return ok(await service.run_notice_source_ingest(
+        db,
+        source_id,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    ))
+
+
+@admin_router.get("/ingest-runs", response_model=ApiResponse[Paginated[NoticeIngestRunOut]])
+async def admin_list_ingest_runs(
+    db: DBDep,
+    _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+    source_id: int | None = None,
+    status: str | None = None,
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+) -> ApiResponse[Paginated[NoticeIngestRunOut]]:
+    rows, total = await repo.list_ingest_runs(
+        db, source_id=source_id, status=status, page=page, size=size
+    )
+    return ok(Paginated[NoticeIngestRunOut](
+        items=[service.ingest_run_to_out(row) for row in rows],
+        meta=PageMeta(page=page, size=size, total=total),
+    ))
+
+
+@admin_router.post("/deliveries/{delivery_id}/retry", response_model=ApiResponse[NoticeDeliveryOut])
+async def admin_retry_delivery(
+    delivery_id: int,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+) -> ApiResponse[NoticeDeliveryOut]:
+    row = await service.retry_notice_delivery(
+        db,
+        delivery_id,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    return ok(NoticeDeliveryOut.model_validate(row))
+
+
+@admin_router.post(
+    "/deliveries/{delivery_id}/receipt/mock",
+    response_model=ApiResponse[dict],
+)
+async def admin_mock_delivery_receipt(
+    delivery_id: int,
+    payload: NoticeDeliveryReceiptMockIn,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+) -> ApiResponse[dict]:
+    attempt = await service.mock_delivery_receipt(
+        db,
+        delivery_id,
+        receipt_status=payload.receipt_status,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    return ok(attempt.model_dump())

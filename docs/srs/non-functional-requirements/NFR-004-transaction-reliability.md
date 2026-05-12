@@ -27,9 +27,9 @@ The platform shall preserve consistency of request states, party-work records, a
 
 ## Acceptance Criteria
 
-- [ ] 申请状态与处理记录在失败恢复后保持一致。
-- [ ] 导入结果与实际入库记录可核对一致。
-- [ ] 党团节点与学业规则更新不会产生不可解释的部分生效状态。
+- 申请状态与处理记录在失败恢复后保持一致。
+- 导入结果与实际入库记录可核对一致。
+- 党团节点与学业规则更新不会产生不可解释的部分生效状态。
 
 ## Implementation Notes
 
@@ -37,4 +37,4 @@ The platform shall preserve consistency of request states, party-work records, a
 
 ---
 *Created: 2026-04-13*  
-*Last Updated: 2026-04-13*
+*Last Updated: 2026-05-12*

@@ -57,6 +57,29 @@
     <view class="section-card">
       <view class="section-head">
         <view>
+          <text class="section-title">重点入口</text>
+          <text class="section-subtitle">学业查看、模板下载、统一进度中心</text>
+        </view>
+      </view>
+
+      <view class="priority-grid">
+        <view
+          v-for="item in shortcutEntries"
+          :key="item.url"
+          class="priority-card"
+          hover-class="hover-scale"
+          @tap="goTo(item.url)"
+        >
+          <view class="priority-mark" :class="item.tone">{{ item.mark }}</view>
+          <text class="priority-label">{{ item.label }}</text>
+          <text class="priority-desc">{{ item.desc }}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="section-card">
+      <view class="section-head">
+        <view>
           <text class="section-title">常用服务</text>
         </view>
         <view class="section-link" hover-class="hover-opacity" @tap="goTo('/pages/request/index')">
@@ -308,6 +331,30 @@ const entries: Array<{
     url: "/pages/knowledge/index",
   },
 ];
+
+const shortcutEntries = [
+  {
+    mark: "学",
+    tone: "blue",
+    label: "学业查看",
+    desc: "上传成绩单 PDF，查看学业缺口与候选课程。",
+    url: "/pages/academic/index",
+  },
+  {
+    mark: "模",
+    tone: "gold",
+    label: "常用模板",
+    desc: "查看模板下载与官方来源信息。",
+    url: "/pages/knowledge/index",
+  },
+  {
+    mark: "进",
+    tone: "green",
+    label: "进度中心",
+    desc: "聚合申请与党团流程，查看当前步骤。",
+    url: "/pages/progress/index",
+  },
+] as const;
 
 const recentNotices = ref<StudentNoticeItem[]>([]);
 const workflows = ref<StudentWorkflow[]>([]);
@@ -1114,6 +1161,14 @@ onPullDownRefresh(async () => {
   color: #1e293b;
 }
 
+.section-subtitle {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: #8b7280;
+}
+
 .section-link {
   flex-shrink: 0;
   display: flex;
@@ -1139,6 +1194,88 @@ onPullDownRefresh(async () => {
   display: flex;
   flex-wrap: wrap;
   row-gap: 30rpx;
+}
+
+.priority-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16rpx;
+}
+
+.priority-card {
+  padding: 20rpx 16rpx 18rpx;
+  border-radius: 20rpx;
+  background: #fff;
+  border: 1rpx solid #f0e2e5;
+  box-shadow: var(--shadow-soft);
+}
+
+.priority-mark {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 22rpx;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1rpx solid rgba(240, 226, 229, 0.92);
+  box-shadow: 0 12rpx 24rpx rgba(41, 18, 23, 0.08);
+  color: var(--primary-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.priority-mark.primary {
+  background: linear-gradient(135deg, rgba(183, 15, 36, 0.12), rgba(255, 255, 255, 0.96));
+  border-color: rgba(183, 15, 36, 0.16);
+  color: var(--primary-color);
+}
+
+.priority-mark.blue {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(255, 255, 255, 0.96));
+  border-color: rgba(37, 99, 235, 0.18);
+  color: var(--accent-blue);
+}
+
+.priority-mark.gold {
+  background: linear-gradient(135deg, rgba(215, 154, 43, 0.16), rgba(255, 255, 255, 0.96));
+  border-color: rgba(215, 154, 43, 0.22);
+  color: var(--accent-gold);
+}
+
+.priority-mark.green {
+  background: linear-gradient(135deg, rgba(22, 163, 74, 0.12), rgba(255, 255, 255, 0.96));
+  border-color: rgba(22, 163, 74, 0.18);
+  color: var(--accent-green);
+}
+
+.priority-mark.orange {
+  background: linear-gradient(135deg, rgba(234, 122, 34, 0.14), rgba(255, 255, 255, 0.96));
+  border-color: rgba(234, 122, 34, 0.2);
+  color: var(--accent-orange);
+}
+
+.priority-mark.slate {
+  background: linear-gradient(135deg, rgba(51, 65, 85, 0.1), rgba(255, 255, 255, 0.96));
+  border-color: rgba(51, 65, 85, 0.16);
+  color: rgba(51, 65, 85, 0.9);
+}
+
+.priority-label {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.priority-desc {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 20rpx;
+  line-height: 1.5;
+  color: #8b7280;
 }
 
 .entry-card {

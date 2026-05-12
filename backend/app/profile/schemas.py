@@ -138,6 +138,19 @@ class CorrectionIn(BaseModel):
     reason: str | None = None
 
 
+class AcademicCorrectionIn(BaseModel):
+    field_name: str = Field(description="grade_code/major_code/class_code/expected_graduation_year")
+    proposed_value: str | None = None
+    reason: str | None = None
+
+
+class StudentAcademicInfoPatch(BaseModel):
+    grade_code: str | None = None
+    major_code: str | None = None
+    class_code: str | None = None
+    expected_graduation_year: int | None = None
+
+
 class CorrectionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

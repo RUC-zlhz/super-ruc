@@ -6,6 +6,7 @@ export type NoticeStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
 export type NoticeChannel = 'IN_APP' | 'EMAIL' | 'SMS'
 export type NoticeBatchStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'PARTIAL'
 export type NoticeDeliveryStatus = 'SENT' | 'FAILED' | 'SKIPPED' | 'READ'
+export type NoticeSourceType = 'URL' | 'RSS'
 
 export interface NoticeTargetRule {
   grade_codes?: string[] | null
@@ -97,15 +98,91 @@ export interface NoticeDelivery {
   user_id?: number | null
   channel: NoticeChannel
   status: NoticeDeliveryStatus
+  target_handle?: string | null
   sent_at?: string | null
   read_at?: string | null
   error_code?: string | null
   error_message?: string | null
 }
 
+export interface NoticeDeliveryAttempt {
+  id: number
+  delivery_id: number
+  provider: string
+  attempt_no: number
+  status: string
+  target_handle?: string | null
+  provider_message_id?: string | null
+  error_code?: string | null
+  error_message?: string | null
+  receipt_status?: string | null
+  receipt_at?: string | null
+  created_at: string
+}
+
+export interface NoticeSourceInput {
+  name: string
+  source_type: NoticeSourceType
+  source_url: string
+  category?: string | null
+  target_rule?: NoticeTargetRule | null
+  is_active?: boolean
+}
+
+export interface NoticeSourcePatchInput {
+  name?: string | null
+  source_type?: NoticeSourceType | null
+  source_url?: string | null
+  category?: string | null
+  target_rule?: NoticeTargetRule | null
+  is_active?: boolean | null
+}
+
+export interface NoticeSource {
+  id: number
+  name: string
+  source_type: NoticeSourceType
+  source_url: string
+  category?: string | null
+  target_rule?: NoticeTargetRule | null
+  is_active: boolean
+  last_run_at?: string | null
+  created_by?: number | null
+  updated_by?: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NoticeIngestRun {
+  id: number
+  source_id: number
+  status: string
+  fetched_count: number
+  created_count: number
+  skipped_count: number
+  error_message?: string | null
+  started_at: string
+  finished_at?: string | null
+  created_by?: number | null
+}
+
 export interface NoticeDeliveryListParams {
   status?: NoticeDeliveryStatus
   channel?: NoticeChannel
+  page?: number
+  size?: number
+}
+
+export interface NoticeSourceListParams {
+  is_active?: boolean
+  source_type?: NoticeSourceType
+  page?: number
+  size?: number
+}
+
+export interface NoticeIngestRunListParams {
+  source_id?: number
+  status?: string
   page?: number
   size?: number
 }
@@ -146,6 +223,37 @@ export function listBatchDeliveries(batchId: number, params: NoticeDeliveryListP
   return get<ApiEnvelope<Paginated<NoticeDelivery>>>(`/admin/notices/batches/${batchId}/deliveries`, {
     params,
   })
+}
+
+export function listNoticeSources(params: NoticeSourceListParams) {
+  return get<ApiEnvelope<Paginated<NoticeSource>>>('/admin/notices/sources', { params })
+}
+
+export function createNoticeSource(payload: NoticeSourceInput) {
+  return post<ApiEnvelope<NoticeSource>>('/admin/notices/sources', payload)
+}
+
+export function updateNoticeSource(id: number, payload: NoticeSourcePatchInput) {
+  return patch<ApiEnvelope<NoticeSource>>(`/admin/notices/sources/${id}`, payload)
+}
+
+export function runNoticeSource(id: number) {
+  return post<ApiEnvelope<NoticeIngestRun>>(`/admin/notices/sources/${id}/run`)
+}
+
+export function listNoticeIngestRuns(params: NoticeIngestRunListParams) {
+  return get<ApiEnvelope<Paginated<NoticeIngestRun>>>('/admin/notices/ingest-runs', { params })
+}
+
+export function retryNoticeDelivery(id: number) {
+  return post<ApiEnvelope<NoticeDelivery>>(`/admin/notices/deliveries/${id}/retry`)
+}
+
+export function mockNoticeDeliveryReceipt(
+  id: number,
+  payload: { receipt_status: string },
+) {
+  return post<ApiEnvelope<NoticeDeliveryAttempt>>(`/admin/notices/deliveries/${id}/receipt/mock`, payload)
 }
 
 export function archiveNotice(id: number) {

@@ -20,9 +20,9 @@ The platform shall record administrator operations, approval actions, content ch
 
 ## Acceptance Criteria
 
-- [ ] 审批、配置变更、内容发布停用和导出动作均被记录。
-- [ ] 每条日志至少包含操作者、操作时间、操作对象和操作类型。
-- [ ] 授权管理员可按时间、对象或人员查询日志记录。
+- 审批、配置变更、内容发布停用和导出动作均被记录。
+- 每条日志至少包含操作者、操作时间、操作对象和操作类型。
+- 授权管理员可按时间、对象或人员查询日志记录。
 
 ## Notes
 
@@ -30,5 +30,5 @@ The platform shall record administrator operations, approval actions, content ch
 
 ---
 *Created: 2026-04-13*  
-*Last Updated: 2026-04-13*  
+*Last Updated: 2026-05-12*
 *Author: Codex*

@@ -55,6 +55,55 @@
       </button>
     </view>
 
+    <view class="template-panel">
+      <view class="template-head">
+        <view>
+          <text class="template-panel-title">常用模板</text>
+          <text class="template-panel-desc">直接下载已发布模板，并核对来源信息。</text>
+        </view>
+        <text class="template-note">{{ templateLoading ? '同步中' : '官方发布' }}</text>
+      </view>
+
+      <InlineStateNotice
+        v-if="templateError && !templateItems.length"
+        compact
+        :tone="'warning'"
+        title="模板列表未完全更新"
+        :description="templateError"
+        action-text="重试"
+        @action="loadTemplates"
+      />
+
+      <view v-if="templateItems.length" class="template-list">
+        <view
+          v-for="tpl in templateItems"
+          :key="tpl.id"
+          class="template-item"
+        >
+          <view class="template-main">
+            <text class="template-name">{{ tpl.template_name }}</text>
+            <text class="template-meta">
+              {{ [tpl.template_type, tpl.version_label, tpl.category_code].filter(Boolean).join(' · ') || '官方模板' }}
+            </text>
+            <text v-if="tpl.applicable_scenario" class="template-meta">{{ tpl.applicable_scenario }}</text>
+          </view>
+          <view class="template-side">
+            <text class="template-side-note">{{ formatTemplateDate(tpl.uploaded_at) }}</text>
+            <button
+              class="template-download-btn"
+              size="mini"
+              :type="UNI_BUTTON_TYPE.primary"
+              :loading="downloadingTemplateId === tpl.id"
+              @tap="openTemplate(tpl.id)"
+            >下载</button>
+          </view>
+        </view>
+      </view>
+      <view v-else-if="templateLoaded && !templateError && !templateLoading" class="template-empty">
+        暂无可下载模板
+      </view>
+    </view>
+
     <view v-if="aiResult" class="ai-panel">
       <view class="ai-panel-head">
         <text class="ai-title">智能匹配</text>
@@ -69,6 +118,18 @@
         <view class="ai-item-title">{{ candidate.title }}</view>
         <view class="ai-item-reason">
           {{ candidate.reason || '基于已发布知识条目匹配' }} · {{ Math.round(candidate.score * 100) }}%
+        </view>
+        <view v-if="candidate.source_name || candidate.source_url" class="source-row">
+          <text class="source-label">{{ candidate.source_is_official ? '官方来源' : '来源' }}</text>
+          <text class="source-name">{{ candidate.source_name || '已发布来源' }}</text>
+          <text
+            v-if="candidate.source_url"
+            class="source-link"
+            hover-class="hover-opacity"
+            @tap.stop="copyUrl(candidate.source_url, '来源链接已复制')"
+          >
+            复制链接
+          </text>
         </view>
       </view>
       <view v-if="aiResult.manual_consult_required" class="consult-card">
@@ -92,6 +153,18 @@
             </text>
           </view>
           <text class="result-body">{{ item.summary || '点击查看适用条件、办理步骤与正文详情' }}</text>
+          <view v-if="item.source_name || item.source_url" class="source-row result-source-row">
+            <text class="source-label">{{ item.source_is_official ? '官方来源' : '来源' }}</text>
+            <text class="source-name">{{ item.source_name || '已发布来源' }}</text>
+            <text
+              v-if="item.source_url"
+              class="source-link"
+              hover-class="hover-opacity"
+              @tap.stop="copyUrl(item.source_url, '来源链接已复制')"
+            >
+              复制链接
+            </text>
+          </view>
           <view class="tag-row" v-if="item.tags?.length">
             <text class="tag" v-for="t in item.tags" :key="t" @tap.stop="selectTag(t)">{{ t }}</text>
           </view>
@@ -125,6 +198,21 @@
           <text class="detail-section-title">正文内容</text>
           <text class="detail-body">{{ detailBody }}</text>
         </view>
+        <view v-if="selected.source" class="detail-section source-section">
+          <text class="detail-section-title">{{ selected.source.is_official ? '官方来源' : '来源' }}</text>
+          <text class="source-main">{{ selected.source.source_name }}</text>
+          <text v-if="selected.source.issuing_org" class="source-meta">发布机构：{{ selected.source.issuing_org }}</text>
+          <text v-if="selected.source.version_label" class="source-meta">版本：{{ selected.source.version_label }}</text>
+          <text
+            v-if="selected.source.source_url"
+            class="source-url"
+            hover-class="hover-opacity"
+            @tap="copyUrl(selected.source.source_url, '原文链接已复制')"
+          >
+            {{ selected.source.source_url }}
+          </text>
+          <text v-if="selected.source.source_url" class="source-tip">点击复制官方原文链接</text>
+        </view>
         <view v-if="selected.tags?.length" class="tag-row detail-tags">
           <text class="tag" v-for="t in selected.tags" :key="t" @tap="selectTag(t)">{{ t }}</text>
         </view>
@@ -140,21 +228,17 @@
           >
             <view class="template-main">
               <text class="template-title">{{ tpl.template_name }}</text>
-              <text class="template-meta">{{ [tpl.template_type, tpl.version_label].filter(Boolean).join(' · ') }}</text>
-            </view>
-            <button
-              class="template-btn"
-              size="mini"
+            <text class="template-meta">{{ [tpl.template_type, tpl.version_label].filter(Boolean).join(' · ') }}</text>
+          </view>
+          <button
+            class="template-btn"
+            size="mini"
               :type="UNI_BUTTON_TYPE.primary"
               :loading="downloadingTemplateId === tpl.template_id"
               @tap="openTemplate(tpl.template_id)"
             >打开</button>
           </view>
         </view>
-        <view v-if="selected.source" class="detail-source">
-          来源：{{ selected.source.source_name }}
-        </view>
-        <view class="detail-action" @tap="openSource">查看原文</view>
       </view>
     </view>
   </view>
@@ -162,21 +246,25 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import InlineStateNotice from '@/components/InlineStateNotice.vue'
 import {
   aiMatchKnowledge,
   getEntryDetail,
   getTemplateDownloadLink,
   listKnowledgeCategories,
+  listStudentTemplates,
   searchKnowledge,
   type AiMatchResult,
   type KnowledgeCategory,
   type KnowledgeEntry,
   type KnowledgeEntryDetail,
+  type KnowledgeTemplateItem,
 } from '@/api/knowledge'
 import { UNI_BUTTON_TYPE } from '@/utils/uni-button'
 
 const query = ref('')
 const categories = ref<KnowledgeCategory[]>([])
+const templateItems = ref<KnowledgeTemplateItem[]>([])
 const selectedCategory = ref<string | null>(null)
 const selectedTag = ref<string | null>(null)
 const results = ref<KnowledgeEntry[]>([])
@@ -185,6 +273,9 @@ const searched = ref(false)
 const selected = ref<KnowledgeEntryDetail | null>(null)
 const aiResult = ref<AiMatchResult | null>(null)
 const aiLoading = ref(false)
+const templateLoading = ref(false)
+const templateError = ref('')
+const templateLoaded = ref(false)
 const downloadingTemplateId = ref<number | null>(null)
 const detailBody = computed(() => {
   if (!selected.value) return ''
@@ -259,6 +350,23 @@ async function selectTag(tag: string | null) {
   await onSearch()
 }
 
+async function loadTemplates() {
+  templateLoading.value = true
+  try {
+    templateError.value = ''
+    const resp = await listStudentTemplates({ page: 1, size: 8 })
+    templateItems.value = resp.data.items || []
+    templateLoaded.value = true
+  } catch (error) {
+    templateError.value = error instanceof Error ? error.message : '模板列表加载失败'
+    if (!templateLoaded.value) {
+      templateItems.value = []
+    }
+  } finally {
+    templateLoading.value = false
+  }
+}
+
 async function openTemplate(templateId: number) {
   if (downloadingTemplateId.value) return
   downloadingTemplateId.value = templateId
@@ -292,17 +400,19 @@ async function openTemplate(templateId: number) {
   }
 }
 
-function openSource() {
-  if (!selected.value?.source?.source_url) {
-    uni.showToast({ title: '暂无原文链接', icon: 'none' })
-    return
-  }
+function copyUrl(url: string, title = '链接已复制') {
   uni.setClipboardData({
-    data: selected.value.source.source_url,
+    data: url,
     success() {
-      uni.showToast({ title: '原文链接已复制', icon: 'none' })
+      uni.showToast({ title, icon: 'none' })
     },
   })
+}
+
+function formatTemplateDate(value?: string | null) {
+  if (!value) return ''
+  const normalized = value.replace('T', ' ').replace('Z', '')
+  return normalized.length >= 16 ? normalized.slice(0, 16) : normalized
 }
 
 function resultIcon(category?: string | null) {
@@ -315,8 +425,11 @@ function resultIcon(category?: string | null) {
 
 onMounted(async () => {
   try {
-    const resp = await listKnowledgeCategories()
-    categories.value = resp.data.filter((item) => item.is_active)
+    const [categoriesResp] = await Promise.all([
+      listKnowledgeCategories(),
+      loadTemplates(),
+    ])
+    categories.value = categoriesResp.data.filter((item) => item.is_active)
   } catch {
     categories.value = []
   }
@@ -467,6 +580,104 @@ onMounted(async () => {
   font-size: 26rpx;
   font-weight: 700;
 }
+
+.template-panel {
+  margin-top: 22rpx;
+  padding: 24rpx;
+  border-radius: 24rpx;
+  background: #fff;
+  border: 1rpx solid #f0e2e5;
+  box-shadow: var(--shadow-soft);
+}
+
+.template-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.template-panel-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 900;
+  color: #202124;
+}
+
+.template-panel-desc {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 23rpx;
+  line-height: 1.6;
+  color: #6b6365;
+}
+
+.template-note {
+  flex-shrink: 0;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  background: #fff1f2;
+  color: #b70f24;
+  font-size: 22rpx;
+}
+
+.template-list {
+  margin-top: 18rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.template-item {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 18rpx 0;
+  border-top: 1rpx solid #f3e8eb;
+}
+
+.template-item:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.template-name {
+  display: block;
+  font-size: 27rpx;
+  font-weight: 800;
+  color: #202124;
+}
+
+.template-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10rpx;
+}
+
+.template-side-note {
+  font-size: 20rpx;
+  color: #8a8f98;
+}
+
+.template-download-btn {
+  width: 112rpx;
+  height: 62rpx;
+  border-radius: 16rpx;
+  padding: 0;
+  font-size: 24rpx;
+}
+
+.template-empty {
+  margin-top: 18rpx;
+  padding: 24rpx 18rpx;
+  border-radius: 20rpx;
+  background: #f8fafc;
+  color: #6b7280;
+  font-size: 24rpx;
+  text-align: center;
+}
+
 .ai-panel {
   margin-top: 22rpx;
   padding: 24rpx;
@@ -519,6 +730,39 @@ onMounted(async () => {
 }
 .detail-consult {
   margin-top: 22rpx;
+}
+
+.source-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 12rpx;
+}
+
+.result-source-row {
+  margin-top: 12rpx;
+}
+
+.source-label {
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  background: #fff1f2;
+  color: #b70f24;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.source-name {
+  font-size: 22rpx;
+  color: #6b6365;
+  line-height: 1.5;
+}
+
+.source-link {
+  font-size: 22rpx;
+  color: #b70f24;
+  font-weight: 700;
 }
 
 .result-list { margin-top: 24rpx; }
@@ -717,6 +961,41 @@ onMounted(async () => {
 .detail-body { font-size: 28rpx; color: #333; line-height: 1.8; display: block; white-space: pre-wrap; }
 .detail-tags { margin-top: 22rpx; }
 .detail-source { font-size: 24rpx; color: #7f1722; margin-top: 16rpx; }
+.source-section {
+  margin-top: 18rpx;
+}
+
+.source-main {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 800;
+  color: #1f2937;
+}
+
+.source-meta {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 23rpx;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.source-url {
+  display: block;
+  margin-top: 12rpx;
+  color: #b70f24;
+  font-size: 23rpx;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.source-tip {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 21rpx;
+  color: #8a8f98;
+}
+
 .template-section {
   margin-top: 22rpx;
   padding: 22rpx;

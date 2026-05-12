@@ -13,6 +13,7 @@ export interface KnowledgeSource {
   version_label?: string | null
   effective_date?: string | null
   expires_on?: string | null
+  is_official: boolean
   is_active: boolean
   updated_at: string
 }
@@ -30,6 +31,12 @@ export interface KnowledgeTemplate {
   uploaded_at: string
 }
 
+export interface TemplateDownloadLink {
+  template_id: number
+  download_url: string
+  expires_in_minutes: number
+}
+
 export interface KnowledgeEntryBrief {
   id: number
   slug: string
@@ -41,6 +48,9 @@ export interface KnowledgeEntryBrief {
   version_label?: string | null
   updated_at: string
   tags: string[]
+  source_name?: string | null
+  source_url?: string | null
+  source_is_official: boolean
 }
 
 export interface KnowledgeEntryDetail extends KnowledgeEntryBrief {
@@ -129,8 +139,25 @@ export function createSource(payload: {
   version_label?: string | null
   effective_date?: string | null
   expires_on?: string | null
+  is_official?: boolean
 }) {
   return post<ApiEnvelope<KnowledgeSource>>('/admin/knowledge/sources', payload)
+}
+
+export function updateSource(
+  id: number,
+  payload: {
+    source_name?: string
+    source_url?: string | null
+    issuing_org?: string | null
+    version_label?: string | null
+    effective_date?: string | null
+    expires_on?: string | null
+    is_official?: boolean
+    is_active?: boolean
+  },
+) {
+  return patch<ApiEnvelope<KnowledgeSource>>(`/admin/knowledge/sources/${id}`, payload)
 }
 
 export function listTemplates(params: {
@@ -161,6 +188,16 @@ export function uploadTemplate(payload: {
   return post<ApiEnvelope<KnowledgeTemplate>>('/admin/knowledge/templates', body, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
+}
+
+export function getTemplateDownloadLink(
+  templateId: number,
+  scope: 'student' | 'admin' = 'student',
+) {
+  const path = scope === 'admin'
+    ? `/admin/knowledge/templates/${templateId}/download`
+    : `/knowledge/templates/${templateId}/download`
+  return get<ApiEnvelope<TemplateDownloadLink>>(path)
 }
 
 export function deprecateTemplate(id: number) {

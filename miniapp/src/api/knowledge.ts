@@ -14,6 +14,9 @@ export interface KnowledgeEntry {
   title: string
   summary?: string | null
   category_code?: string | null
+  source_name?: string | null
+  source_url?: string | null
+  source_is_official?: boolean
   status: string
   ambiguity_flag: boolean
   version_label?: string | null
@@ -30,6 +33,7 @@ export interface KnowledgeEntryDetail extends KnowledgeEntry {
   source?: {
     source_name: string
     source_url?: string | null
+    is_official?: boolean
     issuing_org?: string | null
     version_label?: string | null
   } | null
@@ -66,6 +70,7 @@ export interface AiMatchCandidate {
   reason?: string | null
   source_name?: string | null
   source_url?: string | null
+  source_is_official?: boolean
   version_label?: string | null
   ambiguity_flag: boolean
 }
@@ -82,6 +87,28 @@ export interface TemplateDownloadLink {
   template_id: number
   download_url: string
   expires_in_minutes: number
+}
+
+export interface KnowledgeTemplateItem {
+  id: number
+  template_name: string
+  template_type: string
+  category_code?: string | null
+  applicable_scenario?: string | null
+  version_label?: string | null
+  file_size?: number | null
+  mime_type?: string | null
+  status: string
+  uploaded_at: string
+}
+
+export interface PaginatedResult<T> {
+  items: T[]
+  meta: {
+    page: number
+    size: number
+    total: number
+  }
 }
 
 export function listKnowledgeCategories() {
@@ -105,4 +132,13 @@ export function aiMatchKnowledge(query: string, topK = 3) {
 
 export function getTemplateDownloadLink(templateId: number) {
   return get<TemplateDownloadLink>(`/knowledge/templates/${templateId}/download`)
+}
+
+export function listStudentTemplates(params?: {
+  q?: string
+  category?: string | null
+  page?: number
+  size?: number
+}) {
+  return get<PaginatedResult<KnowledgeTemplateItem>>('/knowledge/templates', params)
 }

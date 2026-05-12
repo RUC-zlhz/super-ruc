@@ -102,6 +102,27 @@ class NoticeDeliveryOut(BaseModel):
     error_message: str | None
 
 
+class NoticeDeliveryAttemptOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    delivery_id: int
+    provider: str
+    attempt_no: int
+    status: str
+    target_handle: str | None
+    provider_message_id: str | None
+    error_code: str | None
+    error_message: str | None
+    receipt_status: str | None
+    receipt_at: datetime | None
+    created_at: datetime
+
+
+class NoticeDeliveryReceiptMockIn(BaseModel):
+    receipt_status: str = Field(default="DELIVERED", max_length=32)
+
+
 class NoticeBatchOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -116,6 +137,56 @@ class NoticeBatchOut(BaseModel):
     note: str | None
     started_at: datetime
     finished_at: datetime | None
+
+
+class NoticeSourceIn(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    source_type: str = Field(description="URL/RSS")
+    source_url: str = Field(min_length=1, max_length=1024)
+    category: str | None = None
+    target_rule: TargetRule | None = None
+    is_active: bool = True
+
+
+class NoticeSourcePatchIn(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    source_type: str | None = Field(default=None, description="URL/RSS")
+    source_url: str | None = Field(default=None, min_length=1, max_length=1024)
+    category: str | None = None
+    target_rule: TargetRule | None = None
+    is_active: bool | None = None
+
+
+class NoticeSourceOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    source_type: str
+    source_url: str
+    category: str | None
+    target_rule: dict[str, Any] | None
+    is_active: bool
+    last_run_at: datetime | None
+    created_by: int | None
+    updated_by: int | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class NoticeIngestRunOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    source_id: int
+    status: str
+    fetched_count: int
+    created_count: int
+    skipped_count: int
+    error_message: str | None
+    started_at: datetime
+    finished_at: datetime | None
+    created_by: int | None
 
 
 class StudentNoticeItem(BaseModel):

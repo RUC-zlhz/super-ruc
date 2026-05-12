@@ -86,6 +86,33 @@ class TranscriptPdfUploadResult(BaseModel):
     uploaded_at: datetime
 
 
+class TranscriptPdfReviewRecordIn(BaseModel):
+    line_no: int | None = None
+    course_code: str
+    course_name: str
+    credits: float = 0
+    term_code: str
+    score: float | None = None
+    grade_letter: str | None = None
+    pass_flag: bool
+    note: str | None = None
+
+
+class TranscriptPdfReviewCommitIn(BaseModel):
+    records: list[TranscriptPdfReviewRecordIn]
+    note: str | None = None
+
+
+class TranscriptPdfReviewCommitResult(BaseModel):
+    batch_id: int
+    batch_no: str
+    status: str
+    student_id: int
+    student_no: str
+    formal_records_written: int
+    committed_at: datetime
+
+
 # ============================================================
 # FR-016 运营看板
 # ============================================================

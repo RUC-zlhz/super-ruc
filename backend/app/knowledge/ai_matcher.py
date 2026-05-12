@@ -48,9 +48,13 @@ def _score_keyword(entry: KnowledgeEntry, query: str) -> float:
     return score
 
 
+def _source_official_rank(entry: KnowledgeEntry) -> int:
+    return 1 if entry.source and entry.source.is_official else 0
+
+
 def rank_by_keyword(entries: list[KnowledgeEntry], query: str, top_k: int) -> list[tuple[KnowledgeEntry, float]]:
     scored = [(e, _score_keyword(e, query)) for e in entries]
-    scored.sort(key=lambda x: x[1], reverse=True)
+    scored.sort(key=lambda x: (x[1], _source_official_rank(x[0]), x[0].id), reverse=True)
     scored = [p for p in scored if p[1] > 0][:top_k]
     return scored
 
@@ -81,6 +85,8 @@ async def rank_by_claude(
             "applicable_condition": (e.applicable_condition or "")[:280],
             "required_materials": (e.required_materials or "")[:280],
             "process_steps": (e.process_steps or "")[:280],
+            "source_name": e.source.source_name if e.source else "",
+            "source_is_official": bool(e.source and e.source.is_official),
         }
         for e in entries
     ]
@@ -126,7 +132,7 @@ async def rank_by_claude(
 
     # 规范化输出
     normalized: list[dict[str, Any]] = []
-    entry_ids = {e.id for e in entries}
+    by_id = {e.id: e for e in entries}
     for item in parsed:
         if not isinstance(item, dict):
             continue
@@ -134,7 +140,7 @@ async def rank_by_claude(
             eid = int(item.get("entry_id"))
         except (TypeError, ValueError):
             continue
-        if eid not in entry_ids:
+        if eid not in by_id:
             continue
         try:
             score = float(item.get("score", 0.0))
@@ -147,4 +153,11 @@ async def rank_by_claude(
                 "reason": str(item.get("reason", ""))[:80] or None,
             }
         )
+    normalized.sort(
+        key=lambda item: (
+            item["score"],
+            _source_official_rank(by_id[item["entry_id"]]),
+        ),
+        reverse=True,
+    )
     return normalized[:top_k]

@@ -59,6 +59,23 @@
                   <a-tag v-for="tag in record.tags" :key="tag" size="small">{{ tag }}</a-tag>
                   <span v-if="!record.tags.length" class="muted">-</span>
                 </template>
+                <template v-else-if="column.key === 'source'">
+                  <div class="table-title">
+                    {{ record.source_name || '未绑定来源' }}
+                    <a-tag v-if="record.source_is_official" color="green" size="small">官方</a-tag>
+                  </div>
+                  <a
+                    v-if="record.source_url"
+                    class="table-link"
+                    :href="record.source_url"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    @click.stop
+                  >
+                    {{ record.source_url }}
+                  </a>
+                  <span v-else class="muted">未填写来源链接</span>
+                </template>
                 <template v-else-if="column.key === 'updated_at'">
                   {{ formatDateTime(record.updated_at) }}
                 </template>
@@ -107,6 +124,11 @@
                   </template>
                   <template v-else-if="column.key === 'version_label'">
                     {{ record.version_label || '-' }}
+                  </template>
+                  <template v-else-if="column.key === 'actions'">
+                    <a-button type="link" size="small" @click="onDownloadTemplate(record.template_id, record.template_name)">
+                      下载
+                    </a-button>
                   </template>
                 </template>
               </a-table>
@@ -158,8 +180,22 @@
                 </div>
               </label>
               <label class="panel-field">
-                <span>官方来源</span>
-                <p>{{ selectedEntryDetail?.source?.source_name || '未绑定官方来源' }}</p>
+                <span>来源</span>
+                <p v-if="selectedEntryDetail?.source">
+                  <strong class="source-name">{{ selectedEntryDetail.source.source_name }}</strong>
+                  <a-tag v-if="selectedEntryDetail.source.is_official" color="green" size="small">官方来源</a-tag>
+                  <a
+                    v-if="selectedEntryDetail.source.source_url"
+                    class="table-link"
+                    :href="selectedEntryDetail.source.source_url"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    @click.stop
+                  >
+                    {{ selectedEntryDetail.source.source_url }}
+                  </a>
+                </p>
+                <p v-else>未绑定来源</p>
               </label>
               <label class="panel-field">
                 <span>备注</span>
@@ -191,6 +227,62 @@
             <a-empty v-else description="请选择记录" />
           </aside>
         </div>
+      </a-tab-pane>
+
+      <a-tab-pane key="sources" tab="来源管理">
+        <a-form layout="inline" class="filter-card">
+          <a-form-item>
+            <a-button type="primary" @click="openSourceDrawer()">新增来源</a-button>
+          </a-form-item>
+        </a-form>
+
+        <a-table
+          :columns="sourceColumns"
+          :data-source="sources"
+          :loading="sourceLoading"
+          row-key="id"
+          size="small"
+          :pagination="false"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'source_name'">
+              <div class="table-title">
+                {{ record.source_name }}
+                <a-tag v-if="record.is_official" color="green" size="small">官方</a-tag>
+                <a-tag v-else color="default" size="small">可信待核</a-tag>
+              </div>
+              <a
+                v-if="record.source_url"
+                class="table-link"
+                :href="record.source_url"
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                {{ record.source_url }}
+              </a>
+              <span v-else class="muted">未填写来源链接</span>
+            </template>
+            <template v-else-if="column.key === 'status'">
+              <a-tag :color="record.is_active ? 'green' : 'default'">
+                {{ record.is_active ? '启用' : '停用' }}
+              </a-tag>
+            </template>
+            <template v-else-if="column.key === 'updated_at'">
+              {{ formatDateTime(record.updated_at) }}
+            </template>
+            <template v-else-if="column.key === 'actions'">
+              <a-space size="small" wrap>
+                <a-button type="link" size="small" @click="openSourceDrawer(record)">编辑</a-button>
+                <a-button type="link" size="small" @click="onToggleSourceOfficial(record)">
+                  {{ record.is_official ? '取消官方' : '标记官方' }}
+                </a-button>
+                <a-button type="link" size="small" @click="onToggleSourceActive(record)">
+                  {{ record.is_active ? '停用' : '启用' }}
+                </a-button>
+              </a-space>
+            </template>
+          </template>
+        </a-table>
       </a-tab-pane>
 
       <a-tab-pane key="templates" tab="模板文件">
@@ -239,9 +331,14 @@
               {{ formatDateTime(record.uploaded_at) }}
             </template>
             <template v-else-if="column.key === 'actions'">
-              <a-popconfirm title="确定停用该模板？" @confirm="onDeprecateTemplate(record.id)">
-                <a-button v-if="record.status === 'ACTIVE'" type="link" size="small" danger>停用</a-button>
-              </a-popconfirm>
+              <a-space size="small" wrap>
+                <a-button type="link" size="small" @click="onDownloadTemplate(record.id, record.template_name)">
+                  下载
+                </a-button>
+                <a-popconfirm title="确定停用该模板？" @confirm="onDeprecateTemplate(record.id)">
+                  <a-button v-if="record.status === 'ACTIVE'" type="link" size="small" danger>停用</a-button>
+                </a-popconfirm>
+              </a-space>
             </template>
           </template>
         </a-table>
@@ -272,10 +369,10 @@
           <a-col :span="8"><a-form-item label="分类"><a-input v-model:value="entryForm.category_code" /></a-form-item></a-col>
           <a-col :span="8"><a-form-item label="版本"><a-input v-model:value="entryForm.version_label" /></a-form-item></a-col>
           <a-col :span="8">
-            <a-form-item label="官方来源">
+            <a-form-item label="来源">
               <a-select v-model:value="entryForm.source_id" allow-clear show-search option-filter-prop="label">
-                <a-select-option v-for="source in sources" :key="source.id" :value="source.id" :label="source.source_name">
-                  {{ source.source_name }}
+                <a-select-option v-for="source in activeSources" :key="source.id" :value="source.id" :label="source.source_name">
+                  {{ source.source_name }}{{ source.is_official ? '（官方）' : '' }}
                 </a-select-option>
               </a-select>
             </a-form-item>
@@ -316,6 +413,58 @@
         </a-form-item>
       </a-form>
       </a-spin>
+    </a-drawer>
+
+    <a-drawer
+      :open="sourceDrawerOpen"
+      :title="editingSourceId ? '编辑知识来源' : '新增知识来源'"
+      width="520"
+      @close="resetSourceForm"
+    >
+      <a-form layout="vertical" :model="sourceForm" @finish="onSubmitSource">
+        <a-form-item label="来源名称" name="source_name" :rules="[{ required: true, message: '请输入来源名称' }]">
+          <a-input v-model:value="sourceForm.source_name" />
+        </a-form-item>
+        <a-form-item label="来源链接">
+          <a-input v-model:value="sourceForm.source_url" placeholder="https://..." />
+        </a-form-item>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="发布机构">
+              <a-input v-model:value="sourceForm.issuing_org" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="版本">
+              <a-input v-model:value="sourceForm.version_label" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="生效日期">
+              <a-input v-model:value="sourceForm.effective_date" placeholder="YYYY-MM-DD" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="失效日期">
+              <a-input v-model:value="sourceForm.expires_on" placeholder="YYYY-MM-DD" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item>
+          <a-space direction="vertical">
+            <a-checkbox v-model:checked="sourceForm.is_official">官方来源</a-checkbox>
+            <a-checkbox v-model:checked="sourceForm.is_active">启用</a-checkbox>
+          </a-space>
+        </a-form-item>
+        <a-form-item>
+          <a-space>
+            <a-button type="primary" html-type="submit" :loading="sourceSubmitting">保存</a-button>
+            <a-button @click="resetSourceForm">取消</a-button>
+          </a-space>
+        </a-form-item>
+      </a-form>
     </a-drawer>
 
     <a-drawer :open="templateDrawerOpen" title="上传模板文件" width="520" @close="resetTemplateForm">
@@ -370,6 +519,7 @@ import {
   deprecateEntry,
   deprecateTemplate,
   getEntry,
+  getTemplateDownloadLink,
   type KnowledgeEntryDetail,
   listEntries,
   listEntryRevisions,
@@ -377,6 +527,7 @@ import {
   listTemplates,
   publishEntry,
   updateEntry,
+  updateSource,
   uploadTemplate,
   type EntryPayload,
   type KnowledgeEntryBrief,
@@ -391,6 +542,7 @@ const entryColumns = [
   { title: '条目', key: 'title' },
   { title: '状态', key: 'status', width: 100 },
   { title: '标签', key: 'tags', width: 180 },
+  { title: '来源', key: 'source', width: 260 },
   { title: '版本', dataIndex: 'version_label', key: 'version_label', width: 120 },
   { title: '更新时间', key: 'updated_at', width: 180 },
   { title: '操作', key: 'actions', width: 210 },
@@ -404,7 +556,16 @@ const templateColumns = [
   { title: '大小', key: 'file_size', width: 100 },
   { title: '状态', key: 'status', width: 100 },
   { title: '上传时间', key: 'uploaded_at', width: 180 },
-  { title: '操作', key: 'actions', width: 90 },
+  { title: '操作', key: 'actions', width: 160 },
+]
+
+const sourceColumns = [
+  { title: '来源', key: 'source_name' },
+  { title: '发布机构', dataIndex: 'issuing_org', key: 'issuing_org', width: 160 },
+  { title: '版本', dataIndex: 'version_label', key: 'version_label', width: 120 },
+  { title: '状态', key: 'status', width: 100 },
+  { title: '更新时间', key: 'updated_at', width: 180 },
+  { title: '操作', key: 'actions', width: 220 },
 ]
 
 const templatePreviewColumns = [
@@ -412,6 +573,7 @@ const templatePreviewColumns = [
   { title: '类型', dataIndex: 'template_type', key: 'template_type', width: 110 },
   { title: '版本', key: 'version_label', width: 120 },
   { title: '状态', key: 'status', width: 100 },
+  { title: '操作', key: 'actions', width: 100 },
 ]
 
 const revisionColumns = [
@@ -430,6 +592,8 @@ const entrySubmitting = ref(false)
 const entryPagination = reactive({ current: 1, pageSize: 20, total: 0 })
 
 const sources = ref<KnowledgeSource[]>([])
+const sourceLoading = ref(false)
+const sourceSubmitting = ref(false)
 const templates = ref<KnowledgeTemplate[]>([])
 const templateLoading = ref(false)
 const templateSubmitting = ref(false)
@@ -473,6 +637,30 @@ interface EditableEntryForm {
   template_ids: number[]
 }
 
+const sourceDrawerOpen = ref(false)
+const editingSourceId = ref<number | null>(null)
+const sourceForm = reactive<EditableSourceForm>({
+  source_name: '',
+  source_url: '',
+  issuing_org: '',
+  version_label: '',
+  effective_date: '',
+  expires_on: '',
+  is_official: false,
+  is_active: true,
+})
+
+interface EditableSourceForm {
+  source_name: string
+  source_url: string
+  issuing_org: string
+  version_label: string
+  effective_date: string
+  expires_on: string
+  is_official: boolean
+  is_active: boolean
+}
+
 const templateDrawerOpen = ref(false)
 const templateFile = ref<File | null>(null)
 const templateForm = reactive({
@@ -487,6 +675,7 @@ const revisionModalOpen = ref(false)
 const revisions = ref<KnowledgeRevision[]>([])
 
 const activeTemplates = computed(() => templates.value.filter((item) => item.status === 'ACTIVE'))
+const activeSources = computed(() => sources.value.filter((item) => item.is_active))
 const selectedEntryId = ref<number | null>(null)
 const selectedEntry = computed(() => {
   if (selectedEntryId.value == null) return null
@@ -566,8 +755,13 @@ async function reloadEntries() {
 }
 
 async function reloadSources() {
-  const resp = await listSources(false)
-  sources.value = resp.data
+  sourceLoading.value = true
+  try {
+    const resp = await listSources(true)
+    sources.value = resp.data
+  } finally {
+    sourceLoading.value = false
+  }
 }
 
 async function reloadTemplates() {
@@ -759,7 +953,11 @@ function normalizeEntryPayload(form: EditableEntryForm): EntryPayload {
 async function ensureDefaultSource() {
   const existing = sources.value[0]
   if (existing) return existing
-  const resp = await createSource({ source_name: '学院官方材料', version_label: '默认来源' })
+  const resp = await createSource({
+    source_name: '学院官方材料',
+    version_label: '默认来源',
+    is_official: true,
+  })
   sources.value = [resp.data]
   return resp.data
 }
@@ -799,6 +997,87 @@ async function openRevisions(id: number) {
 function openTemplateDrawer() {
   resetTemplateForm()
   templateDrawerOpen.value = true
+}
+
+function resetSourceForm() {
+  sourceDrawerOpen.value = false
+  editingSourceId.value = null
+  Object.assign(sourceForm, {
+    source_name: '',
+    source_url: '',
+    issuing_org: '',
+    version_label: '',
+    effective_date: '',
+    expires_on: '',
+    is_official: false,
+    is_active: true,
+  })
+}
+
+function openSourceDrawer(source?: KnowledgeSource | Record<string, any>) {
+  resetSourceForm()
+  if (source) {
+    const sourceRecord = source as KnowledgeSource
+    editingSourceId.value = sourceRecord.id
+    Object.assign(sourceForm, {
+      source_name: sourceRecord.source_name,
+      source_url: sourceRecord.source_url || '',
+      issuing_org: sourceRecord.issuing_org || '',
+      version_label: sourceRecord.version_label || '',
+      effective_date: sourceRecord.effective_date || '',
+      expires_on: sourceRecord.expires_on || '',
+      is_official: sourceRecord.is_official,
+      is_active: sourceRecord.is_active,
+    })
+  }
+  sourceDrawerOpen.value = true
+}
+
+function normalizeSourcePayload() {
+  return {
+    source_name: sourceForm.source_name.trim(),
+    source_url: sourceForm.source_url.trim() || null,
+    issuing_org: sourceForm.issuing_org.trim() || null,
+    version_label: sourceForm.version_label.trim() || null,
+    effective_date: sourceForm.effective_date.trim() || null,
+    expires_on: sourceForm.expires_on.trim() || null,
+    is_official: sourceForm.is_official,
+    is_active: sourceForm.is_active,
+  }
+}
+
+async function onSubmitSource() {
+  sourceSubmitting.value = true
+  try {
+    const payload = normalizeSourcePayload()
+    if (editingSourceId.value) {
+      await updateSource(editingSourceId.value, payload)
+      message.success('知识来源已更新')
+    } else {
+      await createSource(payload)
+      message.success('知识来源已创建')
+    }
+    resetSourceForm()
+    await reloadSources()
+  } finally {
+    sourceSubmitting.value = false
+  }
+}
+
+async function onToggleSourceOfficial(source: KnowledgeSource | Record<string, any>) {
+  const sourceRecord = source as KnowledgeSource
+  await updateSource(sourceRecord.id, { is_official: !sourceRecord.is_official })
+  message.success(sourceRecord.is_official ? '已取消官方标识' : '已标记为官方来源')
+  await reloadSources()
+  entryDetailCache.clear()
+  await reloadEntries()
+}
+
+async function onToggleSourceActive(source: KnowledgeSource | Record<string, any>) {
+  const sourceRecord = source as KnowledgeSource
+  await updateSource(sourceRecord.id, { is_active: !sourceRecord.is_active })
+  message.success(sourceRecord.is_active ? '来源已停用' : '来源已启用')
+  await reloadSources()
 }
 
 function resetTemplateForm() {
@@ -846,6 +1125,22 @@ async function onDeprecateTemplate(id: number) {
   await deprecateTemplate(id)
   message.success('模板已停用')
   reloadTemplates()
+}
+
+async function onDownloadTemplate(templateId: number, templateName: string) {
+  try {
+    const resp = await getTemplateDownloadLink(templateId, 'admin')
+    const link = document.createElement('a')
+    link.href = resp.data.download_url
+    link.target = '_blank'
+    link.rel = 'noopener noreferrer'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    message.success(`已打开 ${templateName}`)
+  } catch {
+    message.error('模板下载失败')
+  }
 }
 
 onMounted(async () => {
@@ -1035,6 +1330,8 @@ onMounted(async () => {
 .table-secondary { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: #8c8c8c; font-size: 12px; margin-top: 4px; }
 .muted { color: #bfbfbf; }
 .upload-name { margin-left: 12px; color: #595959; }
+.table-link { display: block; margin-top: 4px; color: var(--ruc-red); word-break: break-all; }
+.source-name { display: block; margin-bottom: 4px; color: var(--text); font-weight: 700; }
 
 :deep(.selectable-entry-row > td) {
   cursor: pointer;

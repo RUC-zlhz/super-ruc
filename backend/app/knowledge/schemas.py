@@ -32,6 +32,18 @@ class SourceIn(BaseModel):
     version_label: str | None = None
     effective_date: date | None = None
     expires_on: date | None = None
+    is_official: bool = False
+
+
+class SourceUpdate(BaseModel):
+    source_name: str | None = Field(default=None, min_length=1, max_length=256)
+    source_url: str | None = None
+    issuing_org: str | None = None
+    version_label: str | None = None
+    effective_date: date | None = None
+    expires_on: date | None = None
+    is_official: bool | None = None
+    is_active: bool | None = None
 
 
 class SourceOut(BaseModel):
@@ -44,6 +56,7 @@ class SourceOut(BaseModel):
     version_label: str | None
     effective_date: date | None
     expires_on: date | None
+    is_official: bool
     is_active: bool
     updated_at: datetime
 
@@ -102,6 +115,9 @@ class EntryBrief(BaseModel):
     version_label: str | None
     updated_at: datetime
     tags: list[str] = []
+    source_name: str | None = None
+    source_url: str | None = None
+    source_is_official: bool = False
 
 
 class EntryDetail(BaseModel):
@@ -194,6 +210,7 @@ class AiMatchCandidate(BaseModel):
     reason: str | None = None
     source_name: str | None = None
     source_url: str | None = None
+    source_is_official: bool = False
     version_label: str | None = None
     ambiguity_flag: bool = False
 

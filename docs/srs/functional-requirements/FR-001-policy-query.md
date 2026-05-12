@@ -20,9 +20,9 @@ The platform shall allow students to search and browse official policy, eligibil
 
 ## Acceptance Criteria
 
-- [ ] 学生可按关键词、分类或标签查询常见事务说明。
-- [ ] 每条结果至少显示事务名称、适用条件、所需材料和办理步骤。
-- [ ] 学生在不提交申请的情况下即可查看查询结果。
+- 学生可按关键词、分类或标签查询常见事务说明。
+- 每条结果至少显示事务名称、适用条件、所需材料和办理步骤。
+- 学生在不提交申请的情况下即可查看查询结果。
 
 ## Notes
 
@@ -31,5 +31,5 @@ The platform shall allow students to search and browse official policy, eligibil
 
 ---
 *Created: 2026-04-13*  
-*Last Updated: 2026-04-13*  
+*Last Updated: 2026-05-12*
 *Author: Codex*

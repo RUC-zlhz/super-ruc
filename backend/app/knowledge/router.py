@@ -19,6 +19,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
 from app.core.dependencies import CurrentUserDep, DBDep, require_role
+from app.core.exceptions import NotFoundError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
 from app.knowledge import repository as repo
 from app.knowledge import service
@@ -35,6 +36,7 @@ from app.knowledge.schemas import (
     RevisionOut,
     SourceIn,
     SourceOut,
+    SourceUpdate,
     TemplateDownloadLink,
     TemplateOut,
 )
@@ -75,6 +77,26 @@ async def search(
         db, q=q, category_code=category, tag=tag, page=page, size=size
     )
     return ok(Paginated[EntryBrief](items=items, meta=PageMeta(page=page, size=size, total=total)))
+
+
+@router.get("/templates", response_model=ApiResponse[Paginated[TemplateOut]])
+async def list_student_templates(
+    db: DBDep,
+    _user: CurrentUserDep,
+    q: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+) -> ApiResponse[Paginated[TemplateOut]]:
+    rows, total = await service.list_templates_for_student(
+        db,
+        q=q,
+        category_code=category,
+        page=page,
+        size=size,
+    )
+    items = [TemplateOut.model_validate(row) for row in rows]
+    return ok(Paginated[TemplateOut](items=items, meta=PageMeta(page=page, size=size, total=total)))
 
 
 @router.get("/{entry_id}", response_model=ApiResponse[EntryDetail])
@@ -136,6 +158,21 @@ async def admin_create_source(
     _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
 ) -> ApiResponse[SourceOut]:
     row = await repo.create_source(db, **payload.model_dump())
+    await db.commit()
+    await db.refresh(row)
+    return ok(SourceOut.model_validate(row))
+
+
+@admin_router.patch("/sources/{source_id}", response_model=ApiResponse[SourceOut])
+async def admin_update_source(
+    source_id: int,
+    payload: SourceUpdate,
+    db: DBDep,
+    _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+) -> ApiResponse[SourceOut]:
+    row = await repo.update_source(db, source_id, **payload.model_dump(exclude_unset=True))
+    if row is None:
+        raise NotFoundError("知识来源不存在")
     await db.commit()
     await db.refresh(row)
     return ok(SourceOut.model_validate(row))
@@ -287,3 +324,18 @@ async def admin_deprecate_template(
         db, template_id, operator_id=user.user_id, operator_role=",".join(user.roles) or None
     )
     return ok(TemplateOut.model_validate(row))
+
+
+@admin_router.get("/templates/{template_id}/download", response_model=ApiResponse[TemplateDownloadLink])
+async def admin_download_template(
+    template_id: int,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+) -> ApiResponse[TemplateDownloadLink]:
+    _, url, minutes = await service.template_download_url(
+        db,
+        template_id,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    return ok(TemplateDownloadLink(template_id=template_id, download_url=url, expires_in_minutes=minutes))

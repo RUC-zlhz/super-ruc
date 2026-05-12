@@ -10,6 +10,23 @@ from passlib.context import CryptContext
 
 from app.core.config import settings
 
+try:
+    import bcrypt as _bcrypt_module
+except ImportError:  # pragma: no cover - bcrypt is expected in normal runtime
+    _bcrypt_module = None
+else:
+    _original_hashpw = _bcrypt_module.hashpw
+
+    if not getattr(_original_hashpw, "__codex_truncate_72__", False):
+
+        def _compat_hashpw(secret: bytes, salt: bytes, *args: Any, **kwargs: Any):
+            if isinstance(secret, (bytes, bytearray, memoryview)) and len(secret) > 72:
+                secret = bytes(secret[:72])
+            return _original_hashpw(secret, salt, *args, **kwargs)
+
+        _compat_hashpw.__codex_truncate_72__ = True  # type: ignore[attr-defined]
+        _bcrypt_module.hashpw = _compat_hashpw
+
 _pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 _fernet = Fernet(settings.FIELD_ENCRYPTION_KEY.encode())
 

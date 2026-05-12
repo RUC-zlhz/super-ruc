@@ -28,6 +28,7 @@ from app.core.sql import order_by_nulls_last_desc
 from app.core.storage import put_object
 from app.exchange import repository as exchange_repo
 from app.exchange.models import (
+    BATCH_STATUS_COMMITTED,
     BATCH_STATUS_VALIDATED,
     IMPORT_TYPE_TRANSCRIPT_PDF_REVIEW,
     ROW_RESULT_SKIPPED,
@@ -48,6 +49,8 @@ from app.report.schemas import (
     OverviewResult,
     RequestSummary,
     TranscriptPdfCandidateCourse,
+    TranscriptPdfReviewCommitIn,
+    TranscriptPdfReviewCommitResult,
     TranscriptPdfUploadResult,
     WorkflowSummary,
 )
@@ -105,6 +108,16 @@ def _normalize_term_code(term_code: str | None) -> str | None:
             data={"term_code": term_code},
         )
     return normalized
+
+
+def _iter_module_courses(raw: Any) -> list[dict[str, Any]]:
+    if not raw:
+        return []
+    if isinstance(raw, list):
+        return [item for item in raw if isinstance(item, dict)]
+    if isinstance(raw, dict):
+        return [raw]
+    return []
 
 
 async def upload_transcript_pdf_for_review(
@@ -269,6 +282,92 @@ async def upload_transcript_pdf_for_review(
     )
 
 
+async def commit_transcript_pdf_review(
+    db: AsyncSession,
+    batch_id: int,
+    payload: TranscriptPdfReviewCommitIn,
+    *,
+    operator_id: int,
+    operator_role: str | None,
+) -> TranscriptPdfReviewCommitResult:
+    """教师人工核验 PDF 候选课程后写入正式成绩。"""
+    batch = await exchange_repo.get_batch(db, batch_id)
+    if batch is None:
+        raise NotFoundError("成绩单 PDF 核验批次不存在")
+    if batch.import_type != IMPORT_TYPE_TRANSCRIPT_PDF_REVIEW:
+        raise BizError("该批次不是成绩单 PDF 核验批次", code=40073)
+    if batch.status == BATCH_STATUS_COMMITTED:
+        raise BizError("该成绩单 PDF 核验批次已提交", code=40074)
+    if batch.status != BATCH_STATUS_VALIDATED:
+        raise BizError(f"批次状态 {batch.status} 不可提交核验结果", code=40075)
+    if not payload.records:
+        raise BizError("请至少选择一条核验后的课程记录", code=40076)
+
+    summary = dict(batch.summary or {})
+    student_id = int(summary.get("student_id") or 0)
+    student = await db.get(Student, student_id) if student_id else None
+    if student is None:
+        raise NotFoundError("核验批次对应的学生不存在")
+
+    written = 0
+    for record in payload.records:
+        course_code = (record.course_code or "").strip()
+        course_name = (record.course_name or "").strip()
+        if not course_code or not course_name:
+            raise BizError("核验课程必须包含课程编码和课程名称", code=40077)
+        term_code = _normalize_term_code(record.term_code)
+        await exchange_repo.upsert_student_course_record(
+            db,
+            {
+                "student_id": student.id,
+                "term_code": term_code,
+                "course_code": course_code,
+                "course_name": course_name,
+                "credits": float(record.credits or 0),
+                "course_type": None,
+                "score": record.score,
+                "grade_letter": record.grade_letter,
+                "pass_flag": bool(record.pass_flag),
+                "imported_batch_id": batch.id,
+                "note": record.note or payload.note or "成绩单 PDF 人工核验写入",
+            },
+        )
+        written += 1
+
+    summary["formal_records_written"] = written
+    summary["reviewed_by"] = operator_id
+    summary["reviewed_at"] = datetime.now(UTC).isoformat()
+    summary["review_note"] = payload.note
+    batch.summary = summary
+    if payload.note:
+        batch.note = payload.note
+    await exchange_repo.mark_batch_committed(db, batch)
+    await log_action(
+        db,
+        event_type="REPORT",
+        entity_code="TRANSCRIPT_PDF",
+        action="COMMIT_TRANSCRIPT_PDF_REVIEW",
+        entity_id=batch.id,
+        actor_user_id=operator_id,
+        actor_role=operator_role,
+        detail=build_audit_detail(
+            target={"student_id": student.id, "student_no": student.student_no},
+            metrics={"formal_records_written": written},
+        ),
+    )
+    await db.commit()
+    await db.refresh(batch)
+    return TranscriptPdfReviewCommitResult(
+        batch_id=batch.id,
+        batch_no=batch.batch_no,
+        status=batch.status,
+        student_id=student.id,
+        student_no=student.student_no,
+        formal_records_written=written,
+        committed_at=batch.finished_at or datetime.now(UTC),
+    )
+
+
 async def compute_academic_gap(
     db: AsyncSession, student_id: int
 ) -> AcademicGapResult:
@@ -350,11 +449,10 @@ async def compute_academic_gap(
     total_earned = 0.0
     for m in modules:
         allowed_codes: set[str] = set()
-        if m.courses:
-            for c in m.courses:
-                code = c.get("code") if isinstance(c, dict) else None
-                if code:
-                    allowed_codes.add(str(code))
+        for c in _iter_module_courses(m.courses):
+            code = c.get("code")
+            if code:
+                allowed_codes.add(str(code))
         module_earned = 0.0
         passed: list[str] = []
         if allowed_codes:
@@ -387,33 +485,91 @@ async def compute_academic_gap(
             note=m.note,
         ))
 
-    # 建议课程：从当前有效开课中选取模块下尚缺学分的课程
-    suggested: list[dict[str, Any]] = []
+    # 建议课程：缺口模块中的未修课程均返回；缺少开课/容量/课表/先修/偏好数据时显式提示。
+    ranked_suggestions: list[tuple[int, float, int, int, str, dict[str, Any]]] = []
     offered = (await db.execute(
         select(CourseOffering).where(CourseOffering.is_active.is_(True))
     )).scalars().all()
     offer_map = {o.course_code: o for o in offered}
-    for gap in module_gaps:
+    if not offered:
+        data_warnings.append("当前未配置有效开课数据，课程推荐仅按培养方案白名单列出候选。")
+    module_map = {module.module_code: module for module in modules}
+    module_gap_map = {gap.module_code: gap.credits_gap for gap in module_gaps}
+    module_priority_map = {
+        "REQUIRED": 0,
+        "PRACTICE": 1,
+        "GENERAL": 2,
+        "ELECTIVE": 3,
+    }
+    for module_order, gap in enumerate(module_gaps):
         if gap.credits_gap <= 0:
             continue
-        for m in modules:
-            if m.module_code != gap.module_code or not m.courses:
+        module = module_map.get(gap.module_code)
+        if module is None:
+            continue
+        module_priority = module_priority_map.get(module.module_type, 9)
+        for course in _iter_module_courses(module.courses):
+            code = str(course.get("code") or "").strip()
+            if not code or code in gap.passed_courses:
                 continue
-            for c in m.courses:
-                code = c.get("code") if isinstance(c, dict) else None
-                if not code or code in gap.passed_courses:
-                    continue
-                o = offer_map.get(str(code))
-                if o is None:
-                    continue
-                suggested.append({
-                    "module_code": gap.module_code,
-                    "course_code": o.course_code,
-                    "course_name": o.course_name,
-                    "credits": float(o.credits or 0),
-                    "term_code": o.term_code,
-                    "course_type": o.course_type,
-                })
+            offering = offer_map.get(code)
+            course_warnings: list[str] = []
+            rank_score = 0
+            if offering is not None:
+                rank_score += 50
+                term_value = offering.term_code
+                course_name = offering.course_name
+                credits = float(offering.credits or course.get("credits") or 0)
+                course_type = offering.course_type or module.module_type
+                capacity = offering.capacity
+                capacity_status = "已配置" if capacity is not None else "数据未配置"
+                if capacity is not None:
+                    rank_score += 10
+                schedule_status = "已配置" if term_value else "数据未配置"
+            else:
+                term_value = course.get("opening_term")
+                course_name = str(course.get("name") or code)
+                credits = float(course.get("credits") or 0)
+                course_type = module.module_type
+                capacity = None
+                capacity_status = "数据未配置"
+                schedule_status = "实际开课数据未配置"
+                course_warnings.append("实际开课数据未配置")
+            if not term_value:
+                course_warnings.append("开课学期数据未配置")
+            if capacity is None:
+                course_warnings.append("容量数据未配置")
+            course_warnings.extend(["先修要求数据未配置", "时间冲突数据未配置", "学生偏好数据未配置"])
+            ranked_suggestions.append(
+                (
+                    rank_score,
+                    module_gap_map.get(gap.module_code, 0.0),
+                    module_priority,
+                    module_order,
+                    code,
+                    {
+                        "module_code": gap.module_code,
+                        "module_name": gap.module_name,
+                        "course_code": code,
+                        "course_name": course_name,
+                        "credits": credits,
+                        "term_code": term_value,
+                        "course_type": course_type,
+                        "capacity": capacity,
+                        "capacity_status": capacity_status,
+                        "schedule_status": schedule_status,
+                        "prerequisite_status": "数据未配置",
+                        "conflict_status": "数据未配置",
+                        "preference_status": "数据未配置",
+                        "rank_score": rank_score,
+                        "data_status": "PARTIAL" if course_warnings else "COMPLETE",
+                        "data_warnings": course_warnings,
+                        "reason": f"模块 {gap.module_name} 尚有 {format(gap.credits_gap, '.1f')} 学分差额",
+                    },
+                )
+            )
+    ranked_suggestions.sort(key=lambda item: (-item[0], -item[1], item[2], item[3], item[4]))
+    suggested = [item for _, _, _, _, _, item in ranked_suggestions]
 
     return AcademicGapResult(
         student_no=student.student_no,

@@ -58,6 +58,12 @@ _PROFILE_SOURCE_LABELS = {
 }
 _FULL_VIEW_FIELD_KIND = "FIELD:"
 _FULL_VIEW_FACTS_KIND = "FACTS"
+_STUDENT_ACADEMIC_FIELDS = {
+    "grade_code",
+    "major_code",
+    "class_code",
+    "expected_graduation_year",
+}
 
 
 @dataclass(slots=True)
@@ -216,6 +222,17 @@ def _set_review_comment(fact: ProfileFact, comment: str | None) -> None:
 
 def _build_student_basic(student: Student) -> StudentBasic:
     return StudentBasic.model_validate(student)
+
+
+def _coerce_student_academic_value(field_name: str, value: str | int | None) -> str | int | None:
+    if value in (None, ""):
+        return None
+    if field_name == "expected_graduation_year":
+        try:
+            return int(value)
+        except (TypeError, ValueError) as exc:
+            raise BizError("毕业年份必须是整数", code=40186) from exc
+    return str(value).strip() or None
 
 
 def _build_fact_admin_view(
@@ -762,6 +779,13 @@ async def submit_correction(
         if fact.student_id != student_id:
             raise BizError("不允许修改他人画像", code=40180)
         data["current_value"] = str(getattr(fact, data["field_name"], "") or "")
+    elif data["field_name"] in _STUDENT_ACADEMIC_FIELDS:
+        student = await repo.get_student(db, student_id)
+        if student is None:
+            raise NotFoundError("学生不存在")
+        data["current_value"] = str(getattr(student, data["field_name"], "") or "")
+    else:
+        raise BizError("该纠错入口仅支持学籍核心字段或画像条目引用", code=40187)
     row = await repo.create_correction(db, data)
     await log_action(
         db,
@@ -838,11 +862,21 @@ async def decide_correction(
     row.handled_at = datetime.now(UTC)
     row.handler_comment = comment
 
-    if decision == PROFILE_APPROVAL_APPROVED and apply_to_fact and row.fact_id:
-        fact = await repo.get_fact(db, row.fact_id)
-        if fact is not None and fact.student_id == row.student_id and hasattr(fact, row.field_name):
-            setattr(fact, row.field_name, row.proposed_value)
-            fact.updated_by = operator_id
+    if decision == PROFILE_APPROVAL_APPROVED and apply_to_fact:
+        if row.fact_id:
+            fact = await repo.get_fact(db, row.fact_id)
+            if fact is not None and fact.student_id == row.student_id and hasattr(fact, row.field_name):
+                setattr(fact, row.field_name, row.proposed_value)
+                fact.updated_by = operator_id
+        elif row.field_name in _STUDENT_ACADEMIC_FIELDS:
+            student = await repo.get_student(db, row.student_id)
+            if student is not None and hasattr(student, row.field_name):
+                setattr(
+                    student,
+                    row.field_name,
+                    _coerce_student_academic_value(row.field_name, row.proposed_value),
+                )
+                student.updated_at = datetime.now(UTC)
 
     await log_action(
         db,
@@ -857,6 +891,44 @@ async def decide_correction(
     await db.commit()
     await db.refresh(row)
     return row
+
+
+async def update_student_academic_info(
+    db: AsyncSession,
+    student_id: int,
+    payload: dict[str, Any],
+    *,
+    operator_id: int,
+    operator_role: str | None,
+) -> Student:
+    student = await _ensure_student_access(
+        db,
+        student_id,
+        viewer_user_id=operator_id,
+        viewer_role=operator_role,
+        denied_action="UPDATE_ACADEMIC_INFO_DENIED",
+    )
+    for field_name in _STUDENT_ACADEMIC_FIELDS:
+        if field_name in payload:
+            setattr(
+                student,
+                field_name,
+                _coerce_student_academic_value(field_name, payload.get(field_name)),
+            )
+    student.updated_at = datetime.now(UTC)
+    await log_action(
+        db,
+        event_type="PROFILE",
+        entity_code="STUDENT",
+        action="UPDATE_ACADEMIC_INFO",
+        entity_id=student.id,
+        actor_user_id=operator_id,
+        actor_role=operator_role,
+        detail={"student_id": student.id, "fields": sorted(k for k in payload if k in _STUDENT_ACADEMIC_FIELDS)},
+    )
+    await db.commit()
+    await db.refresh(student)
+    return student
 
 
 async def submit_fact(

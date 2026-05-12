@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import io
+import json
 import logging
 import uuid
 from datetime import UTC, date, datetime
@@ -313,6 +314,7 @@ async def _apply_curriculum_module(db: AsyncSession, batch: ImportBatch) -> None
                 "module_name": m.get("module_name"),
                 "module_type": m.get("module_type") or "REQUIRED",
                 "credits_required": float(m.get("credits_required") or 0),
+                "courses": _parse_courses(m.get("courses")),
                 "note": m.get("note"),
                 "sort_order": _parse_int(m.get("sort_order")) or 0,
             }
@@ -502,6 +504,22 @@ def _parse_bool(v: Any, *, default: bool = False) -> bool:
         return bool(v)
     s = str(v).strip().lower()
     return s in ("1", "true", "yes", "y", "是", "通过", "合格")
+
+
+def _parse_courses(v: Any) -> list[dict[str, Any]] | None:
+    if v in (None, ""):
+        return None
+    if isinstance(v, list):
+        return [item for item in v if isinstance(item, dict)] or None
+    if isinstance(v, dict):
+        return [v]
+    if isinstance(v, str):
+        try:
+            parsed = json.loads(v)
+        except json.JSONDecodeError:
+            return None
+        return _parse_courses(parsed)
+    return None
 
 
 def _parse_date(v: Any) -> date | None:
