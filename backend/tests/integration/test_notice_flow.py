@@ -36,7 +36,11 @@ async def _login_as_student(
     await db.refresh(stu)
     resp = await client.post(
         "/api/v1/auth/wx-login",
-        json={"code": wx_code, "student_no": student_no},
+        json={
+            "code": wx_code,
+            "student_no": student_no,
+            "full_name": f"n-{student_no}",
+        },
     )
     assert resp.status_code == 200, resp.text
     return resp.json()["data"]["access_token"], stu.id

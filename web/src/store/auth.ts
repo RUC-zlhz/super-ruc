@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { changePassword as changePasswordApi, loginByWorkNo, getMe } from '@/api/auth'
+import {
+  changePassword as changePasswordApi,
+  getMe,
+  loginByWorkNo,
+  logoutSession,
+} from '@/api/auth'
 import type { UserInfo } from '@/api/types'
 import { setAccessToken, getAccessToken } from '@/utils/request'
 
@@ -40,12 +45,21 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem(REFRESH_KEY, refresh)
   }
 
-  function logout() {
+  function clearLocalSession() {
     accessToken.value = null
     refreshToken.value = null
     user.value = null
     setAccessToken(null)
     localStorage.removeItem(REFRESH_KEY)
+  }
+
+  function logout() {
+    const accessSnapshot = accessToken.value
+    const refreshSnapshot = refreshToken.value
+    clearLocalSession()
+    if (accessSnapshot) {
+      void logoutSession(refreshSnapshot, accessSnapshot).catch(() => undefined)
+    }
   }
 
   return {

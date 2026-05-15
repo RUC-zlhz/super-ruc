@@ -18,8 +18,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
+from app.audit.service import build_audit_detail, log_action
 from app.core.dependencies import CurrentUserDep, DBDep, require_role
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import BizError, NotFoundError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
 from app.knowledge import repository as repo
 from app.knowledge import service
@@ -141,6 +142,40 @@ async def admin_upsert_category(
 
 
 # ========== 管理侧：来源 ==========
+def _clean_source_url(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
+def _source_snapshot(row) -> dict:
+    return {
+        "source_name": row.source_name,
+        "source_url": row.source_url,
+        "issuing_org": row.issuing_org,
+        "version_label": row.version_label,
+        "effective_date": row.effective_date.isoformat() if row.effective_date else None,
+        "expires_on": row.expires_on.isoformat() if row.expires_on else None,
+        "is_official": row.is_official,
+        "is_active": row.is_active,
+    }
+
+
+def _source_changes(before: dict, after: dict) -> list[dict]:
+    changes: list[dict] = []
+    for key, old_value in before.items():
+        new_value = after.get(key)
+        if old_value != new_value:
+            changes.append({"field": key, "before": old_value, "after": new_value})
+    return changes
+
+
+def _assert_official_source_url(*, is_official: bool, source_url: str | None) -> None:
+    if is_official and not _clean_source_url(source_url):
+        raise BizError("官方知识来源必须填写 source_url", code=40081, http_status=422)
+
+
 @admin_router.get("/sources", response_model=ApiResponse[list[SourceOut]])
 async def admin_list_sources(
     db: DBDep,
@@ -155,9 +190,29 @@ async def admin_list_sources(
 async def admin_create_source(
     payload: SourceIn,
     db: DBDep,
-    _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
 ) -> ApiResponse[SourceOut]:
-    row = await repo.create_source(db, **payload.model_dump())
+    fields = payload.model_dump()
+    fields["source_url"] = _clean_source_url(fields.get("source_url"))
+    _assert_official_source_url(
+        is_official=bool(fields.get("is_official")),
+        source_url=fields.get("source_url"),
+    )
+    row = await repo.create_source(db, **fields)
+    await log_action(
+        db,
+        event_type="KNOWLEDGE",
+        entity_code="KNOWLEDGE_SOURCE",
+        action="CREATE_KNOWLEDGE_SOURCE",
+        entity_id=row.id,
+        actor_user_id=user.user_id,
+        actor_role=",".join(user.roles) or None,
+        detail=build_audit_detail(
+            target={"source_id": row.id, "source_name": row.source_name},
+            refs={"source_url": row.source_url},
+            changes={"after": _source_snapshot(row)},
+        ),
+    )
     await db.commit()
     await db.refresh(row)
     return ok(SourceOut.model_validate(row))
@@ -168,11 +223,39 @@ async def admin_update_source(
     source_id: int,
     payload: SourceUpdate,
     db: DBDep,
-    _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
 ) -> ApiResponse[SourceOut]:
-    row = await repo.update_source(db, source_id, **payload.model_dump(exclude_unset=True))
+    current = await repo.get_source(db, source_id)
+    if current is None:
+        raise NotFoundError("知识来源不存在")
+    before = _source_snapshot(current)
+    fields = payload.model_dump(exclude_unset=True)
+    if "source_url" in fields:
+        fields["source_url"] = _clean_source_url(fields.get("source_url"))
+    next_is_official = bool(fields.get("is_official", current.is_official))
+    next_source_url = fields.get("source_url", current.source_url)
+    _assert_official_source_url(
+        is_official=next_is_official,
+        source_url=next_source_url,
+    )
+    row = await repo.update_source(db, source_id, **fields)
     if row is None:
         raise NotFoundError("知识来源不存在")
+    after = _source_snapshot(row)
+    await log_action(
+        db,
+        event_type="KNOWLEDGE",
+        entity_code="KNOWLEDGE_SOURCE",
+        action="UPDATE_KNOWLEDGE_SOURCE",
+        entity_id=row.id,
+        actor_user_id=user.user_id,
+        actor_role=",".join(user.roles) or None,
+        detail=build_audit_detail(
+            target={"source_id": row.id, "source_name": row.source_name},
+            refs={"source_url": row.source_url},
+            changes=_source_changes(before, after),
+        ),
+    )
     await db.commit()
     await db.refresh(row)
     return ok(SourceOut.model_validate(row))

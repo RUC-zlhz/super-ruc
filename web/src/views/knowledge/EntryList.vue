@@ -369,7 +369,7 @@
           <a-col :span="8"><a-form-item label="分类"><a-input v-model:value="entryForm.category_code" /></a-form-item></a-col>
           <a-col :span="8"><a-form-item label="版本"><a-input v-model:value="entryForm.version_label" /></a-form-item></a-col>
           <a-col :span="8">
-            <a-form-item label="来源">
+            <a-form-item label="来源" name="source_id" :rules="[{ required: true, message: '请选择来源' }]">
               <a-select v-model:value="entryForm.source_id" allow-clear show-search option-filter-prop="label">
                 <a-select-option v-for="source in activeSources" :key="source.id" :value="source.id" :label="source.source_name">
                   {{ source.source_name }}{{ source.is_official ? '（官方）' : '' }}
@@ -426,7 +426,7 @@
           <a-input v-model:value="sourceForm.source_name" />
         </a-form-item>
         <a-form-item label="来源链接">
-          <a-input v-model:value="sourceForm.source_url" placeholder="https://..." />
+          <a-input v-model:value="sourceForm.source_url" placeholder="官方来源必须填写 https://..." />
         </a-form-item>
         <a-row :gutter="16">
           <a-col :span="12">
@@ -919,8 +919,8 @@ async function onSubmitEntry() {
   try {
     const payload = normalizeEntryPayload(entryForm)
     if (!payload.source_id) {
-      const source = await ensureDefaultSource()
-      payload.source_id = source.id
+      message.warning('请选择知识来源；官方来源必须由来源管理显式维护')
+      return
     }
     if (editingEntryId.value) {
       await updateEntry(editingEntryId.value, payload)
@@ -948,18 +948,6 @@ function normalizeEntryPayload(form: EditableEntryForm): EntryPayload {
     throw new Error('请输入 slug')
   }
   return payload
-}
-
-async function ensureDefaultSource() {
-  const existing = sources.value[0]
-  if (existing) return existing
-  const resp = await createSource({
-    source_name: '学院官方材料',
-    version_label: '默认来源',
-    is_official: true,
-  })
-  sources.value = [resp.data]
-  return resp.data
 }
 
 function onPublishEntry(id: number) {
@@ -1050,6 +1038,10 @@ async function onSubmitSource() {
   sourceSubmitting.value = true
   try {
     const payload = normalizeSourcePayload()
+    if (payload.is_official && !payload.source_url) {
+      message.warning('官方来源必须填写来源链接')
+      return
+    }
     if (editingSourceId.value) {
       await updateSource(editingSourceId.value, payload)
       message.success('知识来源已更新')
@@ -1066,6 +1058,11 @@ async function onSubmitSource() {
 
 async function onToggleSourceOfficial(source: KnowledgeSource | Record<string, any>) {
   const sourceRecord = source as KnowledgeSource
+  if (!sourceRecord.is_official && !sourceRecord.source_url) {
+    message.warning('标记官方来源前必须先填写来源链接')
+    openSourceDrawer(sourceRecord)
+    return
+  }
   await updateSource(sourceRecord.id, { is_official: !sourceRecord.is_official })
   message.success(sourceRecord.is_official ? '已取消官方标识' : '已标记为官方来源')
   await reloadSources()

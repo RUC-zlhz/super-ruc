@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy import pool
+from sqlalchemy import inspect, pool, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -39,6 +39,38 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def ensure_alembic_version_capacity(connection: Connection) -> None:
+    """Alembic's default VARCHAR(32) is too short for existing named revisions."""
+
+    inspector = inspect(connection)
+    if not inspector.has_table("alembic_version"):
+        connection.execute(
+            text(
+                "CREATE TABLE alembic_version "
+                "(version_num VARCHAR(128) NOT NULL PRIMARY KEY)"
+            )
+        )
+        return
+
+    version_num = next(
+        (
+            column
+            for column in inspector.get_columns("alembic_version")
+            if column["name"] == "version_num"
+        ),
+        None,
+    )
+    if version_num is None:
+        return
+
+    column_type = version_num["type"]
+    length = getattr(column_type, "length", None)
+    if length is not None and length < 128:
+        connection.execute(
+            text("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(128)")
+        )
+
+
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
@@ -53,6 +85,9 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    ensure_alembic_version_capacity(connection)
+    if connection.in_transaction():
+        connection.commit()
     context.configure(
         connection=connection,
         target_metadata=target_metadata,

@@ -361,9 +361,10 @@ async def _get_default_plan(
 async def import_default_students(
     db: AsyncSession,
     *,
-    operator_id: int,
+    operator_id: int | None,
     operator_role: str | None,
     source_path: Path = _DEFAULT_STUDENTS_PATH,
+    commit: bool = True,
 ) -> DefaultImportResult:
     if not source_path.exists():
         raise BizError(f"默认学生花名册不存在：{source_path}", code=40091)
@@ -423,7 +424,8 @@ async def import_default_students(
             "skipped": skipped,
         },
     )
-    await db.commit()
+    if commit:
+        await db.commit()
     return DefaultImportResult(
         import_type="DEFAULT_STUDENTS",
         total_rows=total,
@@ -438,9 +440,10 @@ async def import_default_students(
 async def import_default_curriculum(
     db: AsyncSession,
     *,
-    operator_id: int,
+    operator_id: int | None,
     operator_role: str | None,
     source_path: Path = _DEFAULT_CURRICULUM_PATH,
+    commit: bool = True,
 ) -> DefaultImportResult:
     if not source_path.exists():
         raise BizError(f"默认培养方案不存在：{source_path}", code=40094)
@@ -521,7 +524,8 @@ async def import_default_curriculum(
             "skipped": skipped,
         },
     )
-    await db.commit()
+    if commit:
+        await db.commit()
     return DefaultImportResult(
         import_type="DEFAULT_CURRICULUM",
         total_rows=total,

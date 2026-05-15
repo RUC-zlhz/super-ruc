@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：在 `S1 ~ S12` 已闭合的基础上，推进 `S13` 需求文档与实现一致性修复
+- 当前目标：`S1 ~ S14` 已闭合；后续仅在新确认范围内继续增量推进
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -448,6 +448,33 @@
 - 前端构建：`pnpm -C web build` 通过；`pnpm -C miniapp build:mp-weixin` 通过。
 - 文档轻量检查：`docs/srs` 的 FR/NFR 文件不再存在 `- [ ]` 验收项；`docs/srs`、`scripts/srs`、`docs/source` 不再命中 `S12` 进行中、`v1.7` 准备中、旧式证明 PDF 或通知抓取过度承诺表述。
 
+### S14 安全、权限与验证闭环修复
+
+- [x] `S14.1` 微信绑定与账号安全：绑定不再仅凭学号；同一学生只能绑定一个微信用户；微信登录检查 `users.is_active`；退出登录服务端失效 token 并写入审计。
+- [x] `S14.2` Web 前端权限边界：治理页路由与菜单补齐与后端一致的 `roles`，低权限账号在进入页面前被前端拦截。
+- [x] `S14.3` 小程序访客态与缓存隔离：学生专属 Tab/页面在访客态先提示绑定；首页缓存按当前用户隔离，账号切换不展示上一位学生数据。
+- [x] `S14.4` S12 PDF 教师核验闭环：Web 导入中心提供成绩单 PDF 候选审核、确认提交与结果回看入口。
+- [x] `S14.5` S13 官方来源治理：禁止无 `source_url` 的官方来源兜底，来源创建/修改写审计，官方标识变更可追踪。
+- [x] `S14.6` 临时 IP 小程序出包治理：固定临时部署出包命令与产物检查，避免直接导入旧 `127.0.0.1:8080` 产物。
+- [x] `S14.DB` 真实 DB / 迁移 gate：补 blank DB `alembic upgrade head + seed_initial + Kingbase` 空库链验证，并覆盖默认学生/培养方案 seed/bootstrap。
+- [x] `S14.DOC` 规格文档收口：修正 `specs/001-student-service-platform` 对证明模板、S12/S13 边界和验证链的过强或过期承诺。
+
+出口条件：
+
+- P0 安全与权限问题有代码、迁移、测试和双端构建证据。
+- P1 功能闭环缺口均有可操作 UI / API / 审计链路或明确阻塞记录。
+- 真实 DB / 迁移 gate 和规格文档不再保留与当前实现冲突的完成态判断。
+
+当前结论：
+
+- `S14` 已闭合：账号安全、权限闸门、访客缓存隔离、PDF 教师核验、官方来源治理、临时 IP 出包、空库迁移/默认数据 seed 和规格文档漂移均已完成代码与验证收口。
+
+证据：
+
+- Backend 静态校验：`backend` 下设置 repo-local `UV_CACHE_DIR` 后，执行 S14 相关 `ruff check` 与 `py_compile` 通过。
+- Backend DB / 集成：执行 `.\backend\scripts\dev\run_s14_blank_db_gate.ps1 -SkipSync` 通过，覆盖隔离 Kingbase `54324` 从零初始化、`alembic upgrade head`、`seed_initial.py` 与 `seed_default_data.py`；随后在同一隔离库执行 `uv run --extra dev pytest tests/integration/test_auth_flow.py tests/integration/test_knowledge_flow.py tests/integration/test_s12_gap_closure.py -q -o cache_dir=.tmp/pytest-cache-s14-final --basetemp=.tmp/pytest-tmp-s14-final`，结果 `27 passed in 26.13s`。
+- Frontend：`pnpm -C web build` 与 `pnpm -C miniapp build:mp-weixin` 均通过。
+
 ## 细化文件登记
 
 > 规则：每个新细化文件都要写入本表，且必须关联一个或多个主计划条目编号。
@@ -504,6 +531,7 @@
 | 2026-05-11 | 教师管理端默认管理员与初始密码提醒 | `docs/notes/refinements/2026-05-11-s11-admin-default-password-change.md` | `S11.7` | `[x]` | 已新增 `admin/admin123` 默认超管种子、登录后改密提醒与个人信息页改密弹窗；通过后端静态校验与 Web 构建，集成测试受本机 DB 拒连阻塞 |
 | 2026-05-11 | S12 需求缺口闭环与默认数据导入 | `docs/notes/refinements/2026-05-11-s12-requirements-gap-closure.md` | `S12.1, S12.2, S12.3, S12.4, S12.5, S12.6, S12.7, S12.8, S12.9, S12.DOC` | `[x]` | 已完成默认导入、PDF 核验、模板下载、进度中心、通知抓取、短信治理、Web/Miniapp 接入与 SRS v1.7 出件；后端 S12 回归、Web 构建、小程序出包和文档 QC 均通过 |
 | 2026-05-12 | S13 需求文档与实现一致性修复 | `docs/notes/refinements/2026-05-12-s13-requirements-doc-implementation-alignment.md` | `S13.1, S13.2, S13.3, S13.4, S13.5` | `[x]` | 已完成 S12 状态漂移、FR 验收项语义、需求边界和官方来源结构化标识修复，并通过后端静态/定向集成、双端构建与文档 grep 验证 |
+| 2026-05-14 | S14 安全、权限与验证闭环修复 | `docs/notes/refinements/2026-05-14-s14-security-permission-gap-closure.md` | `S14.1, S14.2, S14.3, S14.4, S14.5, S14.6, S14.DB, S14.DOC` | `[x]` | 已完成账号安全、权限闸门、PDF 教师核验、官方来源治理、临时 IP 出包、空库迁移和规格文档收口；S14 定向集成 `27 passed`，双端构建通过 |
 
 ## 会话更新要求
 
@@ -568,3 +596,6 @@
 - `2026-05-11`：完成 `S12` 闭环；修复学业推荐排序使默认信息安全课程 `BISYMS0012` 进入缺口建议，完成后端 S12 定向集成测试、Web 构建、小程序 `mp-weixin` 出包，并生成含 S12 增量说明的 SRS v1.7 三组 DOCX/PDF。
 - `2026-05-12`：新增 `S13` 需求文档与实现一致性修复条目及细化文件，开始修正 S12 文档状态漂移、FR 验收项语义、边界表述与知识来源官方标识实现。
 - `2026-05-12`：完成 `S13` 修复；知识来源已具备结构化官方标识和同分优先排序，Web/Miniapp 已消费该标识，文档边界与追踪矩阵已对齐；随后通过后端 ruff / py_compile、隔离 Kingbase 定向集成回归 `5 passed`、Web 构建、小程序 `mp-weixin` 出包和文档 grep 检查。
+- `2026-05-14`：新增 `S14` 安全、权限与验证闭环修复条目及细化文件；根据并行审查结论，先处理微信绑定安全、停用账号登录、服务端退出失效、Web 前端角色闸门和小程序访客态/缓存隔离。
+- `2026-05-14`：完成 `S14.2 ~ S14.3`；`S14.1` 已落后端绑定校验、唯一绑定约束、token_version 失效和 logout 审计，并通过 ruff / py_compile，但定向 auth 集成测试仍受 `localhost:54322/sip_db_test` 拒连阻塞。
+- `2026-05-15`：完成 `S14.1 / S14.4 / S14.5 / S14.6 / S14.DB / S14.DOC` 收口；修复 refresh token 版本声明、Alembic 长 revision 空库兼容和 S14 gate 参数传递问题，隔离 Kingbase 空库 gate 通过，S14 定向集成测试 `27 passed`，Web 与 Miniapp 构建通过。

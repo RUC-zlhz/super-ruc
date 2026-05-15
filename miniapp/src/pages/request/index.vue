@@ -28,6 +28,17 @@
       </view>
     </view>
 
+    <EmptyState
+      v-if="isGuest"
+      icon="绑"
+      tone="warning"
+      title="请先绑定学号"
+      description="访客身份不能查看或发起学生事务申请。绑定学生主档后再进入申请列表。"
+      action-text="去绑定"
+      @action="goBindStudent"
+    />
+
+    <template v-else>
     <view class="launch-btn" hover-class="hover-opacity" @tap="goCreate">
       <view class="launch-core">
         <text class="launch-plus">＋</text>
@@ -185,6 +196,7 @@
       action-text="立即发起"
       @action="goCreate"
     />
+    </template>
   </view>
 </template>
 
@@ -198,6 +210,7 @@ import {
   getRequestStatusLabel,
   type RequestBrief,
 } from "@/api/workflow";
+import { useAuthStore } from "@/store/auth";
 import { getErrorMessage } from "@/utils/error";
 import { openMiniappPage } from "@/utils/navigation";
 
@@ -216,6 +229,8 @@ const loading = ref(false);
 const pageError = ref("");
 const hasLoaded = ref(false);
 const lastLoadedTab = ref("");
+const auth = useAuthStore();
+const isGuest = computed(() => auth.isLoggedIn && !auth.user?.student_id);
 
 const activeTabLabel = computed(
   () => STATUS_TABS.find((item) => item.value === tab.value)?.label || "全部",
@@ -301,6 +316,13 @@ function formatDateTime(value?: string | null) {
 }
 
 async function reload() {
+  if (isGuest.value) {
+    requests.value = [];
+    pageError.value = "";
+    hasLoaded.value = false;
+    lastLoadedTab.value = "";
+    return;
+  }
   loading.value = true;
   try {
     pageError.value = "";
@@ -322,6 +344,10 @@ async function reload() {
   } finally {
     loading.value = false;
   }
+}
+
+async function goBindStudent() {
+  await openMiniappPage("/pages/profile/index");
 }
 
 function onTab(value: string) {

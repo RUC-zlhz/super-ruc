@@ -26,6 +26,17 @@
       </view>
     </view>
 
+    <EmptyState
+      v-if="isGuest"
+      icon="绑"
+      tone="warning"
+      title="请先绑定学号"
+      description="访客身份不能查看事务申请和党团流程的个人进度。"
+      action-text="去绑定"
+      @action="goBindStudent"
+    />
+
+    <template v-else>
     <view class="section-header">
       <view>
         <text class="section-title">我的进度事项</text>
@@ -101,6 +112,7 @@
       title="当前暂无进度事项"
       description="新的申请记录或党团流程进展会自动汇总到这里。"
     />
+    </template>
   </view>
 </template>
 
@@ -110,14 +122,17 @@ import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 import EmptyState from '@/components/EmptyState.vue'
 import InlineStateNotice from '@/components/InlineStateNotice.vue'
 import { getMyProgress, type ProgressItem } from '@/api/progress'
+import { useAuthStore } from '@/store/auth'
 import { getErrorMessage } from '@/utils/error'
 import { openMiniappPage } from '@/utils/navigation'
 
+const auth = useAuthStore()
 const items = ref<ProgressItem[]>([])
 const loading = ref(false)
 const pageError = ref('')
 const hasLoaded = ref(false)
 const generatedAt = ref('')
+const isGuest = computed(() => auth.isLoggedIn && !auth.user?.student_id)
 
 const requestCount = computed(() =>
   items.value.filter((item) => item.source_type === 'REQUEST').length,
@@ -172,6 +187,13 @@ async function openDetail(url: string) {
 }
 
 async function reload() {
+  if (isGuest.value) {
+    items.value = []
+    generatedAt.value = ''
+    pageError.value = ''
+    hasLoaded.value = false
+    return
+  }
   loading.value = true
   try {
     pageError.value = ''
@@ -188,6 +210,10 @@ async function reload() {
   } finally {
     loading.value = false
   }
+}
+
+async function goBindStudent() {
+  await openMiniappPage('/pages/profile/index')
 }
 
 onShow(() => {

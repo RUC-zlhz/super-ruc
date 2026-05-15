@@ -62,6 +62,7 @@ class User(Base):
 
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     # 学生绑定：一个 user 最多关联一个 student。教师类 user 则为 NULL。
     student_id: Mapped[int | None] = mapped_column(
@@ -81,6 +82,10 @@ class User(Base):
     )
     roles: Mapped[list[UserRole]] = relationship(
         "UserRole", back_populates="user", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("student_id", name="uq_users_student_id"),
     )
 
 

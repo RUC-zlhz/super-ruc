@@ -1,6 +1,15 @@
 <template>
   <view class="container">
-    <view v-if="loading" class="loading">加载中...</view>
+    <EmptyState
+      v-if="isGuest"
+      icon="绑"
+      tone="warning"
+      title="请先绑定学号"
+      description="访客身份不能查看学业缺口、成绩单 PDF 核验候选或课程建议。"
+      action-text="去绑定"
+      @action="goBindStudent"
+    />
+    <view v-else-if="loading" class="loading">加载中...</view>
     <template v-else>
       <InlineStateNotice
         v-if="pageError"
@@ -228,8 +237,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { onPullDownRefresh } from '@dcloudio/uni-app'
+import { computed, ref } from 'vue'
+import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
+import EmptyState from '@/components/EmptyState.vue'
 import InlineStateNotice from '@/components/InlineStateNotice.vue'
 import {
   getMyAcademicGap,
@@ -239,8 +249,11 @@ import {
   type SuggestedCourse,
   type TranscriptPdfUploadResult,
 } from '@/api/report'
+import { useAuthStore } from '@/store/auth'
 import { getErrorMessage } from '@/utils/error'
+import { openMiniappPage } from '@/utils/navigation'
 
+const auth = useAuthStore()
 const result = ref<AcademicGapResult | null>(null)
 const loading = ref(false)
 const uploadingTranscript = ref(false)
@@ -248,6 +261,7 @@ const transcriptUpload = ref<TranscriptPdfUploadResult | null>(null)
 const pageError = ref('')
 const hasLoaded = ref(false)
 const defaultDisclaimer = '本结果仅为辅助提示，不构成毕业资格、课程替代或教务最终结论；请以学院/学校正式审核结果为准。'
+const isGuest = computed(() => auth.isLoggedIn && !auth.user?.student_id)
 
 const MODULE_TYPE_LABELS: Record<string, string> = {
   REQUIRED: '必修模块',
@@ -331,6 +345,13 @@ async function onUploadTranscriptPdf() {
 }
 
 async function reload() {
+  if (isGuest.value) {
+    result.value = null
+    pageError.value = ''
+    hasLoaded.value = false
+    transcriptUpload.value = null
+    return
+  }
   loading.value = true
   try {
     pageError.value = ''
@@ -347,7 +368,11 @@ async function reload() {
   }
 }
 
-onMounted(reload)
+function goBindStudent() {
+  void openMiniappPage('/pages/profile/index')
+}
+
+onShow(reload)
 
 onPullDownRefresh(async () => {
   try {

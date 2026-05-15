@@ -259,7 +259,7 @@ type HomeSectionCacheMap = {
   workflows?: HomeDashboardCache["workflows"];
 };
 
-const HOME_CACHE_KEY = "sip.home.dashboard.cache.v1";
+const HOME_CACHE_KEY_PREFIX = "sip.home.dashboard.cache.v2";
 const SECTION_KEYS: HomeSectionKey[] = ["notices", "requests", "workflows"];
 const SECTION_LABELS: Record<HomeSectionKey, string> = {
   notices: "通知",
@@ -362,6 +362,7 @@ const requests = ref<RequestBrief[]>([]);
 const displayName = ref("同学");
 const dashboardRefreshing = ref(false);
 const cacheHydrated = ref(false);
+const activeCacheScope = ref("");
 const sectionMeta = reactive<Record<HomeSectionKey, HomeSectionMeta>>({
   notices: {
     loading: false,
@@ -621,6 +622,17 @@ function formatDateTime(value?: string | null) {
   return normalized.length >= 16 ? normalized.slice(0, 16) : normalized;
 }
 
+function getDashboardCacheScope() {
+  const auth = useAuthStore();
+  if (auth.user?.student_id) return `student:${auth.user.student_id}`;
+  if (auth.user?.id) return `user:${auth.user.id}`;
+  return "anonymous";
+}
+
+function getDashboardCacheKey() {
+  return `${HOME_CACHE_KEY_PREFIX}:${getDashboardCacheScope()}`;
+}
+
 function getLatestSuccessAt() {
   const timestamps = SECTION_KEYS
     .map((key) => sectionMeta[key].lastSuccessAt)
@@ -632,7 +644,7 @@ function getLatestSuccessAt() {
 }
 
 function readDashboardCache(): HomeDashboardCache {
-  const raw = uni.getStorageSync(HOME_CACHE_KEY);
+  const raw = uni.getStorageSync(getDashboardCacheKey());
   if (!raw || typeof raw !== "string") return {};
   try {
     const parsed = JSON.parse(raw) as HomeDashboardCache;
@@ -643,7 +655,7 @@ function readDashboardCache(): HomeDashboardCache {
 }
 
 function writeDashboardCache(cache: HomeDashboardCache) {
-  uni.setStorageSync(HOME_CACHE_KEY, JSON.stringify(cache));
+  uni.setStorageSync(getDashboardCacheKey(), JSON.stringify(cache));
 }
 
 function setSectionItems<K extends HomeSectionKey>(
@@ -806,6 +818,12 @@ async function loadDashboard() {
   try {
     await syncDisplayName();
     const auth = useAuthStore();
+    const nextScope = getDashboardCacheScope();
+    if (nextScope !== activeCacheScope.value) {
+      clearDashboardData();
+      cacheHydrated.value = false;
+      activeCacheScope.value = nextScope;
+    }
     if (!auth.isLoggedIn || !auth.user?.student_id) {
       clearDashboardData();
       return;

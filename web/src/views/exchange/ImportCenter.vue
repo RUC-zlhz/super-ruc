@@ -134,6 +134,162 @@
           </a-space>
         </a-card>
 
+        <a-card title="成绩单 PDF 核验" :bordered="false" class="mb16 transcript-review-card">
+          <template #extra>
+            <a-space>
+              <a-button :loading="transcriptReviewLoading" @click="loadTranscriptPdfReviews">刷新</a-button>
+            </a-space>
+          </template>
+          <a-alert
+            class="mb16"
+            type="info"
+            show-icon
+            message="学生上传的成绩单 PDF 只生成候选批次，教师核验并提交后才写入正式成绩。"
+          />
+          <a-table
+            :columns="transcriptReviewBatchCols"
+            :data-source="transcriptReviewBatches"
+            :loading="transcriptReviewLoading"
+            :pagination="{ pageSize: 6 }"
+            row-key="id"
+            size="small"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'status'">
+                <StatusTag :status="record.status" />
+              </template>
+              <template v-else-if="column.key === 'student'">
+                <span>{{ record.summary?.student_no || '-' }}</span>
+                <span class="muted"> / {{ record.summary?.student_name || '-' }}</span>
+              </template>
+              <template v-else-if="column.key === 'parsed'">
+                {{ record.summary?.parsed_courses_count || 0 }} 条候选
+              </template>
+              <template v-else-if="column.key === 'actions'">
+                <a-button type="link" size="small" @click="openTranscriptPdfReview(record.id)">
+                  {{ record.status === 'COMMITTED' ? '查看' : '核验' }}
+                </a-button>
+              </template>
+            </template>
+          </a-table>
+
+          <template v-if="transcriptReviewDetail">
+            <a-divider />
+            <a-descriptions title="核验批次" :column="4" size="small" bordered>
+              <a-descriptions-item label="批次号">{{ transcriptReviewDetail.batch.batch_no }}</a-descriptions-item>
+              <a-descriptions-item label="学生">
+                {{ transcriptReviewSummary.student_no || '-' }} / {{ transcriptReviewSummary.student_name || '-' }}
+              </a-descriptions-item>
+              <a-descriptions-item label="文件">{{ transcriptReviewDetail.batch.filename }}</a-descriptions-item>
+              <a-descriptions-item label="状态">
+                <StatusTag :status="transcriptReviewDetail.batch.status" />
+              </a-descriptions-item>
+              <a-descriptions-item label="解析字符数">
+                {{ transcriptReviewSummary.parsed_text_chars || 0 }}
+              </a-descriptions-item>
+              <a-descriptions-item label="候选数">
+                {{ transcriptReviewSummary.parsed_courses_count || transcriptReviewRecords.length }}
+              </a-descriptions-item>
+              <a-descriptions-item label="已写入">
+                {{ transcriptReviewSummary.formal_records_written || 0 }}
+              </a-descriptions-item>
+              <a-descriptions-item label="审核备注">
+                {{ transcriptReviewDetail.batch.note || '-' }}
+              </a-descriptions-item>
+            </a-descriptions>
+
+            <div v-if="transcriptReviewWarnings.length" class="review-warnings">
+              <a-tag v-for="warning in transcriptReviewWarnings" :key="warning" color="orange">{{ warning }}</a-tag>
+            </div>
+
+            <a-space class="mt8">
+              <a-button
+                :disabled="isTranscriptReviewCommitted"
+                @click="addTranscriptReviewRecord"
+              >
+                新增课程
+              </a-button>
+            </a-space>
+
+            <a-table
+              class="mt8"
+              :columns="transcriptReviewRecordCols"
+              :data-source="transcriptReviewRecords"
+              :pagination="false"
+              row-key="client_key"
+              size="small"
+            >
+              <template #bodyCell="{ column, record, index }">
+                <template v-if="column.key === 'course_code'">
+                  <a-input v-model:value="record.course_code" :disabled="isTranscriptReviewCommitted" />
+                </template>
+                <template v-else-if="column.key === 'course_name'">
+                  <a-input v-model:value="record.course_name" :disabled="isTranscriptReviewCommitted" />
+                </template>
+                <template v-else-if="column.key === 'credits'">
+                  <a-input-number
+                    v-model:value="record.credits"
+                    :disabled="isTranscriptReviewCommitted"
+                    :min="0"
+                    :precision="1"
+                    style="width: 88px"
+                  />
+                </template>
+                <template v-else-if="column.key === 'term_code'">
+                  <a-input v-model:value="record.term_code" :disabled="isTranscriptReviewCommitted" placeholder="2025-FALL" />
+                </template>
+                <template v-else-if="column.key === 'score'">
+                  <a-input-number
+                    v-model:value="record.score"
+                    :disabled="isTranscriptReviewCommitted"
+                    :min="0"
+                    :max="100"
+                    style="width: 88px"
+                  />
+                </template>
+                <template v-else-if="column.key === 'grade_letter'">
+                  <a-input v-model:value="record.grade_letter" :disabled="isTranscriptReviewCommitted" />
+                </template>
+                <template v-else-if="column.key === 'pass_flag'">
+                  <a-switch v-model:checked="record.pass_flag" :disabled="isTranscriptReviewCommitted" />
+                </template>
+                <template v-else-if="column.key === 'note'">
+                  <a-input v-model:value="record.note" :disabled="isTranscriptReviewCommitted" />
+                </template>
+                <template v-else-if="column.key === 'actions'">
+                  <a-button
+                    type="link"
+                    danger
+                    size="small"
+                    :disabled="isTranscriptReviewCommitted"
+                    @click="removeTranscriptReviewRecord(index)"
+                  >
+                    删除
+                  </a-button>
+                </template>
+              </template>
+            </a-table>
+
+            <a-textarea
+              v-model:value="transcriptReviewNote"
+              class="mt8"
+              :disabled="isTranscriptReviewCommitted"
+              :rows="2"
+              placeholder="核验说明"
+            />
+            <a-space class="mt8">
+              <a-button
+                type="primary"
+                :disabled="isTranscriptReviewCommitted"
+                :loading="transcriptReviewCommitLoading"
+                @click="onCommitTranscriptPdfReview"
+              >
+                提交核验结果
+              </a-button>
+            </a-space>
+          </template>
+        </a-card>
+
         <!-- 批次列表 -->
         <a-card title="历史批次" :bordered="false">
           <a-table
@@ -249,15 +405,23 @@ import {
   importAllDefaults,
   importDefaultCurriculum,
   importDefaultStudents,
-  uploadImport, commitImport, listImports,
+  uploadImport, commitImport, listImports, getImport, commitTranscriptPdfReview,
   downloadErrorReport, downloadStudents, downloadTranscripts, downloadCurriculum,
+  TRANSCRIPT_PDF_REVIEW_IMPORT_TYPE,
   type DefaultImportResult, type ImportType, type ImportPreviewResult, type ImportBatchBrief,
+  type TranscriptPdfReviewRecord,
 } from '@/api/exchange'
 import StatusTag from '@/components/StatusTag.vue'
 
 const activeTab = ref('import')
 const importType = ref<ImportType>('student')
 const preview = ref<ImportPreviewResult | null>(null)
+const transcriptReviewBatches = ref<ImportBatchBrief[]>([])
+const transcriptReviewDetail = ref<ImportPreviewResult | null>(null)
+const transcriptReviewRecords = ref<EditableTranscriptReviewRecord[]>([])
+const transcriptReviewNote = ref('')
+const transcriptReviewLoading = ref(false)
+const transcriptReviewCommitLoading = ref(false)
 const defaultImportLoading = reactive({ students: false, curriculum: false, all: false })
 const defaultImportSummary = ref<{ title: string; results: DefaultImportResult[] } | null>(null)
 const latestBatch = computed(() => preview.value?.batch || batches.value[0] || null)
@@ -312,6 +476,44 @@ const rowCols = [
   { title: '结果', dataIndex: 'result', key: 'result', width: 80 },
   { title: '消息', dataIndex: 'message', key: 'message' },
 ]
+const transcriptReviewBatchCols = [
+  { title: '批次号', dataIndex: 'batch_no', key: 'batch_no', width: 180 },
+  { title: '学生', key: 'student', width: 180 },
+  { title: '文件名', dataIndex: 'filename', key: 'filename' },
+  { title: '候选', key: 'parsed', width: 100 },
+  { title: '状态', key: 'status', width: 100 },
+  { title: '上传时间', dataIndex: 'started_at', key: 'started_at', width: 180 },
+  { title: '操作', key: 'actions', width: 90 },
+]
+const transcriptReviewRecordCols = [
+  { title: '课程编码', key: 'course_code', width: 130 },
+  { title: '课程名称', key: 'course_name', width: 190 },
+  { title: '学分', key: 'credits', width: 100 },
+  { title: '学期', key: 'term_code', width: 130 },
+  { title: '成绩', key: 'score', width: 100 },
+  { title: '等级', key: 'grade_letter', width: 90 },
+  { title: '通过', key: 'pass_flag', width: 80 },
+  { title: '备注', key: 'note', width: 160 },
+  { title: '操作', key: 'actions', width: 70 },
+]
+
+interface EditableTranscriptReviewRecord extends TranscriptPdfReviewRecord {
+  client_key: string
+  course_code: string
+  course_name: string
+  credits: number
+  term_code: string
+  pass_flag: boolean
+}
+
+const transcriptReviewSummary = computed<Record<string, any>>(() => (
+  transcriptReviewDetail.value?.batch.summary || {}
+))
+const transcriptReviewWarnings = computed<string[]>(() => {
+  const warnings = transcriptReviewSummary.value.data_warnings
+  return Array.isArray(warnings) ? warnings.filter((item) => typeof item === 'string') : []
+})
+const isTranscriptReviewCommitted = computed(() => transcriptReviewDetail.value?.batch.status === 'COMMITTED')
 
 function severityColor(s: string) {
   return s === 'FATAL' ? 'red' : s === 'WARN' ? 'orange' : 'green'
@@ -394,6 +596,116 @@ function onDownloadBatchErrors(batchId: number) {
   downloadErrorReport(batchId)
 }
 
+function normalizeReviewRecord(candidate: Record<string, any>, index: number): EditableTranscriptReviewRecord {
+  const score = candidate.score == null || candidate.score === '' ? null : Number(candidate.score)
+  const passFlag = typeof candidate.pass_flag === 'boolean'
+    ? candidate.pass_flag
+    : (score == null ? true : score >= 60)
+  return {
+    client_key: `${candidate.line_no ?? 'new'}-${index}-${Date.now()}`,
+    line_no: candidate.line_no ?? null,
+    course_code: String(candidate.course_code || ''),
+    course_name: String(candidate.course_name || ''),
+    credits: Number(candidate.credits ?? 0),
+    term_code: String(candidate.term_code || ''),
+    score,
+    grade_letter: candidate.grade_letter == null ? null : String(candidate.grade_letter),
+    pass_flag: passFlag,
+    note: candidate.note == null ? null : String(candidate.note),
+  }
+}
+
+function buildTranscriptReviewRecords(detail: ImportPreviewResult): EditableTranscriptReviewRecord[] {
+  const summaryCandidates = detail.batch.summary?.candidate_courses
+  const rowCandidates = detail.rows
+    .filter((row) => row.field_name === 'parsed_courses' && row.raw_data)
+    .map((row) => row.raw_data as Record<string, any>)
+  const candidates = Array.isArray(summaryCandidates) && summaryCandidates.length
+    ? summaryCandidates
+    : rowCandidates
+  return candidates.map((item, index) => normalizeReviewRecord(item, index))
+}
+
+async function loadTranscriptPdfReviews() {
+  transcriptReviewLoading.value = true
+  try {
+    const resp = await listImports({
+      import_type: TRANSCRIPT_PDF_REVIEW_IMPORT_TYPE,
+      page: 1,
+      size: 20,
+    })
+    transcriptReviewBatches.value = resp.data.items
+  } finally {
+    transcriptReviewLoading.value = false
+  }
+}
+
+async function openTranscriptPdfReview(batchId: number) {
+  transcriptReviewLoading.value = true
+  try {
+    const resp = await getImport(batchId)
+    transcriptReviewDetail.value = resp.data
+    transcriptReviewRecords.value = buildTranscriptReviewRecords(resp.data)
+    transcriptReviewNote.value = resp.data.batch.note || ''
+  } finally {
+    transcriptReviewLoading.value = false
+  }
+}
+
+function addTranscriptReviewRecord() {
+  transcriptReviewRecords.value.push(normalizeReviewRecord({}, transcriptReviewRecords.value.length))
+}
+
+function removeTranscriptReviewRecord(index: number) {
+  transcriptReviewRecords.value.splice(index, 1)
+}
+
+function validateTranscriptReviewRecords() {
+  if (!transcriptReviewRecords.value.length) {
+    message.warning('请至少保留一条核验课程')
+    return false
+  }
+  const termPattern = /^\d{4}-(SPRING|SUMMER|FALL|WINTER)$/
+  for (const record of transcriptReviewRecords.value) {
+    if (!record.course_code.trim() || !record.course_name.trim()) {
+      message.warning('核验课程必须填写课程编码和课程名称')
+      return false
+    }
+    if (!termPattern.test(record.term_code.trim().toUpperCase())) {
+      message.warning('学期格式必须为 YYYY-SPRING/SUMMER/FALL/WINTER')
+      return false
+    }
+  }
+  return true
+}
+
+async function onCommitTranscriptPdfReview() {
+  if (!transcriptReviewDetail.value || !validateTranscriptReviewRecords()) return
+  transcriptReviewCommitLoading.value = true
+  try {
+    const records = transcriptReviewRecords.value.map((record) => ({
+      line_no: record.line_no ?? undefined,
+      course_code: record.course_code.trim(),
+      course_name: record.course_name.trim(),
+      credits: Number(record.credits || 0),
+      term_code: record.term_code.trim().toUpperCase(),
+      score: record.score == null ? null : Number(record.score),
+      grade_letter: record.grade_letter?.trim() || null,
+      pass_flag: record.pass_flag,
+      note: record.note?.trim() || null,
+    }))
+    await commitTranscriptPdfReview(transcriptReviewDetail.value.batch.id, {
+      records,
+      note: transcriptReviewNote.value.trim() || null,
+    })
+    message.success('成绩单 PDF 核验已提交')
+    await openTranscriptPdfReview(transcriptReviewDetail.value.batch.id)
+    await Promise.all([loadTranscriptPdfReviews(), loadBatches()])
+  } finally {
+    transcriptReviewCommitLoading.value = false
+  }
+}
+
 // 批次列表
 const batchCols = [
   { title: '批次号', dataIndex: 'batch_no', key: 'batch_no', width: 160 },
@@ -433,7 +745,10 @@ function dlStudents() { downloadStudents() }
 function dlTranscripts() { downloadTranscripts() }
 function dlCurriculum() { downloadCurriculum() }
 
-onMounted(loadBatches)
+onMounted(() => {
+  loadBatches()
+  loadTranscriptPdfReviews()
+})
 </script>
 
 <style scoped>
@@ -474,6 +789,17 @@ onMounted(loadBatches)
   color: var(--text-3);
   font-size: 12px;
   line-height: 1.6;
+}
+
+.muted {
+  color: var(--text-3);
+}
+
+.review-warnings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .import-hero :deep(.ant-card-body) {

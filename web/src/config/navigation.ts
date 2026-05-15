@@ -10,7 +10,14 @@ import {
   SafetyOutlined,
   TrophyOutlined,
 } from "@ant-design/icons-vue";
-import { hasAnyRole } from "@/utils/permission";
+import {
+  APPROVER_ROLES,
+  AUDIT_VIEWER_ROLES,
+  CONTENT_EDITOR_ROLES,
+  CURRICULUM_ADMIN_ROLES,
+  SYSTEM_USER_ROLES,
+  hasAnyRole,
+} from "@/utils/permission";
 
 export type NavLeaf = {
   key: string;
@@ -40,40 +47,53 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     group: "审批",
     items: [
-      { key: "/approval/workbench", label: "审批工作台", icon: InboxOutlined },
+      {
+        key: "/approval/workbench",
+        label: "审批工作台",
+        icon: InboxOutlined,
+        roles: APPROVER_ROLES,
+      },
       {
         key: "/workflow/party-stage",
         label: "党团流程管理",
         icon: BranchesOutlined,
-        roles: [
-          "SUPER_ADMIN",
-          "COUNSELOR",
-          "HEAD_TEACHER",
-          "YOUTH_LEAGUE_TEACHER",
-          "PARTY_BUILD_TEACHER",
-        ],
+        roles: CONTENT_EDITOR_ROLES,
       },
     ],
   },
   {
     group: "内容",
     items: [
-      { key: "/notice/list", label: "通知中心", icon: NotificationOutlined },
-      { key: "/knowledge/entries", label: "知识库管理", icon: BookOutlined },
+      {
+        key: "/notice/list",
+        label: "通知中心",
+        icon: NotificationOutlined,
+        roles: CONTENT_EDITOR_ROLES,
+      },
+      {
+        key: "/knowledge/entries",
+        label: "知识库管理",
+        icon: BookOutlined,
+        roles: CONTENT_EDITOR_ROLES,
+      },
       {
         key: "/workflow/quiz-bank",
         label: "理论自测题库",
         icon: ReadOutlined,
-        roles: [
-          "SUPER_ADMIN",
-          "COUNSELOR",
-          "HEAD_TEACHER",
-          "YOUTH_LEAGUE_TEACHER",
-          "PARTY_BUILD_TEACHER",
-        ],
+        roles: CONTENT_EDITOR_ROLES,
       },
-      { key: "/academic/curriculum", label: "培养方案管理", icon: ReadOutlined },
-      { key: "/honor/list", label: "荣誉公示管理", icon: TrophyOutlined },
+      {
+        key: "/academic/curriculum",
+        label: "培养方案管理",
+        icon: ReadOutlined,
+        roles: CURRICULUM_ADMIN_ROLES,
+      },
+      {
+        key: "/honor/list",
+        label: "荣誉公示管理",
+        icon: TrophyOutlined,
+        roles: CONTENT_EDITOR_ROLES,
+      },
     ],
   },
   {
@@ -83,19 +103,19 @@ export const NAV_GROUPS: NavGroup[] = [
         key: "/exchange/import",
         label: "导入导出中心",
         icon: ImportOutlined,
-        roles: ["SUPER_ADMIN", "COUNSELOR"],
+        roles: CURRICULUM_ADMIN_ROLES,
       },
       {
         key: "/system/users",
         label: "用户管理",
         icon: TeamOutlined,
-        roles: ["SUPER_ADMIN", "COLLEGE_LEADER", "COUNSELOR", "HEAD_TEACHER"],
+        roles: SYSTEM_USER_ROLES,
       },
       {
         key: "/audit/log",
         label: "审计日志",
         icon: SafetyOutlined,
-        roles: ["SUPER_ADMIN", "COLLEGE_LEADER"],
+        roles: AUDIT_VIEWER_ROLES,
       },
     ],
   },

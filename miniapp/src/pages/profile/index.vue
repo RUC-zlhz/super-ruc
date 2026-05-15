@@ -34,6 +34,19 @@
             class="bind-input"
             v-model="studentNoForBinding"
             placeholder="填写学号绑定，留空以访客登录"
+            confirm-type="next"
+          />
+          <input
+            class="bind-input"
+            v-model="fullNameForBinding"
+            placeholder="绑定时填写学生姓名"
+            confirm-type="next"
+          />
+          <input
+            class="bind-input"
+            v-model="idCardTailForBinding"
+            placeholder="可选：身份证号后 6 位"
+            maxlength="6"
             confirm-type="done"
           />
           <button
@@ -47,7 +60,7 @@
           >
             <text class="btn-icon">微</text> 微信一键登录
           </button>
-          <text class="login-note">已绑定微信可直接登录；不填学号将以访客身份进入。</text>
+          <text class="login-note">已绑定微信可直接登录；首次绑定需填写学号和姓名，或身份证号后 6 位。</text>
         </view>
       </view>
     </view>
@@ -112,6 +125,19 @@
           class="bind-input guest-bind-input"
           v-model="studentNoForBinding"
           placeholder="请输入学号完成绑定"
+          confirm-type="next"
+        />
+        <input
+          class="bind-input guest-bind-input"
+          v-model="fullNameForBinding"
+          placeholder="请输入学生姓名"
+          confirm-type="next"
+        />
+        <input
+          class="bind-input guest-bind-input"
+          v-model="idCardTailForBinding"
+          placeholder="可选：身份证号后 6 位"
+          maxlength="6"
           confirm-type="done"
         />
         <button
@@ -545,6 +571,8 @@ const appealSubmitting = ref(false)
 const growthSubmitting = ref(false)
 const fullViewSubmitting = ref('')
 const studentNoForBinding = ref('')
+const fullNameForBinding = ref('')
+const idCardTailForBinding = ref('')
 const appealVisible = ref(false)
 const growthVisible = ref(false)
 const growthAttachments = ref<ProfileFactAttachment[]>([])
@@ -777,11 +805,26 @@ function getWxLoginCode(): Promise<string> {
 
 async function onWxLogin() {
   if (loginSubmitting.value) return
+  const normalizedStudentNo = studentNoForBinding.value.trim()
+  const normalizedFullName = fullNameForBinding.value.trim()
+  const normalizedIdCardTail = idCardTailForBinding.value.trim()
+  if (!normalizedStudentNo && (normalizedFullName || normalizedIdCardTail)) {
+    uni.showToast({ title: '绑定学生时请先填写学号', icon: 'none' })
+    return
+  }
+  if (normalizedStudentNo && !normalizedFullName && !normalizedIdCardTail) {
+    uni.showToast({ title: '请填写姓名或身份证后 6 位', icon: 'none' })
+    return
+  }
   loginSubmitting.value = true
   try {
     const code = await getWxLoginCode()
-    const normalizedStudentNo = studentNoForBinding.value.trim()
-    await auth.wxLogin(code, normalizedStudentNo || undefined)
+    await auth.wxLogin(
+      code,
+      normalizedStudentNo || undefined,
+      normalizedFullName || undefined,
+      normalizedIdCardTail || undefined,
+    )
     if (auth.user?.student_id) {
       await loadAll()
       uni.showToast({ title: '登录成功', icon: 'none' })
@@ -800,6 +843,10 @@ async function onWxLogin() {
 async function onBindStudent() {
   if (!studentNoForBinding.value.trim()) {
     uni.showToast({ title: '请先填写学号', icon: 'none' })
+    return
+  }
+  if (!fullNameForBinding.value.trim() && !idCardTailForBinding.value.trim()) {
+    uni.showToast({ title: '请填写姓名或身份证后 6 位', icon: 'none' })
     return
   }
   await onWxLogin()
@@ -1013,6 +1060,8 @@ function onLogout() {
       uni.showToast({ title: '已退出', icon: 'none' })
       clearProfileData()
       studentNoForBinding.value = ''
+      fullNameForBinding.value = ''
+      idCardTailForBinding.value = ''
     },
   })
 }

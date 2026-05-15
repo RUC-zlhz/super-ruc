@@ -9,6 +9,7 @@ from app.auth import service
 from app.auth.schemas import (
     ChangePasswordRequest,
     EnrollmentStatusUpdate,
+    LogoutRequest,
     RefreshTokenRequest,
     TokenResponse,
     UserInfo,
@@ -34,7 +35,12 @@ async def wx_login(
     payload: WxLoginRequest, db: DBDep, request: Request
 ) -> ApiResponse[TokenResponse]:
     token = await service.login_with_wechat(
-        db, code=payload.code, student_no=payload.student_no, ip=_client_ip(request)
+        db,
+        code=payload.code,
+        student_no=payload.student_no,
+        full_name=payload.full_name,
+        id_card_tail=payload.id_card_tail,
+        ip=_client_ip(request),
     )
     return ok(token)
 
@@ -53,6 +59,22 @@ async def login(
 async def refresh(payload: RefreshTokenRequest, db: DBDep) -> ApiResponse[TokenResponse]:
     token = await service.refresh_access_token(db, payload.refresh_token)
     return ok(token)
+
+
+@router.post("/logout", response_model=ApiResponse[dict], summary="退出登录并失效当前账号令牌")
+async def logout(
+    db: DBDep,
+    user: CurrentUserDep,
+    request: Request,
+    payload: LogoutRequest | None = None,
+) -> ApiResponse[dict]:
+    await service.logout(
+        db,
+        user_id=user.user_id,
+        refresh_token=payload.refresh_token if payload else None,
+        ip=_client_ip(request),
+    )
+    return ok({"revoked": True})
 
 
 @router.post("/change-password", response_model=ApiResponse[UserInfo], summary="修改当前账号密码")

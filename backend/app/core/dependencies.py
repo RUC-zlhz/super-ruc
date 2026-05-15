@@ -11,6 +11,7 @@ from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.models import User
 from app.auth.role_codes import normalize_role_codes
 from app.core.database import get_db
 from app.core.exceptions import AuthError, PermissionError
@@ -45,6 +46,7 @@ class CurrentUser:
 
 async def get_current_user(
     request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> CurrentUser:
     if credentials is None or not credentials.credentials:
@@ -59,6 +61,15 @@ async def get_current_user(
         user_id = int(claims["sub"])
     except (KeyError, ValueError) as e:
         raise AuthError("Token 主体缺失") from e
+    row = await db.get(User, user_id)
+    if row is None or row.deleted_at is not None or not row.is_active:
+        raise AuthError("用户不存在或已停用")
+    try:
+        claim_token_version = int(claims.get("ver", 0))
+    except (TypeError, ValueError) as e:
+        raise AuthError("Token 版本无效") from e
+    if claim_token_version != row.token_version:
+        raise AuthError("Token 已失效，请重新登录")
     roles = normalize_role_codes(claims.get("roles", []))
     student_id = claims.get("sid")
     cu = CurrentUser(

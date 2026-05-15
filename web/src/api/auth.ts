@@ -10,6 +10,14 @@ export function refreshToken(refresh_token: string) {
   return post<ApiEnvelope<TokenResponse>>('/auth/refresh', { refresh_token })
 }
 
+export function logoutSession(refresh_token?: string | null, access_token?: string | null) {
+  return post<ApiEnvelope<{ revoked: boolean }>>(
+    '/auth/logout',
+    { refresh_token: refresh_token || undefined },
+    access_token ? { headers: { Authorization: `Bearer ${access_token}` } } : undefined,
+  )
+}
+
 export function getMe() {
   return get<ApiEnvelope<UserInfo>>('/auth/me')
 }

@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import service
-from app.auth.models import Student
+from app.auth.models import Student, User
 from app.core.exceptions import AuthError, BizError
 
 
@@ -55,7 +56,11 @@ async def test_wx_login_creates_user_and_binds_student(
     # Act: 首次微信登录 + 学号绑定
     resp = await client.post(
         "/api/v1/auth/wx-login",
-        json={"code": "wx_code_alpha", "student_no": "2022110101"},
+        json={
+            "code": "wx_code_alpha",
+            "student_no": "2022110101",
+            "full_name": "测试学生A",
+        },
     )
 
     # Assert: token + 用户信息 + STUDENT 角色
@@ -79,7 +84,11 @@ async def test_me_returns_current_user(
     await db.commit()
     login_resp = await client.post(
         "/api/v1/auth/wx-login",
-        json={"code": "wx_code_beta", "student_no": "2022110102"},
+        json={
+            "code": "wx_code_beta",
+            "student_no": "2022110102",
+            "full_name": "测试学生B",
+        },
     )
     token = login_resp.json()["data"]["access_token"]
 
@@ -105,7 +114,11 @@ async def test_refresh_token_returns_new_access(
     await db.commit()
     login = await client.post(
         "/api/v1/auth/wx-login",
-        json={"code": "wx_code_gamma", "student_no": "2022110103"},
+        json={
+            "code": "wx_code_gamma",
+            "student_no": "2022110103",
+            "full_name": "测试学生C",
+        },
     )
     refresh_token = login.json()["data"]["refresh_token"]
 
@@ -193,7 +206,11 @@ async def test_guest_wx_login_can_bind_student_later(
 
     bind_resp = await client.post(
         "/api/v1/auth/wx-login",
-        json={"code": "wx_code_guest_bind", "student_no": "2022110104"},
+        json={
+            "code": "wx_code_guest_bind",
+            "student_no": "2022110104",
+            "full_name": "测试学生D",
+        },
     )
 
     assert bind_resp.status_code == 200, bind_resp.text
@@ -202,6 +219,112 @@ async def test_guest_wx_login_can_bind_student_later(
     assert user["display_name"] == "测试学生D"
     assert any(r["code"] == "STUDENT" for r in user["roles"])
     assert not any(r["code"] == "GUEST" for r in user["roles"])
+
+
+async def test_wx_login_rejects_student_no_only_binding(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    db.add(Student(student_no="2022110105", full_name="测试学生E"))
+    await db.commit()
+
+    resp = await client.post(
+        "/api/v1/auth/wx-login",
+        json={"code": "wx_code_student_no_only", "student_no": "2022110105"},
+    )
+
+    assert resp.status_code == 400
+
+
+async def test_wx_login_rejects_duplicate_student_binding(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    db.add(Student(student_no="2022110106", full_name="测试学生F"))
+    await db.commit()
+
+    first = await client.post(
+        "/api/v1/auth/wx-login",
+        json={
+            "code": "wx_code_bind_first",
+            "student_no": "2022110106",
+            "full_name": "测试学生F",
+        },
+    )
+    assert first.status_code == 200, first.text
+
+    second = await client.post(
+        "/api/v1/auth/wx-login",
+        json={
+            "code": "wx_code_bind_second",
+            "student_no": "2022110106",
+            "full_name": "测试学生F",
+        },
+    )
+
+    assert second.status_code == 409
+
+
+async def test_wx_login_rejects_inactive_account(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    db.add(Student(student_no="2022110107", full_name="测试学生G"))
+    await db.commit()
+    login = await client.post(
+        "/api/v1/auth/wx-login",
+        json={
+            "code": "wx_code_inactive",
+            "student_no": "2022110107",
+            "full_name": "测试学生G",
+        },
+    )
+    assert login.status_code == 200, login.text
+    user = (
+        await db.execute(select(User).where(User.openid == "mock_wx_code_inactive"))
+    ).scalar_one()
+    user.is_active = False
+    await db.commit()
+
+    resp = await client.post(
+        "/api/v1/auth/wx-login",
+        json={"code": "wx_code_inactive"},
+    )
+
+    assert resp.status_code == 401
+
+
+async def test_logout_revokes_refresh_and_access_token(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    db.add(Student(student_no="2022110108", full_name="测试学生H"))
+    await db.commit()
+    login = await client.post(
+        "/api/v1/auth/wx-login",
+        json={
+            "code": "wx_code_logout",
+            "student_no": "2022110108",
+            "full_name": "测试学生H",
+        },
+    )
+    assert login.status_code == 200, login.text
+    data = login.json()["data"]
+    access_token = data["access_token"]
+    refresh_token = data["refresh_token"]
+
+    logout = await client.post(
+        "/api/v1/auth/logout",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"refresh_token": refresh_token},
+    )
+    assert logout.status_code == 200, logout.text
+
+    me = await client.get(
+        "/api/v1/auth/me", headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert me.status_code == 401
+
+    refresh = await client.post(
+        "/api/v1/auth/refresh", json={"refresh_token": refresh_token}
+    )
+    assert refresh.status_code == 401
 
 
 async def test_wx_login_with_unknown_student_no_returns_404(

@@ -170,7 +170,7 @@ async def upload_import(
     )
     rows = await repo.list_batch_rows(db, batch.id, limit=200)
     return ok(ImportPreviewResult(
-        batch=ImportBatchBrief.model_validate(batch),
+        batch=ImportBatchDetail.model_validate(batch),
         rows=[ImportBatchRowOut.model_validate(r) for r in rows],
     ))
 
@@ -271,7 +271,7 @@ async def get_import(
         raise NotFoundError("批次不存在")
     rows = await repo.list_batch_rows(db, batch_id, severity=severity, limit=500)
     return ok(ImportPreviewResult(
-        batch=ImportBatchBrief.model_validate(batch),
+        batch=ImportBatchDetail.model_validate(batch),
         rows=[ImportBatchRowOut.model_validate(r) for r in rows],
     ))
 

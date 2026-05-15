@@ -37,6 +37,28 @@ export const ROLE_LEVEL: Record<RoleCode, number> = {
   STUDENT: 5,
 };
 
+export const APPROVER_ROLES: RoleCode[] = [
+  "SUPER_ADMIN",
+  "COLLEGE_LEADER",
+  "COUNSELOR",
+  "HEAD_TEACHER",
+  "YOUTH_LEAGUE_TEACHER",
+  "PARTY_BUILD_TEACHER",
+];
+
+export const CONTENT_EDITOR_ROLES: RoleCode[] = [...APPROVER_ROLES];
+
+export const CURRICULUM_ADMIN_ROLES: RoleCode[] = [
+  "SUPER_ADMIN",
+  "COLLEGE_LEADER",
+  "COUNSELOR",
+  "HEAD_TEACHER",
+];
+
+export const SYSTEM_USER_ROLES: RoleCode[] = [...CURRICULUM_ADMIN_ROLES];
+
+export const AUDIT_VIEWER_ROLES: RoleCode[] = ["SUPER_ADMIN", "COLLEGE_LEADER"];
+
 export function hasAnyRole(
   userRoles: string[],
   required: string[] | undefined,

@@ -24,6 +24,11 @@ async def get_user_by_work_no(db: AsyncSession, work_no: str) -> User | None:
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
+async def get_user_by_student_id(db: AsyncSession, student_id: int) -> User | None:
+    stmt = select(User).where(User.student_id == student_id, User.deleted_at.is_(None))
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
 async def create_user_from_wechat(
     db: AsyncSession,
     *,

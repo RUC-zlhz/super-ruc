@@ -10,6 +10,13 @@ class WxLoginRequest(BaseModel):
     code: str = Field(..., description="微信 wx.login 返回的 code")
     # 首次登录可选：传入学号完成绑定
     student_no: str | None = Field(default=None, description="首次登录时绑定学号")
+    full_name: str | None = Field(default=None, max_length=64, description="绑定校验：学生姓名")
+    id_card_tail: str | None = Field(
+        default=None,
+        min_length=4,
+        max_length=6,
+        description="绑定校验：身份证号后 4~6 位",
+    )
 
 
 class WorkNoLoginRequest(BaseModel):
@@ -24,6 +31,10 @@ class ChangePasswordRequest(BaseModel):
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str | None = None
 
 
 class TokenResponse(BaseModel):

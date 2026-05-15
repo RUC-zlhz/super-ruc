@@ -91,7 +91,7 @@ function Get-KingbaseRuntimeConfig {
         BootstrapDatabase  = $bootstrapDatabase
         DbMode             = $normalizedDbMode
         KingbaseConfigPath = Join-Path $dataDir "kingbase.conf"
-        UvCacheDir         = Join-Path $repoRoot ".uv-cache"
+        UvCacheDir         = Join-Path $backendRoot ".tmp\uv-cache-kingbase-gate"
     }
 
     $config | Add-Member -NotePropertyName AppDsn -NotePropertyValue (

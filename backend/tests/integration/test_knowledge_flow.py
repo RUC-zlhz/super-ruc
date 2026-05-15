@@ -6,6 +6,10 @@
 from __future__ import annotations
 
 from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.audit.models import AuditLog
 
 
 async def test_list_categories_anonymous(client: AsyncClient) -> None:
@@ -101,19 +105,103 @@ async def test_admin_endpoint_rejects_unauthenticated(client: AsyncClient) -> No
     assert resp.status_code == 401
 
 
-async def test_admin_endpoint_rejects_student_role(client: AsyncClient) -> None:
+async def test_admin_endpoint_rejects_student_role(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
     """普通学生不能维护知识库 → 403。"""
-    from app.core.security import create_token
+    from app.auth.models import Student
 
-    student_token = create_token(
-        "999", "access", extra_claims={"roles": ["STUDENT"]}
+    db.add(Student(student_no="2022110199", full_name="测试学生Z"))
+    await db.commit()
+    login = await client.post(
+        "/api/v1/auth/wx-login",
+        json={
+            "code": "wx_code_knowledge_student",
+            "student_no": "2022110199",
+            "full_name": "测试学生Z",
+        },
     )
+    student_token = login.json()["data"]["access_token"]
     resp = await client.post(
         "/api/v1/admin/knowledge/sources",
         headers={"Authorization": f"Bearer {student_token}"},
         json={"source_name": "x"},
     )
     assert resp.status_code == 403
+
+
+async def test_official_source_requires_url_and_writes_audit(
+    admin_client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    rejected = await admin_client.post(
+        "/api/v1/admin/knowledge/sources",
+        json={
+            "source_name": "无链接官方来源",
+            "is_official": True,
+        },
+    )
+    assert rejected.status_code == 422, rejected.text
+
+    draft_source = await admin_client.post(
+        "/api/v1/admin/knowledge/sources",
+        json={
+            "source_name": "待核验来源",
+            "is_official": False,
+        },
+    )
+    assert draft_source.status_code == 200, draft_source.text
+    draft_mark_official = await admin_client.patch(
+        f"/api/v1/admin/knowledge/sources/{draft_source.json()['data']['id']}",
+        json={"is_official": True},
+    )
+    assert draft_mark_official.status_code == 422, draft_mark_official.text
+
+    created = await admin_client.post(
+        "/api/v1/admin/knowledge/sources",
+        json={
+            "source_name": "学院官网来源",
+            "source_url": "https://info.ruc.edu.cn/service",
+            "is_official": True,
+        },
+    )
+    assert created.status_code == 200, created.text
+    source_id = created.json()["data"]["id"]
+
+    create_log = (
+        await db.execute(
+            select(AuditLog).where(
+                AuditLog.action == "CREATE_KNOWLEDGE_SOURCE",
+                AuditLog.entity_id == source_id,
+            )
+        )
+    ).scalar_one_or_none()
+    assert create_log is not None
+    assert create_log.result_code == "SUCCESS"
+
+    blocked_update = await admin_client.patch(
+        f"/api/v1/admin/knowledge/sources/{source_id}",
+        json={"source_url": None},
+    )
+    assert blocked_update.status_code == 422, blocked_update.text
+
+    updated = await admin_client.patch(
+        f"/api/v1/admin/knowledge/sources/{source_id}",
+        json={"source_url": "https://info.ruc.edu.cn/service/v2"},
+    )
+    assert updated.status_code == 200, updated.text
+
+    update_log = (
+        await db.execute(
+            select(AuditLog).where(
+                AuditLog.action == "UPDATE_KNOWLEDGE_SOURCE",
+                AuditLog.entity_id == source_id,
+            )
+        )
+    ).scalar_one_or_none()
+    assert update_log is not None
+    assert update_log.result_code == "SUCCESS"
 
 
 async def test_ai_match_fallback_to_keyword(admin_client: AsyncClient) -> None:

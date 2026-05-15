@@ -185,6 +185,12 @@ async def test_transcript_pdf_review_commit_writes_formal_records(
     )
     await db.commit()
 
+    detail = await admin_client.get(f"/api/v1/admin/exchange/imports/{batch.id}")
+    assert detail.status_code == 200, detail.text
+    detail_data = detail.json()["data"]
+    assert detail_data["batch"]["summary"]["student_id"] == student.id
+    assert detail_data["batch"]["summary"]["review_required"] is True
+
     commit = await admin_client.post(
         f"/api/v1/admin/report/transcript-pdf-reviews/{batch.id}/commit",
         json={
@@ -206,6 +212,13 @@ async def test_transcript_pdf_review_commit_writes_formal_records(
     data = commit.json()["data"]
     assert data["status"] == BATCH_STATUS_COMMITTED
     assert data["formal_records_written"] == 1
+
+    committed_detail = await admin_client.get(f"/api/v1/admin/exchange/imports/{batch.id}")
+    assert committed_detail.status_code == 200, committed_detail.text
+    committed_summary = committed_detail.json()["data"]["batch"]["summary"]
+    assert committed_summary["formal_records_written"] == 1
+    assert committed_summary["review_note"] == "人工核验通过"
+    assert committed_summary["reviewed_at"]
 
     record = (
         await db.execute(

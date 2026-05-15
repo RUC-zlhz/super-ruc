@@ -27,6 +27,7 @@ class ImportBatchBrief(BaseModel):
     started_at: datetime
     finished_at: datetime | None
     note: str | None
+    summary: dict[str, Any] | None = None
 
 
 class ImportBatchRowOut(BaseModel):
@@ -50,7 +51,7 @@ class ImportCommitIn(BaseModel):
 
 
 class ImportPreviewResult(BaseModel):
-    batch: ImportBatchBrief
+    batch: ImportBatchDetail
     rows: list[ImportBatchRowOut]
 
 

@@ -20,7 +20,7 @@ from app.auth.role_codes import normalize_role_code, normalize_role_codes
 from app.auth.schemas import RoleInfo, TokenResponse, UserInfo
 from app.core.config import settings
 from app.core.exceptions import AuthError, BizError, NotFoundError
-from app.core.security import create_token, hash_password, verify_password
+from app.core.security import create_token, decrypt_field, hash_password, verify_password
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,44 @@ def _is_initial_admin_password(user: User) -> bool:
         and bool(user.password_hash)
         and verify_password(INITIAL_ADMIN_PLAIN, user.password_hash)
     )
+
+
+def _clean_optional(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
+def _claims_token_version(claims: dict) -> int:
+    try:
+        return int(claims.get("ver", 0))
+    except (TypeError, ValueError) as exc:
+        raise AuthError("令牌版本无效") from exc
+
+
+def _validate_student_binding_factor(
+    student,
+    *,
+    full_name: str | None,
+    id_card_tail: str | None,
+) -> None:
+    if not full_name and not id_card_tail:
+        raise BizError("绑定学号需填写学生姓名或身份证号后 6 位", code=40072)
+
+    if full_name and full_name != student.full_name.strip():
+        raise AuthError("学生绑定信息不匹配")
+
+    if student.id_card_enc:
+        if not id_card_tail:
+            raise BizError("该学生主档已配置身份证号，绑定时需填写身份证号后 6 位", code=40072)
+        raw_id_card = decrypt_field(student.id_card_enc)
+        if not raw_id_card or not raw_id_card.endswith(id_card_tail):
+            raise AuthError("学生绑定信息不匹配")
+        return
+
+    if id_card_tail and not full_name:
+        raise BizError("该学生主档未配置身份证号，请填写学生姓名完成绑定", code=40072)
 
 
 # ---------- 微信 ----------
@@ -129,11 +167,11 @@ async def build_user_info(db: AsyncSession, user: User) -> UserInfo:
 async def _build_token_response(db: AsyncSession, user: User) -> TokenResponse:
     roles_rows = await repo.list_user_roles(db, user.id)
     role_codes = normalize_role_codes(r.role_code for r in roles_rows)
-    claims: dict = {"roles": role_codes}
+    claims: dict = {"roles": role_codes, "ver": user.token_version}
     if user.student_id:
         claims["sid"] = user.student_id
     access = create_token(str(user.id), "access", extra_claims=claims)
-    refresh = create_token(str(user.id), "refresh")
+    refresh = create_token(str(user.id), "refresh", extra_claims={"ver": user.token_version})
     return TokenResponse(
         access_token=access,
         refresh_token=refresh,
@@ -148,26 +186,57 @@ async def login_with_wechat(
     *,
     code: str,
     student_no: str | None = None,
+    full_name: str | None = None,
+    id_card_tail: str | None = None,
     ip: str | None = None,
 ) -> TokenResponse:
     session_data = await wx_code2session(code)
     openid = session_data["openid"]
-    normalized_student_no = student_no.strip() if student_no else None
+    normalized_student_no = _clean_optional(student_no)
+    normalized_full_name = _clean_optional(full_name)
+    normalized_id_card_tail = _clean_optional(id_card_tail)
 
     user = await repo.get_user_by_openid(db, openid)
+    if user is not None and not user.is_active:
+        await log_action(
+            db,
+            event_type="AUTH",
+            entity_code="USER",
+            action="LOGIN_WX",
+            entity_id=user.id,
+            actor_user_id=user.id,
+            result_code="FAIL",
+            ip_address=ip,
+            message="账号已停用",
+        )
+        await db.commit()
+        raise AuthError("账号已停用")
+
+    student = None
+    if normalized_student_no:
+        student = await repo.get_student_by_no(db, normalized_student_no)
+        if student is None:
+            raise NotFoundError(f"学号 {normalized_student_no} 未在学生主档中，无法绑定")
+        _validate_student_binding_factor(
+            student,
+            full_name=normalized_full_name,
+            id_card_tail=normalized_id_card_tail,
+        )
+        bound_user = await repo.get_user_by_student_id(db, student.id)
+        if bound_user is not None and (user is None or bound_user.id != user.id):
+            raise BizError("该学生已绑定其他微信账号，请联系学院老师处理", code=40901, http_status=409)
+
     if user is None:
         user = await repo.create_user_from_wechat(
             db, openid=openid, unionid=session_data.get("unionid")
         )
 
     if user.student_id is None:
-        if normalized_student_no:
-            student = await repo.get_student_by_no(db, normalized_student_no)
-            if student is None:
-                raise NotFoundError(f"学号 {normalized_student_no} 未在学生主档中，无法绑定")
+        if student is not None:
             user.student_id = student.id
             user.student = student
             user.display_name = student.full_name or user.display_name
+            user.token_version += 1
             await db.flush()
             await repo.ensure_user_role(db, user_id=user.id, role_code=ROLE_STUDENT)
             await repo.remove_user_role(db, user_id=user.id, role_code=ROLE_GUEST)
@@ -183,8 +252,12 @@ async def login_with_wechat(
                 auto_flush=False,
             )
         else:
+            if normalized_full_name or normalized_id_card_tail:
+                raise BizError("绑定学生时请同时填写学号", code=40072)
             await repo.ensure_user_role(db, user_id=user.id, role_code=ROLE_GUEST)
     else:
+        if student is not None and user.student_id != student.id:
+            raise BizError("当前微信已绑定其他学号，不能重复绑定", code=40902, http_status=409)
         await repo.ensure_user_role(db, user_id=user.id, role_code=ROLE_STUDENT)
         await repo.remove_user_role(db, user_id=user.id, role_code=ROLE_GUEST)
 
@@ -291,6 +364,34 @@ async def change_password(
     return await build_user_info(db, user)
 
 
+async def logout(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    refresh_token: str | None = None,
+    ip: str | None = None,
+) -> None:
+    user = await repo.get_user_by_id(db, user_id)
+    if user is None or user.deleted_at is not None:
+        raise AuthError("用户不存在")
+    user.token_version += 1
+    await log_action(
+        db,
+        event_type="AUTH",
+        entity_code="USER",
+        action="LOGOUT",
+        entity_id=user.id,
+        actor_user_id=user.id,
+        ip_address=ip,
+        detail={
+            "refresh_token_present": bool(refresh_token),
+            "revoked_account_tokens": True,
+        },
+        auto_flush=False,
+    )
+    await db.commit()
+
+
 async def update_enrollment_status(
     db: AsyncSession,
     student_id: int,
@@ -359,4 +460,6 @@ async def refresh_access_token(db: AsyncSession, refresh_token: str) -> TokenRes
     user = await repo.get_user_by_id(db, user_id)
     if user is None or user.deleted_at is not None or not user.is_active:
         raise AuthError("用户不存在或已停用")
+    if _claims_token_version(claims) != user.token_version:
+        raise AuthError("刷新令牌已失效，请重新登录")
     return await _build_token_response(db, user)

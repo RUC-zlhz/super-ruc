@@ -10,6 +10,8 @@ export type ImportType =
   | 'course-equiv'
   | 'course-offering'
 
+export const TRANSCRIPT_PDF_REVIEW_IMPORT_TYPE = 'TRANSCRIPT_PDF_REVIEW'
+
 export interface DefaultImportResult {
   import_type: string
   total_rows: number
@@ -37,6 +39,8 @@ export interface ImportBatchBrief {
   fatal_rows: number
   started_at: string
   finished_at?: string | null
+  summary?: Record<string, any> | null
+  note?: string | null
 }
 
 export interface ImportBatchRowOut {
@@ -52,6 +56,28 @@ export interface ImportBatchRowOut {
 export interface ImportPreviewResult {
   batch: ImportBatchBrief
   rows: ImportBatchRowOut[]
+}
+
+export interface TranscriptPdfReviewRecord {
+  line_no?: number | null
+  course_code: string
+  course_name: string
+  credits?: number
+  term_code: string
+  score?: number | null
+  grade_letter?: string | null
+  pass_flag: boolean
+  note?: string | null
+}
+
+export interface TranscriptPdfReviewCommitResult {
+  batch_id: number
+  batch_no: string
+  status: string
+  student_id: number
+  student_no: string
+  formal_records_written: number
+  committed_at: string
 }
 
 export function uploadImport(type: ImportType, file: File) {
@@ -115,4 +141,17 @@ export function downloadTranscripts(filename = 'transcripts.xlsx') {
 }
 export function downloadCurriculum(filename = 'curriculum.xlsx') {
   return downloadFile('/admin/exchange/exports/curriculum', filename)
+}
+
+export function commitTranscriptPdfReview(
+  batchId: number,
+  payload: {
+    records: TranscriptPdfReviewRecord[]
+    note?: string | null
+  },
+) {
+  return post<ApiEnvelope<TranscriptPdfReviewCommitResult>>(
+    `/admin/report/transcript-pdf-reviews/${batchId}/commit`,
+    payload,
+  )
 }

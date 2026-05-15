@@ -34,10 +34,17 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   })
 
-  async function wxLogin(code: string, studentNo?: string) {
+  async function wxLogin(
+    code: string,
+    studentNo?: string,
+    fullName?: string,
+    idCardTail?: string,
+  ) {
     const resp = await post<TokenResponse>('/auth/wx-login', {
       code,
       student_no: studentNo?.trim() || undefined,
+      full_name: fullName?.trim() || undefined,
+      id_card_tail: idCardTail?.trim() || undefined,
     })
     setToken(resp.data.access_token)
     uni.setStorageSync('sip.refresh_token', resp.data.refresh_token)
@@ -76,10 +83,17 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function logout() {
+    const refreshToken = uni.getStorageSync('sip.refresh_token') || undefined
+    const remoteLogout = getToken()
+      ? post<{ revoked: boolean }>('/auth/logout', {
+          refresh_token: refreshToken,
+        }).catch(() => undefined)
+      : null
     user.value = null
     tokenPresent.value = false
     setToken(null)
     uni.removeStorageSync('sip.refresh_token')
+    if (remoteLogout) void remoteLogout
   }
 
   return { user, isLoggedIn, wxLogin, fetchMe, logout }

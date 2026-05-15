@@ -5,7 +5,14 @@ import {
 } from "vue-router";
 import { useAuthStore } from "@/store/auth";
 import { getDefaultRouteForRoles } from "@/config/navigation";
-import { hasAnyRole } from "@/utils/permission";
+import {
+  APPROVER_ROLES,
+  AUDIT_VIEWER_ROLES,
+  CONTENT_EDITOR_ROLES,
+  CURRICULUM_ADMIN_ROLES,
+  SYSTEM_USER_ROLES,
+  hasAnyRole,
+} from "@/utils/permission";
 
 const MainLayout = () => import("@/layouts/MainLayout.vue");
 
@@ -33,13 +40,13 @@ const routes: RouteRecordRaw[] = [
         path: "approval/workbench",
         name: "approval-workbench",
         component: () => import("@/views/approval/WorkbenchList.vue"),
-        meta: { title: "审批工作台" },
+        meta: { title: "审批工作台", roles: APPROVER_ROLES },
       },
       {
         path: "approval/:id",
         name: "approval-detail",
         component: () => import("@/views/approval/ApprovalDetail.vue"),
-        meta: { title: "审批详情" },
+        meta: { title: "审批详情", roles: APPROVER_ROLES },
       },
       {
         path: "workflow/party-stage",
@@ -47,13 +54,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import("@/views/workflow/PartyStageList.vue"),
         meta: {
           title: "党团流程",
-          roles: [
-            "SUPER_ADMIN",
-            "COUNSELOR",
-            "HEAD_TEACHER",
-            "YOUTH_LEAGUE_TEACHER",
-            "PARTY_BUILD_TEACHER",
-          ],
+          roles: CONTENT_EDITOR_ROLES,
         },
       },
       {
@@ -62,44 +63,38 @@ const routes: RouteRecordRaw[] = [
         component: () => import("@/views/workflow/QuizBank.vue"),
         meta: {
           title: "理论自测题库",
-          roles: [
-            "SUPER_ADMIN",
-            "COUNSELOR",
-            "HEAD_TEACHER",
-            "YOUTH_LEAGUE_TEACHER",
-            "PARTY_BUILD_TEACHER",
-          ],
+          roles: CONTENT_EDITOR_ROLES,
         },
       },
       {
         path: "knowledge/entries",
         name: "knowledge-entries",
         component: () => import("@/views/knowledge/EntryList.vue"),
-        meta: { title: "知识条目" },
+        meta: { title: "知识条目", roles: CONTENT_EDITOR_ROLES },
       },
       {
         path: "notice/list",
         name: "notice-list",
         component: () => import("@/views/notice/NoticeList.vue"),
-        meta: { title: "通知中心" },
+        meta: { title: "通知中心", roles: CONTENT_EDITOR_ROLES },
       },
       {
         path: "exchange/import",
         name: "exchange-import",
         component: () => import("@/views/exchange/ImportCenter.vue"),
-        meta: { title: "导入中心", roles: ["SUPER_ADMIN", "COUNSELOR"] },
+        meta: { title: "导入中心", roles: CURRICULUM_ADMIN_ROLES },
       },
       {
         path: "academic/curriculum",
         name: "academic-curriculum",
         component: () => import("@/views/academic/CurriculumRules.vue"),
-        meta: { title: "培养方案" },
+        meta: { title: "培养方案", roles: CURRICULUM_ADMIN_ROLES },
       },
       {
         path: "honor/list",
         name: "honor-list",
         component: () => import("@/views/honor/HonorList.vue"),
-        meta: { title: "荣誉公示" },
+        meta: { title: "荣誉公示", roles: CONTENT_EDITOR_ROLES },
       },
       {
         path: "system/users",
@@ -107,14 +102,14 @@ const routes: RouteRecordRaw[] = [
         component: () => import("@/views/system/UserManage.vue"),
         meta: {
           title: "用户管理",
-          roles: ["SUPER_ADMIN", "COLLEGE_LEADER", "COUNSELOR", "HEAD_TEACHER"],
+          roles: SYSTEM_USER_ROLES,
         },
       },
       {
         path: "audit/log",
         name: "audit-log",
         component: () => import("@/views/audit/AuditLog.vue"),
-        meta: { title: "审计日志", roles: ["SUPER_ADMIN", "COLLEGE_LEADER"] },
+        meta: { title: "审计日志", roles: AUDIT_VIEWER_ROLES },
       },
       {
         path: "profile",
@@ -128,7 +123,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import("@/views/profile/StudentProfile.vue"),
         meta: {
           title: "学生画像",
-          roles: ["SUPER_ADMIN", "COLLEGE_LEADER", "COUNSELOR", "HEAD_TEACHER"],
+          roles: SYSTEM_USER_ROLES,
         },
       },
     ],
