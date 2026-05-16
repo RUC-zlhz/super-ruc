@@ -88,8 +88,15 @@ async def test_default_imports_students_curriculum_and_gap_suggestions(
     assert curriculum_import.status_code == 200, curriculum_import.text
     curriculum_result = curriculum_import.json()["data"]
     assert curriculum_result["import_type"] == "DEFAULT_CURRICULUM"
-    assert curriculum_result["total_rows"] == 6
-    assert curriculum_result["created_count"] == 6
+    assert curriculum_result["total_rows"] == 7
+    assert curriculum_result["created_count"] == 7
+
+    curriculum_reimport = await admin_client.post("/api/v1/admin/default-imports/curriculum")
+    assert curriculum_reimport.status_code == 200, curriculum_reimport.text
+    reimport_result = curriculum_reimport.json()["data"]
+    assert reimport_result["total_rows"] == 7
+    assert reimport_result["created_count"] == 0
+    assert reimport_result["updated_count"] == 7
 
     default_plans = (
         await db.execute(
@@ -104,6 +111,88 @@ async def test_default_imports_students_curriculum_and_gap_suggestions(
         "数据科学与大数据技术",
         "数据科学与大数据技术（理学）",
     }
+    target_default_plans = [
+        plan for plan in default_plans if plan.major_code != "源文件全量课程池"
+    ]
+    plan_credit_expectations = {
+        "计算机科学与技术": 155,
+        "信息管理与信息系统": 153,
+        "软件工程": 156,
+        "信息安全": 155,
+        "数据科学与大数据技术": 155,
+        "数据科学与大数据技术（理学）": 153,
+    }
+    for plan in target_default_plans:
+        assert round(float(plan.total_credits_required or 0), 2) == plan_credit_expectations[plan.major_code]
+        assert len(plan.modules) == 19
+        module_names = {module.module_name for module in plan.modules}
+        assert "公共选修课" in "".join(module_names)
+        assert any("通识课程群" in name for name in module_names)
+    data_science_engineering_codes = {
+        course["code"]
+        for plan in target_default_plans
+        if plan.major_code == "数据科学与大数据技术"
+        for module in plan.modules
+        if module.module_name == "2. 专业核心课"
+        for course in (module.courses or [])
+        if isinstance(course, dict) and course.get("code")
+    }
+    data_science_science_codes = {
+        course["code"]
+        for plan in target_default_plans
+        if plan.major_code == "数据科学与大数据技术（理学）"
+        for module in plan.modules
+        if module.module_name == "2. 专业核心课"
+        for course in (module.courses or [])
+        if isinstance(course, dict) and course.get("code")
+    }
+    assert "BBSEMS0028S" in data_science_engineering_codes
+    assert "BBSEMS0028S" not in data_science_science_codes
+    assert "BSTAMS0030S" in data_science_science_codes
+    assert "BSTAMS0030S" not in data_science_engineering_codes
+    assert data_science_engineering_codes != data_science_science_codes
+    source_coverage_plan = next(plan for plan in default_plans if plan.major_code == "源文件全量课程池")
+    assert source_coverage_plan.is_active is False
+    source_coverage_codes = {
+        course["code"]
+        for module in source_coverage_plan.modules
+        for course in (module.courses or [])
+        if isinstance(course, dict) and course.get("code")
+    }
+    assert len(source_coverage_codes) == 466
+    for source_code in ["BBSMPMA001", "BACYMS0007", "BELLCF0001", "BISYMS0012"]:
+        assert source_code in source_coverage_codes
+    stale_plan = target_default_plans[0]
+    stale_update = await admin_client.patch(
+        f"/api/v1/admin/curriculum/plans/{stale_plan.id}",
+        json={
+            "grade_code": stale_plan.grade_code,
+            "major_code": stale_plan.major_code,
+            "plan_name": stale_plan.plan_name,
+            "version_label": stale_plan.version_label,
+            "total_credits_required": float(stale_plan.total_credits_required or 0),
+            "effective_from": stale_plan.effective_from.isoformat()
+            if stale_plan.effective_from
+            else None,
+            "is_active": stale_plan.is_active,
+            "note": stale_plan.note,
+            "expected_updated_at": "2000-01-01T00:00:00+00:00",
+            "modules": [
+                {
+                    "module_code": module.module_code,
+                    "module_name": module.module_name,
+                    "module_type": module.module_type,
+                    "credits_required": float(module.credits_required or 0),
+                    "courses": module.courses or [],
+                    "note": module.note,
+                    "sort_order": module.sort_order,
+                }
+                for module in stale_plan.modules
+            ],
+        },
+    )
+    assert stale_update.status_code == 409
+    assert stale_update.json()["code"] == 40915
     refreshed_non_default = (
         await db.execute(
             select(CurriculumPlan).where(CurriculumPlan.version_label == "teacher-v1")
@@ -131,7 +220,7 @@ async def test_default_imports_students_curriculum_and_gap_suggestions(
         if isinstance(course, dict) and course.get("code")
     }
     assert "BISYMS0012" in all_course_codes
-    assert "BCSAMSS0001S" not in all_course_codes
+    assert "BCSAMSS0001S" in all_course_codes
 
     gap_student = Student(
         student_no="S12-GAP-001",

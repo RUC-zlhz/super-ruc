@@ -30,6 +30,7 @@ _DEFAULT_CURRICULUM_PATH = (
 )
 _DEFAULT_GRADE_CODE = "2024"
 _DEFAULT_VERSION_LABEL = "2024-default"
+_SOURCE_COVERAGE_MAJOR_CODE = "源文件全量课程池"
 _TARGET_MAJORS = [
     "计算机科学与技术专业",
     "信息管理与信息系统专业",
@@ -38,6 +39,72 @@ _TARGET_MAJORS = [
     "数据科学与大数据技术专业",
     "数据科学与大数据技术（理学）专业",
 ]
+_PLAN_TOTAL_CREDITS = {
+    "计算机科学与技术": 155.0,
+    "信息管理与信息系统": 153.0,
+    "软件工程": 156.0,
+    "信息安全": 155.0,
+    "数据科学与大数据技术": 155.0,
+    "数据科学与大数据技术（理学）": 153.0,
+}
+_PERSONALIZED_ELECTIVE_CREDITS = {
+    "计算机科学与技术": 18.0,
+    "信息管理与信息系统": 22.0,
+    "软件工程": 18.0,
+    "信息安全": 18.0,
+    "数据科学与大数据技术": 19.0,
+    "数据科学与大数据技术（理学）": 16.0,
+}
+_PROFESSIONAL_CORE_CREDITS = {
+    "计算机科学与技术": 46.0,
+    "信息管理与信息系统": 40.0,
+    "软件工程": 47.0,
+    "信息安全": 46.0,
+    "数据科学与大数据技术": 45.0,
+    "数据科学与大数据技术（理学）": 46.0,
+}
+_COMMON_CREDIT_OVERRIDES = (
+    ("思想政治理论课", 21.0),
+    ("公共外语", 6.0),
+    ("公共体育", 4.0),
+    ("新生研讨课", 2.0),
+    ("心理健康教育", 2.0),
+    ("部类核心课", 26.0),
+    ("研究训练", 2.0),
+    ("专业实习", 4.0),
+    ("毕业论文", 4.0),
+    ("劳动教育", 1.0),
+    ("军事课", 4.0),
+    ("职业生涯规划", 1.0),
+    ("志愿服务", 2.0),
+)
+_REQUIREMENT_ONLY_MODULES = (
+    ("GENERAL-ELECTIVE", "通识课程群（通识核心课、一般通识课）", "GENERAL", 6.0),
+    ("AESTHETIC", "美育课程", "GENERAL", 2.0),
+    ("INTERNATIONAL-SUMMER", "国际暑期学校全英文课", "GENERAL", 2.0),
+    ("PUBLIC-ELECTIVE", "公共选修课", "ELECTIVE", 2.0),
+)
+_DATA_SCIENCE_SCIENCE_FEATURE_CODES = {
+    "BSTAMS0030S",
+    "BSTAMS0022",
+    "BBSMMSB005",
+    "BSTAMS0010S",
+    "BBSMMS0007",
+    "BPTMMS0004",
+    "BORCMS0004S",
+    "BSTAMS0026S",
+}
+_DATA_SCIENCE_ENGINEERING_FEATURE_CODES = {
+    "BBSEMS0006S",
+    "BCSAMSS0005S",
+    "BCSAMSB001S",
+    "BCSTMSA004",
+    "BCSTMS0002S",
+    "BCSTMSB007S",
+    "BBSEMS0028S",
+    "BISYMS0005S",
+    "BCSTMS0008S",
+}
 _COURSE_CODE_RE = re.compile(r"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z][A-Za-z0-9_-]{4,}$")
 _NUMBER_RE = re.compile(r"\d+(?:\.\d+)?")
 
@@ -242,6 +309,8 @@ def _extract_course_modules(
     *,
     scope: str,
     major_name: str | None = None,
+    include_shared_without_major: bool = False,
+    include_all_major_rows: bool = False,
 ) -> list[dict[str, Any]]:
     modules: list[dict[str, Any]] = []
     for seq, match in enumerate(re.finditer(r"<table>.*?</table>", section, flags=re.S), start=1):
@@ -265,14 +334,14 @@ def _extract_course_modules(
             if max(required_indices) >= len(row):
                 continue
             if major_idx is not None:
-                if major_name is None:
+                if major_name is None and not include_all_major_rows:
                     continue
-                if major_idx >= len(row):
+                if major_idx >= len(row) and not include_all_major_rows:
                     continue
-                row_major = _major_alias_key(row[major_idx])
-                if row_major != normalized_major_name:
+                row_major = _major_alias_key(row[major_idx]) if major_idx < len(row) else ""
+                if major_name is not None and row_major != normalized_major_name:
                     continue
-            elif major_name is not None:
+            elif major_name is not None and not include_shared_without_major:
                 continue
             name = _clean_text(row[name_idx])
             code = _clean_text(row[code_idx]).replace(" ", "")
@@ -310,6 +379,148 @@ def _extract_course_modules(
     return modules
 
 
+def _extract_source_coverage_modules(text: str) -> list[dict[str, Any]]:
+    modules = _extract_course_modules(
+        text,
+        scope="SOURCE",
+        include_all_major_rows=True,
+    )
+    normalized = _merge_same_named_modules(modules)
+    for sort_order, module in enumerate(normalized, start=1):
+        module["module_code"] = _module_code(
+            "SOURCE",
+            str(module.get("module_name") or "课程模块"),
+            sort_order,
+        )
+        module["module_type"] = str(module.get("module_type") or "OTHER")
+        module["credits_required"] = round(
+            sum(float(course.get("credits") or 0) for course in module.get("courses") or []),
+            2,
+        )
+        module["note"] = "默认导入：源文件全量课程池，用于完整保存 2024_information.md 中可解析课程。"
+        module["sort_order"] = sort_order
+    return normalized
+
+
+def _normalize_default_modules(
+    modules: list[dict[str, Any]],
+    *,
+    major_code: str,
+) -> list[dict[str, Any]]:
+    modules = _filter_data_science_variant_modules(modules, major_code=major_code)
+    modules = _merge_same_named_modules([*modules, *_requirement_only_modules(major_code)])
+    normalized: list[dict[str, Any]] = []
+    for sort_order, module in enumerate(modules, start=1):
+        item = dict(module)
+        title = str(item.get("module_name") or "")
+        for keyword, credits in _COMMON_CREDIT_OVERRIDES:
+            if keyword in title:
+                item["credits_required"] = credits
+                break
+        if "个性化选修课" in title:
+            item["credits_required"] = _PERSONALIZED_ELECTIVE_CREDITS.get(
+                major_code,
+                float(item.get("credits_required") or 0),
+            )
+            item["module_type"] = "ELECTIVE"
+        if "专业核心课" in title:
+            item["credits_required"] = _PROFESSIONAL_CORE_CREDITS.get(
+                major_code,
+                float(item.get("credits_required") or 0),
+            )
+        item["sort_order"] = sort_order
+        normalized.append(item)
+    return normalized
+
+
+def _filter_data_science_variant_modules(
+    modules: list[dict[str, Any]],
+    *,
+    major_code: str,
+) -> list[dict[str, Any]]:
+    if major_code not in {"数据科学与大数据技术", "数据科学与大数据技术（理学）"}:
+        return modules
+    feature_codes = (
+        _DATA_SCIENCE_SCIENCE_FEATURE_CODES
+        if major_code == "数据科学与大数据技术（理学）"
+        else _DATA_SCIENCE_ENGINEERING_FEATURE_CODES
+    )
+    filtered: list[dict[str, Any]] = []
+    for module in modules:
+        item = dict(module)
+        courses = list(item.get("courses") or [])
+        if item.get("module_name") == "2. 专业核心课":
+            variant_courses = [
+                course
+                for course in courses
+                if str(course.get("code") or "") not in (
+                    _DATA_SCIENCE_SCIENCE_FEATURE_CODES
+                    | _DATA_SCIENCE_ENGINEERING_FEATURE_CODES
+                )
+                or str(course.get("code") or "") in feature_codes
+            ]
+            item["courses"] = variant_courses
+            item["credits_required"] = round(
+                sum(float(course.get("credits") or 0) for course in variant_courses),
+                2,
+            )
+        filtered.append(item)
+    return filtered
+
+
+def _requirement_only_modules(major_code: str) -> list[dict[str, Any]]:
+    return [
+        {
+            "module_code": f"REQ-{code}",
+            "module_name": name,
+            "module_type": module_type,
+            "credits_required": credits,
+            "courses": [],
+            "note": (
+                "默认导入：源培养方案仅给出最低学分要求，未提供固定课程编码；"
+                "需教师维护课程白名单或以人工核验为准。"
+            ),
+            "sort_order": 900 + index,
+        }
+        for index, (code, name, module_type, credits) in enumerate(
+            _REQUIREMENT_ONLY_MODULES,
+            start=1,
+        )
+    ]
+
+
+def _merge_same_named_modules(modules: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged: list[dict[str, Any]] = []
+    by_name: dict[str, dict[str, Any]] = {}
+    for module in modules:
+        name = str(module.get("module_name") or "")
+        if name not in by_name:
+            item = dict(module)
+            item["courses"] = list(module.get("courses") or [])
+            by_name[name] = item
+            merged.append(item)
+            continue
+        item = by_name[name]
+        seen_codes = {
+            str(course.get("code") or "")
+            for course in item.get("courses") or []
+            if isinstance(course, dict)
+        }
+        for course in module.get("courses") or []:
+            if not isinstance(course, dict):
+                continue
+            code = str(course.get("code") or "")
+            if not code or code in seen_codes:
+                continue
+            item.setdefault("courses", []).append(course)
+            seen_codes.add(code)
+        item["credits_required"] = round(
+            sum(float(course.get("credits") or 0) for course in item.get("courses") or []),
+            2,
+        )
+    return merged
+
+
 def _normalize_major_name(major_heading: str) -> str:
     return _clean_text(major_heading).removesuffix("专业")
 
@@ -317,11 +528,6 @@ def _normalize_major_name(major_heading: str) -> str:
 def _major_alias_key(value: str) -> str:
     text = _clean_text(value).removesuffix("专业")
     text = re.sub(r"\s*\^.*$", "", text)
-    while True:
-        stripped = re.sub(r"[\(（][^()（）]*[\)）]$", "", text).strip()
-        if stripped == text:
-            break
-        text = stripped
     return text
 
 
@@ -465,16 +671,25 @@ async def import_default_curriculum(
     warnings: list[str] = []
     for major_heading in _TARGET_MAJORS:
         major_code = _normalize_major_name(major_heading)
+        course_table_major_name = (
+            "数据科学与大数据技术"
+            if major_code == "数据科学与大数据技术（理学）"
+            else major_code
+        )
         major_modules = _extract_course_modules(
             professional_text,
             scope=major_code,
-            major_name=major_code,
+            major_name=course_table_major_name,
+            include_shared_without_major=True,
         )
         if not major_modules:
             skipped += 1
             warnings.append(f"未找到专业课程模块：{major_heading}")
             continue
-        modules = [dict(module) for module in common_modules] + major_modules
+        modules = _normalize_default_modules(
+            [dict(module) for module in common_modules] + major_modules,
+            major_code=major_code,
+        )
         if not modules:
             skipped += 1
             warnings.append(f"专业 {major_heading} 未解析出课程模块")
@@ -492,7 +707,7 @@ async def import_default_curriculum(
                 "major_code": major_code,
                 "plan_name": f"{_DEFAULT_GRADE_CODE}级{major_code}专业培养方案（默认）",
                 "version_label": _DEFAULT_VERSION_LABEL,
-                "total_credits_required": None,
+                "total_credits_required": _PLAN_TOTAL_CREDITS.get(major_code),
                 "effective_from": datetime(2024, 9, 1, tzinfo=UTC).date(),
                 "is_active": True,
                 "note": (
@@ -502,6 +717,40 @@ async def import_default_curriculum(
             },
         )
         await repo.set_plan_modules(db, plan.id, modules)
+        if existing is None:
+            created += 1
+        else:
+            updated += 1
+
+    source_coverage_modules = _extract_source_coverage_modules(text)
+    if not source_coverage_modules:
+        skipped += 1
+        warnings.append("未解析出源文件全量课程池")
+    else:
+        total += 1
+        existing = await _get_default_plan(
+            db,
+            grade_code=_DEFAULT_GRADE_CODE,
+            major_code=_SOURCE_COVERAGE_MAJOR_CODE,
+        )
+        plan = await repo.create_or_update_plan(
+            db,
+            {
+                "grade_code": _DEFAULT_GRADE_CODE,
+                "major_code": _SOURCE_COVERAGE_MAJOR_CODE,
+                "plan_name": f"{_DEFAULT_GRADE_CODE}级培养方案源文件全量课程池（默认）",
+                "version_label": _DEFAULT_VERSION_LABEL,
+                "total_credits_required": None,
+                "effective_from": datetime(2024, 9, 1, tzinfo=UTC).date(),
+                "is_active": False,
+                "note": (
+                    "S19 默认导入补充记录，用于完整保存 "
+                    "docs/source/training program/2024_information.md 中可解析课程；"
+                    "不参与学生学业缺口自动匹配。"
+                ),
+            },
+        )
+        await repo.set_plan_modules(db, plan.id, source_coverage_modules)
         if existing is None:
             created += 1
         else:

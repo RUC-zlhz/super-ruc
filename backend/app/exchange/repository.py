@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -280,12 +280,9 @@ async def delete_plan(db: AsyncSession, plan: CurriculumPlan) -> None:
 async def set_plan_modules(
     db: AsyncSession, plan_id: int, modules: list[dict[str, Any]]
 ) -> list[CurriculumModule]:
-    # 简单策略：清空再写入
-    existing = (await db.execute(
-        select(CurriculumModule).where(CurriculumModule.plan_id == plan_id)
-    )).scalars().all()
-    for m in existing:
-        await db.delete(m)
+    # 先落库删除旧模块，再插入新模块，避免同事务内触发 plan_id/module_code 唯一约束。
+    await db.execute(delete(CurriculumModule).where(CurriculumModule.plan_id == plan_id))
+    await db.flush()
     created: list[CurriculumModule] = []
     for m in modules:
         row = CurriculumModule(plan_id=plan_id, **m)

@@ -627,6 +627,7 @@ async def upsert_plan_with_modules(
     operator_id: int,
     operator_role: str | None,
 ) -> int:
+    payload.pop("expected_updated_at", None)
     modules = payload.pop("modules", []) or []
     plan = await repo.create_or_update_plan(db, payload)
     await repo.set_plan_modules(

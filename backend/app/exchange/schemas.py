@@ -109,6 +109,7 @@ class CurriculumPlanIn(BaseModel):
     effective_from: date | None = None
     is_active: bool = True
     note: str | None = None
+    expected_updated_at: datetime | None = None
     modules: list[CurriculumModuleIn] = []
 
 

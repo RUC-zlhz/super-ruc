@@ -345,8 +345,12 @@ body {
   color: var(--ruc-red) !important;
 }
 
-.ant-btn-dangerous {
+.ant-btn-dangerous:not(.ant-btn-primary) {
   color: var(--danger) !important;
+}
+
+.ant-btn-primary.ant-btn-dangerous {
+  color: #fff !important;
 }
 
 .ant-input,

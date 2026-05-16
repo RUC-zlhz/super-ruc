@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S17` 已闭合；后续仅在新确认范围内继续增量推进
+- 当前目标：`S1 ~ S22` 已闭合；后续仅在新确认范围内继续增量推进
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -542,6 +542,114 @@
 - Web 构建：`pnpm -C web build` 通过；仅输出 Dart Sass legacy JS API 弃用警告。
 - Miniapp 验证：`& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；`pnpm -C miniapp build:mp-weixin` 通过。
 
+### S18 Web 危险主按钮对比度修复
+
+- [x] `S18.1` 使用浏览器检查当前 Web 管理端，定位红底红字按钮来源。
+- [x] `S18.2` 检索 Web 端 `primary + danger` 按钮组合，确认当前静态命中点。
+- [x] `S18.3` 在全局主题中修复危险主按钮文字颜色覆盖规则。
+- [x] `S18.4` 回归个人信息页与审计日志页按钮计算样式，并通过 Web 构建验证。
+
+出口条件：
+
+- 个人信息页 `退出登录` 和审计日志页 `执行归档` 均为红底白字。
+- 普通危险按钮仍保持红色危险语义。
+- Web 类型检查与构建通过。
+
+当前结论：
+
+- `S18` 已完成；Web 管理端 `primary + danger` 按钮不再出现红底红字对比度问题。
+
+证据：
+
+- `web/src/styles/theme.scss` 已将 `.ant-btn-dangerous` 限定为非 primary，并为 `.ant-btn-primary.ant-btn-dangerous` 明确设置白色文字。
+- 浏览器检查：`http://127.0.0.1:5174/profile` 的 `退出登录` 计算样式为红色渐变背景、`rgb(255, 255, 255)` 文字；`http://127.0.0.1:5174/audit/log` 的 `执行归档` 同样为红色渐变背景、白色文字。
+- 静态检索：当前 `web/src` 静态 `primary + danger` 组合命中为 `Profile.vue` 与 `AuditLog.vue` 两处，均受全局规则覆盖。
+- Web 构建：`pnpm -C web build` 通过；仅输出 Dart Sass legacy JS API 弃用警告。
+
+### S19 默认培养方案完整导入修复
+
+- [x] `S19.1` 审查 `docs/source/training program/2024_information.md` 与现有默认培养方案导入器，确认旧逻辑漏导专业模块共享课程池、个性化选修和实践/素拓课程。
+- [x] `S19.2` 扩展默认导入解析，专业方案导入时纳入无专业列的共享课程表，同时保留按专业列过滤专业核心课。
+- [x] `S19.3` 按源培养方案最低学分要求写入 `total_credits_required`、专业核心、个性化选修和 requirement-only 模块，避免把全部可选课程学分错误累计为必修。
+- [x] `S19.4` 增加默认培养方案完整导入回归断言，并完成后端定向集成与静态验证。
+- [x] `S19.5` 新增 `源文件全量课程池` 非 active 默认方案，补齐源文件中不应污染信息学院学业缺口计算的全校共同课、公共数学/外语拓展和其他理工专业核心课程。
+- [x] `S19.6` 按源文档区分数据科学工学/理学专业核心特色模块，并在学业缺口计算中用未归属已修学分抵扣 requirement-only 模块。
+
+当前结论：
+
+- `S19` 已完成；`2024-default` 默认培养方案现在覆盖 6 个目标专业，每个专业生成 19 个模块，模块学分合计与源培养方案总学分对齐；源文件可解析课程编码覆盖为 `466 / 466`；数据科学工学/理学专业核心课程集合已按源文档特色模块分离。
+
+证据：
+
+- `backend/app/exchange/default_imports.py` 已补全专业共享课程表、个性化选修、实践/素拓、无固定课程编码的最低学分模块，以及 `源文件全量课程池` 非 active 方案。
+- `backend/tests/integration/test_s12_gap_closure.py` 已断言 6 个默认方案的总学分、模块数、关键 requirement-only 模块、数据科学工学/理学专业核心差异和 `源文件全量课程池` 的 `466` 个唯一课程编码。
+- 后端定向集成：`UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache-local` 下执行 `uv run pytest tests\integration\test_s12_gap_closure.py -q`，结果 `5 passed in 82.99s`。
+- 后端静态校验：`uv run ruff check app\exchange\default_imports.py tests\integration\test_s12_gap_closure.py` 通过；`uv run python -m py_compile app\exchange\default_imports.py tests\integration\test_s12_gap_closure.py` 通过。
+
+### S20 成绩单 PDF 解析正确性修复
+
+- [x] `S20.1` 将 `pypdf` 加入后端正式依赖和锁文件，避免默认后端环境缺少 PDF 文本解析能力。
+- [x] `S20.2` 新增 RUC 成绩单文本层解析分支，支持单字拆行课程名、学期标题和无课程代码成绩行。
+- [x] `S20.3` 保留原有课程代码解析兜底，并维持“学生上传只生成教师核验候选、不直接写正式成绩”的边界。
+- [x] `S20.4` 补单元测试和上传边界回归，复核小程序学业页上传结果字段可继续展示解析候选。
+- [x] `S20.5` 将 RUC 成绩单学期归一为系统可提交的 `YYYY-FALL / YYYY-SPRING` 格式，并收紧人工核验原文摘要。
+
+出口条件：
+
+- `D:\Downloads\1778947112713.pdf` 这类 RUC 成绩单不再解析为 `0` 条候选。
+- 学生上传后仍只进入 `TRANSCRIPT_PDF_REVIEW` / `PENDING_REVIEW`，`formal_records_written = 0`。
+
+当前结论：
+
+- `S20` 已完成；真实 RUC 成绩单文本层可识别 `34` 条待核验课程候选，候选学期码与审核提交链路兼容，并继续保持教师核验前不写正式成绩的安全边界。
+
+证据：
+
+- 真实 PDF 本地解析：`D:\Downloads\1778947112713.pdf` 可抽取 `1471` 字文本，修复后识别 `34` 条待核验课程候选。
+- Backend 单元测试：`uv run --project backend --no-sync --extra dev pytest tests/test_transcript_pdf_analysis.py -q`，结果 `2 passed`。
+- Backend 静态校验：`uv run --project backend --no-sync --extra dev ruff check app\report\transcript_pdf.py tests\test_transcript_pdf_analysis.py` 通过；`uv run --project backend --no-sync --extra dev python -m py_compile app\report\transcript_pdf.py tests\test_transcript_pdf_analysis.py` 通过。
+- 上传边界集成测试：`uv run --project backend --no-sync --extra dev pytest tests/integration/test_report_contract_flow.py::test_student_transcript_pdf_upload_creates_review_record_without_formal_grades -q`，结果 `1 passed`。
+- Miniapp 类型检查：`.\web\node_modules\.bin\vue-tsc.CMD --noEmit -p miniapp\tsconfig.json` 通过。
+
+### S21 默认培养方案重复导入落库修复
+
+- [x] `S21.1` 核对 5174 页面实际数据，确认页面仍显示旧库内容：6 个方案、模块数 6/7、总学分为空。
+- [x] `S21.2` 修复 `set_plan_modules()` 覆盖旧模块时未先 flush 删除操作的问题，避免同事务插入相同 `(plan_id, module_code)` 触发唯一约束。
+- [x] `S21.3` 增加二次默认培养方案导入回归断言，确认重复导入不再失败并返回 `updated_count=7`。
+- [x] `S21.4` 对当前 `localhost:8080` 后端连接的 `sip_db` 重跑默认培养方案导入，并刷新 5174 页面验证新数据可见。
+
+当前结论：
+
+- `S21` 已完成；`http://127.0.0.1:5174/academic/curriculum` 旧内容的根因是当前库没有成功完成覆盖式重导入，已修复重复导入幂等性并把当前库更新为新培养方案数据。
+
+证据：
+
+- `backend/app/exchange/repository.py` 的 `set_plan_modules()` 已改为先删除并 flush 旧模块，再插入新模块。
+- 当前库验证：6 个启用 2024 默认专业方案均为 19 个模块且总学分已写入，另有停用的 `源文件全量课程池`。
+- 浏览器验证：5174 培养方案页刷新后显示 `培养方案数 7`、`模块数 19`、专业方案总学分不再为空。
+- 后端定向集成：`UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache-local` 下执行 `uv run pytest tests\integration\test_s12_gap_closure.py -q`，结果 `5 passed in 72.28s`。
+- 后端静态校验：`uv run ruff check app\exchange\repository.py app\exchange\default_imports.py tests\integration\test_s12_gap_closure.py` 通过；`uv run python -m py_compile app\exchange\repository.py app\exchange\default_imports.py tests\integration\test_s12_gap_closure.py` 通过。
+
+### S22 培养方案明细与 CRUD 界面补齐
+
+- [x] `S22.1` 复核后端培养方案接口，确认可复用现有方案级 `GET/POST/PATCH/DELETE`，其中 `PATCH` 支持整份方案连同模块与课程数组覆盖保存。
+- [x] `S22.2` 将模块表改为可展开表格，展示模块内课程编码、课程名称、学分、开课学期和行级操作。
+- [x] `S22.3` 补齐方案新增、方案编辑、方案删除、模块新增、模块编辑、模块删除、课程新增、课程编辑、课程删除入口。
+- [x] `S22.4` 复用现有 `PATCH /admin/curriculum/plans/{id}` 保存模块与课程变更，并完成 Web 构建与浏览器页面检查。
+- [x] `S22.5` 补齐培养方案切换加载态隔离与 `updated_at` 乐观冲突校验，避免旧详情在加载中被误操作或多标签页静默覆盖。
+
+当前结论：
+
+- `S22` 已完成；培养方案页已从只读模块列表升级为可维护工作台，支持点开模块查看课程明细，并支持方案、模块、课程的增删改操作。
+
+证据：
+
+- `web/src/views/academic/CurriculumRules.vue` 已新增方案抽屉、模块弹窗、课程弹窗、模块展开行和对应保存/删除逻辑。
+- Web 构建：`pnpm -C web build` 通过。
+- 后端回归：`UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache-local` 下执行 `uv run pytest tests\integration\test_s12_gap_closure.py -q`，结果 `5 passed in 77.97s`。
+- 浏览器检查：5174 培养方案页已显示 `新增方案`、`新增模块`、`编辑方案`、`删除方案`，模块行已显示课程数量和 `新增课程 / 编辑 / 删除` 操作，表格包含展开入口。
+- 加固回归：培养方案切换时会清空旧详情并等待新详情加载完成后再开放编辑动作；后端 `PATCH /admin/curriculum/plans/{id}` 在 `expected_updated_at` 不匹配时返回 `409` 冲突。
+
 ## 细化文件登记
 
 > 规则：每个新细化文件都要写入本表，且必须关联一个或多个主计划条目编号。
@@ -602,6 +710,11 @@
 | 2026-05-16 | Web 管理端学生画像路由遮蔽缺陷修复 | `docs/notes/refinements/2026-05-16-s15-profile-route-shadow-fix.md` | `S15.1, S15.2, S15.3, S15.4` | `[x]` | 已修复 `/admin/profile/corrections` 被 `/{student_id}` 遮蔽导致学生画像页 422 的问题，定向路由测试 `2 passed` |
 | 2026-05-16 | RUC 校训文案修正 | `docs/notes/refinements/2026-05-16-s16-ruc-motto-copy-fix.md` | `S16.1, S16.2, S16.3` | `[x]` | 已将 Web 管理端侧栏文案修正为 `实事求是`，Web 构建通过并确认旧文案无残留 |
 | 2026-05-16 | 可见文案口径统一 | `docs/notes/refinements/2026-05-16-s17-visible-copy-normalization.md` | `S17.1, S17.2, S17.3, S17.4` | `[x]` | 已统一 Web/Miniapp/Backend 可见文案口径，双端构建通过且高风险旧文案无残留 |
+| 2026-05-16 | Web 危险主按钮对比度修复 | `docs/notes/refinements/2026-05-16-s18-web-danger-primary-button-contrast-fix.md` | `S18.1, S18.2, S18.3, S18.4` | `[x]` | 已修复 `primary + danger` 按钮红底红字问题，浏览器样式检查与 Web 构建通过 |
+| 2026-05-17 | 默认培养方案完整导入修复 | `docs/notes/refinements/2026-05-17-s19-default-curriculum-complete-import.md` | `S19.1, S19.2, S19.3, S19.4, S19.5, S19.6` | `[x]` | 已补全 `2024_information.md` 默认导入的共享课程池、个性化选修、实践/素拓、最低学分模块和源文件全量课程池；源文件课程码覆盖 `466 / 466`，数据科学工学/理学核心模块已分离，后端回归与静态校验通过 |
+| 2026-05-17 | 成绩单 PDF 解析正确性修复 | `docs/notes/refinements/2026-05-17-s20-transcript-pdf-ruc-parser-fix.md` | `S20.1, S20.2, S20.3, S20.4, S20.5` | `[x]` | 已补 `pypdf` 依赖和 RUC 成绩单文本层解析，真实 PDF 可识别 34 条待核验课程候选且学期码可提交，上传边界回归通过 |
+| 2026-05-17 | 默认培养方案重复导入落库修复 | `docs/notes/refinements/2026-05-17-s21-default-curriculum-reimport-persistence-fix.md` | `S21.1, S21.2, S21.3, S21.4` | `[x]` | 已修复覆盖式导入旧模块删除未 flush 导致唯一约束失败的问题；当前 5174 页面已显示 7 个方案、选中专业 19 个模块和正确总学分 |
+| 2026-05-17 | 培养方案明细与 CRUD 界面补齐 | `docs/notes/refinements/2026-05-17-s22-curriculum-detail-crud-ui.md` | `S22.1, S22.2, S22.3, S22.4` | `[x]` | 已补模块展开课程明细，以及方案、模块、课程的新增、编辑、删除入口；Web 构建和 5174 页面检查通过 |
 
 ## 会话更新要求
 
@@ -672,3 +785,8 @@
 - `2026-05-16`：新增并完成 `S15` Web 管理端学生画像路由遮蔽缺陷修复；将 `/admin/profile/corrections` 静态路由移到 `/{student_id}` 前，补路由匹配回归测试并通过后端静态校验，本地 `/profile/student/4` 可渲染学生画像。
 - `2026-05-16`：新增并完成 `S16` RUC 校训文案修正；将 Web 管理端侧栏 `RUC` 下方文案从 `立学为民 · 治学报国` 改为 `实事求是`，并通过 Web 类型检查、构建与旧文案残留检索。
 - `2026-05-16`：新增并完成 `S17` 可见文案口径统一；Web 管理端统一为 `信息学院管理后台`，Miniapp 统一为 `信息学院学生服务`，并修正荣誉、审批、导入导出、进度中心、学业分析等范围不准文案，双端构建和后端静态校验通过。
+- `2026-05-16`：新增并完成 `S18` Web 危险主按钮对比度修复；收口 `.ant-btn-dangerous` 与 `.ant-btn-primary.ant-btn-dangerous` 的全局覆盖关系，个人信息页 `退出登录` 和审计日志页 `执行归档` 已恢复红底白字，Web 构建通过。
+- `2026-05-17`：新增并完成 `S19` 默认培养方案完整导入修复；`2024_information.md` 默认导入已覆盖 6 个目标专业的共享课程池、专业核心、个性化选修、实践/素拓和 requirement-only 最低学分模块，并以 `源文件全量课程池` 非 active 方案保存全部 `466` 个可解析课程编码，定向集成测试、ruff 与 py_compile 均通过。
+- `2026-05-17`：新增并完成 `S20` 成绩单 PDF 解析正确性修复；后端补 `pypdf` 依赖和 RUC 成绩单拆字文本解析分支，`D:\Downloads\1778947112713.pdf` 可识别 `34` 条待核验候选课程，单元测试、上传边界集成测试、ruff、py_compile 与 Miniapp 类型检查通过。
+- `2026-05-17`：新增并完成 `S21` 默认培养方案重复导入落库修复；修复覆盖式导入旧模块删除未 flush 导致唯一约束失败的问题，对当前 `localhost:8080` 连接库重跑默认培养方案导入，5174 页面刷新后已显示新方案数据。
+- `2026-05-17`：新增并完成 `S22` 培养方案明细与 CRUD 界面补齐；`/academic/curriculum` 已支持模块展开课程明细，以及方案、模块、课程的新增、编辑、删除维护操作。

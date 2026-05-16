@@ -10,7 +10,7 @@ from io import BytesIO
 from typing import Any
 
 _MAX_TEXT_CHARS = 20_000
-_MAX_CANDIDATES = 30
+_MAX_CANDIDATES = 100
 _COURSE_CODE_RE = re.compile(r"\b[A-Z]{2,8}[-_]?\d{2,5}[A-Z]?\b")
 _CREDIT_RE = re.compile(r"(?:学分|credit[s]?)\D{0,8}(\d+(?:\.\d+)?)", re.IGNORECASE)
 _SCORE_RE = re.compile(r"(?:成绩|分数|score)\D{0,8}(\d+(?:\.\d+)?)", re.IGNORECASE)
@@ -18,7 +18,16 @@ _TERM_RE = re.compile(
     r"\b20\d{2}[-_/]?(?:SPRING|FALL|SUMMER|AUTUMN|[12])\b",
     re.IGNORECASE,
 )
-_GRADE_RE = re.compile(r"\b(A\+?|A-|B\+?|B-|C\+?|C-|D\+?|D-|F|P|NP)\b")
+_GRADE_RE = re.compile(r"\b(A\+|A-|A|B\+|B-|B|C\+|C-|C|D\+|D-|D|F|NP|P)\b")
+_RUC_TRANSCRIPT_SCORE_RE = re.compile(
+    r"^(?P<prefix>.*?)"
+    r"(?P<credits>\d+(?:\.\d+)?)\s+"
+    r"(?P<grade>\d+(?:\.\d+)?|A\+|A-|A|B\+|B-|B|C\+|C-|C|D\+|D-|D|F|NP|P)\s+"
+    r"(?P<points>\d+(?:\.\d+)?)$"
+)
+_RUC_TERM_RE = re.compile(
+    r"(?P<year>20\d{2}\s*-\s*20\d{2})\s*学年\s*(?P<season>春季|夏季|秋季|冬季)\s*学期"
+)
 
 
 @dataclass
@@ -112,6 +121,10 @@ def _normalize_text(text: str) -> str:
 
 
 def _parse_candidate_courses(text: str) -> list[TranscriptPdfCandidate]:
+    ruc_candidates = _parse_ruc_transcript_courses(text)
+    if ruc_candidates:
+        return ruc_candidates
+
     candidates: list[TranscriptPdfCandidate] = []
     for line_no, line in enumerate(text.splitlines(), start=1):
         if len(candidates) >= _MAX_CANDIDATES:
@@ -147,6 +160,122 @@ def _parse_candidate_line(line_no: int, line: str) -> TranscriptPdfCandidate | N
     )
 
 
+def _parse_ruc_transcript_courses(text: str) -> list[TranscriptPdfCandidate]:
+    compact_text = _compact_course_text(text)
+    if "学生成绩单" not in compact_text or "总取得学分" not in compact_text:
+        return []
+
+    candidates: list[TranscriptPdfCandidate] = []
+    pending_parts: list[str] = []
+    current_term: str | None = None
+    in_course_area = False
+
+    for line_no, line in enumerate(text.splitlines(), start=1):
+        score_line = " ".join(line.split())
+        compact = _compact_course_text(line)
+        if not compact:
+            continue
+        if "课程名称" in compact:
+            in_course_area = True
+            pending_parts.clear()
+            continue
+        if "总取得学分" in compact:
+            break
+        if not in_course_area:
+            continue
+
+        score_match = _RUC_TRANSCRIPT_SCORE_RE.fullmatch(score_line)
+        if score_match is None:
+            pending_parts.append(compact)
+            continue
+
+        prefix = _compact_course_text(score_match.group("prefix"))
+        if prefix:
+            pending_parts.append(prefix)
+        course_name, detected_term = _take_ruc_course_name(pending_parts)
+        pending_parts.clear()
+        if detected_term is not None:
+            current_term = detected_term
+        if not course_name:
+            continue
+
+        credits = _safe_float(score_match.group("credits"))
+        grade_token = score_match.group("grade")
+        score = _safe_float(grade_token)
+        grade_letter = None if score is not None else grade_token
+        candidates.append(
+            TranscriptPdfCandidate(
+                line_no=line_no,
+                raw_text=(
+                    f"{course_name} 学分 {score_match.group('credits')} "
+                    f"成绩 {grade_token} 绩点 {score_match.group('points')}"
+                )[:300],
+                course_name=course_name,
+                credits=credits,
+                term_code=current_term,
+                score=score,
+                grade_letter=grade_letter,
+                pass_flag=_derive_pass_flag(score=score, grade_letter=grade_letter),
+                confidence="MEDIUM",
+            )
+        )
+        if len(candidates) >= _MAX_CANDIDATES:
+            break
+
+    return candidates
+
+
+def _take_ruc_course_name(parts: list[str]) -> tuple[str | None, str | None]:
+    joined = _compact_course_text("".join(parts))
+    if not joined:
+        return None, None
+
+    detected_term = None
+    term_match = _RUC_TERM_RE.search(joined)
+    if term_match is not None:
+        year = term_match.group("year").replace(" ", "")
+        detected_term = _ruc_term_code(year, term_match.group("season"))
+        joined = joined[term_match.end() :]
+
+    joined = _strip_ruc_noise(joined)
+    if not joined:
+        return None, detected_term
+    return joined[:128], detected_term
+
+
+def _strip_ruc_noise(value: str) -> str:
+    value = value.strip(" ：:-")
+    value = value.replace("课程名称", "")
+    value = value.replace("学分绩点", "")
+    value = value.replace("学分", "")
+    value = value.replace("成绩", "")
+    return value.strip(" ：:-")
+
+
+def _ruc_term_code(year_range: str, season: str) -> str:
+    start_year = year_range.split("-", 1)[0]
+    season_code = {
+        "春季": "SPRING",
+        "夏季": "SUMMER",
+        "秋季": "FALL",
+        "冬季": "WINTER",
+    }.get(season, season.upper())
+    return f"{start_year}-{season_code}"
+
+
+def _compact_course_text(value: str) -> str:
+    return re.sub(r"\s+", "", value).strip()
+
+
+def _safe_float(value: str | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
 def _first_match(pattern: re.Pattern[str], value: str) -> str | None:
     match = pattern.search(value)
     return match.group(0) if match else None
@@ -176,6 +305,8 @@ def _derive_pass_flag(
         return True
     if normalized in {"F", "NP"}:
         return False
+    if normalized in {"A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-"}:
+        return True
     return None
 
 

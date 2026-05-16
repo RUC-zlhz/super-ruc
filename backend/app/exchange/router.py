@@ -22,6 +22,7 @@
 """
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from io import BytesIO
 from typing import Annotated
 
@@ -37,7 +38,7 @@ from app.audit.policies import (
 )
 from app.audit.service import build_audit_detail, log_action
 from app.core.dependencies import CurrentUserDep, DBDep, require_role
-from app.core.exceptions import BizError, NotFoundError
+from app.core.exceptions import BizError, ConflictError, NotFoundError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
 from app.exchange import default_imports, service
 from app.exchange import repository as repo
@@ -557,9 +558,12 @@ async def update_plan(
 ) -> ApiResponse[CurriculumPlanDetail]:
     # 重用 upsert 逻辑
     raw = payload.model_dump()
+    expected_updated_at = raw.pop("expected_updated_at", None)
     plan = await repo.get_plan(db, plan_id)
     if plan is None:
         raise NotFoundError("培养方案不存在")
+    if expected_updated_at is not None and not _same_timestamp(plan.updated_at, expected_updated_at):
+        raise ConflictError("培养方案已被其他操作更新，请刷新后重试", code=40915)
     # 强制绑定 id 的主键三元组 — 按当前记录
     raw["grade_code"] = plan.grade_code
     raw["major_code"] = plan.major_code
@@ -571,6 +575,12 @@ async def update_plan(
     )
     refreshed = await repo.get_plan(db, new_plan_id)
     return ok(CurriculumPlanDetail.model_validate(refreshed))
+
+
+def _same_timestamp(left: datetime, right: datetime) -> bool:
+    left_utc = left if left.tzinfo is not None else left.replace(tzinfo=UTC)
+    right_utc = right if right.tzinfo is not None else right.replace(tzinfo=UTC)
+    return abs(left_utc.timestamp() - right_utc.timestamp()) < 0.001
 
 
 @curriculum_router.delete(

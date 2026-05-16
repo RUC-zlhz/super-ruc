@@ -439,14 +439,18 @@ async def compute_academic_gap(
     # 同时记录该课程的"有效学分"
     earned: dict[str, float] = {}
     passed_course_codes: set[str] = set()
+    total_passed_credits = 0.0
     for r in records:
         passed_course_codes.add(r.course_code)
+        total_passed_credits += float(r.credits or 0)
         earned[r.course_code] = earned.get(r.course_code, 0) + float(r.credits or 0)
         for target, ratio in equiv_map.get(r.course_code, []):
             earned[target] = earned.get(target, 0) + float(r.credits or 0) * ratio
 
     module_gaps: list[AcademicModuleGap] = []
     total_earned = 0.0
+    whitelist_earned_total = 0.0
+    flexible_credit_balance = total_passed_credits
     for m in modules:
         allowed_codes: set[str] = set()
         for c in _iter_module_courses(m.courses):
@@ -459,16 +463,17 @@ async def compute_academic_gap(
             for code in allowed_codes:
                 if code in earned:
                     module_earned += earned[code]
+                    whitelist_earned_total += earned[code]
                     if code in passed_course_codes:
                         passed.append(code)
+            flexible_credit_balance = max(total_passed_credits - whitelist_earned_total, 0.0)
         else:
-            # 无白名单：按 module_type 作为粗口径（通识/实践允许任何通过课程）
-            # 这里仅按全部记录累加作为参考，并给出 warning
-            if not allowed_codes:
-                module_earned = 0.0
-                data_warnings.append(
-                    f"模块 {m.module_code} 未配置课程白名单，缺口计算仅供参考。"
-                )
+            required = float(m.credits_required or 0)
+            module_earned = min(required, flexible_credit_balance)
+            flexible_credit_balance = max(flexible_credit_balance - module_earned, 0.0)
+            data_warnings.append(
+                f"模块 {m.module_code} 未配置课程白名单，已按未归属已修学分粗略抵扣。"
+            )
 
         module_earned = round(module_earned, 2)
         required = float(m.credits_required or 0)
