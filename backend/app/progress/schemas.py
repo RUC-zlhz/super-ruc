@@ -1,4 +1,4 @@
-"""S12 统一进度中心 schema。"""
+"""S12 进度中心 schema。"""
 from __future__ import annotations
 
 from datetime import date, datetime

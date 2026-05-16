@@ -70,7 +70,7 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(
         title="SIP Backend",
-        description="信息学院学生综合服务与党团管理平台 — 后端 API",
+        description="中国人民大学信息学院学生综合服务平台 — 后端 API",
         version="0.1.0",
         docs_url="/docs" if settings.APP_DEBUG else None,
         redoc_url="/redoc" if settings.APP_DEBUG else None,

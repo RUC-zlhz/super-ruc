@@ -1,6 +1,6 @@
 <template>
   <div class="operation-dashboard">
-    <a-page-header title="运营看板" sub-title="学院事务运营、通知触达与学业缺口弱提示" />
+    <a-page-header title="运营看板" sub-title="学院事务运营、通知触达与学业缺口辅助提示" />
 
     <div v-if="dashboard.generatedAt" class="board-meta mb16">
       数据生成时间：{{ formatDateTime(dashboard.generatedAt) }} · {{ overviewFilters.term_code || '全量学期' }}

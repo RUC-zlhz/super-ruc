@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "信息学院学生综合服务与党团管理平台 — 管理端",
+  "description": "中国人民大学信息学院学生综合服务平台 — 管理端",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",

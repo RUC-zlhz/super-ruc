@@ -10,7 +10,7 @@
             <div>
               <div class="name-row">
                 <h2>{{ user.display_name }}</h2>
-                <a-tag color="red">教师管理员</a-tag>
+                <a-tag color="red">管理端用户</a-tag>
                 <a-tag color="green">在职</a-tag>
               </div>
               <div class="hero-meta">工号：{{ user.work_no || '-' }}</div>

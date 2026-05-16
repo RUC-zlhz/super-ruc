@@ -1,6 +1,6 @@
 <template>
   <div class="honor-page">
-    <a-page-header title="荣誉公示管理" sub-title="维护教师荣誉信息、公示状态与历史记录" />
+    <a-page-header title="荣誉公示管理" sub-title="维护学生荣誉记录、公示状态与历史记录" />
 
     <div class="metric-grid">
       <div v-for="metric in metrics" :key="metric.key" class="metric-tile">

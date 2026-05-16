@@ -1,6 +1,6 @@
 <template>
   <div class="workbench-page">
-    <a-page-header title="审批工作台" sub-title="教师业务申请审批与进度管理" />
+    <a-page-header title="审批工作台" sub-title="学生事务申请审批与进度管理" />
 
     <div class="metric-grid">
       <div v-for="metric in metrics" :key="metric.key" class="metric-tile">

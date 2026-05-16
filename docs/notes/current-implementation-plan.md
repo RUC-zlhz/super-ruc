@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S14` 已闭合；后续仅在新确认范围内继续增量推进
+- 当前目标：`S1 ~ S17` 已闭合；后续仅在新确认范围内继续增量推进
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -475,6 +475,73 @@
 - Backend DB / 集成：执行 `.\backend\scripts\dev\run_s14_blank_db_gate.ps1 -SkipSync` 通过，覆盖隔离 Kingbase `54324` 从零初始化、`alembic upgrade head`、`seed_initial.py` 与 `seed_default_data.py`；随后在同一隔离库执行 `uv run --extra dev pytest tests/integration/test_auth_flow.py tests/integration/test_knowledge_flow.py tests/integration/test_s12_gap_closure.py -q -o cache_dir=.tmp/pytest-cache-s14-final --basetemp=.tmp/pytest-tmp-s14-final`，结果 `27 passed in 26.13s`。
 - Frontend：`pnpm -C web build` 与 `pnpm -C miniapp build:mp-weixin` 均通过。
 
+### S15 Web 管理端学生画像路由遮蔽缺陷修复
+
+- [x] `S15.1` 复现 `profile/student/4` 页面错误，确认 `422` 来源为画像纠错列表接口。
+- [x] `S15.2` 修复后端 `admin/profile` 静态路由与 `/{student_id}` 动态路由的注册顺序。
+- [x] `S15.3` 增加不依赖数据库的路由匹配回归测试，防止 `/corrections` 再被学生详情路由遮蔽。
+- [x] `S15.4` 完成后端静态校验、定向测试和本地页面/API 复核。
+
+出口条件：
+
+- `http://127.0.0.1:5174/profile/student/4` 不再因 `/admin/profile/corrections` 返回 `422` 而打断加载。
+- 后端路由测试能直接证明 `/admin/profile/corrections` 优先命中静态列表路由。
+
+当前结论：
+
+- `S15` 已完成；学生画像页的路由遮蔽问题已修复，当前本地页面可渲染学生 `2024201517 / 李明蔚` 的画像信息。
+
+证据：
+
+- Backend 定向测试：`backend` 下设置 repo-local `UV_CACHE_DIR=.uv-cache-local` 后执行 `uv run --no-sync pytest tests/test_profile_admin_route_order.py -q -o cache_dir=.tmp/pytest-cache-profile-route --basetemp=.tmp/pytest-tmp-profile-route`，结果 `2 passed in 46.29s`。
+- Backend 静态校验：`uv run --no-sync python -m py_compile app/profile/router.py tests/test_profile_admin_route_order.py` 通过；`uv run --no-sync ruff check app/profile/router.py tests/test_profile_admin_route_order.py` 返回 `All checks passed!`。
+- 本地页面/API 复核：无 token 请求 `/api/v1/admin/profile/corrections?student_id=4&status=PENDING&page=1&size=1` 返回 `401` 而非 `422`；浏览器刷新 `/profile/student/4` 后可见学生 `2024201517 / 李明蔚` 的学籍信息、成长事实和待审核区域。
+
+### S16 RUC 校训文案修正
+
+- [x] `S16.1` 检索 Web / Miniapp / 后端 / 文档计划 / SRS / specs / scripts 中的旧标语残留。
+- [x] `S16.2` 将 Web 管理端侧栏 `RUC` 下方文案从 `立学为民 · 治学报国` 修正为 `实事求是`。
+- [x] `S16.3` 重跑 Web 类型检查与构建，并确认构建产物同步更新。
+
+出口条件：
+
+- 旧文案 `立学为民` / `治学报国` 不再出现在当前应用源码与构建产物检查范围内。
+- Web 管理端侧栏底部展示 `实事求是`。
+
+当前结论：
+
+- `S16` 已完成；RUC 校训文案已按用户确认修正为 `实事求是`。
+
+证据：
+
+- `web/src/layouts/MainLayout.vue` 已将侧栏底部文案替换为 `实事求是`。
+- `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p web\tsconfig.json` 通过。
+- `pnpm -C web build` 通过；构建仅输出 Dart Sass legacy JS API 弃用警告。
+- `rg -n "立学为民|治学报国" web miniapp backend docs/notes docs/srs specs scripts` 无命中；`rg -n "实事求是" web/src web/dist` 命中源码与新构建产物。
+
+### S17 可见文案口径统一
+
+- [x] `S17.1` 检索品牌、平台名、功能入口、页面标题和副标题相关可见文案。
+- [x] `S17.2` Web 管理端统一为 `信息学院管理后台`，并修正荣誉、审批、导入导出、运营看板等页面副标题。
+- [x] `S17.3` 小程序学生端统一为 `信息学院学生服务`，将首页入口和页面标题收口到当前真实功能范围。
+- [x] `S17.4` 后端 OpenAPI 描述和进度中心错误文案同步采用新的口径。
+
+出口条件：
+
+- `教师管理员 / 教师业务 / 教师数据 / 奖助学金 / 宿舍服务 / 缴费记录 / 党团进度列表 / 学业查看 / 统一进度 / 荣誉榜 / 信息学院综合服务` 等高风险旧文案不再出现在 active code 或双端构建产物中。
+- Web、小程序、后端 API 描述的产品口径统一。
+
+当前结论：
+
+- `S17` 已完成；Web 管理端、Miniapp 学生端、后端 API 描述和构建产物中的可见文案已按当前实现范围统一。
+
+证据：
+
+- 文案残留扫描：`rg -n "教师管理员|教师业务|教师数据|奖助学金|宿舍服务|缴费记录|党团进度列表|学业查看|统一进度|荣誉榜|学生综合服务与党团管理平台|信息学院综合服务|立学为民|治学报国" web/src web/dist miniapp/src miniapp/dist/build/mp-weixin backend/app` 无命中。
+- Backend 静态校验：`uv run --no-sync python -m py_compile app/main.py app/progress/__init__.py app/progress/service.py app/progress/schemas.py app/progress/router.py` 通过；`uv run --no-sync ruff check app/main.py app/progress/__init__.py app/progress/service.py app/progress/schemas.py app/progress/router.py` 返回 `All checks passed`。
+- Web 构建：`pnpm -C web build` 通过；仅输出 Dart Sass legacy JS API 弃用警告。
+- Miniapp 验证：`& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；`pnpm -C miniapp build:mp-weixin` 通过。
+
 ## 细化文件登记
 
 > 规则：每个新细化文件都要写入本表，且必须关联一个或多个主计划条目编号。
@@ -532,6 +599,9 @@
 | 2026-05-11 | S12 需求缺口闭环与默认数据导入 | `docs/notes/refinements/2026-05-11-s12-requirements-gap-closure.md` | `S12.1, S12.2, S12.3, S12.4, S12.5, S12.6, S12.7, S12.8, S12.9, S12.DOC` | `[x]` | 已完成默认导入、PDF 核验、模板下载、进度中心、通知抓取、短信治理、Web/Miniapp 接入与 SRS v1.7 出件；后端 S12 回归、Web 构建、小程序出包和文档 QC 均通过 |
 | 2026-05-12 | S13 需求文档与实现一致性修复 | `docs/notes/refinements/2026-05-12-s13-requirements-doc-implementation-alignment.md` | `S13.1, S13.2, S13.3, S13.4, S13.5` | `[x]` | 已完成 S12 状态漂移、FR 验收项语义、需求边界和官方来源结构化标识修复，并通过后端静态/定向集成、双端构建与文档 grep 验证 |
 | 2026-05-14 | S14 安全、权限与验证闭环修复 | `docs/notes/refinements/2026-05-14-s14-security-permission-gap-closure.md` | `S14.1, S14.2, S14.3, S14.4, S14.5, S14.6, S14.DB, S14.DOC` | `[x]` | 已完成账号安全、权限闸门、PDF 教师核验、官方来源治理、临时 IP 出包、空库迁移和规格文档收口；S14 定向集成 `27 passed`，双端构建通过 |
+| 2026-05-16 | Web 管理端学生画像路由遮蔽缺陷修复 | `docs/notes/refinements/2026-05-16-s15-profile-route-shadow-fix.md` | `S15.1, S15.2, S15.3, S15.4` | `[x]` | 已修复 `/admin/profile/corrections` 被 `/{student_id}` 遮蔽导致学生画像页 422 的问题，定向路由测试 `2 passed` |
+| 2026-05-16 | RUC 校训文案修正 | `docs/notes/refinements/2026-05-16-s16-ruc-motto-copy-fix.md` | `S16.1, S16.2, S16.3` | `[x]` | 已将 Web 管理端侧栏文案修正为 `实事求是`，Web 构建通过并确认旧文案无残留 |
+| 2026-05-16 | 可见文案口径统一 | `docs/notes/refinements/2026-05-16-s17-visible-copy-normalization.md` | `S17.1, S17.2, S17.3, S17.4` | `[x]` | 已统一 Web/Miniapp/Backend 可见文案口径，双端构建通过且高风险旧文案无残留 |
 
 ## 会话更新要求
 
@@ -599,3 +669,6 @@
 - `2026-05-14`：新增 `S14` 安全、权限与验证闭环修复条目及细化文件；根据并行审查结论，先处理微信绑定安全、停用账号登录、服务端退出失效、Web 前端角色闸门和小程序访客态/缓存隔离。
 - `2026-05-14`：完成 `S14.2 ~ S14.3`；`S14.1` 已落后端绑定校验、唯一绑定约束、token_version 失效和 logout 审计，并通过 ruff / py_compile，但定向 auth 集成测试仍受 `localhost:54322/sip_db_test` 拒连阻塞。
 - `2026-05-15`：完成 `S14.1 / S14.4 / S14.5 / S14.6 / S14.DB / S14.DOC` 收口；修复 refresh token 版本声明、Alembic 长 revision 空库兼容和 S14 gate 参数传递问题，隔离 Kingbase 空库 gate 通过，S14 定向集成测试 `27 passed`，Web 与 Miniapp 构建通过。
+- `2026-05-16`：新增并完成 `S15` Web 管理端学生画像路由遮蔽缺陷修复；将 `/admin/profile/corrections` 静态路由移到 `/{student_id}` 前，补路由匹配回归测试并通过后端静态校验，本地 `/profile/student/4` 可渲染学生画像。
+- `2026-05-16`：新增并完成 `S16` RUC 校训文案修正；将 Web 管理端侧栏 `RUC` 下方文案从 `立学为民 · 治学报国` 改为 `实事求是`，并通过 Web 类型检查、构建与旧文案残留检索。
+- `2026-05-16`：新增并完成 `S17` 可见文案口径统一；Web 管理端统一为 `信息学院管理后台`，Miniapp 统一为 `信息学院学生服务`，并修正荣誉、审批、导入导出、进度中心、学业分析等范围不准文案，双端构建和后端静态校验通过。

@@ -305,6 +305,54 @@ async def admin_decide_full_view_request(
     return ok(service._build_full_view_request_out(row, names))
 
 
+@admin_router.get(
+    "/corrections", response_model=ApiResponse[Paginated[CorrectionOut]]
+)
+async def admin_list_corrections(
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+    student_id: int | None = None,
+    status: str | None = None,
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+) -> ApiResponse[Paginated[CorrectionOut]]:
+    rows, total = await service.list_corrections_admin(
+        db,
+        student_id=student_id,
+        status=status,
+        page=page,
+        size=size,
+        viewer_user_id=user.user_id,
+        viewer_role=",".join(user.roles) or None,
+    )
+    items = [CorrectionOut.model_validate(row) for row in rows]
+    return ok(Paginated[CorrectionOut](items=items, meta=PageMeta(page=page, size=size, total=total)))
+
+
+@admin_router.post(
+    "/corrections/{correction_id}/decision",
+    response_model=ApiResponse[CorrectionOut],
+)
+async def admin_decide_correction(
+    correction_id: int,
+    payload: CorrectionDecisionIn,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+) -> ApiResponse[CorrectionOut]:
+    row = await service.decide_correction(
+        db,
+        correction_id,
+        decision=payload.decision,
+        comment=payload.comment,
+        apply_to_fact=payload.apply_to_fact,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    return ok(CorrectionOut.model_validate(row))
+
+
+# Keep one-segment static admin endpoints above /{student_id}; FastAPI will
+# otherwise route them to the dynamic detail handler and return 422.
 @admin_router.get("/{student_id}", response_model=ApiResponse[ProfileSummary])
 async def admin_get_profile(
     student_id: int,
@@ -403,52 +451,6 @@ async def admin_delete_fact(
         operator_role=",".join(user.roles) or None,
     )
     return ok({"id": fact_id, "deleted": True})
-
-
-@admin_router.get(
-    "/corrections", response_model=ApiResponse[Paginated[CorrectionOut]]
-)
-async def admin_list_corrections(
-    db: DBDep,
-    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
-    student_id: int | None = None,
-    status: str | None = None,
-    page: int = Query(default=1, ge=1),
-    size: int = Query(default=20, ge=1, le=100),
-) -> ApiResponse[Paginated[CorrectionOut]]:
-    rows, total = await service.list_corrections_admin(
-        db,
-        student_id=student_id,
-        status=status,
-        page=page,
-        size=size,
-        viewer_user_id=user.user_id,
-        viewer_role=",".join(user.roles) or None,
-    )
-    items = [CorrectionOut.model_validate(row) for row in rows]
-    return ok(Paginated[CorrectionOut](items=items, meta=PageMeta(page=page, size=size, total=total)))
-
-
-@admin_router.post(
-    "/corrections/{correction_id}/decision",
-    response_model=ApiResponse[CorrectionOut],
-)
-async def admin_decide_correction(
-    correction_id: int,
-    payload: CorrectionDecisionIn,
-    db: DBDep,
-    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
-) -> ApiResponse[CorrectionOut]:
-    row = await service.decide_correction(
-        db,
-        correction_id,
-        decision=payload.decision,
-        comment=payload.comment,
-        apply_to_fact=payload.apply_to_fact,
-        operator_id=user.user_id,
-        operator_role=",".join(user.roles) or None,
-    )
-    return ok(CorrectionOut.model_validate(row))
 
 
 @admin_router.get(

@@ -1,4 +1,4 @@
-"""S12 统一进度中心路由。"""
+"""S12 进度中心路由。"""
 from __future__ import annotations
 
 from fastapi import APIRouter
@@ -18,7 +18,7 @@ async def my_progress(
     user: CurrentUserDep,
 ) -> ApiResponse[ProgressMyResult]:
     if user.student_id is None:
-        raise BizError("仅学生可查看统一进度中心", code=40305, http_status=403)
+        raise BizError("仅学生可查看进度中心", code=40305, http_status=403)
     return ok(
         await service.build_my_progress(
             db,

@@ -1,4 +1,4 @@
-"""S12 统一进度中心服务。"""
+"""S12 进度中心服务。"""
 from __future__ import annotations
 
 from datetime import UTC, datetime

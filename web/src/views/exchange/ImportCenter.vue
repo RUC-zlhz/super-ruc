@@ -1,6 +1,6 @@
 <template>
   <div class="exchange-page">
-    <a-page-header title="导入导出中心" sub-title="教师数据批量导入、模板下载与结果追踪" />
+    <a-page-header title="导入导出中心" sub-title="学生、课程与荣誉数据批量导入、模板下载与结果追踪" />
 
     <div class="metric-grid">
       <div v-for="metric in metrics" :key="metric.key" class="metric-tile">

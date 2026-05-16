@@ -2,7 +2,7 @@
   <view class="container">
     <view class="honor-hero">
       <view class="hero-copy">
-        <text class="hero-kicker">荣誉榜</text>
+        <text class="hero-kicker">荣誉公示</text>
         <text class="hero-title">榜样力量，追光而行</text>
         <text class="hero-sub">见贤思齐 · 躬身笃行 · 不负韶华</text>
       </view>

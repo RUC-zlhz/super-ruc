@@ -3,7 +3,7 @@
     <view class="page-hero">
       <view class="hero-top">
         <view class="hero-copy">
-          <text class="hero-kicker">统一进度</text>
+          <text class="hero-kicker">进度中心</text>
           <text class="hero-title">申请与党团流程一处查看</text>
           <text class="hero-desc">聚合当前步骤、详情路径和最近更新时间，方便你持续跟进。</text>
         </view>
@@ -58,7 +58,7 @@
       v-if="loading && !items.length"
       icon="进"
       tone="muted"
-      title="统一进度加载中"
+      title="进度中心加载中"
       description="正在同步你的申请与党团流程，请稍候。"
     />
 

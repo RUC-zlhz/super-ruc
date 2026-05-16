@@ -1,12 +1,12 @@
 {
-  "name": "信息学院综合服务",
+  "name": "信息学院学生服务",
   "appid": "__UNI__TEST_SIP",
-  "description": "信息学院学生综合服务与党团管理平台 — 学生端",
+  "description": "中国人民大学信息学院学生综合服务平台 — 学生端",
   "versionName": "0.1.0",
   "versionCode": "100",
   "transformPx": false,
   "h5": {
-    "title": "信息学院综合服务",
+    "title": "信息学院学生服务",
     "router": { "mode": "hash" },
     "devServer": {
       "port": 5174

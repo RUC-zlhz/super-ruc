@@ -5,7 +5,7 @@
         <div class="logo-mark">R</div>
         <div v-if="!app.siderCollapsed" class="logo-text">
           <div class="t1">中国人民大学</div>
-          <div class="t2">教师管理员后台</div>
+          <div class="t2">信息学院管理后台</div>
         </div>
       </div>
 
@@ -50,7 +50,7 @@
 
       <div class="sider-foot">
         <span class="foot-logo">RUC</span>
-        <span v-if="!app.siderCollapsed">立学为民 · 治学报国</span>
+        <span v-if="!app.siderCollapsed">实事求是</span>
       </div>
     </aside>
 
@@ -62,7 +62,7 @@
 
         <div class="topbar-title">
           <span class="topbar-seal">R</span>
-          <span>教师管理员管理平台</span>
+          <span>信息学院管理后台</span>
         </div>
 
         <div class="topbar-search">

@@ -3,7 +3,7 @@
     <div class="brand-block">
       <div class="brand-seal">R</div>
       <div>
-        <div class="brand-title">教师管理员管理台</div>
+        <div class="brand-title">信息学院管理后台</div>
         <div class="brand-sub">中国人民大学</div>
       </div>
     </div>
@@ -13,7 +13,7 @@
         <h1>欢迎登录</h1>
         <div class="heading-line">
           <span />
-          <p>教师管理员管理台</p>
+          <p>信息学院管理后台</p>
           <span />
         </div>
       </div>

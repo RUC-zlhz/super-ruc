@@ -58,7 +58,7 @@
       <view class="section-head">
         <view>
           <text class="section-title">重点入口</text>
-          <text class="section-subtitle">学业查看、模板下载、统一进度中心</text>
+          <text class="section-subtitle">学业分析、模板下载、进度中心</text>
         </view>
       </view>
 
@@ -291,8 +291,8 @@ const entries: Array<{
   {
     mark: "奖",
     tone: "gold",
-    label: "奖助学金",
-    desc: "查看荣誉与奖助学金相关信息。",
+    label: "荣誉公示",
+    desc: "查看学院荣誉公示与历史荣誉信息。",
     url: "/pages/honor/index",
   },
   {
@@ -305,15 +305,15 @@ const entries: Array<{
   {
     mark: "宿",
     tone: "slate",
-    label: "宿舍服务",
-    desc: "宿舍调整、住宿证明等事务入口。",
-    url: "/pages/request/create?type_code=DORM_SERVICE",
+    label: "事务办理",
+    desc: "进入事务申请列表查看可办理事项。",
+    url: "/pages/request/index",
   },
   {
     mark: "费",
     tone: "orange",
-    label: "缴费记录",
-    desc: "查询政策、缴费说明和服务指南。",
+    label: "政策查询",
+    desc: "查询政策说明、办理指引和服务指南。",
     url: "/pages/knowledge/index",
   },
   {
@@ -336,7 +336,7 @@ const shortcutEntries = [
   {
     mark: "学",
     tone: "blue",
-    label: "学业查看",
+    label: "学业分析",
     desc: "上传成绩单 PDF，查看学业缺口与候选课程。",
     url: "/pages/academic/index",
   },
