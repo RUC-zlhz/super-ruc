@@ -2,6 +2,14 @@
   <div class="workbench-page">
     <a-page-header title="审批工作台" sub-title="学生事务申请审批与进度管理" />
 
+    <a-alert
+      class="mb16"
+      type="warning"
+      show-icon
+      message="请假类申请仅用于院内协同与留痕"
+      description="涉及 LEAVE 类申请时，本平台仅承载院内提醒、补件和审批留痕；正式请假仍以微人大等校级正式系统为准。"
+    />
+
     <div class="metric-grid">
       <div v-for="metric in metrics" :key="metric.key" class="metric-tile">
         <span class="metric-icon"><component :is="metric.icon" /></span>

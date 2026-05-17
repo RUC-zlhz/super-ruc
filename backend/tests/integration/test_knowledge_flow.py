@@ -10,6 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.models import AuditLog
+from app.auth.models import User, UserRole
+from app.core.security import create_token
 
 
 async def test_list_categories_anonymous(client: AsyncClient) -> None:
@@ -129,6 +131,31 @@ async def test_admin_endpoint_rejects_student_role(
         json={"source_name": "x"},
     )
     assert resp.status_code == 403
+
+
+async def test_collaborator_role_can_manage_knowledge_sources(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    user = User(work_no="KNCADRE01", display_name="Knowledge Cadre", is_active=True)
+    db.add(user)
+    await db.flush()
+    db.add(UserRole(user_id=user.id, role_code="PARTY_BRANCH_SECRETARY"))
+    await db.commit()
+    token = create_token(str(user.id), "access", extra_claims={"roles": ["PARTY_BRANCH_SECRETARY"]})
+
+    resp = await client.post(
+        "/api/v1/admin/knowledge/sources",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "source_name": "党支部工作手册",
+            "source_url": "https://example.edu/party-handbook",
+            "issuing_org": "信息学院党支部",
+            "version_label": "2026-v1",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["source_name"] == "党支部工作手册"
 
 
 async def test_official_source_requires_url_and_writes_audit(

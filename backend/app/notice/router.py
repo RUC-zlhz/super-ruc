@@ -18,6 +18,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
+from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES
 from app.core.dependencies import CurrentUserDep, DBDep, require_role
 from app.core.exceptions import BizError, NotFoundError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
@@ -47,6 +48,7 @@ _NOTICE_EDITOR_ROLES = (
     "HEAD_TEACHER",
     "YOUTH_LEAGUE_TEACHER",
     "PARTY_BUILD_TEACHER",
+    *ROLE_CODE_COLLABORATOR_ROLES,
 )
 _EditorRole = require_role(*_NOTICE_EDITOR_ROLES)
 

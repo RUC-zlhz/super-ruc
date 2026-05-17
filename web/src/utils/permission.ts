@@ -37,6 +37,14 @@ export const ROLE_LEVEL: Record<RoleCode, number> = {
   STUDENT: 5,
 };
 
+export const COLLABORATOR_ROLES: RoleCode[] = [
+  "PARTY_BRANCH_SECRETARY",
+  "YOUTH_LEAGUE_SECRETARY",
+  "CLASS_MONITOR",
+  "YOUTH_BRANCH_SECRETARY",
+  "CLASS_LEADER",
+];
+
 export const APPROVER_ROLES: RoleCode[] = [
   "SUPER_ADMIN",
   "COLLEGE_LEADER",
@@ -44,6 +52,7 @@ export const APPROVER_ROLES: RoleCode[] = [
   "HEAD_TEACHER",
   "YOUTH_LEAGUE_TEACHER",
   "PARTY_BUILD_TEACHER",
+  ...COLLABORATOR_ROLES,
 ];
 
 export const CONTENT_EDITOR_ROLES: RoleCode[] = [...APPROVER_ROLES];

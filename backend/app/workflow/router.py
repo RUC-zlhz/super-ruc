@@ -12,6 +12,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
 
+from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES
 from app.audit.enforcement import ensure_export_permission
 from app.audit.policies import REQUEST_PROOF_PREVIEW
 from app.audit.service import build_audit_detail, log_action
@@ -60,6 +61,7 @@ _APPROVER_ROLES = (
     "HEAD_TEACHER",
     "YOUTH_LEAGUE_TEACHER",
     "PARTY_BUILD_TEACHER",
+    *ROLE_CODE_COLLABORATOR_ROLES,
 )
 _WORKFLOW_EDITOR_ROLES = _APPROVER_ROLES
 _ApproverRole = require_role(*_APPROVER_ROLES)

@@ -18,6 +18,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
+from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES
 from app.audit.service import build_audit_detail, log_action
 from app.core.dependencies import CurrentUserDep, DBDep, require_role
 from app.core.exceptions import BizError, NotFoundError
@@ -50,6 +51,7 @@ _KNOWLEDGE_EDITOR_ROLES = (
     "HEAD_TEACHER",
     "YOUTH_LEAGUE_TEACHER",
     "PARTY_BUILD_TEACHER",
+    *ROLE_CODE_COLLABORATOR_ROLES,
 )
 _EditorRole = require_role(*_KNOWLEDGE_EDITOR_ROLES)
 _AdminRole = require_role("SUPER_ADMIN")

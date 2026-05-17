@@ -8,61 +8,72 @@
       </div>
     </div>
 
-    <section class="login-card">
-      <div class="card-heading">
-        <h1>欢迎登录</h1>
-        <div class="heading-line">
-          <span />
-          <p>信息学院管理后台</p>
-          <span />
+    <div class="login-column">
+      <section class="login-card">
+        <div class="card-heading">
+          <h1>欢迎登录</h1>
+          <div class="heading-line">
+            <span />
+            <p>信息学院管理后台</p>
+            <span />
+          </div>
+        </div>
+
+        <a-form layout="vertical" :model="form" @finish="onSubmit">
+          <a-form-item
+            name="work_no"
+            :rules="[{ required: true, message: '请输入工号' }]"
+          >
+            <a-input
+              v-model:value="form.work_no"
+              autocomplete="username"
+              placeholder="教师工号"
+              size="large"
+            >
+              <template #prefix><UserOutlined /></template>
+            </a-input>
+          </a-form-item>
+
+          <a-form-item
+            name="password"
+            :rules="[{ required: true, message: '请输入密码' }]"
+          >
+            <a-input-password
+              v-model:value="form.password"
+              autocomplete="current-password"
+              placeholder="密码"
+              size="large"
+            >
+              <template #prefix><LockOutlined /></template>
+            </a-input-password>
+          </a-form-item>
+
+          <a-form-item>
+            <a-button type="primary" html-type="submit" :loading="loading" block size="large">
+              登录
+            </a-button>
+          </a-form-item>
+        </a-form>
+
+        <div class="security-tip">
+          <SafetyCertificateOutlined />
+          <span>安全登录，保护账户信息</span>
+        </div>
+      </section>
+
+      <div class="login-support">
+        <div class="student-tip">
+          <MobileOutlined />
+          <span>学生端请使用小程序登录访问</span>
+        </div>
+
+        <div v-if="showPreviewEntry" class="preview-entry">
+          <div class="preview-title">开发预览</div>
+          <a-button block @click="openRequirementsPreview">
+            直接预览班团骨干权限与请假提示
+          </a-button>
         </div>
       </div>
-
-      <a-form layout="vertical" :model="form" @finish="onSubmit">
-        <a-form-item
-          name="work_no"
-          :rules="[{ required: true, message: '请输入工号' }]"
-        >
-          <a-input
-            v-model:value="form.work_no"
-            autocomplete="username"
-            placeholder="教师工号"
-            size="large"
-          >
-            <template #prefix><UserOutlined /></template>
-          </a-input>
-        </a-form-item>
-
-        <a-form-item
-          name="password"
-          :rules="[{ required: true, message: '请输入密码' }]"
-        >
-          <a-input-password
-            v-model:value="form.password"
-            autocomplete="current-password"
-            placeholder="密码"
-            size="large"
-          >
-            <template #prefix><LockOutlined /></template>
-          </a-input-password>
-        </a-form-item>
-
-        <a-form-item>
-          <a-button type="primary" html-type="submit" :loading="loading" block size="large">
-            登录
-          </a-button>
-        </a-form-item>
-      </a-form>
-
-      <div class="security-tip">
-        <SafetyCertificateOutlined />
-        <span>安全登录，保护账号信息</span>
-      </div>
-    </section>
-
-    <div class="student-tip">
-      <MobileOutlined />
-      <span>学生端请使用小程序登录/访问</span>
     </div>
   </div>
 </template>
@@ -86,6 +97,7 @@ const route = useRoute()
 
 const form = reactive({ work_no: '', password: '' })
 const loading = ref(false)
+const showPreviewEntry = import.meta.env.DEV || import.meta.env.VITE_ENABLE_REQUIREMENT_PREVIEW === 'true'
 
 async function onSubmit() {
   loading.value = true
@@ -112,6 +124,10 @@ async function onSubmit() {
   } finally {
     loading.value = false
   }
+}
+
+function openRequirementsPreview() {
+  void router.push('/preview/requirements')
 }
 </script>
 
@@ -192,16 +208,23 @@ async function onSubmit() {
   font-size: 18px;
 }
 
-.login-card {
+.login-column {
   z-index: 1;
-  width: 560px;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 36px));
+  gap: 14px;
+  transform: translateY(-18px);
+}
+
+.login-card {
+  width: 100%;
   padding: 56px 56px 42px;
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(176, 0, 24, 0.16);
   border-radius: 18px;
   box-shadow: 0 26px 70px rgba(31, 35, 41, 0.13);
   backdrop-filter: blur(12px);
-  transform: translateY(-34px);
 }
 
 .card-heading {
@@ -250,20 +273,49 @@ async function onSubmit() {
   margin-top: 8px;
 }
 
+.login-support {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
 .student-tip {
-  position: absolute;
-  z-index: 2;
-  bottom: 146px;
+  align-self: center;
+  max-width: 100%;
   padding: 8px 18px;
   color: var(--text-2);
   background: rgba(255, 255, 255, 0.72);
   border-radius: 999px;
-  font-size: 18px;
+  box-shadow: 0 10px 26px rgba(31, 35, 41, 0.08);
+  font-size: 16px;
   backdrop-filter: blur(6px);
+}
+
+.preview-entry {
+  padding: 16px 18px 18px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(176, 0, 24, 0.14);
+  border-radius: 16px;
+  box-shadow: 0 16px 42px rgba(31, 35, 41, 0.08);
+  backdrop-filter: blur(8px);
+}
+
+.preview-title {
+  margin-bottom: 10px;
+  color: var(--text-2);
+  font-size: 13px;
+  text-align: center;
 }
 
 .student-tip :deep(.anticon) {
   color: var(--ruc-red);
+}
+
+.preview-entry :deep(.ant-btn) {
+  height: 44px;
+  border-radius: 10px;
+  font-weight: 700;
 }
 
 :deep(.ant-input-affix-wrapper-lg) {
@@ -294,9 +346,17 @@ async function onSubmit() {
     font-size: 14px;
   }
 
-  .login-card {
+  .login-column {
     width: calc(100vw - 36px);
+    transform: none;
+  }
+
+  .login-card {
     padding: 42px 26px 32px;
+  }
+
+  .student-tip {
+    font-size: 14px;
   }
 }
 </style>

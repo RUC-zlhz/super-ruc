@@ -19,6 +19,10 @@ class WorkflowNodeIn(BaseModel):
     trigger_rule: str = "PREV_DONE"
     due_rule_days: int | None = None
     reminder_lead_days: int | None = None
+    reminder_enabled: bool = True
+    reminder_channel: str = "IN_APP"
+    repeat_interval_days: int | None = None
+    max_reminders: int | None = 1
     is_terminal: bool = False
     is_active: bool = True
 
@@ -35,6 +39,10 @@ class WorkflowNodeOut(BaseModel):
     trigger_rule: str
     due_rule_days: int | None
     reminder_lead_days: int | None
+    reminder_enabled: bool
+    reminder_channel: str
+    repeat_interval_days: int | None
+    max_reminders: int | None
     is_terminal: bool
     is_active: bool
 
@@ -146,6 +154,50 @@ class ReminderOut(BaseModel):
     status: str
     sent_at: datetime | None
     message: str | None
+    cancel_reason: str | None
+    error_message: str | None
+    created_at: datetime
+
+
+class ReminderRunOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    as_of_date: date
+    channel: str
+    trigger_mode: str
+    status: str
+    created_count: int
+    sent_count: int
+    skipped_count: int
+    cancelled_count: int
+    failed_count: int
+    error_message: str | None
+    operator_id: int | None
+    operator_role: str | None
+    started_at: datetime
+    finished_at: datetime | None
+
+
+class ReminderAdminOut(BaseModel):
+    id: int
+    workflow_node_state_id: int
+    student_id: int
+    student_no: str | None
+    student_name: str | None
+    template_code: str
+    template_name: str
+    node_code: str
+    node_name: str
+    node_status: str
+    due_date: date | None
+    reminder_date: date
+    channel: str
+    status: str
+    sent_at: datetime | None
+    message: str | None
+    cancel_reason: str | None
+    error_message: str | None
     created_at: datetime
 
 

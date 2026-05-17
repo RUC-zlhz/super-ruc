@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import Student, User, UserRole
+from app.core.security import create_token
 from app.core.security import encrypt_field
 
 
@@ -184,6 +185,8 @@ async def test_notice_publish_dispatch_and_student_inbox(
     )
     other_headers = {"Authorization": f"Bearer {other_token}"}
 
+
+
     # 2. 管理员创建通知
     create = await admin_client.post(
         "/api/v1/admin/notices",
@@ -309,6 +312,26 @@ async def test_notice_publish_dispatch_and_student_inbox(
     assert in_app_row["target_handle"] is None
     assert sms_row["error_code"] == "SMS_DISABLED"
     assert "target_handle" in sms_row
+
+
+async def test_collaborator_role_can_access_notice_admin_tools(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    user = User(work_no="NOTCADRE01", display_name="Notice Cadre", is_active=True)
+    db.add(user)
+    await db.flush()
+    db.add(UserRole(user_id=user.id, role_code="YOUTH_LEAGUE_SECRETARY"))
+    await db.commit()
+    token = create_token(str(user.id), "access", extra_claims={"roles": ["YOUTH_LEAGUE_SECRETARY"]})
+
+    resp = await client.post(
+        "/api/v1/admin/notices/target-preview",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"target_rule": None},
+    )
+    assert resp.status_code == 200, resp.text
+    assert "target_count" in resp.json()["data"]
 
 
 async def test_notice_email_dispatch_records_delivery(

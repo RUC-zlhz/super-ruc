@@ -648,6 +648,25 @@
 - Web 构建：`pnpm -C web build` 通过。
 - 后端回归：`UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache-local` 下执行 `uv run pytest tests\integration\test_s12_gap_closure.py -q`，结果 `5 passed in 77.97s`。
 - 浏览器检查：5174 培养方案页已显示 `新增方案`、`新增模块`、`编辑方案`、`删除方案`，模块行已显示课程数量和 `新增课程 / 编辑 / 删除` 操作，表格包含展开入口。
+
+### S23 党团提醒规则配置与自动闭环
+
+- [ ] `S23.1` 在党团流程模板节点中补齐提醒规则字段的保存与展示，包括启用状态、提前提醒天数、重复提醒间隔、最大提醒次数和渠道。
+- [ ] `S23.2` 将 Web“节点提醒”页从占位态升级为真实工作台，支持规则查询、提醒记录查询和运行记录展示。
+- [ ] `S23.3` 为提醒执行增加持久化运行记录，支持展示 `created / sent / skipped / cancelled / failed` 结果。
+- [ ] `S23.4` 在提醒生成逻辑中补齐去重、逾期推进、节点完成后自动取消未发送提醒等闭环规则。
+- [ ] `S23.5` 将 `IN_APP` 渠道接入真实站内提醒发送，并在提醒记录中回写 `SENT / CANCELLED` 等最终状态。
+- [ ] `S23.6` 复用现有 scheduler 模式为党团提醒增加自动调度能力，并补齐对应回归测试。
+
+当前结论：
+
+- `S23` 尚未开始实施，但可直接按已登记的前后端拆分方案推进。
+
+证据：
+
+- 细化方案：`docs/notes/refinements/2026-05-17-workflow-reminder-rule-and-auto-closure-breakdown.md`
+- 当前占位页：`web/src/views/workflow/PartyStageList.vue`
+- 当前手动提醒生成接口：`backend/app/workflow/router.py`、`backend/app/workflow/service.py`
 - 加固回归：培养方案切换时会清空旧详情并等待新详情加载完成后再开放编辑动作；后端 `PATCH /admin/curriculum/plans/{id}` 在 `expected_updated_at` 不匹配时返回 `409` 冲突。
 
 ## 细化文件登记
@@ -715,6 +734,10 @@
 | 2026-05-17 | 成绩单 PDF 解析正确性修复 | `docs/notes/refinements/2026-05-17-s20-transcript-pdf-ruc-parser-fix.md` | `S20.1, S20.2, S20.3, S20.4, S20.5` | `[x]` | 已补 `pypdf` 依赖和 RUC 成绩单文本层解析，真实 PDF 可识别 34 条待核验课程候选且学期码可提交，上传边界回归通过 |
 | 2026-05-17 | 默认培养方案重复导入落库修复 | `docs/notes/refinements/2026-05-17-s21-default-curriculum-reimport-persistence-fix.md` | `S21.1, S21.2, S21.3, S21.4` | `[x]` | 已修复覆盖式导入旧模块删除未 flush 导致唯一约束失败的问题；当前 5174 页面已显示 7 个方案、选中专业 19 个模块和正确总学分 |
 | 2026-05-17 | 培养方案明细与 CRUD 界面补齐 | `docs/notes/refinements/2026-05-17-s22-curriculum-detail-crud-ui.md` | `S22.1, S22.2, S22.3, S22.4` | `[x]` | 已补模块展开课程明细，以及方案、模块、课程的新增、编辑、删除入口；Web 构建和 5174 页面检查通过 |
+| 2026-05-17 | Web 需求总结对照核查 | `docs/notes/refinements/2026-05-17-web-requirements-summary-audit.md` | `S1 ~ S22（现状复核）` | `[x]` | 已对照 `需求总结.docx` 完成 Web 端实现审计；确认后台主能力已覆盖，但班团骨干权限、登录方式、党团提醒规则与通知来源治理仍有差距；`web vue-tsc` 与 `vite build` 通过 |
+| 2026-05-17 | Web 班团骨干权限与请假边界文案修复 | `docs/notes/refinements/2026-05-17-web-cadre-access-and-leave-boundary.md` | `S22.5, S22.6` | `[x]` | 已向班团骨干开放 Web 协同管理入口，并在审批工作台/请假详情补充“正式请假仍以微人大等校级系统为准”提示；`web vue-tsc`、`vite build` 与后端 `py_compile` 通过，`pytest` 受本地运行时缺少模块阻塞 |
+| 2026-05-17 | Web 前端需求预览入口 | `docs/notes/refinements/2026-05-17-web-frontend-preview-for-requirement-check.md` | `S22.7` | `[x]` | 已新增公开预览页与登录页开发入口，可直接在前端预览班团骨干菜单范围与请假边界提示；登录页已重排预览区与学生提示，避免遮挡，并将 `vite` 默认开发端口调整为 `4173` 以规避本机 `5173` 排除端口冲突；`web vue-tsc` 与 `vite build` 通过 |
+| 2026-05-17 | 党团提醒规则配置与自动闭环实施拆分 | `docs/notes/refinements/2026-05-17-workflow-reminder-rule-and-auto-closure-breakdown.md` | `S23` | `[x]` | 已基于现有工作流实现拆分出前后端可执行清单；首版建议先闭环 `IN_APP` 站内提醒，并复用现有 scheduler 模式实现自动执行 |
 
 ## 会话更新要求
 
@@ -790,3 +813,7 @@
 - `2026-05-17`：新增并完成 `S20` 成绩单 PDF 解析正确性修复；后端补 `pypdf` 依赖和 RUC 成绩单拆字文本解析分支，`D:\Downloads\1778947112713.pdf` 可识别 `34` 条待核验候选课程，单元测试、上传边界集成测试、ruff、py_compile 与 Miniapp 类型检查通过。
 - `2026-05-17`：新增并完成 `S21` 默认培养方案重复导入落库修复；修复覆盖式导入旧模块删除未 flush 导致唯一约束失败的问题，对当前 `localhost:8080` 连接库重跑默认培养方案导入，5174 页面刷新后已显示新方案数据。
 - `2026-05-17`：新增并完成 `S22` 培养方案明细与 CRUD 界面补齐；`/academic/curriculum` 已支持模块展开课程明细，以及方案、模块、课程的新增、编辑、删除维护操作。
+- `2026-05-17`：新增 “Web 需求总结对照核查” 细化文件；对照 `需求总结.docx` 复核当前 `web` 端范围，确认其定位为老师/管理员后台而非学生端 Web 前台，并记录已实现能力与剩余缺口；执行 `web vue-tsc` 与 `vite build` 通过。
+- `2026-05-17`：新增并完成 `S22.5 / S22.6` Web 班团骨干权限与请假边界文案修复；班团骨干现可进入审批、党团流程、通知、知识库、理论自测和荣誉公示等协同入口，请假事项已在工作台和详情页标明“正式请假仍以微人大等校级系统为准”；`web vue-tsc`、`vite build` 与后端 `py_compile` 通过，后端 `pytest` 因 bundled Python 缺少 `pytest` 模块未执行。
+- `2026-05-17`：新增并完成 `S22.7` Web 前端需求预览入口；登录页已提供“直接预览班团骨干权限与请假提示”的公开入口，用户可不依赖后端账号直接在前端切换角色并查看可见菜单与请假边界提示；同时将登录页学生端提示与开发预览拆分为独立辅助区，避免遮挡，并将 `vite` 默认开发端口改为 `4173`，规避当前 Windows 环境 `5173` 位于 `5099-5198` 排除端口区间导致的启动失败；`web vue-tsc` 与 `vite build` 通过。
+- `2026-05-17`：新增 “党团提醒规则配置与自动闭环实施拆分” 细化文件；基于当前工作流实现确认差距主要集中在规则查询、运行记录、自动调度、去重和提醒取消闭环，并将后续开发拆分为 `S23.1 ~ S23.6`，首版建议仅闭环 `IN_APP` 站内提醒。

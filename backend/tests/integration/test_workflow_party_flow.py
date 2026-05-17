@@ -16,7 +16,8 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.models import Student
+from app.auth.models import Student, User, UserRole
+from app.core.security import create_token
 from app.workflow.models import (
     StudentWorkflowNode,
     WorkflowReminder,
@@ -257,3 +258,21 @@ async def test_workflow_endpoints_reject_anonymous_and_student(
         json=_party_template_payload(),
     )
     assert forbidden.status_code == 403
+
+
+async def test_collaborator_role_can_access_workflow_admin_tools(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    user = User(work_no="WFCADRE01", display_name="Workflow Cadre", is_active=True)
+    db.add(user)
+    await db.flush()
+    db.add(UserRole(user_id=user.id, role_code="PARTY_BRANCH_SECRETARY"))
+    await db.commit()
+    token = create_token(str(user.id), "access", extra_claims={"roles": ["PARTY_BRANCH_SECRETARY"]})
+
+    resp = await client.get(
+        "/api/v1/admin/workflow/templates",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200, resp.text

@@ -19,7 +19,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.models import AuditLog
-from app.auth.models import Student
+from app.auth.models import Student, User, UserRole
+from app.core.security import create_token
 from app.core import storage
 from app.workflow import pdf_generator
 
@@ -62,6 +63,21 @@ async def _latest_audit(
         .order_by(AuditLog.id.desc())
     )
     return (await db.execute(stmt)).scalars().first()
+
+
+async def _headers_for_role(
+    db: AsyncSession,
+    *,
+    role_code: str,
+    work_no: str,
+) -> dict[str, str]:
+    user = User(work_no=work_no, display_name=f"req-{role_code}", is_active=True)
+    db.add(user)
+    await db.flush()
+    db.add(UserRole(user_id=user.id, role_code=role_code))
+    await db.commit()
+    token = create_token(str(user.id), "access", extra_claims={"roles": [role_code]})
+    return {"Authorization": f"Bearer {token}"}
 
 
 async def test_request_happy_path_draft_submit_claim_approve(
@@ -632,3 +648,49 @@ async def test_request_endpoints_reject_anonymous_and_student_role(
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 403
+
+
+async def test_collaborator_role_can_view_request_workbench_and_detail(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    token = await _login_as_student(
+        client, db, student_no="R700001", wx_code="wx_r700001"
+    )
+    stu_headers = {"Authorization": f"Bearer {token}"}
+    create = await client.post(
+        "/api/v1/requests",
+        headers=stu_headers,
+        json={
+            "type_code": "LEAVE_PERSONAL",
+            "title": "班团骨干查看的请假单",
+            "form_data": {
+                "reason": "活动请假",
+                "start_date": "2026-05-18",
+                "end_date": "2026-05-18",
+            },
+            "summary": "用于权限回归",
+        },
+    )
+    assert create.status_code == 200, create.text
+    request_id = create.json()["data"]["id"]
+    submit = await client.post(
+        f"/api/v1/requests/{request_id}/submit",
+        headers=stu_headers,
+    )
+    assert submit.status_code == 200, submit.text
+
+    cadre_headers = await _headers_for_role(
+        db,
+        role_code="YOUTH_LEAGUE_SECRETARY",
+        work_no="REQCADRE01",
+    )
+    workbench = await client.get("/api/v1/admin/requests", headers=cadre_headers)
+    assert workbench.status_code == 200, workbench.text
+
+    detail = await client.get(
+        f"/api/v1/requests/{request_id}",
+        headers=cadre_headers,
+    )
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["data"]["id"] == request_id
