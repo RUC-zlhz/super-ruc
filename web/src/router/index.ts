@@ -23,6 +23,11 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: "登录" },
   },
   {
+    path: "/preview/requirements",
+    component: () => import("@/views/preview/RequirementsPreview.vue"),
+    meta: { public: true, title: "鍓嶇棰勮" },
+  },
+  {
     path: "/",
     component: MainLayout,
     redirect: () => {

@@ -11,14 +11,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit.enforcement import audit_forbidden_and_raise
 from app.audit.service import build_audit_detail, log_action
 from app.auth.models import Student
-from app.auth.role_codes import ROLE_CODE_CLASS_MONITOR, normalize_role_codes
+from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES, normalize_role_codes
 from app.core.config import settings
 from app.core.exceptions import BizError, ConflictError, NotFoundError
 from app.core.storage import put_object
+from app.notice import repository as notice_repo
 from app.notice.service import create_system_in_app_notice_for_student
 from app.workflow import repository as repo
 from app.workflow.models import (
+    REMINDER_RUN_STATUS_COMPLETED,
+    REMINDER_RUN_STATUS_FAILED,
+    REMINDER_RUN_STATUS_RUNNING,
+    REMINDER_STATUS_CANCELLED,
+    REMINDER_STATUS_FAILED,
     REMINDER_STATUS_PENDING,
+    REMINDER_STATUS_SENT,
     REQUEST_ACTION_APPROVE,
     REQUEST_ACTION_OFFLINE,
     REQUEST_ACTION_REJECT,
@@ -30,6 +37,7 @@ from app.workflow.models import (
     REQUEST_STATUS_REJECTED,
     REQUEST_STATUS_SUBMITTED,
     WORKFLOW_NODE_DONE,
+    WORKFLOW_NODE_MANUAL,
     WORKFLOW_NODE_OVERDUE,
     WORKFLOW_NODE_PENDING,
     Request,
@@ -37,11 +45,15 @@ from app.workflow.models import (
     StudentWorkflow,
     StudentWorkflowNode,
     WorkflowNode,
+    WorkflowReminder,
+    WorkflowReminderRun,
     WorkflowTemplate,
 )
 from app.workflow.schemas import (
     ApprovalRecordOut,
     AttachmentOut,
+    ReminderAdminOut,
+    ReminderRunOut,
     RequestBrief,
     RequestDetail,
     StudentWorkflowBrief,
@@ -111,6 +123,10 @@ async def upsert_template_with_nodes(
             trigger_rule=n.trigger_rule,
             due_rule_days=n.due_rule_days,
             reminder_lead_days=n.reminder_lead_days,
+            reminder_enabled=n.reminder_enabled,
+            reminder_channel=n.reminder_channel,
+            repeat_interval_days=n.repeat_interval_days,
+            max_reminders=n.max_reminders,
             is_terminal=n.is_terminal,
             is_active=n.is_active,
         )
@@ -263,8 +279,15 @@ async def get_workflow_for_student(
         raise NotFoundError("流程实例不存在")
     # 学生仅能查看本人；老师/管理员按角色已放行（路由层做）
     if viewer_student_id is not None and sw.student_id != viewer_student_id:
-        allowed = {"SUPER_ADMIN", "COLLEGE_LEADER", "COUNSELOR", "HEAD_TEACHER",
-                   "YOUTH_LEAGUE_TEACHER", "PARTY_BUILD_TEACHER", ROLE_CODE_CLASS_MONITOR}
+        allowed = {
+            "SUPER_ADMIN",
+            "COLLEGE_LEADER",
+            "COUNSELOR",
+            "HEAD_TEACHER",
+            "YOUTH_LEAGUE_TEACHER",
+            "PARTY_BUILD_TEACHER",
+            *ROLE_CODE_COLLABORATOR_ROLES,
+        }
         if not (set(normalize_role_codes(viewer_roles)) & allowed):
             raise BizError("无权查看该流程", code=40301, http_status=403)
     return _workflow_to_detail(sw)
@@ -295,6 +318,11 @@ async def complete_node(
     state.completed_by = operator_id
     state.evidence = evidence
     state.note = note
+    cancelled = await _cancel_unsent_reminders_for_state(
+        db,
+        state_id=state.id,
+        reason="节点已完成，自动关闭未发送提醒",
+    )
 
     sw = state.workflow
     # 触发下一节点
@@ -325,6 +353,7 @@ async def complete_node(
         entity_id=state.id,
         actor_user_id=operator_id,
         actor_role=operator_role,
+        detail={"cancelled_reminders": cancelled},
     )
     await db.commit()
     full = await repo.get_student_workflow(db, sw.id)
@@ -349,6 +378,13 @@ async def mark_node_status(
     state.status = new_status
     if note:
         state.note = note
+    cancelled = 0
+    if new_status == WORKFLOW_NODE_MANUAL:
+        cancelled = await _cancel_unsent_reminders_for_state(
+            db,
+            state_id=state.id,
+            reason="节点已转人工跟进，自动关闭未发送提醒",
+        )
     await log_action(
         db,
         event_type="WORKFLOW",
@@ -357,7 +393,7 @@ async def mark_node_status(
         entity_id=state.id,
         actor_user_id=operator_id,
         actor_role=operator_role,
-        detail={"new_status": new_status},
+        detail={"new_status": new_status, "cancelled_reminders": cancelled},
     )
     await db.commit()
     full = await repo.get_student_workflow(db, state.workflow_id)
@@ -401,6 +437,272 @@ async def list_admin_workflows(
     return items, total
 
 
+def _reminder_run_to_out(run: WorkflowReminderRun) -> ReminderRunOut:
+    return ReminderRunOut.model_validate(run)
+
+
+def _reminder_row_to_out(
+    reminder: WorkflowReminder,
+    state: StudentWorkflowNode,
+    workflow: StudentWorkflow,
+    template: WorkflowTemplate,
+    student: Student,
+) -> ReminderAdminOut:
+    return ReminderAdminOut(
+        id=reminder.id,
+        workflow_node_state_id=reminder.workflow_node_state_id,
+        student_id=reminder.student_id,
+        student_no=student.student_no,
+        student_name=student.full_name,
+        template_code=template.code,
+        template_name=template.name,
+        node_code=state.node.code if state.node else "",
+        node_name=state.node.name if state.node else "",
+        node_status=state.status,
+        due_date=state.due_date,
+        reminder_date=reminder.reminder_date,
+        channel=reminder.channel,
+        status=reminder.status,
+        sent_at=reminder.sent_at,
+        message=reminder.message,
+        cancel_reason=reminder.cancel_reason,
+        error_message=reminder.error_message,
+        created_at=reminder.created_at,
+    )
+
+
+async def list_reminder_runs(
+    db: AsyncSession,
+    *,
+    page: int,
+    size: int,
+) -> tuple[list[ReminderRunOut], int]:
+    rows, total = await repo.list_reminder_runs(db, page=page, size=size)
+    return [_reminder_run_to_out(row) for row in rows], total
+
+
+async def list_reminders_admin(
+    db: AsyncSession,
+    *,
+    template_code: str | None,
+    student_no: str | None,
+    status: str | None,
+    page: int,
+    size: int,
+) -> tuple[list[ReminderAdminOut], int]:
+    rows, total = await repo.list_workflow_reminders_admin(
+        db,
+        template_code=template_code,
+        student_no=student_no,
+        status=status,
+        page=page,
+        size=size,
+    )
+    return [
+        _reminder_row_to_out(reminder, state, workflow, template, student)
+        for reminder, state, workflow, template, student in rows
+    ], total
+
+
+async def _cancel_unsent_reminders_for_state(
+    db: AsyncSession,
+    *,
+    state_id: int,
+    reason: str,
+) -> int:
+    return await repo.cancel_unsent_reminders_for_state(
+        db,
+        workflow_node_state_id=state_id,
+        statuses=[REMINDER_STATUS_PENDING, REMINDER_STATUS_FAILED],
+        cancel_reason=reason,
+    )
+
+
+def _build_reminder_message(
+    *,
+    template: WorkflowTemplate,
+    node: WorkflowNode,
+    due_date: date,
+) -> tuple[str, str, str]:
+    title = f"党团流程提醒：{template.name} - {node.name}"
+    summary = f"{node.name} 需在 {due_date} 前跟进"
+    body = "\n".join(
+        [
+            f"你在《{template.name}》中的当前节点为：{node.name}",
+            f"截止日期：{due_date}",
+            f"待完成事项：{node.required_task or '请按学院要求及时跟进'}",
+        ]
+    )
+    return title, summary, body
+
+
+async def run_reminder_cycle(
+    db: AsyncSession,
+    *,
+    as_of: date | None,
+    channel: str | None,
+    trigger_mode: str,
+    operator_id: int | None,
+    operator_role: str | None,
+) -> ReminderRunOut:
+    as_of = as_of or date.today()
+    run = await repo.create_reminder_run(
+        db,
+        as_of_date=as_of,
+        channel=channel or settings.WORKFLOW_REMINDER_CHANNEL,
+        trigger_mode=trigger_mode,
+        status=REMINDER_RUN_STATUS_RUNNING,
+        created_count=0,
+        sent_count=0,
+        skipped_count=0,
+        cancelled_count=0,
+        failed_count=0,
+        operator_id=operator_id,
+        operator_role=operator_role,
+    )
+
+    created_count = 0
+    sent_count = 0
+    skipped_count = 0
+    failed_count = 0
+    user_cache: dict[int, int | None] = {}
+    try:
+        states = await repo.list_pending_nodes_for_reminder(db, as_of=as_of)
+        for state in states:
+            if state.due_date is None or state.node is None or state.workflow is None:
+                skipped_count += 1
+                continue
+
+            node = state.node
+            workflow = state.workflow
+            template = workflow.template
+
+            if not node.reminder_enabled:
+                skipped_count += 1
+                continue
+
+            effective_channel = channel or node.reminder_channel or settings.WORKFLOW_REMINDER_CHANNEL
+            if effective_channel != "IN_APP":
+                skipped_count += 1
+                continue
+
+            lead_days = node.reminder_lead_days or 0
+            remind_on = state.due_date - timedelta(days=lead_days)
+            if remind_on > as_of:
+                skipped_count += 1
+                continue
+
+            if state.due_date < as_of and state.status == WORKFLOW_NODE_PENDING:
+                state.status = WORKFLOW_NODE_OVERDUE
+
+            existing = await repo.list_reminders_for_state(
+                db,
+                workflow_node_state_id=state.id,
+                channel=effective_channel,
+            )
+            active_reminders = [row for row in existing if row.status != REMINDER_STATUS_CANCELLED]
+            if any(row.reminder_date == as_of for row in active_reminders):
+                skipped_count += 1
+                continue
+
+            if node.max_reminders is not None and len(active_reminders) >= node.max_reminders:
+                skipped_count += 1
+                continue
+
+            if active_reminders:
+                interval_days = node.repeat_interval_days
+                if interval_days is None or interval_days <= 0:
+                    skipped_count += 1
+                    continue
+                last_date = max(row.reminder_date for row in active_reminders)
+                if (as_of - last_date).days < interval_days:
+                    skipped_count += 1
+                    continue
+
+            title, summary, body = _build_reminder_message(
+                template=template,
+                node=node,
+                due_date=state.due_date,
+            )
+            reminder = await repo.create_reminder(
+                db,
+                run_id=run.id,
+                workflow_node_state_id=state.id,
+                student_id=workflow.student_id,
+                reminder_date=as_of,
+                channel=effective_channel,
+                status=REMINDER_STATUS_PENDING,
+                message=summary,
+            )
+            created_count += 1
+
+            try:
+                if workflow.student_id not in user_cache:
+                    user = await notice_repo.find_user_by_student_id(db, workflow.student_id)
+                    user_cache[workflow.student_id] = user.id if user else None
+                await create_system_in_app_notice_for_student(
+                    db,
+                    student_id=workflow.student_id,
+                    user_id=user_cache[workflow.student_id],
+                    title=title,
+                    body_md=body,
+                    summary=summary,
+                    category="WORKFLOW",
+                    source_type="SYSTEM",
+                    source_url=f"workflow-reminder:{reminder.id}",
+                    operator_id=operator_id,
+                )
+                reminder.status = REMINDER_STATUS_SENT
+                reminder.sent_at = datetime.now(UTC)
+                sent_count += 1
+            except Exception as exc:  # noqa: BLE001
+                logger.exception("workflow reminder send failed | reminder_id=%s", reminder.id)
+                reminder.status = REMINDER_STATUS_FAILED
+                reminder.error_message = str(exc)[:512]
+                failed_count += 1
+
+        run.status = REMINDER_RUN_STATUS_COMPLETED
+        run.created_count = created_count
+        run.sent_count = sent_count
+        run.skipped_count = skipped_count
+        run.cancelled_count = 0
+        run.failed_count = failed_count
+        run.finished_at = datetime.now(UTC)
+
+        await log_action(
+            db,
+            event_type="WORKFLOW",
+            entity_code="REMINDER_RUN",
+            action="RUN",
+            entity_id=run.id,
+            actor_user_id=operator_id,
+            actor_role=operator_role,
+            detail={
+                "as_of": str(as_of),
+                "channel": run.channel,
+                "trigger_mode": trigger_mode,
+                "created": created_count,
+                "sent": sent_count,
+                "skipped": skipped_count,
+                "failed": failed_count,
+            },
+        )
+        await db.commit()
+        await db.refresh(run)
+        return _reminder_run_to_out(run)
+    except Exception as exc:  # noqa: BLE001
+        run.status = REMINDER_RUN_STATUS_FAILED
+        run.error_message = str(exc)[:512]
+        run.created_count = created_count
+        run.sent_count = sent_count
+        run.skipped_count = skipped_count
+        run.cancelled_count = 0
+        run.failed_count = failed_count
+        run.finished_at = datetime.now(UTC)
+        await db.commit()
+        raise
+
+
 # ======================================================================
 # A.3 提醒（FR-005）
 # ======================================================================
@@ -411,41 +713,15 @@ async def generate_reminders(
     channel: str,
     operator_id: int,
     operator_role: str | None,
-) -> int:
-    as_of = as_of or date.today()
-    states = await repo.list_pending_nodes_for_reminder(db, as_of=as_of)
-    created = 0
-    for s in states:
-        if s.due_date is None:
-            continue
-        lead = (s.node.reminder_lead_days if s.node and s.node.reminder_lead_days is not None else 0)
-        remind_on = s.due_date - timedelta(days=lead)
-        if remind_on > as_of:
-            continue
-        # 逾期也自动调整节点状态
-        if s.due_date < as_of and s.status == WORKFLOW_NODE_PENDING:
-            s.status = WORKFLOW_NODE_OVERDUE
-        await repo.create_reminder(
-            db,
-            workflow_node_state_id=s.id,
-            student_id=s.workflow.student_id if s.workflow else 0,
-            reminder_date=as_of,
-            channel=channel,
-            status=REMINDER_STATUS_PENDING,
-            message=f"节点 {s.node.name} 需要跟进，截止 {s.due_date}",
-        )
-        created += 1
-    await log_action(
+) -> ReminderRunOut:
+    return await run_reminder_cycle(
         db,
-        event_type="WORKFLOW",
-        entity_code="REMINDER",
-        action="GENERATE",
-        actor_user_id=operator_id,
-        actor_role=operator_role,
-        detail={"as_of": str(as_of), "count": created},
+        as_of=as_of,
+        channel=channel,
+        trigger_mode="MANUAL",
+        operator_id=operator_id,
+        operator_role=operator_role,
     )
-    await db.commit()
-    return created
 
 
 # ======================================================================
@@ -772,8 +1048,13 @@ async def get_request_detail(
         raise NotFoundError("申请不存在")
     # 学生仅能查看自己提交的，其他角色按路由层放行
     admin_roles = {
-        "SUPER_ADMIN", "COLLEGE_LEADER", "COUNSELOR", "HEAD_TEACHER",
-        "YOUTH_LEAGUE_TEACHER", "PARTY_BUILD_TEACHER", ROLE_CODE_CLASS_MONITOR,
+        "SUPER_ADMIN",
+        "COLLEGE_LEADER",
+        "COUNSELOR",
+        "HEAD_TEACHER",
+        "YOUTH_LEAGUE_TEACHER",
+        "PARTY_BUILD_TEACHER",
+        *ROLE_CODE_COLLABORATOR_ROLES,
     }
     if req.applicant_user_id != viewer_user_id and not (
         set(normalize_role_codes(viewer_roles)) & admin_roles

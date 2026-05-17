@@ -16,6 +16,15 @@
           <a-tag :color="statusMeta.color">{{ statusMeta.label }}</a-tag>
         </div>
 
+        <a-alert
+          v-if="isLeaveRequest"
+          class="mb16"
+          type="warning"
+          show-icon
+          message="正式请假仍以校级正式系统为准"
+          description="当前页面中的请假申请仅用于院内协同、补件和审批留痕；如需形成正式请假结果，请继续通过微人大等校级正式系统办理。"
+        />
+
         <a-card title="申请基础信息" :bordered="false" size="small" class="mb16 visual-card">
           <a-alert
             type="info"
@@ -274,6 +283,12 @@ const showProofActions = computed(() => {
   const typeCode = (detail.value.type_code || '').toUpperCase()
   return detail.value.status === 'APPROVED'
     && (detail.value.category === 'CERTIFICATE' || typeCode.startsWith('CERT'))
+})
+
+const isLeaveRequest = computed(() => {
+  if (!detail.value) return false
+  const typeCode = (detail.value.type_code || '').toUpperCase()
+  return detail.value.category === 'LEAVE' || typeCode.startsWith('LEAVE')
 })
 
 const formEntries = computed(() => {

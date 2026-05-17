@@ -56,6 +56,11 @@ WORKFLOW_NODE_MANUAL = "MANUAL_FOLLOW_UP"
 REMINDER_STATUS_PENDING = "PENDING"
 REMINDER_STATUS_SENT = "SENT"
 REMINDER_STATUS_CANCELLED = "CANCELLED"
+REMINDER_STATUS_FAILED = "FAILED"
+
+REMINDER_RUN_STATUS_RUNNING = "RUNNING"
+REMINDER_RUN_STATUS_COMPLETED = "COMPLETED"
+REMINDER_RUN_STATUS_FAILED = "FAILED"
 
 # ---------- 申请状态机 ----------
 REQUEST_STATUS_DRAFT = "DRAFT"
@@ -142,6 +147,12 @@ class WorkflowNode(Base):
     )
     due_rule_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reminder_lead_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reminder_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    reminder_channel: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="IN_APP", comment="IN_APP/EMAIL/SMS"
+    )
+    repeat_interval_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_reminders: Mapped[int | None] = mapped_column(Integer, nullable=True, default=1)
 
     is_terminal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -250,6 +261,9 @@ class WorkflowReminder(Base):
     __tablename__ = "workflow_reminders"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    run_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("workflow_reminder_runs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     workflow_node_state_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("student_workflow_nodes.id", ondelete="CASCADE"),
         nullable=False, index=True,
@@ -266,9 +280,50 @@ class WorkflowReminder(Base):
     )
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     message: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    cancel_reason: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "workflow_node_state_id",
+            "reminder_date",
+            "channel",
+            name="uq_workflow_reminders_state_date_channel",
+        ),
+    )
+
+
+class WorkflowReminderRun(Base):
+    """一次提醒执行的持久化记录。"""
+
+    __tablename__ = "workflow_reminder_runs"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    as_of_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    channel: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="IN_APP", comment="IN_APP/EMAIL/SMS"
+    )
+    trigger_mode: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="MANUAL", comment="MANUAL/AUTO"
+    )
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=REMINDER_RUN_STATUS_RUNNING, index=True
+    )
+    created_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    sent_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    skipped_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cancelled_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    operator_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    operator_role: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 # =====================================================================

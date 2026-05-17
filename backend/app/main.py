@@ -18,6 +18,7 @@ from app.auth.router import router as auth_router
 from app.core.audit_archive_scheduler import get_audit_archive_scheduler
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
+from app.core.workflow_reminder_scheduler import get_workflow_reminder_scheduler
 from app.core.response import ApiResponse, ok
 from app.exchange.router import curriculum_router as curriculum_router
 from app.exchange.router import router as exchange_router
@@ -54,16 +55,25 @@ async def lifespan(app: FastAPI):
         settings.APP_DEBUG,
         settings.API_V1_PREFIX,
     )
-    scheduler = None
+    audit_scheduler = None
+    workflow_scheduler = None
     if settings.AUDIT_ARCHIVE_ENABLED:
-        scheduler = get_audit_archive_scheduler()
-        await scheduler.start()
+        audit_scheduler = get_audit_archive_scheduler()
+        await audit_scheduler.start()
         logger.info("audit archive scheduler enabled")
     else:
         logger.info("audit archive scheduler disabled")
+    if settings.WORKFLOW_REMINDER_ENABLED:
+        workflow_scheduler = get_workflow_reminder_scheduler()
+        await workflow_scheduler.start()
+        logger.info("workflow reminder scheduler enabled")
+    else:
+        logger.info("workflow reminder scheduler disabled")
     yield
-    if scheduler is not None:
-        await scheduler.stop()
+    if workflow_scheduler is not None:
+        await workflow_scheduler.stop()
+    if audit_scheduler is not None:
+        await audit_scheduler.stop()
     logger.info("SIP backend shutting down")
 
 

@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.auth.models import Student
 from app.core.sql import order_by_nulls_last_desc
 from app.workflow.models import (
+    REMINDER_STATUS_CANCELLED,
     REQUEST_STATUS_APPROVED,
     REQUEST_STATUS_IN_REVIEW,
     REQUEST_STATUS_REJECTED,
@@ -27,6 +28,7 @@ from app.workflow.models import (
     StudentWorkflowNode,
     WorkflowNode,
     WorkflowReminder,
+    WorkflowReminderRun,
     WorkflowTemplate,
 )
 
@@ -170,7 +172,7 @@ async def list_pending_nodes_for_reminder(
         select(StudentWorkflowNode)
         .options(
             selectinload(StudentWorkflowNode.node),
-            selectinload(StudentWorkflowNode.workflow),
+            selectinload(StudentWorkflowNode.workflow).selectinload(StudentWorkflow.template),
         )
         .where(StudentWorkflowNode.status.in_([WORKFLOW_NODE_PENDING, WORKFLOW_NODE_OVERDUE]))
         .where(StudentWorkflowNode.due_date.is_not(None))
@@ -183,6 +185,125 @@ async def create_reminder(db: AsyncSession, **fields) -> WorkflowReminder:
     db.add(row)
     await db.flush()
     return row
+
+
+async def create_reminder_run(db: AsyncSession, **fields) -> WorkflowReminderRun:
+    row = WorkflowReminderRun(**fields)
+    db.add(row)
+    await db.flush()
+    return row
+
+
+async def list_reminder_runs(
+    db: AsyncSession,
+    *,
+    page: int = 1,
+    size: int = 20,
+) -> tuple[Sequence[WorkflowReminderRun], int]:
+    stmt = select(WorkflowReminderRun)
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await db.execute(count_stmt)).scalar_one()
+    stmt = (
+        stmt.order_by(WorkflowReminderRun.started_at.desc(), WorkflowReminderRun.id.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+    )
+    return (await db.execute(stmt)).scalars().all(), total
+
+
+async def find_reminder_by_state_date_channel(
+    db: AsyncSession,
+    *,
+    workflow_node_state_id: int,
+    reminder_date: date,
+    channel: str,
+) -> WorkflowReminder | None:
+    stmt = select(WorkflowReminder).where(
+        WorkflowReminder.workflow_node_state_id == workflow_node_state_id,
+        WorkflowReminder.reminder_date == reminder_date,
+        WorkflowReminder.channel == channel,
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def list_reminders_for_state(
+    db: AsyncSession,
+    *,
+    workflow_node_state_id: int,
+    channel: str | None = None,
+) -> Sequence[WorkflowReminder]:
+    stmt = select(WorkflowReminder).where(
+        WorkflowReminder.workflow_node_state_id == workflow_node_state_id
+    )
+    if channel:
+        stmt = stmt.where(WorkflowReminder.channel == channel)
+    stmt = stmt.order_by(WorkflowReminder.reminder_date, WorkflowReminder.id)
+    return (await db.execute(stmt)).scalars().all()
+
+
+async def cancel_unsent_reminders_for_state(
+    db: AsyncSession,
+    *,
+    workflow_node_state_id: int,
+    statuses: Sequence[str],
+    cancel_reason: str,
+) -> int:
+    stmt = select(WorkflowReminder).where(
+        WorkflowReminder.workflow_node_state_id == workflow_node_state_id,
+        WorkflowReminder.status.in_(list(statuses)),
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+    for row in rows:
+        row.status = REMINDER_STATUS_CANCELLED
+        row.cancel_reason = cancel_reason
+    await db.flush()
+    return len(rows)
+
+
+async def list_workflow_reminders_admin(
+    db: AsyncSession,
+    *,
+    template_code: str | None = None,
+    student_no: str | None = None,
+    status: str | None = None,
+    page: int = 1,
+    size: int = 20,
+) -> tuple[list[tuple[WorkflowReminder, StudentWorkflowNode, StudentWorkflow, WorkflowTemplate, Student]], int]:
+    stmt = (
+        select(
+            WorkflowReminder,
+            StudentWorkflowNode,
+            StudentWorkflow,
+            WorkflowTemplate,
+            Student,
+        )
+        .join(StudentWorkflowNode, WorkflowReminder.workflow_node_state_id == StudentWorkflowNode.id)
+        .join(StudentWorkflow, StudentWorkflowNode.workflow_id == StudentWorkflow.id)
+        .join(WorkflowTemplate, StudentWorkflow.template_id == WorkflowTemplate.id)
+        .join(Student, WorkflowReminder.student_id == Student.id)
+    )
+    if template_code:
+        stmt = stmt.where(WorkflowTemplate.code == template_code)
+    if student_no:
+        stmt = stmt.where(Student.student_no.ilike(f"%{student_no}%"))
+    if status:
+        stmt = stmt.where(WorkflowReminder.status == status)
+
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await db.execute(count_stmt)).scalar_one()
+
+    stmt = (
+        stmt.order_by(
+            *order_by_nulls_last_desc(WorkflowReminder.sent_at),
+            WorkflowReminder.created_at.desc(),
+            WorkflowReminder.id.desc(),
+        )
+        .offset((page - 1) * size)
+        .limit(size)
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+    return [(row[0], row[1], row[2], row[3], row[4]) for row in rows], total
 
 
 async def list_pending_workflows_admin(
