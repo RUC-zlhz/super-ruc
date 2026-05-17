@@ -2,6 +2,333 @@ import { del, get, patch, post } from '@/utils/request'
 import type { ApiEnvelope } from '@/utils/request'
 import type { Paginated } from './types'
 
+export type WorkflowTemplateKind = 'PARTY' | 'YOUTH_LEAGUE' | 'OTHER'
+export type WorkflowTriggerRule = 'PREV_DONE' | 'MANUAL' | 'ON_APPLY' | 'ON_DATE'
+export type WorkflowNodeStatus = 'PENDING' | 'DONE' | 'OVERDUE' | 'DEFERRED' | 'MANUAL_FOLLOW_UP'
+export type ReminderChannel = 'IN_APP' | 'EMAIL' | 'SMS'
+export type ReminderStatus = 'PENDING' | 'SENT' | 'CANCELLED' | 'FAILED'
+export type ReminderRunStatus = 'RUNNING' | 'COMPLETED' | 'FAILED'
+
+export interface WorkflowNode {
+  id: number
+  code: string
+  name: string
+  sort_order: number
+  stage_group?: string | null
+  required_task?: string | null
+  trigger_rule: WorkflowTriggerRule | string
+  due_rule_days?: number | null
+  reminder_lead_days?: number | null
+  reminder_enabled: boolean
+  reminder_channel: ReminderChannel | string
+  repeat_interval_days?: number | null
+  max_reminders?: number | null
+  is_terminal: boolean
+  is_active: boolean
+}
+
+export interface WorkflowNodePayload {
+  code: string
+  name: string
+  sort_order: number
+  stage_group?: string | null
+  required_task?: string | null
+  trigger_rule: WorkflowTriggerRule | string
+  due_rule_days?: number | null
+  reminder_lead_days?: number | null
+  reminder_enabled: boolean
+  reminder_channel: ReminderChannel | string
+  repeat_interval_days?: number | null
+  max_reminders?: number | null
+  is_terminal: boolean
+  is_active: boolean
+}
+
+export interface WorkflowTemplate {
+  id: number
+  code: string
+  name: string
+  kind: WorkflowTemplateKind | string
+  description?: string | null
+  version_label?: string | null
+  is_active: boolean
+  updated_at?: string
+  nodes: WorkflowNode[]
+}
+
+export interface WorkflowTemplatePayload {
+  code: string
+  name: string
+  kind: WorkflowTemplateKind | string
+  description?: string | null
+  version_label?: string | null
+  nodes: WorkflowNodePayload[]
+}
+
+export interface WorkflowStudentBrief {
+  id: number
+  student_id: number
+  student_no?: string | null
+  student_name?: string | null
+  template_code: string
+  template_name: string
+  current_node_name?: string | null
+  current_node_status?: WorkflowNodeStatus | string | null
+  due_date?: string | null
+}
+
+export interface WorkflowReminderRecord {
+  id: number
+  workflow_node_state_id: number
+  student_id: number
+  student_no?: string | null
+  student_name?: string | null
+  template_code: string
+  template_name: string
+  node_code: string
+  node_name: string
+  node_status: WorkflowNodeStatus | string
+  due_date?: string | null
+  reminder_date: string
+  channel: ReminderChannel | string
+  status: ReminderStatus | string
+  sent_at?: string | null
+  message?: string | null
+  cancel_reason?: string | null
+  error_message?: string | null
+  created_at: string
+}
+
+export interface WorkflowReminderRun {
+  id: number
+  as_of_date: string
+  channel: ReminderChannel | string
+  trigger_mode: string
+  status: ReminderRunStatus | string
+  created_count: number
+  sent_count: number
+  skipped_count: number
+  cancelled_count: number
+  failed_count: number
+  error_message?: string | null
+  operator_id?: number | null
+  operator_role?: string | null
+  started_at: string
+  finished_at?: string | null
+}
+
+export interface WorkflowReminderListResult {
+  supported: boolean
+  route: string | null
+  items: WorkflowReminderRecord[]
+  meta: Paginated<WorkflowReminderRecord>['meta']
+}
+
+export interface WorkflowReminderRunListResult {
+  supported: boolean
+  route: string | null
+  items: WorkflowReminderRun[]
+  meta: Paginated<WorkflowReminderRun>['meta']
+}
+
+export interface WorkflowReminderExecutionResult {
+  route: string
+  legacy: boolean
+  run: WorkflowReminderRun
+}
+
+function emptyMeta(page = 1, size = 20) {
+  return { page, size, total: 0 }
+}
+
+function buildApiUrl(path: string, params?: Record<string, unknown>) {
+  const base = (import.meta.env.VITE_API_BASE || '/api/v1').replace(/\/$/, '')
+  const url = new URL(`${base}${path}`, window.location.origin)
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return
+    url.searchParams.set(key, String(value))
+  })
+  return url.toString()
+}
+
+async function requestOptionalEnvelope<T>(
+  method: 'GET' | 'POST',
+  path: string,
+  options?: { params?: Record<string, unknown>; body?: unknown },
+): Promise<{ supported: boolean; data?: T }> {
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+  }
+  const token = localStorage.getItem('sip.access_token')
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+  if (method !== 'GET') {
+    headers['Content-Type'] = 'application/json'
+  }
+  const response = await fetch(buildApiUrl(path, options?.params), {
+    method,
+    headers,
+    body: method === 'GET' ? undefined : JSON.stringify(options?.body ?? {}),
+  })
+  if (response.status === 404 || response.status === 405) {
+    return { supported: false }
+  }
+  const payload = (await response.json().catch(() => null)) as ApiEnvelope<T> | null
+  if (!response.ok || !payload || payload.code !== 0) {
+    throw new Error(payload?.message || `请求失败（${response.status}）`)
+  }
+  return { supported: true, data: payload.data }
+}
+
+async function resolveOptionalEnvelope<T>(
+  method: 'GET' | 'POST',
+  paths: string[],
+  options?: { params?: Record<string, unknown>; body?: unknown },
+): Promise<{ supported: boolean; route: string | null; data?: T }> {
+  for (const path of paths) {
+    const result = await requestOptionalEnvelope<T>(method, path, options)
+    if (result.supported) {
+      return {
+        supported: true,
+        route: path,
+        data: result.data,
+      }
+    }
+  }
+  return {
+    supported: false,
+    route: null,
+  }
+}
+
+function normalizeReminderRunRecord(raw: Record<string, any>, fallbackChannel = 'IN_APP'): WorkflowReminderRun {
+  return {
+    id: Number(raw.id ?? Date.now()),
+    as_of_date: String(raw.as_of_date ?? raw.asOfDate ?? new Date().toISOString().slice(0, 10)),
+    channel: String(raw.channel ?? fallbackChannel),
+    trigger_mode: String(raw.trigger_mode ?? raw.triggerMode ?? 'MANUAL'),
+    status: String(raw.status ?? 'COMPLETED'),
+    created_count: Number(raw.created_count ?? raw.created ?? 0),
+    sent_count: Number(raw.sent_count ?? raw.sent ?? 0),
+    skipped_count: Number(raw.skipped_count ?? raw.skipped ?? 0),
+    cancelled_count: Number(raw.cancelled_count ?? raw.cancelled ?? 0),
+    failed_count: Number(raw.failed_count ?? raw.failed ?? 0),
+    error_message: raw.error_message ?? raw.errorMessage ?? null,
+    operator_id: raw.operator_id ?? raw.operatorId ?? null,
+    operator_role: raw.operator_role ?? raw.operatorRole ?? null,
+    started_at: String(raw.started_at ?? raw.startedAt ?? new Date().toISOString()),
+    finished_at: raw.finished_at ?? raw.finishedAt ?? null,
+  }
+}
+
+export function listWorkflowTemplates(params?: { kind?: string }) {
+  return get<ApiEnvelope<WorkflowTemplate[]>>('/admin/workflow/templates', { params })
+}
+
+export function saveWorkflowTemplate(payload: WorkflowTemplatePayload) {
+  return post<ApiEnvelope<WorkflowTemplate>>('/admin/workflow/templates', payload)
+}
+
+export function listWorkflowStudents(params: {
+  template_code?: string
+  grade_code?: string
+  page?: number
+  size?: number
+}) {
+  return get<ApiEnvelope<Paginated<WorkflowStudentBrief>>>('/admin/workflow/students', { params })
+}
+
+export async function listWorkflowReminderRecords(params: {
+  template_code?: string
+  student_no?: string
+  status?: string
+  page?: number
+  size?: number
+}): Promise<WorkflowReminderListResult> {
+  const result = await resolveOptionalEnvelope<Paginated<WorkflowReminderRecord>>(
+    'GET',
+    ['/admin/workflow/reminders', '/admin/workflow/reminder-records'],
+    { params },
+  )
+  return {
+    supported: result.supported,
+    route: result.route,
+    items: result.data?.items ?? [],
+    meta: result.data?.meta ?? emptyMeta(params.page, params.size),
+  }
+}
+
+export async function listWorkflowReminderRuns(params: {
+  page?: number
+  size?: number
+}): Promise<WorkflowReminderRunListResult> {
+  const result = await resolveOptionalEnvelope<Paginated<WorkflowReminderRun>>(
+    'GET',
+    ['/admin/workflow/reminder-runs', '/admin/workflow/reminders/runs'],
+    { params },
+  )
+  return {
+    supported: result.supported,
+    route: result.route,
+    items: result.data?.items ?? [],
+    meta: result.data?.meta ?? emptyMeta(params.page, params.size),
+  }
+}
+
+export async function executeWorkflowReminderRun(payload: {
+  as_of_date?: string
+  channel?: ReminderChannel | string
+}): Promise<WorkflowReminderExecutionResult> {
+  const preferred = await resolveOptionalEnvelope<WorkflowReminderRun | { run: WorkflowReminderRun }>(
+    'POST',
+    ['/admin/workflow/reminders/run', '/admin/workflow/reminders/execute'],
+    { body: payload },
+  )
+  if (preferred.supported && preferred.data) {
+    const raw = ('run' in preferred.data ? preferred.data.run : preferred.data) as Record<string, any>
+    return {
+      route: preferred.route || '/admin/workflow/reminders/run',
+      legacy: false,
+      run: normalizeReminderRunRecord(raw, String(payload.channel ?? 'IN_APP')),
+    }
+  }
+
+  const fallback = await post<ApiEnvelope<WorkflowReminderRun | { created: number }>>('/admin/workflow/reminders/generate', {
+    as_of_date: payload.as_of_date,
+    channel: payload.channel ?? 'IN_APP',
+  })
+  const fallbackData = fallback.data as Record<string, any>
+  if ('created_count' in fallbackData || 'sent_count' in fallbackData || 'trigger_mode' in fallbackData) {
+    return {
+      route: '/admin/workflow/reminders/generate',
+      legacy: false,
+      run: normalizeReminderRunRecord(fallbackData, String(payload.channel ?? 'IN_APP')),
+    }
+  }
+  return {
+    route: '/admin/workflow/reminders/generate',
+    legacy: true,
+    run: normalizeReminderRunRecord(
+      {
+        id: Date.now(),
+        as_of_date: payload.as_of_date ?? new Date().toISOString().slice(0, 10),
+        channel: payload.channel ?? 'IN_APP',
+        trigger_mode: 'MANUAL',
+        status: 'COMPLETED',
+        created_count: Number(fallbackData.created ?? 0),
+        sent_count: 0,
+        skipped_count: 0,
+        cancelled_count: 0,
+        failed_count: 0,
+        started_at: new Date().toISOString(),
+        finished_at: new Date().toISOString(),
+      },
+      String(payload.channel ?? 'IN_APP'),
+    ),
+  }
+}
+
 export type RequestStatus =
   | 'DRAFT'
   | 'SUBMITTED'

@@ -651,23 +651,25 @@
 
 ### S23 党团提醒规则配置与自动闭环
 
-- [ ] `S23.1` 在党团流程模板节点中补齐提醒规则字段的保存与展示，包括启用状态、提前提醒天数、重复提醒间隔、最大提醒次数和渠道。
-- [ ] `S23.2` 将 Web“节点提醒”页从占位态升级为真实工作台，支持规则查询、提醒记录查询和运行记录展示。
-- [ ] `S23.3` 为提醒执行增加持久化运行记录，支持展示 `created / sent / skipped / cancelled / failed` 结果。
-- [ ] `S23.4` 在提醒生成逻辑中补齐去重、逾期推进、节点完成后自动取消未发送提醒等闭环规则。
-- [ ] `S23.5` 将 `IN_APP` 渠道接入真实站内提醒发送，并在提醒记录中回写 `SENT / CANCELLED` 等最终状态。
-- [ ] `S23.6` 复用现有 scheduler 模式为党团提醒增加自动调度能力，并补齐对应回归测试。
+- [x] `S23.1` 在党团流程模板节点中补齐提醒规则字段的保存与展示，包括启用状态、提前提醒天数、重复提醒间隔、最大提醒次数和渠道。
+- [x] `S23.2` 将 Web“节点提醒”页从占位态升级为真实工作台，支持规则查询、提醒记录查询和运行记录展示。
+- [x] `S23.3` 为提醒执行增加持久化运行记录，支持展示 `created / sent / skipped / cancelled / failed` 结果。
+- [x] `S23.4` 在提醒生成逻辑中补齐去重、逾期推进、节点完成后自动取消未发送提醒等闭环规则。
+- [x] `S23.5` 将 `IN_APP` 渠道接入真实站内提醒发送，并在提醒记录中回写 `SENT / CANCELLED` 等最终状态。
+- [x] `S23.6` 复用现有 scheduler 模式为党团提醒增加自动调度能力，并补齐对应回归测试。
 
 当前结论：
 
-- `S23` 尚未开始实施，但可直接按已登记的前后端拆分方案推进。
+- `S23` 首版已闭环完成：管理员可在 Web 端编辑节点提醒规则，系统可生成并发送站内提醒，节点逾期会自动转 `OVERDUE`，节点完成或转人工跟进时会自动取消未发送提醒，后台可查看提醒记录与运行记录。
 
 证据：
 
 - 细化方案：`docs/notes/refinements/2026-05-17-workflow-reminder-rule-and-auto-closure-breakdown.md`
-- 当前占位页：`web/src/views/workflow/PartyStageList.vue`
-- 当前手动提醒生成接口：`backend/app/workflow/router.py`、`backend/app/workflow/service.py`
-- 加固回归：培养方案切换时会清空旧详情并等待新详情加载完成后再开放编辑动作；后端 `PATCH /admin/curriculum/plans/{id}` 在 `expected_updated_at` 不匹配时返回 `409` 冲突。
+- Web 改造细化：`docs/notes/refinements/2026-05-18-web-workflow-reminder-workbench.md`
+- 前端工作台：`web/src/views/workflow/PartyStageList.vue`、`web/src/api/workflow.ts`
+- 后端闭环：`backend/app/workflow/router.py`、`backend/app/workflow/service.py`、`backend/app/workflow/repository.py`
+- 调度与配置：`backend/app/core/workflow_reminder_scheduler.py`、`backend/app/core/config.py`、`backend/app/main.py`
+- 回归样例：`backend/tests/integration/test_workflow_party_flow.py`、`backend/tests/integration/test_workflow_reminder_scheduler.py`
 
 ## 细化文件登记
 
@@ -738,6 +740,7 @@
 | 2026-05-17 | Web 班团骨干权限与请假边界文案修复 | `docs/notes/refinements/2026-05-17-web-cadre-access-and-leave-boundary.md` | `S22.5, S22.6` | `[x]` | 已向班团骨干开放 Web 协同管理入口，并在审批工作台/请假详情补充“正式请假仍以微人大等校级系统为准”提示；`web vue-tsc`、`vite build` 与后端 `py_compile` 通过，`pytest` 受本地运行时缺少模块阻塞 |
 | 2026-05-17 | Web 前端需求预览入口 | `docs/notes/refinements/2026-05-17-web-frontend-preview-for-requirement-check.md` | `S22.7` | `[x]` | 已新增公开预览页与登录页开发入口，可直接在前端预览班团骨干菜单范围与请假边界提示；登录页已重排预览区与学生提示，避免遮挡，并将 `vite` 默认开发端口调整为 `4173` 以规避本机 `5173` 排除端口冲突；`web vue-tsc` 与 `vite build` 通过 |
 | 2026-05-17 | 党团提醒规则配置与自动闭环实施拆分 | `docs/notes/refinements/2026-05-17-workflow-reminder-rule-and-auto-closure-breakdown.md` | `S23` | `[x]` | 已基于现有工作流实现拆分出前后端可执行清单；首版建议先闭环 `IN_APP` 站内提醒，并复用现有 scheduler 模式实现自动执行 |
+| 2026-05-18 | Web 党团提醒工作台改造 | `docs/notes/refinements/2026-05-18-web-workflow-reminder-workbench.md` | `S23.1, S23.2, S23.3` | `[x]` | 已完成模板节点提醒规则编辑、提醒记录列表、运行记录列表和手动执行结果展示；`web vue-tsc --noEmit` 与 `vite build` 通过 |
 
 ## 会话更新要求
 
@@ -817,3 +820,4 @@
 - `2026-05-17`：新增并完成 `S22.5 / S22.6` Web 班团骨干权限与请假边界文案修复；班团骨干现可进入审批、党团流程、通知、知识库、理论自测和荣誉公示等协同入口，请假事项已在工作台和详情页标明“正式请假仍以微人大等校级系统为准”；`web vue-tsc`、`vite build` 与后端 `py_compile` 通过，后端 `pytest` 因 bundled Python 缺少 `pytest` 模块未执行。
 - `2026-05-17`：新增并完成 `S22.7` Web 前端需求预览入口；登录页已提供“直接预览班团骨干权限与请假提示”的公开入口，用户可不依赖后端账号直接在前端切换角色并查看可见菜单与请假边界提示；同时将登录页学生端提示与开发预览拆分为独立辅助区，避免遮挡，并将 `vite` 默认开发端口改为 `4173`，规避当前 Windows 环境 `5173` 位于 `5099-5198` 排除端口区间导致的启动失败；`web vue-tsc` 与 `vite build` 通过。
 - `2026-05-17`：新增 “党团提醒规则配置与自动闭环实施拆分” 细化文件；基于当前工作流实现确认差距主要集中在规则查询、运行记录、自动调度、去重和提醒取消闭环，并将后续开发拆分为 `S23.1 ~ S23.6`，首版建议仅闭环 `IN_APP` 站内提醒。
+- `2026-05-18`：完成 `S23` 首版实现；后端补齐提醒运行记录、提醒记录查询、手动执行回执、节点完成/转人工自动取消未发送提醒，以及独立的提醒 scheduler；Web 端将 `PartyStageList` 升级为真实工作台并接入模板规则编辑、提醒记录与运行记录展示；`web vue-tsc --noEmit`、`vite build` 与后端目标文件 `py_compile` 通过。

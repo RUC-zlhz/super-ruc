@@ -1,6 +1,6 @@
 <template>
   <div class="party-stage-page">
-    <a-page-header title="党团流程管理" sub-title="党团相关流程模板、节点、学生流程及提醒规则" />
+    <a-page-header title="党团流程管理" sub-title="配置节点规则、查看学生进展，并闭环管理提醒执行记录" />
 
     <div class="metric-grid">
       <div v-for="metric in metrics" :key="metric.key" class="metric-tile">
@@ -13,14 +13,64 @@
 
     <a-tabs v-model:activeKey="activeTab">
       <a-tab-pane key="templates" tab="流程模板">
-        <a-form layout="inline" class="filter-card">
-          <a-form-item>
-            <a-button type="primary" @click="showTemplateDrawer = true">
-            <template #icon><PlusOutlined /></template>
-            新建模板
-          </a-button>
-          </a-form-item>
-        </a-form>
+        <div class="toolbar-card">
+          <a-space wrap>
+            <a-button type="primary" @click="openCreateTemplate">
+              <template #icon><PlusOutlined /></template>
+              新建模板
+            </a-button>
+            <a-button :disabled="!selectedTemplatePreview" @click="openEditTemplate(selectedTemplatePreview!)">
+              <template #icon><EditOutlined /></template>
+              编辑所选模板
+            </a-button>
+            <a-button @click="refreshTemplates">
+              <template #icon><ReloadOutlined /></template>
+              刷新
+            </a-button>
+          </a-space>
+        </div>
+
+        <a-card v-if="selectedTemplatePreview" class="template-preview-card" :bordered="false">
+          <div class="template-preview-head">
+            <div>
+              <p class="card-kicker">当前选中模板</p>
+              <h3>{{ selectedTemplatePreview.name }}</h3>
+              <span>{{ selectedTemplatePreview.code }} · {{ templateKindLabel(selectedTemplatePreview.kind) }}</span>
+            </div>
+            <a-tag :color="selectedTemplatePreview.is_active ? 'green' : 'default'">
+              {{ selectedTemplatePreview.is_active ? '生效中' : '已停用' }}
+            </a-tag>
+          </div>
+          <div class="template-preview-grid">
+            <div>
+              <span>节点数</span>
+              <strong>{{ selectedTemplatePreview.nodes.length }}</strong>
+            </div>
+            <div>
+              <span>启用提醒节点</span>
+              <strong>{{ enabledReminderCount }}</strong>
+            </div>
+            <div>
+              <span>最近更新</span>
+              <strong>{{ formatTime(selectedTemplatePreview.updated_at) }}</strong>
+            </div>
+          </div>
+          <div class="node-chip-list">
+            <div v-for="node in sortedSelectedNodes" :key="node.id" class="node-chip">
+              <div>
+                <strong>{{ node.sort_order }}. {{ node.name }}</strong>
+                <span>{{ node.code }} · {{ triggerRuleLabel(node.trigger_rule) }}</span>
+              </div>
+              <div class="node-chip-meta">
+                <a-tag :color="node.reminder_enabled ? 'gold' : 'default'">
+                  {{ node.reminder_enabled ? `${node.reminder_lead_days ?? 0} 天前提醒` : '提醒关闭' }}
+                </a-tag>
+                <a-tag v-if="node.due_rule_days != null" color="blue">时限 {{ node.due_rule_days }} 天</a-tag>
+              </div>
+            </div>
+          </div>
+        </a-card>
+
         <a-table
           :columns="templateCols"
           :data-source="templates"
@@ -30,16 +80,26 @@
           row-key="id"
         >
           <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'is_active'">
+            <template v-if="column.key === 'kind'">
+              {{ templateKindLabel(record.kind) }}
+            </template>
+            <template v-else-if="column.key === 'rule_summary'">
+              {{ reminderRuleSummary(record) }}
+            </template>
+            <template v-else-if="column.key === 'is_active'">
               <a-tag :color="record.is_active ? 'green' : 'default'">
                 {{ record.is_active ? '生效' : '停用' }}
               </a-tag>
             </template>
+            <template v-else-if="column.key === 'updated_at'">
+              {{ formatTime(record.updated_at) }}
+            </template>
             <template v-else-if="column.key === 'actions'">
-              <a-button type="link" size="small" @click="viewNodes(record)">
-                <template #icon><NodeIndexOutlined /></template>
-                节点
-              </a-button>
+              <a-space>
+                <a-button type="link" size="small" @click.stop="openEditTemplate(record)">
+                  编辑规则
+                </a-button>
+              </a-space>
             </template>
           </template>
         </a-table>
@@ -54,12 +114,18 @@
             <a-input v-model:value="flowFilters.template_code" placeholder="模板编码" allow-clear />
           </a-form-item>
           <a-form-item>
-              <a-button type="primary" html-type="submit">
-                <template #icon><SearchOutlined /></template>
-                查询
-              </a-button>
-            </a-form-item>
+            <a-button type="primary" html-type="submit">
+              <template #icon><SearchOutlined /></template>
+              查询
+            </a-button>
+          </a-form-item>
+          <a-form-item>
+            <a-button @click="resetFlowFilters">
+              重置
+            </a-button>
+          </a-form-item>
         </a-form>
+
         <a-table
           :columns="flowCols"
           :data-source="flows"
@@ -70,7 +136,7 @@
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
-              <StatusTag :status="record.current_node_status || record.status" />
+              <StatusTag :status="record.current_node_status || 'PENDING'" />
             </template>
             <template v-else-if="column.key === 'due_date'">
               {{ record.due_date || '-' }}
@@ -82,268 +148,715 @@
       <a-tab-pane key="reminders" tab="节点提醒">
         <a-alert
           class="mb16"
-          type="info"
+          type="success"
           show-icon
-          message="提醒规则查询接口暂未接通；当前页面仅保留手动生成入口和最近一次生成结果。"
+          message="提醒规则、提醒记录和运行记录已接入后台。首版默认闭环站内提醒（IN_APP），支持手动触发与自动调度并行使用。"
         />
-        <a-button type="primary" :loading="reminderLoading" @click="generateReminders">
-          <template #icon><BellOutlined /></template>
-          生成待办提醒
-        </a-button>
-        <a-card class="mt16" title="最近一次生成结果" :bordered="false">
-          <template v-if="lastReminderRun">
-            <div class="reminder-result-grid">
+
+        <div class="toolbar-card">
+          <a-form layout="inline" @finish="reloadReminderWorkspace">
+            <a-form-item label="模板">
+              <a-input v-model:value="reminderFilters.template_code" placeholder="模板编码" allow-clear />
+            </a-form-item>
+            <a-form-item label="学号">
+              <a-input v-model:value="reminderFilters.student_no" placeholder="学号" allow-clear />
+            </a-form-item>
+            <a-form-item label="状态">
+              <a-select v-model:value="reminderFilters.status" style="width: 160px" allow-clear placeholder="全部状态">
+                <a-select-option value="PENDING">待发送</a-select-option>
+                <a-select-option value="SENT">已发送</a-select-option>
+                <a-select-option value="CANCELLED">已取消</a-select-option>
+                <a-select-option value="FAILED">发送失败</a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item>
+              <a-button type="primary" html-type="submit">
+                <template #icon><SearchOutlined /></template>
+                查询
+              </a-button>
+            </a-form-item>
+            <a-form-item>
+              <a-button @click="resetReminderFilters">
+                重置
+              </a-button>
+            </a-form-item>
+            <a-form-item>
+              <a-button type="primary" :loading="reminderActionLoading" @click="generateReminders">
+                <template #icon><PlayCircleOutlined /></template>
+                立即执行一次提醒
+              </a-button>
+            </a-form-item>
+            <a-form-item>
+              <a-button :loading="reminderLoading || runLoading" @click="reloadReminderWorkspace">
+                <template #icon><ReloadOutlined /></template>
+                刷新工作台
+              </a-button>
+            </a-form-item>
+          </a-form>
+        </div>
+
+        <a-card class="run-summary-card" title="最近一次执行结果" :bordered="false">
+          <template v-if="latestReminderRun">
+            <div class="run-summary-grid">
               <div>
-                <span>生成条数</span>
-                <strong>{{ lastReminderRun.created }}</strong>
+                <span>创建提醒</span>
+                <strong>{{ latestReminderRun.created_count }}</strong>
               </div>
               <div>
-                <span>渠道</span>
-                <strong>{{ lastReminderRun.channel }}</strong>
+                <span>发送成功</span>
+                <strong>{{ latestReminderRun.sent_count }}</strong>
               </div>
               <div>
-                <span>生成时间</span>
-                <strong>{{ lastReminderRun.generatedAt }}</strong>
+                <span>跳过</span>
+                <strong>{{ latestReminderRun.skipped_count }}</strong>
+              </div>
+              <div>
+                <span>自动取消</span>
+                <strong>{{ latestReminderRun.cancelled_count }}</strong>
+              </div>
+              <div>
+                <span>失败</span>
+                <strong>{{ latestReminderRun.failed_count }}</strong>
+              </div>
+              <div>
+                <span>执行方式</span>
+                <strong>{{ latestReminderRun.trigger_mode }}</strong>
               </div>
             </div>
+            <p class="summary-foot">
+              {{ formatTime(latestReminderRun.started_at) }} 开始
+              <span v-if="latestReminderRun.finished_at">，{{ formatTime(latestReminderRun.finished_at) }} 完成</span>
+              ，渠道 {{ latestReminderRun.channel }}
+            </p>
           </template>
-          <a-empty v-else description="尚未执行手动提醒生成" />
+          <a-empty v-else description="尚未找到提醒执行记录" />
+        </a-card>
+
+        <a-card class="workspace-card" title="提醒记录" :bordered="false">
+          <template v-if="reminderSupported">
+            <a-table
+              :columns="reminderCols"
+              :data-source="reminderRecords"
+              :loading="reminderLoading"
+              :pagination="reminderPagination"
+              row-key="id"
+              :scroll="{ x: 1280 }"
+              @change="onReminderTableChange"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'student'">
+                  <div>{{ record.student_name || '-' }}</div>
+                  <span class="cell-sub">{{ record.student_no || '-' }}</span>
+                </template>
+                <template v-else-if="column.key === 'template'">
+                  <div>{{ record.template_name }}</div>
+                  <span class="cell-sub">{{ record.template_code }}</span>
+                </template>
+                <template v-else-if="column.key === 'node'">
+                  <div>{{ record.node_name }}</div>
+                  <span class="cell-sub">{{ record.node_code }}</span>
+                </template>
+                <template v-else-if="column.key === 'node_status'">
+                  <StatusTag :status="record.node_status" />
+                </template>
+                <template v-else-if="column.key === 'status'">
+                  <a-tag :color="reminderStatusColor(record.status)">
+                    {{ reminderStatusLabel(record.status) }}
+                  </a-tag>
+                </template>
+                <template v-else-if="column.key === 'sent_at'">
+                  {{ formatTime(record.sent_at) }}
+                </template>
+                <template v-else-if="column.key === 'message'">
+                  <div>{{ record.message || '-' }}</div>
+                  <span v-if="record.cancel_reason" class="cell-sub">取消原因：{{ record.cancel_reason }}</span>
+                  <span v-else-if="record.error_message" class="cell-sub">失败原因：{{ record.error_message }}</span>
+                </template>
+              </template>
+            </a-table>
+          </template>
+          <a-alert
+            v-else
+            type="warning"
+            show-icon
+            message="当前后端未开放提醒记录查询接口，页面暂时无法展示真实提醒清单。"
+          />
+        </a-card>
+
+        <a-card class="workspace-card" title="最近运行记录" :bordered="false">
+          <template v-if="runSupported">
+            <a-table
+              :columns="runCols"
+              :data-source="reminderRuns"
+              :loading="runLoading"
+              :pagination="runPagination"
+              row-key="id"
+              :scroll="{ x: 1080 }"
+              @change="onRunTableChange"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'status'">
+                  <a-tag :color="runStatusColor(record.status)">
+                    {{ runStatusLabel(record.status) }}
+                  </a-tag>
+                </template>
+                <template v-else-if="column.key === 'started_at'">
+                  {{ formatTime(record.started_at) }}
+                </template>
+                <template v-else-if="column.key === 'finished_at'">
+                  {{ formatTime(record.finished_at) }}
+                </template>
+              </template>
+            </a-table>
+          </template>
+          <a-alert
+            v-else
+            type="warning"
+            show-icon
+            message="当前后端未开放提醒运行记录接口，页面暂时无法展示批次执行轨迹。"
+          />
         </a-card>
       </a-tab-pane>
     </a-tabs>
 
-    <aside class="stage-side-panel">
-      <div class="side-panel-head">
-        <strong>流程配置面板</strong>
-        <a-button type="text" size="small" :disabled="!selectedTemplatePreview" @click="clearSelectedTemplate">
-          <template #icon><CloseOutlined /></template>
-        </a-button>
-      </div>
-      <template v-if="selectedTemplatePreview">
-        <div class="stage-type-card">
-          <BranchesOutlined />
+    <a-drawer
+      :open="showTemplateDrawer"
+      :title="templateDrawerTitle"
+      width="960"
+      @close="showTemplateDrawer = false"
+    >
+      <a-form layout="vertical">
+        <div class="drawer-grid">
+          <a-form-item label="模板编码" required>
+            <a-input v-model:value="tplForm.code" :disabled="editingTemplateId !== null" placeholder="如 PARTY_DEV_MAIN" />
+          </a-form-item>
+          <a-form-item label="模板名称" required>
+            <a-input v-model:value="tplForm.name" placeholder="如 党员发展主流程" />
+          </a-form-item>
+          <a-form-item label="类型">
+            <a-select v-model:value="tplForm.kind">
+              <a-select-option value="PARTY">党员发展</a-select-option>
+              <a-select-option value="YOUTH_LEAGUE">团学流程</a-select-option>
+              <a-select-option value="OTHER">其他</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="版本号">
+            <a-input v-model:value="tplForm.version_label" placeholder="如 2026-v1" />
+          </a-form-item>
+        </div>
+        <a-form-item label="模板说明">
+          <a-textarea v-model:value="tplForm.description" :rows="3" placeholder="说明这个模板适用于哪些党团流程" />
+        </a-form-item>
+
+        <div class="drawer-section-head">
           <div>
-            <p>当前模板</p>
-            <h3>{{ selectedTemplatePreview.name }}</h3>
-            <span>{{ selectedTemplatePreview.code }}</span>
+            <h3>节点规则</h3>
+            <p>节点保存时会一并写入提醒规则，包括提前提醒、重复频率、最大提醒次数和渠道。</p>
           </div>
+          <a-button @click="appendNode">
+            <template #icon><PlusOutlined /></template>
+            新增节点
+          </a-button>
         </div>
 
-        <section class="side-section">
-          <h3>流程概览</h3>
-          <div class="stage-progress-row">
-            <span>模板状态</span>
-            <a-tag :color="selectedTemplatePreview.is_active ? 'green' : 'default'">
-              {{ selectedTemplatePreview.is_active ? '生效' : '未生效' }}
-            </a-tag>
-          </div>
-          <div class="stage-progress-row">
-            <span>学生流程</span>
-            <strong>{{ flowPagination.total || flows.length }}</strong>
-          </div>
-          <div class="stage-progress-row">
-            <span>最近提醒生成</span>
-            <strong>{{ lastReminderRun?.created ?? 0 }}</strong>
-          </div>
-        </section>
+        <div class="node-editor-list">
+          <a-empty v-if="!tplForm.nodes.length" description="请至少配置一个节点" />
+          <a-card v-for="(node, index) in tplForm.nodes" :key="node.__key" class="node-editor-card" :bordered="false">
+            <template #title>
+              <div class="node-editor-title">
+                <span>节点 {{ index + 1 }}</span>
+                <a-space>
+                  <a-tag color="blue">排序 {{ node.sort_order }}</a-tag>
+                  <a-button danger type="text" @click="removeNode(index)">
+                    <template #icon><DeleteOutlined /></template>
+                  </a-button>
+                </a-space>
+              </div>
+            </template>
 
-        <section class="side-section">
-          <h3>节点预览</h3>
-          <div v-if="nodes.length" class="node-timeline">
-            <div v-for="node in nodes.slice(0, 5)" :key="node.id">
-              <i />
-              <span>{{ node.name }}</span>
-              <em>{{ node.due_rule_days || 0 }} 天</em>
+            <div class="node-editor-grid">
+              <a-form-item label="节点编码" required>
+                <a-input v-model:value="node.code" placeholder="如 APPLY" />
+              </a-form-item>
+              <a-form-item label="节点名称" required>
+                <a-input v-model:value="node.name" placeholder="如 递交入党申请书" />
+              </a-form-item>
+              <a-form-item label="排序">
+                <a-input-number v-model:value="node.sort_order" :min="1" style="width: 100%" />
+              </a-form-item>
+              <a-form-item label="阶段分组">
+                <a-input v-model:value="node.stage_group" placeholder="如 INITIAL / ACTIVIST" />
+              </a-form-item>
+              <a-form-item label="触发规则">
+                <a-select v-model:value="node.trigger_rule">
+                  <a-select-option value="PREV_DONE">上一节点完成后触发</a-select-option>
+                  <a-select-option value="ON_APPLY">申请提交后触发</a-select-option>
+                  <a-select-option value="MANUAL">人工触发</a-select-option>
+                  <a-select-option value="ON_DATE">按日期触发</a-select-option>
+                </a-select>
+              </a-form-item>
+              <a-form-item label="时限天数">
+                <a-input-number v-model:value="node.due_rule_days" :min="0" style="width: 100%" />
+              </a-form-item>
+              <a-form-item label="提前提醒天数">
+                <a-input-number v-model:value="node.reminder_lead_days" :min="0" style="width: 100%" />
+              </a-form-item>
+              <a-form-item label="重复提醒间隔（天）">
+                <a-input-number v-model:value="node.repeat_interval_days" :min="0" style="width: 100%" />
+              </a-form-item>
+              <a-form-item label="最大提醒次数">
+                <a-input-number v-model:value="node.max_reminders" :min="1" style="width: 100%" />
+              </a-form-item>
+              <a-form-item label="提醒渠道">
+                <a-select v-model:value="node.reminder_channel">
+                  <a-select-option value="IN_APP">站内提醒</a-select-option>
+                  <a-select-option value="EMAIL">邮件</a-select-option>
+                  <a-select-option value="SMS">短信</a-select-option>
+                </a-select>
+              </a-form-item>
             </div>
-          </div>
-          <p v-else class="side-muted">当前模板暂无节点配置。</p>
-        </section>
 
-        <div class="side-actions vertical">
-            <a-button @click="showTemplateDrawer = true">
-              <template #icon><PlusOutlined /></template>
-              新建模板
-            </a-button>
-            <a-button
-              type="primary"
-              @click="viewNodes(selectedTemplatePreview)"
-            >
-              <template #icon><EyeOutlined /></template>
-              查看节点
-            </a-button>
-          </div>
-      </template>
-      <a-empty v-else description="请选择记录" />
-    </aside>
+            <a-form-item label="待完成事项">
+              <a-textarea v-model:value="node.required_task" :rows="2" placeholder="说明该节点要求学生完成什么动作" />
+            </a-form-item>
 
-    <!-- 模板新建/编辑抽屉 -->
-    <a-drawer :open="showTemplateDrawer" title="流程模板" width="480" @close="showTemplateDrawer = false">
-      <a-form layout="vertical" :model="tplForm" @finish="onSubmitTemplate">
-        <a-form-item label="编码" :rules="[{ required: true }]">
-          <a-input v-model:value="tplForm.code" />
-        </a-form-item>
-        <a-form-item label="名称" :rules="[{ required: true }]">
-          <a-input v-model:value="tplForm.name" />
-        </a-form-item>
-        <a-form-item label="类型">
-          <a-select v-model:value="tplForm.kind" style="width: 100%">
-            <a-select-option value="PARTY">党员发展</a-select-option>
-            <a-select-option value="YOUTH_LEAGUE">团员培养</a-select-option>
-            <a-select-option value="OTHER">其他</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="描述">
-          <a-textarea v-model:value="tplForm.description" :rows="3" />
-        </a-form-item>
-        <a-form-item>
-            <a-button type="primary" html-type="submit">
+            <div class="node-switch-row">
+              <a-space>
+                <span>启用提醒</span>
+                <a-switch v-model:checked="node.reminder_enabled" />
+              </a-space>
+              <a-space>
+                <span>终点节点</span>
+                <a-switch v-model:checked="node.is_terminal" />
+              </a-space>
+              <a-space>
+                <span>启用节点</span>
+                <a-switch v-model:checked="node.is_active" />
+              </a-space>
+            </div>
+          </a-card>
+        </div>
+
+        <div class="drawer-actions">
+          <a-space>
+            <a-button @click="showTemplateDrawer = false">取消</a-button>
+            <a-button type="primary" :loading="tplSubmitting" @click="submitTemplate">
               <template #icon><SaveOutlined /></template>
-              保存
+              保存模板与规则
             </a-button>
-          </a-form-item>
+          </a-space>
+        </div>
       </a-form>
     </a-drawer>
-
-    <!-- 节点列表 Modal -->
-    <a-modal
-      v-model:open="showNodesModal"
-      :title="`流程节点 — ${selectedTemplatePreview?.name || ''}`"
-      width="720"
-      :footer="null"
-    >
-      <a-table :columns="nodeCols" :data-source="nodes" row-key="id" size="small">
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'is_active'">
-            <a-tag :color="record.is_active ? 'green' : 'default'">
-              {{ record.is_active ? '启用' : '停用' }}
-            </a-tag>
-          </template>
-        </template>
-      </a-table>
-    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import {
   BellOutlined,
   BranchesOutlined,
-  CloseOutlined,
+  DeleteOutlined,
+  EditOutlined,
   NodeIndexOutlined,
-  TeamOutlined,
-  SearchOutlined,
+  PlayCircleOutlined,
   PlusOutlined,
+  ReloadOutlined,
   SaveOutlined,
-  EyeOutlined
+  SearchOutlined,
+  TeamOutlined,
 } from '@ant-design/icons-vue'
-import { get, post } from '@/utils/request'
-import type { ApiEnvelope } from '@/utils/request'
-import type { Paginated } from '@/api/types'
 import StatusTag from '@/components/StatusTag.vue'
+import {
+  executeWorkflowReminderRun,
+  listWorkflowReminderRecords,
+  listWorkflowReminderRuns,
+  listWorkflowStudents,
+  listWorkflowTemplates,
+  saveWorkflowTemplate,
+  type ReminderStatus,
+  type WorkflowNode,
+  type WorkflowNodePayload,
+  type WorkflowReminderRecord,
+  type WorkflowReminderRun,
+  type WorkflowStudentBrief,
+  type WorkflowTemplate,
+  type WorkflowTemplateKind,
+  type WorkflowTemplatePayload,
+  type WorkflowTriggerRule,
+} from '@/api/workflow'
+
+type EditableWorkflowNode = {
+  __key: string
+  code: string
+  name: string
+  sort_order: number
+  stage_group?: string
+  required_task?: string
+  trigger_rule: WorkflowTriggerRule | string
+  due_rule_days?: number
+  reminder_lead_days?: number
+  reminder_enabled: boolean
+  reminder_channel: string
+  repeat_interval_days?: number
+  max_reminders?: number
+  is_terminal: boolean
+  is_active: boolean
+}
 
 const activeTab = ref('templates')
+const templates = ref<WorkflowTemplate[]>([])
+const tplLoading = ref(false)
+const tplSubmitting = ref(false)
 const selectedTemplateId = ref<number | null>(null)
 const selectedTemplatePreview = computed(() => {
   if (selectedTemplateId.value == null) return null
   return templates.value.find((item) => item.id === selectedTemplateId.value) ?? null
 })
+const sortedSelectedNodes = computed(() =>
+  [...(selectedTemplatePreview.value?.nodes ?? [])].sort((a, b) => a.sort_order - b.sort_order),
+)
+const enabledReminderCount = computed(
+  () => sortedSelectedNodes.value.filter((node) => node.reminder_enabled).length,
+)
+
+const showTemplateDrawer = ref(false)
+const editingTemplateId = ref<number | null>(null)
+const templateDrawerTitle = computed(() => (editingTemplateId.value ? '编辑流程模板与提醒规则' : '新建流程模板'))
+const tplForm = reactive<{
+  code: string
+  name: string
+  kind: WorkflowTemplateKind | string
+  description: string
+  version_label: string
+  nodes: EditableWorkflowNode[]
+}>({
+  code: '',
+  name: '',
+  kind: 'PARTY',
+  description: '',
+  version_label: '',
+  nodes: [],
+})
+
+const flows = ref<WorkflowStudentBrief[]>([])
+const flowLoading = ref(false)
+const flowFilters = reactive<{ student_no?: string; template_code?: string }>({})
+const flowPagination = reactive({
+  current: 1,
+  pageSize: 20,
+  total: 0,
+  showSizeChanger: true,
+})
+
+const reminderSupported = ref(true)
+const runSupported = ref(true)
+const reminderLoading = ref(false)
+const runLoading = ref(false)
+const reminderActionLoading = ref(false)
+const reminderRecords = ref<WorkflowReminderRecord[]>([])
+const reminderRuns = ref<WorkflowReminderRun[]>([])
+const latestReminderRun = ref<WorkflowReminderRun | null>(null)
+const reminderFilters = reactive<{ template_code?: string; student_no?: string; status?: ReminderStatus | string }>({})
+const reminderPagination = reactive({
+  current: 1,
+  pageSize: 10,
+  total: 0,
+  showSizeChanger: true,
+})
+const runPagination = reactive({
+  current: 1,
+  pageSize: 10,
+  total: 0,
+  showSizeChanger: true,
+})
+
 const metrics = computed(() => [
   {
     key: 'templates',
     label: '流程模板数',
     value: templates.value.length,
-    sub: '当前模板配置',
+    sub: selectedTemplatePreview.value ? `当前选中 ${selectedTemplatePreview.value.name}` : '请选择一个模板查看详情',
     icon: BranchesOutlined,
   },
   {
     key: 'nodes',
-    label: '节点总数',
-    value: nodes.value.length,
-    sub: selectedTemplatePreview.value ? selectedTemplatePreview.value.name : '请先选择模板',
+    label: '所选节点数',
+    value: sortedSelectedNodes.value.length,
+    sub: `${enabledReminderCount.value} 个节点开启提醒`,
     icon: NodeIndexOutlined,
   },
   {
     key: 'flows',
-    label: '学生流程',
+    label: '学生流程数',
     value: flowPagination.total || flows.value.length,
     sub: '当前筛选结果',
     icon: TeamOutlined,
   },
   {
     key: 'reminders',
-    label: '最近提醒生成',
-    value: lastReminderRun.value?.created ?? 0,
-    sub: lastReminderRun.value ? `最近生成于 ${lastReminderRun.value.generatedAt}` : '尚未执行手动提醒生成',
+    label: '最近执行创建',
+    value: latestReminderRun.value?.created_count ?? 0,
+    sub: latestReminderRun.value ? `最近执行：${formatTime(latestReminderRun.value.started_at)}` : '暂无提醒执行记录',
     icon: BellOutlined,
   },
 ])
 
-// ---------- 模板 ----------
-type WorkflowNode = {
-  id: number
-  code: string
-  name: string
-  sort_order: number
-  stage_group?: string | null
-  due_rule_days?: number | null
-  is_active: boolean
-}
-
-type WorkflowTemplate = {
-  id: number
-  code: string
-  name: string
-  kind: string
-  description?: string | null
-  version_label?: string | null
-  is_active: boolean
-  nodes: WorkflowNode[]
-}
-
-type StudentWorkflowBrief = {
-  id: number
-  student_no?: string | null
-  student_name?: string | null
-  template_code: string
-  template_name: string
-  current_node_name?: string | null
-  current_node_status?: string | null
-  due_date?: string | null
-}
-
 const templateCols = [
-  { title: '编码', dataIndex: 'code', key: 'code', width: 140 },
-  { title: '名称', dataIndex: 'name', key: 'name' },
+  { title: '编码', dataIndex: 'code', key: 'code', width: 150 },
+  { title: '名称', dataIndex: 'name', key: 'name', width: 220 },
   { title: '类型', dataIndex: 'kind', key: 'kind', width: 120 },
-  { title: '状态', key: 'is_active', width: 80 },
-  { title: '操作', key: 'actions', width: 100 },
+  { title: '节点数', key: 'node_count', width: 90, customRender: ({ record }: { record: WorkflowTemplate }) => record.nodes.length },
+  { title: '提醒规则概览', key: 'rule_summary' },
+  { title: '状态', key: 'is_active', width: 90 },
+  { title: '最近更新', key: 'updated_at', width: 180 },
+  { title: '操作', key: 'actions', width: 120 },
 ]
-const templates = ref<WorkflowTemplate[]>([])
-const nodes = computed(() => {
-  const current = selectedTemplatePreview.value?.nodes ?? []
-  return [...current].sort((a, b) => a.sort_order - b.sort_order)
-})
-const tplLoading = ref(false)
-const lastReminderRun = ref<{ created: number; generatedAt: string; channel: string } | null>(null)
 
-async function loadTemplates() {
-  tplLoading.value = true
-  try {
-    const resp = await get<ApiEnvelope<WorkflowTemplate[]>>('/admin/workflow/templates')
-    templates.value = resp.data
-    if (selectedTemplateId.value != null && !templates.value.some((item) => item.id === selectedTemplateId.value)) {
-      clearSelectedTemplate()
-    }
-  } finally {
-    tplLoading.value = false
+const flowCols = [
+  { title: '学号', dataIndex: 'student_no', key: 'student_no', width: 140 },
+  { title: '姓名', dataIndex: 'student_name', key: 'student_name', width: 120 },
+  { title: '模板', dataIndex: 'template_name', key: 'template_name', width: 220 },
+  { title: '当前节点', dataIndex: 'current_node_name', key: 'current_node_name' },
+  { title: '节点状态', key: 'status', width: 120 },
+  { title: '到期日', key: 'due_date', width: 140 },
+]
+
+const reminderCols = [
+  { title: '提醒日期', dataIndex: 'reminder_date', key: 'reminder_date', width: 120 },
+  { title: '学生', key: 'student', width: 150 },
+  { title: '模板', key: 'template', width: 220 },
+  { title: '节点', key: 'node', width: 220 },
+  { title: '节点状态', key: 'node_status', width: 120 },
+  { title: '截止日期', dataIndex: 'due_date', key: 'due_date', width: 120 },
+  { title: '渠道', dataIndex: 'channel', key: 'channel', width: 100 },
+  { title: '发送状态', key: 'status', width: 120 },
+  { title: '消息 / 说明', key: 'message' },
+  { title: '发送时间', key: 'sent_at', width: 180 },
+]
+
+const runCols = [
+  { title: '执行时间', key: 'started_at', width: 180 },
+  { title: '截止日期', dataIndex: 'as_of_date', key: 'as_of_date', width: 120 },
+  { title: '触发方式', dataIndex: 'trigger_mode', key: 'trigger_mode', width: 120 },
+  { title: '渠道', dataIndex: 'channel', key: 'channel', width: 100 },
+  { title: '状态', key: 'status', width: 120 },
+  { title: '创建', dataIndex: 'created_count', key: 'created_count', width: 90 },
+  { title: '发送', dataIndex: 'sent_count', key: 'sent_count', width: 90 },
+  { title: '跳过', dataIndex: 'skipped_count', key: 'skipped_count', width: 90 },
+  { title: '取消', dataIndex: 'cancelled_count', key: 'cancelled_count', width: 90 },
+  { title: '失败', dataIndex: 'failed_count', key: 'failed_count', width: 90 },
+  { title: '完成时间', key: 'finished_at', width: 180 },
+]
+
+function templateKindLabel(kind: string) {
+  if (kind === 'PARTY') return '党员发展'
+  if (kind === 'YOUTH_LEAGUE') return '团学流程'
+  return '其他'
+}
+
+function triggerRuleLabel(rule: WorkflowTriggerRule | string) {
+  if (rule === 'PREV_DONE') return '上一节点完成后'
+  if (rule === 'ON_APPLY') return '申请提交后'
+  if (rule === 'MANUAL') return '人工触发'
+  if (rule === 'ON_DATE') return '按日期触发'
+  return rule
+}
+
+function reminderRuleSummary(template: WorkflowTemplate | Record<string, any>) {
+  const nodes = template.nodes as WorkflowNode[]
+  const enabled = nodes.filter((node: WorkflowNode) => node.reminder_enabled)
+  if (!enabled.length) return '所有节点均未开启提醒'
+  const leadSet = [...new Set(enabled.map((node: WorkflowNode) => `${node.reminder_lead_days ?? 0} 天前`))]
+  return `${enabled.length}/${nodes.length} 个节点开启提醒，常见提前量：${leadSet.slice(0, 2).join('、')}`
+}
+
+function reminderStatusLabel(status: string) {
+  if (status === 'PENDING') return '待发送'
+  if (status === 'SENT') return '已发送'
+  if (status === 'CANCELLED') return '已取消'
+  if (status === 'FAILED') return '发送失败'
+  return status
+}
+
+function reminderStatusColor(status: string) {
+  if (status === 'SENT') return 'green'
+  if (status === 'FAILED') return 'red'
+  if (status === 'CANCELLED') return 'default'
+  return 'gold'
+}
+
+function runStatusLabel(status: string) {
+  if (status === 'RUNNING') return '执行中'
+  if (status === 'COMPLETED') return '已完成'
+  if (status === 'FAILED') return '执行失败'
+  return status
+}
+
+function runStatusColor(status: string) {
+  if (status === 'COMPLETED') return 'green'
+  if (status === 'FAILED') return 'red'
+  return 'blue'
+}
+
+function formatTime(value?: string | null) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('zh-CN', { hour12: false })
+}
+
+function createNode(partial?: Partial<WorkflowNode>): EditableWorkflowNode {
+  return {
+    __key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    code: partial?.code ?? '',
+    name: partial?.name ?? '',
+    sort_order: partial?.sort_order ?? tplForm.nodes.length + 1,
+    stage_group: partial?.stage_group ?? undefined,
+    required_task: partial?.required_task ?? undefined,
+    trigger_rule: partial?.trigger_rule ?? 'PREV_DONE',
+    due_rule_days: partial?.due_rule_days ?? undefined,
+    reminder_lead_days: partial?.reminder_lead_days ?? 0,
+    reminder_enabled: partial?.reminder_enabled ?? true,
+    reminder_channel: partial?.reminder_channel ?? 'IN_APP',
+    repeat_interval_days: partial?.repeat_interval_days ?? undefined,
+    max_reminders: partial?.max_reminders ?? 1,
+    is_terminal: partial?.is_terminal ?? false,
+    is_active: partial?.is_active ?? true,
   }
 }
 
-function clearSelectedTemplate() {
-  selectedTemplateId.value = null
-  showNodesModal.value = false
+function resetTemplateForm() {
+  editingTemplateId.value = null
+  Object.assign(tplForm, {
+    code: '',
+    name: '',
+    kind: 'PARTY',
+    description: '',
+    version_label: '',
+    nodes: [createNode({ sort_order: 1 })],
+  })
+}
+
+function openCreateTemplate() {
+  resetTemplateForm()
+  showTemplateDrawer.value = true
+}
+
+function openEditTemplate(template: WorkflowTemplate | Record<string, any>) {
+  const normalized = template as WorkflowTemplate
+  editingTemplateId.value = template.id
+  Object.assign(tplForm, {
+    code: normalized.code,
+    name: normalized.name,
+    kind: normalized.kind,
+    description: normalized.description ?? '',
+    version_label: normalized.version_label ?? '',
+    nodes: normalized.nodes
+      .slice()
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((node) => createNode(node)),
+  })
+  showTemplateDrawer.value = true
+}
+
+function refreshTemplates() {
+  void loadTemplates()
+}
+
+function appendNode() {
+  tplForm.nodes.push(
+    createNode({
+      sort_order: tplForm.nodes.length + 1,
+    }),
+  )
+}
+
+function removeNode(index: number) {
+  tplForm.nodes.splice(index, 1)
+  tplForm.nodes.forEach((node, i) => {
+    if (!node.sort_order || node.sort_order < 1) node.sort_order = i + 1
+  })
+}
+
+function normalizeNodePayload(node: EditableWorkflowNode): WorkflowNodePayload {
+  return {
+    code: node.code.trim(),
+    name: node.name.trim(),
+    sort_order: Number(node.sort_order || 0),
+    stage_group: node.stage_group?.trim() || null,
+    required_task: node.required_task?.trim() || null,
+    trigger_rule: node.trigger_rule,
+    due_rule_days: node.due_rule_days ?? null,
+    reminder_lead_days: node.reminder_lead_days ?? null,
+    reminder_enabled: !!node.reminder_enabled,
+    reminder_channel: node.reminder_channel || 'IN_APP',
+    repeat_interval_days: node.repeat_interval_days ?? null,
+    max_reminders: node.max_reminders ?? null,
+    is_terminal: !!node.is_terminal,
+    is_active: !!node.is_active,
+  }
+}
+
+async function submitTemplate() {
+  const code = tplForm.code.trim()
+  const name = tplForm.name.trim()
+  if (!code || !name) {
+    message.error('请先填写模板编码和模板名称')
+    return
+  }
+  if (!tplForm.nodes.length) {
+    message.error('请至少配置一个节点')
+    return
+  }
+  const normalizedNodes = tplForm.nodes
+    .map(normalizeNodePayload)
+    .sort((a, b) => a.sort_order - b.sort_order)
+  if (normalizedNodes.some((node) => !node.code || !node.name)) {
+    message.error('每个节点都需要填写编码和名称')
+    return
+  }
+
+  tplSubmitting.value = true
+  try {
+    const payload: WorkflowTemplatePayload = {
+      code,
+      name,
+      kind: tplForm.kind,
+      description: tplForm.description.trim() || null,
+      version_label: tplForm.version_label.trim() || null,
+      nodes: normalizedNodes,
+    }
+    const resp = await saveWorkflowTemplate(payload)
+    message.success('流程模板与提醒规则已保存')
+    showTemplateDrawer.value = false
+    await loadTemplates(resp.data.id)
+  } finally {
+    tplSubmitting.value = false
+  }
+}
+
+async function loadTemplates(preferId?: number) {
+  tplLoading.value = true
+  try {
+    const resp = await listWorkflowTemplates()
+    templates.value = resp.data
+    if (!templates.value.length) {
+      selectedTemplateId.value = null
+      return
+    }
+    if (preferId && templates.value.some((item) => item.id === preferId)) {
+      selectedTemplateId.value = preferId
+      return
+    }
+    if (selectedTemplateId.value != null && templates.value.some((item) => item.id === selectedTemplateId.value)) {
+      return
+    }
+    selectedTemplateId.value = templates.value[0].id
+  } finally {
+    tplLoading.value = false
+  }
 }
 
 function templateRowProps(record: WorkflowTemplate) {
@@ -361,60 +874,13 @@ function templateRowClassName(record: WorkflowTemplate) {
     : 'selectable-template-row'
 }
 
-const showTemplateDrawer = ref(false)
-const tplForm = reactive({ code: '', name: '', kind: 'PARTY', description: '' })
-
-async function onSubmitTemplate() {
-  await post<ApiEnvelope<WorkflowTemplate>>('/admin/workflow/templates', {
-    ...tplForm,
-    nodes: [],
-  })
-  message.success('保存成功')
-  showTemplateDrawer.value = false
-  Object.assign(tplForm, { code: '', name: '', kind: 'PARTY', description: '' })
-  loadTemplates()
-}
-
-// ---------- 节点 ----------
-const nodeCols = [
-  { title: '序号', dataIndex: 'sort_order', key: 'sort_order', width: 70 },
-  { title: '编码', dataIndex: 'code', key: 'code', width: 140 },
-  { title: '名称', dataIndex: 'name', key: 'name' },
-  { title: '阶段', dataIndex: 'stage_group', key: 'stage_group', width: 120 },
-  { title: '预计天数', dataIndex: 'due_rule_days', key: 'due_rule_days', width: 100 },
-  { title: '状态', key: 'is_active', width: 80 },
-]
-const showNodesModal = ref(false)
-
-function viewNodes(tpl: WorkflowTemplate | Record<string, any>, openModal = true) {
-  const normalized = tpl as WorkflowTemplate
-  selectedTemplateId.value = normalized.id
-  showNodesModal.value = openModal
-}
-
-// ---------- 学生流程 ----------
-const flowCols = [
-  { title: '学号', dataIndex: 'student_no', key: 'student_no', width: 120 },
-  { title: '姓名', dataIndex: 'student_name', key: 'student_name', width: 100 },
-  { title: '模板', dataIndex: 'template_code', key: 'template_code', width: 140 },
-  { title: '当前节点', dataIndex: 'current_node_name', key: 'current_node_name' },
-  { title: '节点状态', key: 'status', width: 100 },
-  { title: '到期日', key: 'due_date', width: 120 },
-]
-const flowFilters = reactive<{ student_no?: string; template_code?: string }>({})
-const flows = ref<StudentWorkflowBrief[]>([])
-const flowLoading = ref(false)
-const flowPagination = reactive({ current: 1, pageSize: 20, total: 0 })
-
 async function reloadStudentFlows() {
   flowLoading.value = true
   try {
-    const resp = await get<ApiEnvelope<Paginated<StudentWorkflowBrief>>>('/admin/workflow/students', {
-      params: {
-        template_code: flowFilters.template_code,
-        page: flowPagination.current,
-        size: flowPagination.pageSize,
-      },
+    const resp = await listWorkflowStudents({
+      template_code: flowFilters.template_code,
+      page: flowPagination.current,
+      size: flowPagination.pageSize,
     })
     const items = resp.data.items
     flows.value = flowFilters.student_no
@@ -426,194 +892,372 @@ async function reloadStudentFlows() {
   }
 }
 
-function onFlowTableChange(p: any) {
-  flowPagination.current = p.current
-  flowPagination.pageSize = p.pageSize
+function resetFlowFilters() {
+  flowFilters.student_no = undefined
+  flowFilters.template_code = undefined
+  flowPagination.current = 1
   reloadStudentFlows()
 }
 
-// ---------- 提醒 ----------
-const reminderLoading = ref(false)
+function onFlowTableChange(pagination: any) {
+  flowPagination.current = pagination.current ?? 1
+  flowPagination.pageSize = pagination.pageSize ?? flowPagination.pageSize
+  reloadStudentFlows()
+}
 
-async function generateReminders() {
+async function loadReminderRecords() {
   reminderLoading.value = true
   try {
-    const resp = await post<ApiEnvelope<{ created: number }>>('/admin/workflow/reminders/generate', {
-      channel: 'IN_APP',
+    const result = await listWorkflowReminderRecords({
+      template_code: reminderFilters.template_code,
+      student_no: reminderFilters.student_no,
+      status: reminderFilters.status,
+      page: reminderPagination.current,
+      size: reminderPagination.pageSize,
     })
-    lastReminderRun.value = {
-      created: resp.data.created,
-      channel: 'IN_APP',
-      generatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-    }
-    message.success(`已生成 ${resp.data.created} 条提醒`)
+    reminderSupported.value = result.supported
+    reminderRecords.value = result.items
+    reminderPagination.total = result.meta.total
   } finally {
     reminderLoading.value = false
   }
 }
 
-onMounted(() => {
-  loadTemplates()
-  reloadStudentFlows()
+async function loadReminderRuns() {
+  runLoading.value = true
+  try {
+    const result = await listWorkflowReminderRuns({
+      page: runPagination.current,
+      size: runPagination.pageSize,
+    })
+    runSupported.value = result.supported
+    reminderRuns.value = result.items
+    runPagination.total = result.meta.total
+    latestReminderRun.value = result.items[0] ?? latestReminderRun.value
+  } finally {
+    runLoading.value = false
+  }
+}
+
+async function reloadReminderWorkspace() {
+  await Promise.all([loadReminderRecords(), loadReminderRuns()])
+}
+
+function resetReminderFilters() {
+  reminderFilters.template_code = undefined
+  reminderFilters.student_no = undefined
+  reminderFilters.status = undefined
+  reminderPagination.current = 1
+  reloadReminderWorkspace()
+}
+
+async function generateReminders() {
+  reminderActionLoading.value = true
+  try {
+    const result = await executeWorkflowReminderRun({ channel: 'IN_APP' })
+    latestReminderRun.value = result.run
+    message.success(
+      `提醒执行完成：创建 ${result.run.created_count} 条，发送 ${result.run.sent_count} 条，跳过 ${result.run.skipped_count} 条`,
+    )
+    reminderPagination.current = 1
+    runPagination.current = 1
+    await reloadReminderWorkspace()
+  } finally {
+    reminderActionLoading.value = false
+  }
+}
+
+function onReminderTableChange(pagination: any) {
+  reminderPagination.current = pagination.current ?? 1
+  reminderPagination.pageSize = pagination.pageSize ?? reminderPagination.pageSize
+  loadReminderRecords()
+}
+
+function onRunTableChange(pagination: any) {
+  runPagination.current = pagination.current ?? 1
+  runPagination.pageSize = pagination.pageSize ?? runPagination.pageSize
+  loadReminderRuns()
+}
+
+watch(activeTab, (tab) => {
+  if (tab === 'students') {
+    reloadStudentFlows()
+  }
+  if (tab === 'reminders') {
+    reloadReminderWorkspace()
+  }
+})
+
+onMounted(async () => {
+  resetTemplateForm()
+  await loadTemplates()
+  await Promise.all([reloadStudentFlows(), reloadReminderWorkspace()])
 })
 </script>
 
 <style scoped>
 .party-stage-page {
-  padding-right: 364px;
+  display: grid;
+  gap: 16px;
 }
 
-.mb16 { margin-bottom: 16px; }
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
 
-.stage-side-panel {
-  position: fixed;
-  top: 58px;
-  right: 0;
-  bottom: 0;
-  z-index: 12;
-  width: 350px;
-  overflow-y: auto;
+.metric-tile {
+  position: relative;
+  overflow: hidden;
   padding: 18px;
-  background: #fff;
-  border-left: 1px solid var(--line-soft);
-  box-shadow: var(--shadow-card);
+  background: linear-gradient(135deg, #fff8f8, #ffffff 60%);
+  border: 1px solid #f4d7dc;
+  border-radius: 18px;
+  box-shadow: 0 16px 28px rgba(108, 18, 32, 0.06);
 }
 
-.side-panel-head,
-.stage-progress-row,
-.side-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.side-panel-head {
-  margin-bottom: 14px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.side-panel-head strong {
-  color: var(--text);
-  font-size: 16px;
-}
-
-.side-panel-head span {
-  color: var(--text-3);
-  font-size: 18px;
-}
-
-.stage-type-card {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: 12px;
-  align-items: center;
-  padding: 14px;
-  background: linear-gradient(135deg, #fff7f8, #fff);
-  border: 1px solid #ffe0e5;
-  border-radius: 12px;
-}
-
-.stage-type-card > .anticon {
-  display: grid;
-  width: 46px;
-  height: 46px;
+.metric-icon {
+  display: inline-grid;
+  width: 42px;
+  height: 42px;
   place-items: center;
   color: var(--ruc-red);
-  background: #ffe4e8;
+  background: #ffe7ea;
   border-radius: 999px;
+  font-size: 20px;
+}
+
+.metric-label {
+  margin-top: 14px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.metric-value {
+  margin-top: 6px;
+  color: var(--text);
+  font-family: var(--font-number);
+  font-size: 32px;
+  line-height: 1.1;
+}
+
+.metric-sub {
+  margin-top: 8px;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.toolbar-card,
+.filter-card,
+.workspace-card,
+.run-summary-card,
+.template-preview-card {
+  margin-bottom: 16px;
+}
+
+.template-preview-card,
+.workspace-card,
+.run-summary-card {
+  border-radius: 18px;
+  box-shadow: 0 16px 28px rgba(108, 18, 32, 0.05);
+}
+
+.template-preview-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.card-kicker {
+  margin: 0 0 6px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.template-preview-head h3 {
+  margin: 0;
+  color: var(--text);
   font-size: 22px;
 }
 
-.stage-type-card p,
-.side-muted {
-  margin: 0;
+.template-preview-head span {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.template-preview-grid,
+.run-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.template-preview-grid > div,
+.run-summary-grid > div {
+  padding: 14px;
+  background: #faf7f7;
+  border-radius: 14px;
+}
+
+.template-preview-grid span,
+.run-summary-grid span {
+  display: block;
   color: var(--text-3);
   font-size: 12px;
-  line-height: 1.7;
 }
 
-.stage-type-card h3 {
-  margin: 4px 0;
+.template-preview-grid strong,
+.run-summary-grid strong {
+  display: block;
+  margin-top: 8px;
   color: var(--text);
-  font-size: 16px;
+  font-size: 20px;
 }
 
-.stage-type-card span {
-  color: var(--text-2);
-  font-size: 12px;
+.node-chip-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
 }
 
-.side-section {
-  padding: 16px 0;
-  border-bottom: 1px solid var(--line-soft);
+.node-chip {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: #fffaf9;
+  border: 1px solid #f5e0da;
+  border-radius: 14px;
 }
 
-.side-section h3 {
-  margin: 0 0 10px;
+.node-chip strong {
+  display: block;
   color: var(--text);
   font-size: 14px;
 }
 
-.stage-progress-row {
-  min-height: 32px;
+.node-chip span {
   color: var(--text-3);
   font-size: 12px;
 }
 
-.stage-progress-row strong {
-  color: var(--ruc-red);
-  font-family: var(--font-number);
+.node-chip-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.summary-foot,
+.cell-sub {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.summary-foot {
+  margin-top: 14px;
+}
+
+.cell-sub {
+  display: block;
+  line-height: 1.6;
+}
+
+.drawer-grid,
+.node-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+}
+
+.drawer-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 8px 0 16px;
+}
+
+.drawer-section-head h3 {
+  margin: 0;
+  color: var(--text);
   font-size: 18px;
 }
 
-.node-timeline {
-  display: grid;
-  gap: 10px;
-}
-
-.node-timeline div {
-  display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-  color: var(--text-2);
+.drawer-section-head p {
+  margin: 6px 0 0;
+  color: var(--text-3);
   font-size: 12px;
 }
 
-.node-timeline i {
-  width: 9px;
-  height: 9px;
-  background: var(--ruc-red);
-  border-radius: 999px;
-  box-shadow: 0 0 0 4px #ffe4e8;
+.node-editor-list {
+  display: grid;
+  gap: 16px;
 }
 
-.node-timeline em {
-  color: var(--text-3);
-  font-style: normal;
+.node-editor-card {
+  background: #fcfbfb;
+  border-radius: 18px;
 }
 
-.side-actions {
-  margin-top: 16px;
+.node-editor-title,
+.node-switch-row,
+.drawer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
-.side-actions .ant-btn {
-  flex: 1;
+.node-switch-row {
+  flex-wrap: wrap;
+  padding-top: 8px;
 }
 
-@media (max-width: 1320px) {
-  .party-stage-page {
-    padding-right: 0;
+.drawer-actions {
+  margin-top: 24px;
+}
+
+:deep(.selected-template-row > td) {
+  background: #fff4f4 !important;
+}
+
+.mb16 {
+  margin-bottom: 16px;
+}
+
+@media (max-width: 1200px) {
+  .metric-grid,
+  .template-preview-grid,
+  .run-summary-grid,
+  .drawer-grid,
+  .node-editor-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .metric-grid,
+  .template-preview-grid,
+  .run-summary-grid,
+  .drawer-grid,
+  .node-editor-grid {
+    grid-template-columns: 1fr;
   }
 
-  .stage-side-panel {
-    position: static;
-    width: auto;
-    margin-top: 14px;
-    border: 1px solid var(--line-soft);
-    border-radius: 12px;
+  .template-preview-head,
+  .node-chip,
+  .drawer-section-head,
+  .node-editor-title,
+  .node-switch-row,
+  .drawer-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

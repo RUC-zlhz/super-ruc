@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.auth.models import Student
 from app.core.sql import order_by_nulls_last_desc
 from app.workflow.models import (
+    REMINDER_STATUS_CANCELLED,
     REQUEST_STATUS_APPROVED,
     REQUEST_STATUS_IN_REVIEW,
     REQUEST_STATUS_REJECTED,
@@ -253,7 +254,7 @@ async def cancel_unsent_reminders_for_state(
     )
     rows = (await db.execute(stmt)).scalars().all()
     for row in rows:
-        row.status = "CANCELLED"
+        row.status = REMINDER_STATUS_CANCELLED
         row.cancel_reason = cancel_reason
     await db.flush()
     return len(rows)

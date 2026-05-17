@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     AUDIT_ARCHIVE_BATCH_SIZE: int = 1000
     AUDIT_ARCHIVE_LOCK_TTL_SECONDS: int = 3600
 
+    WORKFLOW_REMINDER_ENABLED: bool = False
+    WORKFLOW_REMINDER_INTERVAL_MINUTES: int = 60
+    WORKFLOW_REMINDER_LOCK_TTL_SECONDS: int = 1800
+    WORKFLOW_REMINDER_CHANNEL: str = "IN_APP"
+
     MINIO_ENDPOINT: str = "localhost:9010"
     MINIO_ACCESS_KEY: str = "sip_minio"
     MINIO_SECRET_KEY: str = "sip_minio_dev"
@@ -142,6 +147,12 @@ class Settings(BaseSettings):
             errors.append("AUDIT_ARCHIVE_BATCH_SIZE 必须在 100~10000 之间")
         if self.AUDIT_ARCHIVE_LOCK_TTL_SECONDS <= 0:
             errors.append("AUDIT_ARCHIVE_LOCK_TTL_SECONDS 必须大于 0")
+        if self.WORKFLOW_REMINDER_INTERVAL_MINUTES <= 0:
+            errors.append("WORKFLOW_REMINDER_INTERVAL_MINUTES 必须大于 0")
+        if self.WORKFLOW_REMINDER_LOCK_TTL_SECONDS <= 0:
+            errors.append("WORKFLOW_REMINDER_LOCK_TTL_SECONDS 必须大于 0")
+        if self.WORKFLOW_REMINDER_CHANNEL not in {"IN_APP", "EMAIL", "SMS"}:
+            errors.append("WORKFLOW_REMINDER_CHANNEL 仅支持 IN_APP / EMAIL / SMS")
 
         if errors:
             raise ValueError(

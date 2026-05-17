@@ -39,7 +39,9 @@ from app.workflow.schemas import (
     QuizQuestionUpdate,
     QuizSubmitIn,
     QuizSubmitOut,
+    ReminderAdminOut,
     ReminderGenerateIn,
+    ReminderRunOut,
     ReopenRequestIn,
     RequestBrief,
     RequestCreate,
@@ -355,20 +357,74 @@ async def admin_mark_node_status(
 
 
 # -------- 提醒生成 --------
-@admin_router.post("/workflow/reminders/generate", response_model=ApiResponse[dict])
+@admin_router.post(
+    "/workflow/reminders/generate", response_model=ApiResponse[ReminderRunOut]
+)
 async def admin_generate_reminders(
     payload: ReminderGenerateIn,
     db: DBDep,
     user: Annotated[CurrentUserDep, Depends(_EditorRole)],
-) -> ApiResponse[dict]:
-    count = await service.generate_reminders(
+) -> ApiResponse[ReminderRunOut]:
+    run = await service.generate_reminders(
         db,
         as_of=payload.as_of_date,
         channel=payload.channel,
         operator_id=user.user_id,
         operator_role=",".join(user.roles) or None,
     )
-    return ok({"created": count})
+    return ok(run)
+
+
+@admin_router.get(
+    "/workflow/reminders",
+    response_model=ApiResponse[Paginated[ReminderAdminOut]],
+)
+async def admin_list_reminders(
+    db: DBDep,
+    _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+    template_code: str | None = Query(default=None),
+    student_no: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+) -> ApiResponse[Paginated[ReminderAdminOut]]:
+    items, total = await service.list_reminders_admin(
+        db,
+        template_code=template_code,
+        student_no=student_no,
+        status=status,
+        page=page,
+        size=size,
+    )
+    return ok(
+        Paginated[ReminderAdminOut](
+            items=items,
+            meta=PageMeta(page=page, size=size, total=total),
+        )
+    )
+
+
+@admin_router.get(
+    "/workflow/reminder-runs",
+    response_model=ApiResponse[Paginated[ReminderRunOut]],
+)
+async def admin_list_reminder_runs(
+    db: DBDep,
+    _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+) -> ApiResponse[Paginated[ReminderRunOut]]:
+    items, total = await service.list_reminder_runs(
+        db,
+        page=page,
+        size=size,
+    )
+    return ok(
+        Paginated[ReminderRunOut](
+            items=items,
+            meta=PageMeta(page=page, size=size, total=total),
+        )
+    )
 
 
 # -------- 申请类型维护 --------

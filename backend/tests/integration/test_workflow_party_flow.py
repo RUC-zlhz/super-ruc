@@ -62,8 +62,13 @@ def _party_template_payload() -> dict:
                 "sort_order": 1,
                 "stage_group": "INITIAL",
                 "required_task": "提交书面申请",
+                "trigger_rule": "ON_APPLY",
                 "due_rule_days": 30,
                 "reminder_lead_days": 5,
+                "reminder_enabled": True,
+                "reminder_channel": "IN_APP",
+                "repeat_interval_days": 3,
+                "max_reminders": 3,
             },
             {
                 "code": "ACTIVIST",
@@ -71,8 +76,13 @@ def _party_template_payload() -> dict:
                 "sort_order": 2,
                 "stage_group": "ACTIVIST",
                 "required_task": "支部大会讨论",
+                "trigger_rule": "PREV_DONE",
                 "due_rule_days": 60,
                 "reminder_lead_days": 7,
+                "reminder_enabled": True,
+                "reminder_channel": "IN_APP",
+                "repeat_interval_days": 7,
+                "max_reminders": 2,
             },
             {
                 "code": "TARGET",
@@ -80,6 +90,9 @@ def _party_template_payload() -> dict:
                 "sort_order": 3,
                 "stage_group": "TARGET",
                 "required_task": "政审 + 推优",
+                "trigger_rule": "PREV_DONE",
+                "reminder_enabled": False,
+                "reminder_channel": "IN_APP",
                 "is_terminal": True,
             },
         ],
@@ -103,6 +116,9 @@ async def test_party_template_upsert_start_complete_workflow(
     assert tpl["code"] == "PARTY_DEV_MAIN"
     assert len(tpl["nodes"]) == 3
     assert [n["code"] for n in tpl["nodes"]] == ["APPLY", "ACTIVIST", "TARGET"]
+    assert tpl["nodes"][0]["repeat_interval_days"] == 3
+    assert tpl["nodes"][0]["max_reminders"] == 3
+    assert tpl["nodes"][2]["reminder_enabled"] is False
 
     # 2. 管理员为学生启动流程
     start = await admin_client.post(
@@ -221,7 +237,10 @@ async def test_workflow_reminders_overdue_path(
         json={"channel": "IN_APP"},
     )
     assert gen.status_code == 200, gen.text
-    assert gen.json()["data"]["created"] >= 1
+    run = gen.json()["data"]
+    assert run["created_count"] >= 1
+    assert run["sent_count"] >= 1
+    assert run["status"] == "COMPLETED"
 
     # 节点状态已自动转 OVERDUE
     await db.refresh(apply_state)
@@ -238,8 +257,62 @@ async def test_workflow_reminders_overdue_path(
     assert len(reminders) >= 1
     r = reminders[0]
     assert r.channel == "IN_APP"
-    assert r.status == "PENDING"
-    assert str(yesterday) in (r.message or "")
+    assert r.status == "SENT"
+    assert r.sent_at is not None
+
+    runs = await admin_client.get("/api/v1/admin/workflow/reminder-runs")
+    assert runs.status_code == 200, runs.text
+    assert runs.json()["data"]["items"][0]["id"] == run["id"]
+
+    reminder_list = await admin_client.get(
+        "/api/v1/admin/workflow/reminders",
+        params={"template_code": "PARTY_DEV_MAIN", "student_no": "W20001"},
+    )
+    assert reminder_list.status_code == 200, reminder_list.text
+    reminder_item = reminder_list.json()["data"]["items"][0]
+    assert reminder_item["student_no"] == "W20001"
+    assert reminder_item["template_code"] == "PARTY_DEV_MAIN"
+    assert reminder_item["status"] == "SENT"
+
+
+async def test_complete_node_cancels_unsent_workflow_reminders(
+    client: AsyncClient, db: AsyncSession, admin_client: AsyncClient,
+) -> None:
+    _tok, student_id = await _login_as_student(
+        client, db, student_no="W30001", wx_code="wx_w30001",
+    )
+    await admin_client.post(
+        "/api/v1/admin/workflow/templates", json=_party_template_payload(),
+    )
+    start = await admin_client.post(
+        "/api/v1/admin/workflow/students",
+        json={"student_id": student_id, "template_code": "PARTY_DEV_MAIN"},
+    )
+    assert start.status_code == 200
+    apply_state = next(
+        node for node in start.json()["data"]["nodes"] if node["node_code"] == "APPLY"
+    )
+
+    reminder = WorkflowReminder(
+        workflow_node_state_id=apply_state["id"],
+        student_id=student_id,
+        reminder_date=date.today(),
+        channel="IN_APP",
+        status="PENDING",
+        message="待发送提醒",
+    )
+    db.add(reminder)
+    await db.commit()
+
+    complete = await admin_client.post(
+        f"/api/v1/admin/workflow/node-states/{apply_state['id']}/complete",
+        json={"evidence": "已提交材料"},
+    )
+    assert complete.status_code == 200, complete.text
+
+    await db.refresh(reminder)
+    assert reminder.status == "CANCELLED"
+    assert reminder.cancel_reason == "节点已完成，自动关闭未发送提醒"
 
 
 async def test_workflow_endpoints_reject_anonymous_and_student(

@@ -53,7 +53,6 @@ from app.workflow.schemas import (
     ApprovalRecordOut,
     AttachmentOut,
     ReminderAdminOut,
-    ReminderOut,
     ReminderRunOut,
     RequestBrief,
     RequestDetail,
@@ -319,6 +318,11 @@ async def complete_node(
     state.completed_by = operator_id
     state.evidence = evidence
     state.note = note
+    cancelled = await _cancel_unsent_reminders_for_state(
+        db,
+        state_id=state.id,
+        reason="节点已完成，自动关闭未发送提醒",
+    )
 
     sw = state.workflow
     # 触发下一节点
@@ -349,6 +353,7 @@ async def complete_node(
         entity_id=state.id,
         actor_user_id=operator_id,
         actor_role=operator_role,
+        detail={"cancelled_reminders": cancelled},
     )
     await db.commit()
     full = await repo.get_student_workflow(db, sw.id)
@@ -373,6 +378,13 @@ async def mark_node_status(
     state.status = new_status
     if note:
         state.note = note
+    cancelled = 0
+    if new_status == WORKFLOW_NODE_MANUAL:
+        cancelled = await _cancel_unsent_reminders_for_state(
+            db,
+            state_id=state.id,
+            reason="节点已转人工跟进，自动关闭未发送提醒",
+        )
     await log_action(
         db,
         event_type="WORKFLOW",
@@ -381,7 +393,7 @@ async def mark_node_status(
         entity_id=state.id,
         actor_user_id=operator_id,
         actor_role=operator_role,
-        detail={"new_status": new_status},
+        detail={"new_status": new_status, "cancelled_reminders": cancelled},
     )
     await db.commit()
     full = await repo.get_student_workflow(db, state.workflow_id)
@@ -701,41 +713,15 @@ async def generate_reminders(
     channel: str,
     operator_id: int,
     operator_role: str | None,
-) -> int:
-    as_of = as_of or date.today()
-    states = await repo.list_pending_nodes_for_reminder(db, as_of=as_of)
-    created = 0
-    for s in states:
-        if s.due_date is None:
-            continue
-        lead = (s.node.reminder_lead_days if s.node and s.node.reminder_lead_days is not None else 0)
-        remind_on = s.due_date - timedelta(days=lead)
-        if remind_on > as_of:
-            continue
-        # 逾期也自动调整节点状态
-        if s.due_date < as_of and s.status == WORKFLOW_NODE_PENDING:
-            s.status = WORKFLOW_NODE_OVERDUE
-        await repo.create_reminder(
-            db,
-            workflow_node_state_id=s.id,
-            student_id=s.workflow.student_id if s.workflow else 0,
-            reminder_date=as_of,
-            channel=channel,
-            status=REMINDER_STATUS_PENDING,
-            message=f"节点 {s.node.name} 需要跟进，截止 {s.due_date}",
-        )
-        created += 1
-    await log_action(
+) -> ReminderRunOut:
+    return await run_reminder_cycle(
         db,
-        event_type="WORKFLOW",
-        entity_code="REMINDER",
-        action="GENERATE",
-        actor_user_id=operator_id,
-        actor_role=operator_role,
-        detail={"as_of": str(as_of), "count": created},
+        as_of=as_of,
+        channel=channel,
+        trigger_mode="MANUAL",
+        operator_id=operator_id,
+        operator_role=operator_role,
     )
-    await db.commit()
-    return created
 
 
 # ======================================================================
