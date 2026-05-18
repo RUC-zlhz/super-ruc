@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S22` 已闭合；后续仅在新确认范围内继续增量推进
+- 当前目标：`S1 ~ S24` 已闭合；后续仅在新确认范围内继续增量推进
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -671,6 +671,23 @@
 - 调度与配置：`backend/app/core/workflow_reminder_scheduler.py`、`backend/app/core/config.py`、`backend/app/main.py`
 - 回归样例：`backend/tests/integration/test_workflow_party_flow.py`、`backend/tests/integration/test_workflow_reminder_scheduler.py`
 
+### S24 拉取后请求权限范围与公开预览门禁收口
+
+- [x] `S24.1` 将班团骨干等协同角色的申请列表、详情与处理动作按 `UserRole.scope_code` 收口到班级 / 专业 / 年级范围。
+- [x] `S24.2` 将 `/preview/requirements` 公开预览路由改为开发环境或显式开关启用，生产包默认不注册。
+
+当前结论：
+
+- `S24` 已完成：协同角色不再通过申请工作台越权查看全量事务申请，生产构建也不再默认暴露需求预览页面。
+
+证据：
+
+- 细化方案：`docs/notes/refinements/2026-05-18-s24-request-scope-and-preview-gate.md`
+- 后端权限收口：`backend/app/workflow/repository.py`、`backend/app/workflow/service.py`、`backend/app/workflow/router.py`
+- 回归样例：`backend/tests/integration/test_request_flow.py`
+- 前端门禁：`web/src/router/index.ts`
+- 验证：`ruff check`、`python -m py_compile`、`pytest tests/integration/test_request_flow.py -q`（`14 passed`）、`pnpm -C web build` 均通过。
+
 ## 细化文件登记
 
 > 规则：每个新细化文件都要写入本表，且必须关联一个或多个主计划条目编号。
@@ -741,6 +758,7 @@
 | 2026-05-17 | Web 前端需求预览入口 | `docs/notes/refinements/2026-05-17-web-frontend-preview-for-requirement-check.md` | `S22.7` | `[x]` | 已新增公开预览页与登录页开发入口，可直接在前端预览班团骨干菜单范围与请假边界提示；登录页已重排预览区与学生提示，避免遮挡，并将 `vite` 默认开发端口调整为 `4173` 以规避本机 `5173` 排除端口冲突；`web vue-tsc` 与 `vite build` 通过 |
 | 2026-05-17 | 党团提醒规则配置与自动闭环实施拆分 | `docs/notes/refinements/2026-05-17-workflow-reminder-rule-and-auto-closure-breakdown.md` | `S23` | `[x]` | 已基于现有工作流实现拆分出前后端可执行清单；首版建议先闭环 `IN_APP` 站内提醒，并复用现有 scheduler 模式实现自动执行 |
 | 2026-05-18 | Web 党团提醒工作台改造 | `docs/notes/refinements/2026-05-18-web-workflow-reminder-workbench.md` | `S23.1, S23.2, S23.3` | `[x]` | 已完成模板节点提醒规则编辑、提醒记录列表、运行记录列表和手动执行结果展示；`web vue-tsc --noEmit` 与 `vite build` 通过 |
+| 2026-05-18 | 拉取后请求权限范围与公开预览门禁收口 | `docs/notes/refinements/2026-05-18-s24-request-scope-and-preview-gate.md` | `S24.1, S24.2` | `[x]` | 已按 `scope_code` 收口班团骨干申请列表/详情/处理动作，并让 `/preview/requirements` 仅在开发或显式开关下注册；申请流回归 `14 passed`，Web 构建通过 |
 
 ## 会话更新要求
 
@@ -821,3 +839,4 @@
 - `2026-05-17`：新增并完成 `S22.7` Web 前端需求预览入口；登录页已提供“直接预览班团骨干权限与请假提示”的公开入口，用户可不依赖后端账号直接在前端切换角色并查看可见菜单与请假边界提示；同时将登录页学生端提示与开发预览拆分为独立辅助区，避免遮挡，并将 `vite` 默认开发端口改为 `4173`，规避当前 Windows 环境 `5173` 位于 `5099-5198` 排除端口区间导致的启动失败；`web vue-tsc` 与 `vite build` 通过。
 - `2026-05-17`：新增 “党团提醒规则配置与自动闭环实施拆分” 细化文件；基于当前工作流实现确认差距主要集中在规则查询、运行记录、自动调度、去重和提醒取消闭环，并将后续开发拆分为 `S23.1 ~ S23.6`，首版建议仅闭环 `IN_APP` 站内提醒。
 - `2026-05-18`：完成 `S23` 首版实现；后端补齐提醒运行记录、提醒记录查询、手动执行回执、节点完成/转人工自动取消未发送提醒，以及独立的提醒 scheduler；Web 端将 `PartyStageList` 升级为真实工作台并接入模板规则编辑、提醒记录与运行记录展示；`web vue-tsc --noEmit`、`vite build` 与后端目标文件 `py_compile` 通过。
+- `2026-05-18`：完成 `S24` 拉取后请求权限范围与公开预览门禁收口；班团骨干等协同角色的申请工作台、详情与处理动作已按 `scope_code` 限定可见范围，且本人申请不能绕过协同 scope 执行管理动作；`/preview/requirements` 改为仅开发或显式开关注册；申请流回归 `14 passed`、静态校验与 Web 构建通过。

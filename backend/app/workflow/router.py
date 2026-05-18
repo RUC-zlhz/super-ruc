@@ -12,10 +12,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
 
-from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES
 from app.audit.enforcement import ensure_export_permission
 from app.audit.policies import REQUEST_PROOF_PREVIEW
 from app.audit.service import build_audit_detail, log_action
+from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES
 from app.core.dependencies import (
     ActiveStudentDep,
     CurrentUserDep,
@@ -186,7 +186,13 @@ async def get_request_detail(
     request_id: int, db: DBDep, user: CurrentUserDep
 ) -> ApiResponse[RequestDetail]:
     return ok(
-        await service.get_request_detail(db, request_id, user.user_id, user.roles)
+        await service.get_request_detail(
+            db,
+            request_id,
+            user.user_id,
+            user.roles,
+            viewer_student_id=user.student_id,
+        )
     )
 
 
@@ -198,7 +204,13 @@ async def proof_preview(
     request_id: int, db: DBDep, user: CurrentUserDep
 ) -> StreamingResponse:
     # 复用查看权限：学生本人或管理角色
-    await service.get_request_detail(db, request_id, user.user_id, user.roles)
+    await service.get_request_detail(
+        db,
+        request_id,
+        user.user_id,
+        user.roles,
+        viewer_student_id=user.student_id,
+    )
     await ensure_export_permission(
         db,
         roles=user.roles,
@@ -458,7 +470,7 @@ async def admin_upsert_request_type(
 )
 async def admin_list_requests(
     db: DBDep,
-    _user: Annotated[CurrentUserDep, Depends(_ApproverRole)],
+    user: Annotated[CurrentUserDep, Depends(_ApproverRole)],
     q: str | None = None,
     type_code: str | None = None,
     status: str | None = None,
@@ -472,6 +484,8 @@ async def admin_list_requests(
         type_code=type_code,
         status=status,
         in_review_only=in_review_only,
+        viewer_user_id=user.user_id,
+        viewer_roles=user.roles,
         page=page,
         size=size,
     )
@@ -488,7 +502,15 @@ async def admin_claim_request(
     db: DBDep,
     user: Annotated[CurrentUserDep, Depends(_ApproverRole)],
 ) -> ApiResponse[RequestDetail]:
-    return ok(await service.claim_in_review(db, request_id, user.user_id, user.roles))
+    return ok(
+        await service.claim_in_review(
+            db,
+            request_id,
+            user.user_id,
+            user.roles,
+            operator_student_id=user.student_id,
+        )
+    )
 
 
 @admin_router.post(
@@ -508,6 +530,7 @@ async def admin_approve_request(
             comment=payload.comment,
             operator_id=user.user_id,
             operator_roles=user.roles,
+            operator_student_id=user.student_id,
         )
     )
 
@@ -531,6 +554,7 @@ async def admin_mark_request_offline(
             note=payload.note,
             operator_id=user.user_id,
             operator_roles=user.roles,
+            operator_student_id=user.student_id,
         )
     )
 
@@ -552,6 +576,7 @@ async def admin_reject_request(
             comment=payload.comment,
             operator_id=user.user_id,
             operator_roles=user.roles,
+            operator_student_id=user.student_id,
         )
     )
 
@@ -575,6 +600,7 @@ async def admin_reopen_request(
             target_status=payload.target_status,
             operator_id=user.user_id,
             operator_roles=user.roles,
+            operator_student_id=user.student_id,
         )
     )
 

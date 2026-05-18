@@ -4,11 +4,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import date
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.auth.models import Student
+from app.auth.models import Student, UserRole
+from app.auth.role_codes import expand_role_codes_for_lookup
 from app.core.sql import order_by_nulls_last_desc
 from app.workflow.models import (
     REMINDER_STATUS_CANCELLED,
@@ -178,6 +179,24 @@ async def list_pending_nodes_for_reminder(
         .where(StudentWorkflowNode.due_date.is_not(None))
     )
     return (await db.execute(stmt)).scalars().all()
+
+
+async def list_user_role_scope_codes(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    role_codes: Sequence[str],
+) -> Sequence[str]:
+    lookup_codes = expand_role_codes_for_lookup(role_codes)
+    if not lookup_codes:
+        return []
+    stmt = select(UserRole.scope_code).where(
+        UserRole.user_id == user_id,
+        UserRole.role_code.in_(lookup_codes),
+        UserRole.scope_code.is_not(None),
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+    return [scope.strip() for scope in rows if scope and scope.strip()]
 
 
 async def create_reminder(db: AsyncSession, **fields) -> WorkflowReminder:
@@ -409,11 +428,25 @@ async def list_requests_admin(
     type_code: str | None = None,
     status: str | None = None,
     in_review_only: bool = False,
+    scope_codes: Sequence[str] | None = None,
     page: int = 1,
     size: int = 20,
 ) -> tuple[Sequence[Request], int]:
     stmt = select(Request)
     conds = []
+    if scope_codes is not None:
+        normalized_scopes = [scope.strip() for scope in scope_codes if scope.strip()]
+        if normalized_scopes:
+            stmt = stmt.join(Student, Request.applicant_student_id == Student.id)
+            conds.append(
+                or_(
+                    Student.class_code.in_(normalized_scopes),
+                    Student.major_code.in_(normalized_scopes),
+                    Student.grade_code.in_(normalized_scopes),
+                )
+            )
+        else:
+            conds.append(false())
     if type_code:
         conds.append(Request.type_code == type_code)
     if status:
