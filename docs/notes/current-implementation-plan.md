@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S26` 已闭合；后续仅在新确认范围内继续增量推进
+- 当前目标：`S1 ~ S27` 已闭合；后续仅在新确认范围内继续增量推进
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -264,6 +264,27 @@
 - 后端新增 `backend/app/admin_users/` 独立模块、迁移 `0017_admin_user_import.py`，并在 `auth` 中落地 `must_change_password` 持久字段。
 - Web 用户管理页新增“批量创建账号”tab，支持模板下载、上传预检、提交、一次性密码结果下载、历史批次和错误报告。
 - 验证通过：后端 ruff 与目标文件 `py_compile`；`test_admin_user_import_flow.py + test_auth_flow.py` 结果 `22 passed`；`test_request_flow.py + test_profile_flow.py` 结果 `22 passed`；`pnpm -C web build` 通过。
+
+### S27 开发阶段冷启动脚本
+
+- [x] `S27.1` 新增开发库 schema 重置脚本，明确拒绝 `APP_ENV=prod`。
+- [x] `S27.2` 新增一键启动脚本，设置并验证 repo-local `UV_CACHE_DIR=.uv-cache-local`。
+- [x] `S27.3` 一键脚本串联 Docker 基础设施、Alembic 迁移、基础 seed、默认学生 Excel 导入与默认培养方案导入。
+- [x] `S27.4` 重跑脚本时通过重建 schema 清空旧学生数据、微信 `openid/unionid` 和 `student_id` 绑定关系。
+- [x] `S27.5` 完成脚本语法与最小冷启动验证。
+
+细化文件：`docs/notes/refinements/2026-05-18-development-cold-start-script.md`
+
+证据：
+
+- PowerShell 解析校验与 `reset_dev_database.py` 的 `py_compile` 均通过。
+- 执行 `.\scripts\dev\start-dev.ps1 -NoLaunch -SkipDependencySync` 通过，完成 Docker 基础设施启动、schema 重置、Alembic 迁移、基础 seed、默认学生与默认培养方案导入。
+- 执行 `.\scripts\dev\start-dev.ps1 -NoLaunch -SkipDependencySync -SkipDocker` 通过，证明脚本可重复执行；重跑后导入 `students inserted=5`、`curriculum inserted=7`。
+- 数据复核结果为 `students=5`、`users=1`、`bound_users=0`、`openid_users=0`、`admin=admin`、`must_change=True`。
+
+当前结论：
+
+- `S27` 已完成；开发阶段可使用一键脚本从 Excel 冷启动学生数据并生成 `admin / admin123`，重复执行会清空旧微信绑定与业务数据。该入口只服务开发阶段，正式设计仍以数据库持久化学生、账号、绑定和业务数据为准。
 
 ### S6 前端体验增量优化
 
@@ -798,6 +819,7 @@
 | 2026-05-18 | 拉取后请求权限范围与公开预览门禁收口 | `docs/notes/refinements/2026-05-18-s24-request-scope-and-preview-gate.md` | `S24.1, S24.2` | `[x]` | 已按 `scope_code` 收口班团骨干申请列表/详情/处理动作，并让 `/preview/requirements` 仅在开发或显式开关下注册；申请流回归 `14 passed`，Web 构建通过 |
 | 2026-05-18 | S25 通知渠道收口与微信订阅消息一期接入 | `docs/notes/refinements/2026-05-18-s25-notification-channel-and-wechat-subscribe.md` | `S25.1, S25.2, S25.3, S25.4, S25.5, S25.6` | `[x]` | 已完成渠道收口、微信订阅授权/发送一期、过期文案清理，并通过后端定向回归、Web/Miniapp 类型检查和构建 |
 | 2026-05-18 | S26 后台账号批量创建功能 | `docs/notes/refinements/2026-05-18-admin-user-bulk-import.md` | `S26.1, S26.2, S26.3, S26.4, S26.5, S26.6, S26.7, S26.8` | `[x]` | 已完成独立后台账号导入接口、一次性初始密码、审计留痕、范围格式识别和 Web 批量创建入口；后端定向回归与 Web 构建通过 |
+| 2026-05-18 | S27 开发阶段冷启动脚本 | `docs/notes/refinements/2026-05-18-development-cold-start-script.md` | `S27.1, S27.2, S27.3, S27.4, S27.5` | `[x]` | 已完成开发库 schema 重置、一键启动入口、重复冷启动验证与绑定清空复核 |
 
 ## 会话更新要求
 
