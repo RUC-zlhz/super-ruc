@@ -12,14 +12,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.admin_users.router import router as admin_users_router
 from app.audit.router import router as audit_router
 from app.auth.router import admin_router as auth_admin_router
 from app.auth.router import router as auth_router
 from app.core.audit_archive_scheduler import get_audit_archive_scheduler
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
-from app.core.workflow_reminder_scheduler import get_workflow_reminder_scheduler
 from app.core.response import ApiResponse, ok
+from app.core.workflow_reminder_scheduler import get_workflow_reminder_scheduler
 from app.exchange.router import curriculum_router as curriculum_router
 from app.exchange.router import router as exchange_router
 from app.honor.router import admin_router as honor_admin_router
@@ -110,6 +111,7 @@ def create_app() -> FastAPI:
     prefix = settings.API_V1_PREFIX
     app.include_router(auth_router, prefix=prefix)
     app.include_router(auth_admin_router, prefix=prefix)
+    app.include_router(admin_users_router, prefix=prefix)
     app.include_router(knowledge_router, prefix=prefix)
     app.include_router(knowledge_admin_router, prefix=prefix)
     app.include_router(workflow_router, prefix=prefix)

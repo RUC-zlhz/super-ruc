@@ -47,6 +47,7 @@ from sqlalchemy import text  # noqa: E402
 from sqlalchemy.engine import make_url  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
+from app.admin_users import models as _admin_user_models  # noqa: F401,E402
 from app.audit import models as _audit_models  # noqa: F401,E402
 
 # 导入所有模型以注册到 Base.metadata（同 alembic/env.py）

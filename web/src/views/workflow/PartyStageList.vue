@@ -408,11 +408,7 @@
                 <a-input-number v-model:value="node.max_reminders" :min="1" style="width: 100%" />
               </a-form-item>
               <a-form-item label="提醒渠道">
-                <a-select v-model:value="node.reminder_channel">
-                  <a-select-option value="IN_APP">站内提醒</a-select-option>
-                  <a-select-option value="EMAIL">邮件</a-select-option>
-                  <a-select-option value="SMS">短信</a-select-option>
-                </a-select>
+                <a-input value="站内提醒" disabled />
               </a-form-item>
             </div>
 
@@ -719,7 +715,7 @@ function createNode(partial?: Partial<WorkflowNode>): EditableWorkflowNode {
     due_rule_days: partial?.due_rule_days ?? undefined,
     reminder_lead_days: partial?.reminder_lead_days ?? 0,
     reminder_enabled: partial?.reminder_enabled ?? true,
-    reminder_channel: partial?.reminder_channel ?? 'IN_APP',
+    reminder_channel: 'IN_APP',
     repeat_interval_days: partial?.repeat_interval_days ?? undefined,
     max_reminders: partial?.max_reminders ?? 1,
     is_terminal: partial?.is_terminal ?? false,
@@ -791,7 +787,7 @@ function normalizeNodePayload(node: EditableWorkflowNode): WorkflowNodePayload {
     due_rule_days: node.due_rule_days ?? null,
     reminder_lead_days: node.reminder_lead_days ?? null,
     reminder_enabled: !!node.reminder_enabled,
-    reminder_channel: node.reminder_channel || 'IN_APP',
+    reminder_channel: 'IN_APP',
     repeat_interval_days: node.repeat_interval_days ?? null,
     max_reminders: node.max_reminders ?? null,
     is_terminal: !!node.is_terminal,

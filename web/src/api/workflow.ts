@@ -5,7 +5,7 @@ import type { Paginated } from './types'
 export type WorkflowTemplateKind = 'PARTY' | 'YOUTH_LEAGUE' | 'OTHER'
 export type WorkflowTriggerRule = 'PREV_DONE' | 'MANUAL' | 'ON_APPLY' | 'ON_DATE'
 export type WorkflowNodeStatus = 'PENDING' | 'DONE' | 'OVERDUE' | 'DEFERRED' | 'MANUAL_FOLLOW_UP'
-export type ReminderChannel = 'IN_APP' | 'EMAIL' | 'SMS'
+export type ReminderChannel = 'IN_APP'
 export type ReminderStatus = 'PENDING' | 'SENT' | 'CANCELLED' | 'FAILED'
 export type ReminderRunStatus = 'RUNNING' | 'COMPLETED' | 'FAILED'
 
@@ -280,52 +280,14 @@ export async function executeWorkflowReminderRun(payload: {
   as_of_date?: string
   channel?: ReminderChannel | string
 }): Promise<WorkflowReminderExecutionResult> {
-  const preferred = await resolveOptionalEnvelope<WorkflowReminderRun | { run: WorkflowReminderRun }>(
-    'POST',
-    ['/admin/workflow/reminders/run', '/admin/workflow/reminders/execute'],
-    { body: payload },
-  )
-  if (preferred.supported && preferred.data) {
-    const raw = ('run' in preferred.data ? preferred.data.run : preferred.data) as Record<string, any>
-    return {
-      route: preferred.route || '/admin/workflow/reminders/run',
-      legacy: false,
-      run: normalizeReminderRunRecord(raw, String(payload.channel ?? 'IN_APP')),
-    }
-  }
-
-  const fallback = await post<ApiEnvelope<WorkflowReminderRun | { created: number }>>('/admin/workflow/reminders/generate', {
+  const response = await post<ApiEnvelope<WorkflowReminderRun>>('/admin/workflow/reminders/generate', {
     as_of_date: payload.as_of_date,
-    channel: payload.channel ?? 'IN_APP',
+    channel: 'IN_APP',
   })
-  const fallbackData = fallback.data as Record<string, any>
-  if ('created_count' in fallbackData || 'sent_count' in fallbackData || 'trigger_mode' in fallbackData) {
-    return {
-      route: '/admin/workflow/reminders/generate',
-      legacy: false,
-      run: normalizeReminderRunRecord(fallbackData, String(payload.channel ?? 'IN_APP')),
-    }
-  }
   return {
     route: '/admin/workflow/reminders/generate',
-    legacy: true,
-    run: normalizeReminderRunRecord(
-      {
-        id: Date.now(),
-        as_of_date: payload.as_of_date ?? new Date().toISOString().slice(0, 10),
-        channel: payload.channel ?? 'IN_APP',
-        trigger_mode: 'MANUAL',
-        status: 'COMPLETED',
-        created_count: Number(fallbackData.created ?? 0),
-        sent_count: 0,
-        skipped_count: 0,
-        cancelled_count: 0,
-        failed_count: 0,
-        started_at: new Date().toISOString(),
-        finished_at: new Date().toISOString(),
-      },
-      String(payload.channel ?? 'IN_APP'),
-    ),
+    legacy: false,
+    run: normalizeReminderRunRecord(response.data as Record<string, any>, 'IN_APP'),
   }
 }
 

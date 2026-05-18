@@ -12,11 +12,19 @@ from app.audit.enforcement import audit_forbidden_and_raise
 from app.audit.service import build_audit_detail, log_action
 from app.auth.models import Student
 from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES, normalize_role_codes
+from app.auth.scopes import StudentScopeSet, split_student_scope_codes, student_in_scope
 from app.core.config import settings
 from app.core.exceptions import BizError, ConflictError, NotFoundError
 from app.core.storage import put_object
 from app.notice import repository as notice_repo
-from app.notice.service import create_system_in_app_notice_for_student
+from app.notice.models import (
+    WECHAT_SUBSCRIBE_SCENE_REQUEST_STATUS,
+    WECHAT_SUBSCRIBE_SCENE_WORKFLOW_REMINDER,
+)
+from app.notice.service import (
+    create_system_in_app_notice_for_student,
+    send_wechat_subscribe_for_delivery,
+)
 from app.workflow import repository as repo
 from app.workflow.models import (
     REMINDER_RUN_STATUS_COMPLETED,
@@ -593,8 +601,7 @@ async def run_reminder_cycle(
 
             effective_channel = channel or node.reminder_channel or settings.WORKFLOW_REMINDER_CHANNEL
             if effective_channel != "IN_APP":
-                skipped_count += 1
-                continue
+                raise BizError("流程提醒一期仅支持站内提醒 IN_APP", code=40086)
 
             lead_days = node.reminder_lead_days or 0
             remind_on = state.due_date - timedelta(days=lead_days)
@@ -650,7 +657,7 @@ async def run_reminder_cycle(
                 if workflow.student_id not in user_cache:
                     user = await notice_repo.find_user_by_student_id(db, workflow.student_id)
                     user_cache[workflow.student_id] = user.id if user else None
-                await create_system_in_app_notice_for_student(
+                in_app_delivery = await create_system_in_app_notice_for_student(
                     db,
                     student_id=workflow.student_id,
                     user_id=user_cache[workflow.student_id],
@@ -661,6 +668,14 @@ async def run_reminder_cycle(
                     source_type="SYSTEM",
                     source_url=f"workflow-reminder:{reminder.id}",
                     operator_id=operator_id,
+                )
+                await send_wechat_subscribe_for_delivery(
+                    db,
+                    in_app_delivery=in_app_delivery,
+                    scene=WECHAT_SUBSCRIBE_SCENE_WORKFLOW_REMINDER,
+                    title=title,
+                    summary=summary,
+                    page="/pages/workflow/index",
                 )
                 reminder.status = REMINDER_STATUS_SENT
                 reminder.sent_at = datetime.now(UTC)
@@ -1051,7 +1066,10 @@ async def list_admin_requests(
         type_code=type_code,
         status=status,
         in_review_only=in_review_only,
-        scope_codes=scope_codes,
+        class_scope_codes=None if scope_codes is None else scope_codes.class_codes,
+        major_scope_codes=None if scope_codes is None else scope_codes.major_codes,
+        grade_scope_codes=None if scope_codes is None else scope_codes.grade_codes,
+        legacy_scope_codes=None if scope_codes is None else scope_codes.legacy_codes,
         page=page,
         size=size,
     )
@@ -1067,18 +1085,20 @@ async def _request_scope_codes_for_viewer(
     *,
     viewer_user_id: int,
     viewer_roles: list[str],
-) -> list[str] | None:
+) -> StudentScopeSet | None:
     roles = _normalized_role_set(viewer_roles)
     if roles & _REQUEST_GLOBAL_ROLES:
         return None
     collaborator_roles = sorted(roles & _REQUEST_COLLABORATOR_ROLES)
     if not collaborator_roles:
-        return []
-    return list(
-        await repo.list_user_role_scope_codes(
-            db,
-            user_id=viewer_user_id,
-            role_codes=collaborator_roles,
+        return StudentScopeSet()
+    return split_student_scope_codes(
+        list(
+            await repo.list_user_role_scope_codes(
+                db,
+                user_id=viewer_user_id,
+                role_codes=collaborator_roles,
+            )
         )
     )
 
@@ -1110,13 +1130,12 @@ async def _request_in_viewer_scope(
         viewer_user_id=viewer_user_id,
         viewer_roles=viewer_roles,
     )
-    if not scope_codes or req.applicant_student_id is None:
+    if scope_codes is None or scope_codes.is_empty() or req.applicant_student_id is None:
         return False
     student = await db.get(Student, req.applicant_student_id)
     if student is None:
         return False
-    student_scopes = {student.class_code, student.major_code, student.grade_code}
-    return bool(set(scope_codes) & {scope for scope in student_scopes if scope})
+    return student_in_scope(student, scope_codes)
 
 
 async def _audit_request_scope_denied(
@@ -1216,6 +1235,49 @@ def _approver_has_role(rt, roles: list[str]) -> bool:
     return bool(set(normalize_role_codes(roles)) & allowed)
 
 
+def _request_status_label(status: str) -> str:
+    return {
+        "APPROVED": "已通过",
+        "REJECTED": "已驳回",
+        "OFFLINE_HANDLED": "已转线下办理",
+        "IN_REVIEW": "审核中",
+        "SUBMITTED": "已提交",
+    }.get(status, status)
+
+
+async def _notify_request_status_change(
+    db: AsyncSession,
+    *,
+    req: Request,
+    title: str,
+    body_md: str,
+    summary: str,
+    operator_id: int | None,
+) -> None:
+    if req.applicant_student_id is None:
+        return
+    in_app_delivery = await create_system_in_app_notice_for_student(
+        db,
+        student_id=req.applicant_student_id,
+        user_id=req.applicant_user_id,
+        title=title,
+        body_md=body_md,
+        summary=summary,
+        category="WORKFLOW",
+        source_type="SYSTEM",
+        source_url=f"request:{req.id}",
+        operator_id=operator_id,
+    )
+    await send_wechat_subscribe_for_delivery(
+        db,
+        in_app_delivery=in_app_delivery,
+        scene=WECHAT_SUBSCRIBE_SCENE_REQUEST_STATUS,
+        title=title,
+        summary=summary,
+        page=f"/pages/request/detail?id={req.id}",
+    )
+
+
 async def decide_request(
     db: AsyncSession,
     request_id: int,
@@ -1272,6 +1334,18 @@ async def decide_request(
         actor_user_id=operator_id,
         actor_role=",".join(operator_roles),
         detail={"comment": comment},
+    )
+    status_label = _request_status_label(req.status)
+    await _notify_request_status_change(
+        db,
+        req=req,
+        title=f"申请{status_label}：{req.title}",
+        body_md=(
+            f"你的申请《{req.title}》{status_label}。"
+            + (f"\n\n处理意见：{comment}" if comment else "")
+        ),
+        summary=f"申请状态更新为{status_label}",
+        operator_id=operator_id,
     )
     await db.commit()
     await db.refresh(req)
@@ -1342,24 +1416,19 @@ async def mark_request_offline(
         actor_role=",".join(operator_roles),
         detail={"contact": contact_info, "note": note},
     )
-    if req.applicant_student_id is not None:
-        body = (
-            f"你的申请《{req.title}》已转为线下办理。\n\n"
-            f"联系方式：{contact_info}"
-            + (f"\n\n说明：{note}" if note else "")
-        )
-        await create_system_in_app_notice_for_student(
-            db,
-            student_id=req.applicant_student_id,
-            user_id=req.applicant_user_id,
-            title=f"申请已转线下办理：{req.title}",
-            body_md=body,
-            summary=f"请按线下办理提示联系负责老师：{contact_info}",
-            category="WORKFLOW",
-            source_type="SYSTEM",
-            source_url=f"request:{req.id}",
-            operator_id=operator_id,
-        )
+    body = (
+        f"你的申请《{req.title}》已转为线下办理。\n\n"
+        f"联系方式：{contact_info}"
+        + (f"\n\n说明：{note}" if note else "")
+    )
+    await _notify_request_status_change(
+        db,
+        req=req,
+        title=f"申请已转线下办理：{req.title}",
+        body_md=body,
+        summary=f"请按线下办理提示联系负责老师：{contact_info}",
+        operator_id=operator_id,
+    )
     await db.commit()
     await db.refresh(req)
     return _request_to_detail(req)

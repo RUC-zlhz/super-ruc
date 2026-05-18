@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S24` 已闭合；后续仅在新确认范围内继续增量推进
+- 当前目标：`S1 ~ S26` 已闭合；后续仅在新确认范围内继续增量推进
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -227,6 +227,43 @@
 
 - `S5` 已闭合：追踪矩阵、验收走查、`v1.6` 正式交付件与最终一致性检查已全部落盘，并与当前 `S1 ~ S4` 代码与验证结果对齐。
 - 当前 `output/doc/` 中的 `v1.6`、`v1.6-emf`、`v1.6-emf-inkscape` 三组 `docx / pdf` 可作为正式交付基线；后续若继续迭代，只能在本结果基础上增量更新。
+
+### S25 通知渠道收口与微信订阅消息一期接入
+
+- [x] `S25.1` 新增微信订阅消息配置并保留 `WECHAT_SECRET` 服务器环境变量口径
+- [x] `S25.2` 党团流程提醒渠道收口为 `IN_APP`
+- [x] `S25.3` Web 手动提醒移除旧 `/run`、`/execute` 探测 fallback
+- [x] `S25.4` Miniapp 订阅授权入口与后端授权保存接口
+- [x] `S25.5` 后端微信订阅消息发送记录与失败隔离
+- [x] `S25.6` 过期“尚未上线/尚未部署”文案清理
+
+细化文件：`docs/notes/refinements/2026-05-18-s25-notification-channel-and-wechat-subscribe.md`
+
+证据：
+
+- 后端新增微信订阅授权表、学生侧订阅配置/授权接口、非阻塞发送 helper，并将工作流提醒保存与手动生成收口为 `IN_APP`。
+- Web 党团提醒工作台仅保留站内提醒，手动执行直接调用 `/admin/workflow/reminders/generate`；画像快照和荣誉导入旧占位文案已清理。
+- Miniapp 通知页仅在后端返回模板 ID 时展示订阅入口，并调用小程序订阅消息 API 后保存 `accept/reject/ban/filter` 结果。
+- 验证通过：后端 ruff、目标文件 `py_compile`、定向集成测试 `12 passed`，Web 类型检查与构建，Miniapp 类型检查与 `mp-weixin` 出包。
+
+### S26 后台账号批量创建功能
+
+- [x] `S26.1` 新增专用后台账号导入批次表和行表，新增 `users.must_change_password` 字段。
+- [x] `S26.2` 新增独立 `/api/v1/admin/users/*` 导入接口，不复用 `exchange/import_batches`。
+- [x] `S26.3` 固定导入模板列并拒绝 `password` 列，初始密码统一由系统生成。
+- [x] `S26.4` 落地 `SUPER_ADMIN / COLLEGE_LEADER / L3 / L4 / STUDENT` 的后台账号导入权限边界。
+- [x] `S26.5` 提交时新账号返回一次性明文初始密码，已有账号幂等补齐缺失角色/范围且不重置密码。
+- [x] `S26.6` 审计预检、提交和角色授予，且不记录明文初始密码。
+- [x] `S26.7` 将 `CLASS:/MAJOR:/GRADE:` 范围格式同步到申请和画像范围匹配逻辑。
+- [x] `S26.8` Web 用户管理页新增批量创建入口、预检/提交/历史批次/错误报告能力。
+
+细化文件：`docs/notes/refinements/2026-05-18-admin-user-bulk-import.md`
+
+证据：
+
+- 后端新增 `backend/app/admin_users/` 独立模块、迁移 `0017_admin_user_import.py`，并在 `auth` 中落地 `must_change_password` 持久字段。
+- Web 用户管理页新增“批量创建账号”tab，支持模板下载、上传预检、提交、一次性密码结果下载、历史批次和错误报告。
+- 验证通过：后端 ruff 与目标文件 `py_compile`；`test_admin_user_import_flow.py + test_auth_flow.py` 结果 `22 passed`；`test_request_flow.py + test_profile_flow.py` 结果 `22 passed`；`pnpm -C web build` 通过。
 
 ### S6 前端体验增量优化
 
@@ -759,6 +796,8 @@
 | 2026-05-17 | 党团提醒规则配置与自动闭环实施拆分 | `docs/notes/refinements/2026-05-17-workflow-reminder-rule-and-auto-closure-breakdown.md` | `S23` | `[x]` | 已基于现有工作流实现拆分出前后端可执行清单；首版建议先闭环 `IN_APP` 站内提醒，并复用现有 scheduler 模式实现自动执行 |
 | 2026-05-18 | Web 党团提醒工作台改造 | `docs/notes/refinements/2026-05-18-web-workflow-reminder-workbench.md` | `S23.1, S23.2, S23.3` | `[x]` | 已完成模板节点提醒规则编辑、提醒记录列表、运行记录列表和手动执行结果展示；`web vue-tsc --noEmit` 与 `vite build` 通过 |
 | 2026-05-18 | 拉取后请求权限范围与公开预览门禁收口 | `docs/notes/refinements/2026-05-18-s24-request-scope-and-preview-gate.md` | `S24.1, S24.2` | `[x]` | 已按 `scope_code` 收口班团骨干申请列表/详情/处理动作，并让 `/preview/requirements` 仅在开发或显式开关下注册；申请流回归 `14 passed`，Web 构建通过 |
+| 2026-05-18 | S25 通知渠道收口与微信订阅消息一期接入 | `docs/notes/refinements/2026-05-18-s25-notification-channel-and-wechat-subscribe.md` | `S25.1, S25.2, S25.3, S25.4, S25.5, S25.6` | `[x]` | 已完成渠道收口、微信订阅授权/发送一期、过期文案清理，并通过后端定向回归、Web/Miniapp 类型检查和构建 |
+| 2026-05-18 | S26 后台账号批量创建功能 | `docs/notes/refinements/2026-05-18-admin-user-bulk-import.md` | `S26.1, S26.2, S26.3, S26.4, S26.5, S26.6, S26.7, S26.8` | `[x]` | 已完成独立后台账号导入接口、一次性初始密码、审计留痕、范围格式识别和 Web 批量创建入口；后端定向回归与 Web 构建通过 |
 
 ## 会话更新要求
 

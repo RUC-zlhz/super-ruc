@@ -22,11 +22,18 @@ FIELD_ENCRYPTION_KEY=...
 WECHAT_APPID=...
 WECHAT_SECRET=...
 WECHAT_MOCK_ENABLED=false
+WECHAT_SUBSCRIBE_ENABLED=false
+WECHAT_SUBSCRIBE_REMINDER_TEMPLATE_ID=...
+WECHAT_SUBSCRIBE_REQUEST_TEMPLATE_ID=...
 ```
 
 `WECHAT_MOCK_ENABLED=true` 只允许本地或临时 mock smoke 使用。接入真实微信小程序时必须配置
 `WECHAT_SECRET` 并关闭 mock；否则 `wx.login()` 返回的 code 不会按微信官方 `code2Session`
 流程换取 OpenID。
+启用微信订阅消息前，需要在微信公众平台配置小程序订阅消息模板，并把党团流程提醒、
+申请状态提醒两个模板 ID 写入服务器环境变量；`WECHAT_SECRET` 只能放在服务器环境，不得写入仓库。
+当前一期发送字段按 `thing1=标题`、`thing2=摘要`、`time3=发送时间`、`phrase4=状态` 组织，
+微信公众平台选择模板关键词时需与该关键词类型对齐。
 
 临时验收地址：
 

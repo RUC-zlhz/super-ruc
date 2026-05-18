@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import UTC
+from datetime import UTC, datetime
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +21,7 @@ from app.notice.models import (
     NoticeIngestRun,
     NoticeSource,
     NoticeTag,
+    WechatSubscribeAuthorization,
 )
 
 
@@ -241,6 +242,58 @@ async def next_delivery_attempt_no(db: AsyncSession, delivery_id: int) -> int:
     )
     current = (await db.execute(stmt)).scalar_one()
     return int(current or 0) + 1
+
+
+# ---------- WeChat subscribe authorizations ----------
+async def upsert_wechat_subscribe_authorization(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    student_id: int | None,
+    openid: str,
+    template_id: str,
+    scene: str,
+    status: str,
+) -> WechatSubscribeAuthorization:
+    stmt = select(WechatSubscribeAuthorization).where(
+        WechatSubscribeAuthorization.user_id == user_id,
+        WechatSubscribeAuthorization.template_id == template_id,
+    )
+    row = (await db.execute(stmt.limit(1))).scalar_one_or_none()
+    now = datetime.now(UTC)
+    if row is None:
+        row = WechatSubscribeAuthorization(
+            user_id=user_id,
+            student_id=student_id,
+            openid=openid,
+            template_id=template_id,
+            scene=scene,
+            status=status,
+            authorized_at=now if status == "accept" else None,
+        )
+        db.add(row)
+    else:
+        row.student_id = student_id
+        row.openid = openid
+        row.scene = scene
+        row.status = status
+        if status == "accept":
+            row.authorized_at = now
+    await db.flush()
+    return row
+
+
+async def get_wechat_subscribe_authorization(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    template_id: str,
+) -> WechatSubscribeAuthorization | None:
+    stmt = select(WechatSubscribeAuthorization).where(
+        WechatSubscribeAuthorization.user_id == user_id,
+        WechatSubscribeAuthorization.template_id == template_id,
+    )
+    return (await db.execute(stmt.limit(1))).scalar_one_or_none()
 
 
 async def list_deliveries_for_batch(

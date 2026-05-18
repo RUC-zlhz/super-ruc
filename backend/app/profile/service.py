@@ -17,6 +17,7 @@ from app.audit.policies import EXPORT_PROFILE_SNAPSHOT_DETAIL, student_policy_fi
 from app.audit.service import build_audit_detail, log_action
 from app.auth import repository as auth_repo
 from app.auth.models import Student
+from app.auth.scopes import StudentScopeSet, split_scope_code, student_in_scope
 from app.core.exceptions import BizError, NotFoundError, PermissionError
 from app.profile import repository as repo
 from app.profile.models import (
@@ -310,54 +311,46 @@ async def _load_profile_scope(
             "is_global": True,
             "class_codes": set(),
             "major_codes": set(),
+            "grade_codes": set(),
             "legacy_codes": set(),
         }
 
-    class_codes: set[str] = set()
-    major_codes: set[str] = set()
-    legacy_codes: set[str] = set()
+    parsed_scope = StudentScopeSet()
     for row in roles:
         if row.role_code not in _SCOPED_PROFILE_ROLES:
             continue
-        scope_code = (row.scope_code or "").strip()
-        if not scope_code:
+        parsed = split_scope_code(row.scope_code)
+        if parsed is None:
             continue
-        upper = scope_code.upper()
-        if upper.startswith("CLASS:"):
-            value = scope_code.split(":", 1)[1].strip()
-            if value:
-                class_codes.add(value)
-        elif upper.startswith("MAJOR:"):
-            value = scope_code.split(":", 1)[1].strip()
-            if value:
-                major_codes.add(value)
+        scope_type, value = parsed
+        if scope_type == "CLASS":
+            parsed_scope.class_codes.add(value)
+        elif scope_type == "MAJOR":
+            parsed_scope.major_codes.add(value)
+        elif scope_type == "GRADE":
+            parsed_scope.grade_codes.add(value)
         else:
-            legacy_codes.add(scope_code)
+            parsed_scope.legacy_codes.add(value)
     return {
         "is_global": False,
-        "class_codes": class_codes,
-        "major_codes": major_codes,
-        "legacy_codes": legacy_codes,
+        "class_codes": parsed_scope.class_codes,
+        "major_codes": parsed_scope.major_codes,
+        "grade_codes": parsed_scope.grade_codes,
+        "legacy_codes": parsed_scope.legacy_codes,
     }
 
 
 def _scope_is_empty(scope: dict[str, Any]) -> bool:
     return not scope["is_global"] and not (
-        scope["class_codes"] or scope["major_codes"] or scope["legacy_codes"]
+        scope["class_codes"]
+        or scope["major_codes"]
+        or scope["grade_codes"]
+        or scope["legacy_codes"]
     )
 
 
 def _student_in_scope(student: Student, scope: dict[str, Any]) -> bool:
-    if scope["is_global"]:
-        return True
-    class_code = student.class_code or ""
-    major_code = student.major_code or ""
-    return bool(
-        (class_code and class_code in scope["class_codes"])
-        or (major_code and major_code in scope["major_codes"])
-        or (class_code and class_code in scope["legacy_codes"])
-        or (major_code and major_code in scope["legacy_codes"])
-    )
+    return student_in_scope(student, scope)
 
 
 async def _log_profile_forbidden(
@@ -479,6 +472,7 @@ async def search_students_admin(
         class_code=class_code,
         class_scope_codes=scope["class_codes"],
         major_scope_codes=scope["major_codes"],
+        grade_scope_codes=scope["grade_codes"],
         legacy_scope_codes=scope["legacy_codes"],
         include_non_active=include_non_active,
         enrollment_status=enrollment_status,
@@ -506,6 +500,7 @@ async def search_students_admin(
             scope={
                 "class_codes": sorted(scope["class_codes"]),
                 "major_codes": sorted(scope["major_codes"]),
+                "grade_codes": sorted(scope["grade_codes"]),
                 "legacy_codes": sorted(scope["legacy_codes"]),
             },
             refs=[
@@ -826,6 +821,7 @@ async def list_corrections_admin(
         status=status,
         class_scope_codes=scope["class_codes"],
         major_scope_codes=scope["major_codes"],
+        grade_scope_codes=scope["grade_codes"],
         legacy_scope_codes=scope["legacy_codes"],
         page=page,
         size=size,
@@ -1092,6 +1088,7 @@ async def list_full_view_requests_admin(
         status=status,
         class_scope_codes=scope["class_codes"],
         major_scope_codes=scope["major_codes"],
+        grade_scope_codes=scope["grade_codes"],
         legacy_scope_codes=scope["legacy_codes"],
         page=page,
         size=size,
@@ -1178,6 +1175,7 @@ async def list_pending_facts_admin(
         approval_statuses=[PROFILE_APPROVAL_PENDING],
         class_scope_codes=scope["class_codes"],
         major_scope_codes=scope["major_codes"],
+        grade_scope_codes=scope["grade_codes"],
         legacy_scope_codes=scope["legacy_codes"],
         page=page,
         size=size,

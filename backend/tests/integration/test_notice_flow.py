@@ -15,8 +15,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import Student, User, UserRole
-from app.core.security import create_token
-from app.core.security import encrypt_field
+from app.core.security import create_token, encrypt_field
+from app.notice.models import (
+    CHANNEL_WECHAT_SUBSCRIBE,
+    DELIVERY_STATUS_FAILED,
+    DELIVERY_STATUS_SENT,
+    WECHAT_SUBSCRIBE_SCENE_REQUEST_STATUS,
+    WECHAT_SUBSCRIBE_SCENE_WORKFLOW_REMINDER,
+    NoticeDeliveryAttempt,
+    WechatSubscribeAuthorization,
+)
 
 
 async def _login_as_student(
@@ -337,7 +345,7 @@ async def test_collaborator_role_can_access_notice_admin_tools(
 async def test_notice_email_dispatch_records_delivery(
     client: AsyncClient, db: AsyncSession, admin_client: AsyncClient, monkeypatch,
 ) -> None:
-    token, student_id = await _login_as_student(
+    _, student_id = await _login_as_student(
         client, db, student_no="N20021", wx_code="wx_n20021",
         political_status="中共党员",
         email="n20021@example.com",
@@ -398,7 +406,7 @@ async def test_notice_sms_enabled_uses_phone_and_masks_delivery_handle(
     admin_client: AsyncClient,
     monkeypatch,
 ) -> None:
-    token, student_id = await _login_as_student(
+    _, student_id = await _login_as_student(
         client,
         db,
         student_no="N20031",
@@ -537,3 +545,159 @@ async def test_notice_endpoints_reject_anonymous_and_student(
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp2.status_code == 403
+
+
+async def test_wechat_subscribe_config_and_authorization_record(
+    client: AsyncClient,
+    db: AsyncSession,
+    monkeypatch,
+) -> None:
+    token, student_id = await _login_as_student(
+        client,
+        db,
+        student_no="N21001",
+        wx_code="wx_n21001",
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    from app.notice import service as notice_service
+
+    monkeypatch.setattr(notice_service.settings, "WECHAT_SUBSCRIBE_ENABLED", True)
+    monkeypatch.setattr(
+        notice_service.settings,
+        "WECHAT_SUBSCRIBE_REMINDER_TEMPLATE_ID",
+        "tmpl-reminder",
+    )
+    monkeypatch.setattr(
+        notice_service.settings,
+        "WECHAT_SUBSCRIBE_REQUEST_TEMPLATE_ID",
+        "tmpl-request",
+    )
+
+    config = await client.get("/api/v1/notices/subscribe-config", headers=headers)
+    assert config.status_code == 200, config.text
+    assert config.json()["data"] == {
+        "enabled": True,
+        "templates": [
+            {
+                "scene": WECHAT_SUBSCRIBE_SCENE_WORKFLOW_REMINDER,
+                "template_id": "tmpl-reminder",
+            },
+            {
+                "scene": WECHAT_SUBSCRIBE_SCENE_REQUEST_STATUS,
+                "template_id": "tmpl-request",
+            },
+        ],
+    }
+
+    save = await client.post(
+        "/api/v1/notices/subscribe-authorizations",
+        headers=headers,
+        json={
+            "results": [
+                {"template_id": "tmpl-reminder", "status": "accept"},
+                {"template_id": "tmpl-request", "status": "reject"},
+            ]
+        },
+    )
+    assert save.status_code == 200, save.text
+    rows = (
+        await db.execute(
+            select(WechatSubscribeAuthorization).where(
+                WechatSubscribeAuthorization.student_id == student_id
+            )
+        )
+    ).scalars().all()
+    by_template = {row.template_id: row for row in rows}
+    assert by_template["tmpl-reminder"].status == "accept"
+    assert by_template["tmpl-reminder"].openid == "mock_wx_n21001"
+    assert by_template["tmpl-request"].status == "reject"
+
+
+async def test_wechat_subscribe_send_records_success_and_failure(
+    client: AsyncClient,
+    db: AsyncSession,
+    monkeypatch,
+) -> None:
+    token, student_id = await _login_as_student(
+        client,
+        db,
+        student_no="N21002",
+        wx_code="wx_n21002",
+    )
+    user = (
+        await db.execute(select(User).where(User.student_id == student_id))
+    ).scalar_one()
+
+    from app.notice import service as notice_service
+
+    monkeypatch.setattr(notice_service.settings, "WECHAT_SUBSCRIBE_ENABLED", True)
+    monkeypatch.setattr(
+        notice_service.settings,
+        "WECHAT_SUBSCRIBE_REQUEST_TEMPLATE_ID",
+        "tmpl-request",
+    )
+    await notice_service.save_wechat_subscribe_authorizations(
+        db,
+        user=user,
+        results=[("tmpl-request", "accept")],
+    )
+
+    sent_payloads: list[dict] = []
+
+    async def fake_send(payload: dict):
+        sent_payloads.append(payload)
+        return {"errcode": 0, "errmsg": "ok", "msgid": "wx-msg-1"}
+
+    monkeypatch.setattr(notice_service, "_send_wechat_subscribe_message", fake_send)
+    in_app = await notice_service.create_system_in_app_notice_for_student(
+        db,
+        student_id=student_id,
+        user_id=user.id,
+        title="申请状态更新",
+        body_md="正文",
+        summary="申请已通过",
+    )
+    delivery = await notice_service.send_wechat_subscribe_for_delivery(
+        db,
+        in_app_delivery=in_app,
+        scene=WECHAT_SUBSCRIBE_SCENE_REQUEST_STATUS,
+        title="申请状态更新",
+        summary="申请已通过",
+        page="/pages/request/detail?id=1",
+    )
+    await db.commit()
+    assert delivery is not None
+    assert delivery.channel == CHANNEL_WECHAT_SUBSCRIBE
+    assert delivery.status == DELIVERY_STATUS_SENT
+    attempt = (
+        await db.execute(
+            select(NoticeDeliveryAttempt).where(NoticeDeliveryAttempt.delivery_id == delivery.id)
+        )
+    ).scalar_one()
+    assert attempt.provider_message_id == "wx-msg-1"
+    assert sent_payloads[0]["touser"] == "mock_wx_n21002"
+
+    async def fake_fail(_payload: dict):
+        return {"errcode": 43101, "errmsg": "user refuse to accept the msg"}
+
+    monkeypatch.setattr(notice_service, "_send_wechat_subscribe_message", fake_fail)
+    in_app_failed = await notice_service.create_system_in_app_notice_for_student(
+        db,
+        student_id=student_id,
+        user_id=user.id,
+        title="申请状态更新失败记录",
+        body_md="正文",
+        summary="申请已驳回",
+    )
+    failed_delivery = await notice_service.send_wechat_subscribe_for_delivery(
+        db,
+        in_app_delivery=in_app_failed,
+        scene=WECHAT_SUBSCRIBE_SCENE_REQUEST_STATUS,
+        title="申请状态更新失败记录",
+        summary="申请已驳回",
+    )
+    await db.commit()
+    assert failed_delivery is not None
+    assert failed_delivery.status == DELIVERY_STATUS_FAILED
+    assert failed_delivery.error_code == "43101"

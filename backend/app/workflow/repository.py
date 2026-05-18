@@ -428,23 +428,40 @@ async def list_requests_admin(
     type_code: str | None = None,
     status: str | None = None,
     in_review_only: bool = False,
-    scope_codes: Sequence[str] | None = None,
+    class_scope_codes: set[str] | None = None,
+    major_scope_codes: set[str] | None = None,
+    grade_scope_codes: set[str] | None = None,
+    legacy_scope_codes: set[str] | None = None,
     page: int = 1,
     size: int = 20,
 ) -> tuple[Sequence[Request], int]:
     stmt = select(Request)
     conds = []
-    if scope_codes is not None:
-        normalized_scopes = [scope.strip() for scope in scope_codes if scope.strip()]
-        if normalized_scopes:
-            stmt = stmt.join(Student, Request.applicant_student_id == Student.id)
-            conds.append(
-                or_(
-                    Student.class_code.in_(normalized_scopes),
-                    Student.major_code.in_(normalized_scopes),
-                    Student.grade_code.in_(normalized_scopes),
-                )
+    if (
+        class_scope_codes is not None
+        or major_scope_codes is not None
+        or grade_scope_codes is not None
+        or legacy_scope_codes is not None
+    ):
+        scope_conds = []
+        if class_scope_codes:
+            scope_conds.append(Student.class_code.in_(sorted(class_scope_codes)))
+        if major_scope_codes:
+            scope_conds.append(Student.major_code.in_(sorted(major_scope_codes)))
+        if grade_scope_codes:
+            scope_conds.append(Student.grade_code.in_(sorted(grade_scope_codes)))
+        if legacy_scope_codes:
+            legacy = sorted(legacy_scope_codes)
+            scope_conds.extend(
+                [
+                    Student.class_code.in_(legacy),
+                    Student.major_code.in_(legacy),
+                    Student.grade_code.in_(legacy),
+                ]
             )
+        if scope_conds:
+            stmt = stmt.join(Student, Request.applicant_student_id == Student.id)
+            conds.append(or_(*scope_conds))
         else:
             conds.append(false())
     if type_code:

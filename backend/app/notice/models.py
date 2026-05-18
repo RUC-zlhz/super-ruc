@@ -58,6 +58,15 @@ DELIVERY_ATTEMPT_STATUS_SKIPPED = "SKIPPED"
 CHANNEL_IN_APP = "IN_APP"
 CHANNEL_EMAIL = "EMAIL"
 CHANNEL_SMS = "SMS"
+CHANNEL_WECHAT_SUBSCRIBE = "WECHAT_SUBSCRIBE"
+
+WECHAT_SUBSCRIBE_SCENE_WORKFLOW_REMINDER = "WORKFLOW_REMINDER"
+WECHAT_SUBSCRIBE_SCENE_REQUEST_STATUS = "REQUEST_STATUS"
+
+WECHAT_SUBSCRIBE_STATUS_ACCEPT = "accept"
+WECHAT_SUBSCRIBE_STATUS_REJECT = "reject"
+WECHAT_SUBSCRIBE_STATUS_BAN = "ban"
+WECHAT_SUBSCRIBE_STATUS_FILTER = "filter"
 
 
 class NoticeSource(Base):
@@ -329,4 +338,31 @@ class NoticeDeliveryAttempt(Base):
     __table_args__ = (
         UniqueConstraint("delivery_id", "attempt_no", name="uq_notice_delivery_attempt_no"),
         Index("ix_notice_delivery_attempts_status", "status"),
+    )
+
+
+class WechatSubscribeAuthorization(Base):
+    """小程序订阅消息授权结果。授权状态按 template_id 独立保存。"""
+
+    __tablename__ = "wechat_subscribe_authorizations"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    student_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("students.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    openid: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    template_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    scene: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    authorized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "template_id", name="uq_wechat_subscribe_auth_user_template"),
+        Index("ix_wechat_subscribe_auth_student_template", "student_id", "template_id"),
     )

@@ -10,6 +10,24 @@
       >{{ t.label }}</view>
     </view>
 
+    <view
+      v-if="subscribeTemplates.length"
+      class="subscribe-panel"
+      hover-class="hover-opacity"
+      @tap="onSubscribe"
+    >
+      <view class="subscribe-copy">
+        <text class="subscribe-title">订阅微信提醒</text>
+        <text class="subscribe-desc">接收党团流程提醒和申请状态更新。</text>
+      </view>
+      <button
+        class="subscribe-button"
+        size="mini"
+        :loading="subscribeLoading"
+        @tap.stop="onSubscribe"
+      >订阅</button>
+    </view>
+
     <InlineStateNotice
       v-if="pageError"
       :tone="notices.length ? 'warning' : 'error'"
@@ -78,7 +96,14 @@ import { computed, ref } from 'vue'
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 import InlineStateNotice from '@/components/InlineStateNotice.vue'
 import EmptyState from '@/components/EmptyState.vue'
-import { getMyNotices, type StudentNoticeItem } from '@/api/notice'
+import {
+  getMyNotices,
+  getSubscribeConfig,
+  saveSubscribeAuthorizations,
+  type StudentNoticeItem,
+  type WechatSubscribeAuthorizationResult,
+  type WechatSubscribeTemplate,
+} from '@/api/notice'
 import { getErrorMessage } from '@/utils/error'
 import { openNoticeDetail } from '@/utils/navigation'
 
@@ -105,6 +130,8 @@ const total = ref(0)
 const loading = ref(false)
 const pageError = ref('')
 const hasLoaded = ref(false)
+const subscribeLoading = ref(false)
+const subscribeTemplates = ref<WechatSubscribeTemplate[]>([])
 const hasMore = computed(() => notices.value.length < total.value)
 
 function isUnread(notice: StudentNoticeItem) {
@@ -160,6 +187,64 @@ async function reload(reset = true, targetPage = 1) {
   }
 }
 
+async function loadSubscribeConfig() {
+  try {
+    const resp = await getSubscribeConfig()
+    subscribeTemplates.value = resp.data.enabled ? resp.data.templates : []
+  } catch {
+    subscribeTemplates.value = []
+  }
+}
+
+function normalizeSubscribeResults(
+  raw: Record<string, string>,
+): WechatSubscribeAuthorizationResult[] {
+  const allowed = new Set(['accept', 'reject', 'ban', 'filter'])
+  return subscribeTemplates.value
+    .map((template) => {
+      const status = raw[template.template_id]
+      if (!allowed.has(status)) return null
+      return {
+        template_id: template.template_id,
+        status: status as WechatSubscribeAuthorizationResult['status'],
+      }
+    })
+    .filter((item): item is WechatSubscribeAuthorizationResult => !!item)
+}
+
+async function onSubscribe() {
+  if (subscribeLoading.value || !subscribeTemplates.value.length) return
+  subscribeLoading.value = true
+  try {
+    const tmplIds = subscribeTemplates.value.map((item) => item.template_id)
+    const requester = (uni as any).requestSubscribeMessage
+      || (globalThis as any).wx?.requestSubscribeMessage
+    if (!requester) {
+      uni.showToast({ title: '当前环境不支持微信订阅消息', icon: 'none' })
+      return
+    }
+    const result = await new Promise<Record<string, string>>((resolve, reject) => {
+      requester({
+        tmplIds,
+        success: resolve,
+        fail: reject,
+      })
+    })
+    const results = normalizeSubscribeResults(result)
+    if (!results.length) {
+      uni.showToast({ title: '未获得订阅结果', icon: 'none' })
+      return
+    }
+    await saveSubscribeAuthorizations(results)
+    const accepted = results.some((item) => item.status === 'accept')
+    uni.showToast({ title: accepted ? '订阅已保存' : '订阅结果已记录', icon: 'none' })
+  } catch {
+    uni.showToast({ title: '订阅失败，请稍后重试', icon: 'none' })
+  } finally {
+    subscribeLoading.value = false
+  }
+}
+
 function loadMore() {
   if (loading.value || !hasMore.value) return
   void reload(false, page.value + 1)
@@ -177,7 +262,10 @@ async function onDetail(notice: StudentNoticeItem) {
   }
 }
 
-onShow(() => reload())
+onShow(() => {
+  void reload()
+  void loadSubscribeConfig()
+})
 
 onPullDownRefresh(async () => {
   try {
@@ -221,6 +309,50 @@ onPullDownRefresh(async () => {
   background: linear-gradient(135deg, #c8142f, #a20e20);
   font-weight: 800;
   box-shadow: 0 10rpx 22rpx rgba(183, 15, 36, 0.22);
+}
+
+.subscribe-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+  margin: 0 28rpx 28rpx;
+  padding: 24rpx 26rpx;
+  border-radius: 18rpx;
+  background: #fff;
+  border: 1rpx solid #f0e2e5;
+  box-shadow: var(--shadow-soft);
+}
+.subscribe-copy {
+  min-width: 0;
+  flex: 1;
+}
+.subscribe-title {
+  display: block;
+  font-size: 29rpx;
+  font-weight: 800;
+  color: #202124;
+}
+.subscribe-desc {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.45;
+  color: #6b7280;
+}
+.subscribe-button {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 28rpx;
+  height: 60rpx;
+  line-height: 60rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  color: #fff;
+  background: #b70f24;
+}
+.subscribe-button::after {
+  border: 0;
 }
 
 .notice-card {

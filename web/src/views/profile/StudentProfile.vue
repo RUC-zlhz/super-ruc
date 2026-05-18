@@ -838,7 +838,7 @@ async function onDownloadSnapshot(format: 'pdf' | 'xlsx') {
   try {
     const ok = await downloadStudentProfileSnapshot(studentId, format)
     if (!ok) {
-      message.info('画像快照导出接口尚未上线，后端合并后可直接使用')
+      message.error('画像快照下载失败，请确认权限或稍后重试')
       return
     }
     message.success(`已开始下载 ${format.toUpperCase()} 快照`)

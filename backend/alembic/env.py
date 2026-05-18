@@ -13,6 +13,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+from app.admin_users import models as _admin_user_models  # noqa: F401
 from app.audit import models as _audit_models  # noqa: F401
 
 # 导入所有模型以注册到 Base.metadata

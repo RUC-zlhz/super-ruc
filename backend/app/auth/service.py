@@ -160,7 +160,7 @@ async def build_user_info(db: AsyncSession, user: User) -> UserInfo:
         student_id=user.student_id,
         student_no=user.student.student_no if user.student else None,
         roles=normalized_roles,
-        must_change_password=_is_initial_admin_password(user),
+        must_change_password=bool(user.must_change_password) or _is_initial_admin_password(user),
     )
 
 
@@ -349,6 +349,7 @@ async def change_password(
         raise BizError("新密码不能继续使用初始密码", code=40071)
 
     user.password_hash = hash_password(new_password)
+    user.must_change_password = False
     await log_action(
         db,
         event_type="AUTH",

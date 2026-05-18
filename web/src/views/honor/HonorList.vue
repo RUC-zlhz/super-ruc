@@ -465,19 +465,10 @@
         type="info"
         show-icon
         message="导入流程沿用校验预览、整批提交、错误报告下载的模式"
-        description="如果当前环境尚未部署荣誉导入接口，下面会显示预留提示；接口到位后本页可直接联调。"
+        description="当前导入接口已接入校验预览、整批提交和错误报告下载，可直接选择 Excel 文件发起校验。"
       />
 
-      <a-alert
-        v-if="importUnavailable"
-        class="mb16"
-        type="warning"
-        show-icon
-        message="当前环境尚未部署荣誉导入接口"
-        description="页面入口、批次预览和错误报告下载交互已预留；待后端导入端点上线后，无需再扩展页面结构。"
-      />
-
-      <template v-else>
+      <template>
         <a-card :bordered="false" class="mb16">
           <a-space>
             <a-upload :show-upload-list="false" :before-upload="onBeforeHonorImport">
@@ -1138,12 +1129,7 @@ async function onSubmitCategory() {
   }
 }
 
-function isHttpStatus(error: unknown, status: number) {
-  return (error as { response?: { status?: number } })?.response?.status === status
-}
-
 const showImportModal = ref(false)
-const importUnavailable = ref(false)
 const importLoading = ref(false)
 const importPreview = ref<HonorImportPreviewResult | null>(null)
 const importBatches = ref<HonorImportBatchBrief[]>([])
@@ -1157,17 +1143,8 @@ async function loadImportBatches() {
       page: importBatchPagination.current,
       size: importBatchPagination.pageSize,
     })
-    importUnavailable.value = false
     importBatches.value = resp.data.items
     importBatchPagination.total = resp.data.meta.total
-  } catch (error) {
-    if (isHttpStatus(error, 404)) {
-      importUnavailable.value = true
-      importBatches.value = []
-      importBatchPagination.total = 0
-      return
-    }
-    throw error
   } finally {
     importBatchLoading.value = false
   }
@@ -1188,14 +1165,10 @@ async function onBeforeHonorImport(file: File) {
   importLoading.value = true
   try {
     const resp = await uploadHonorImport(file)
-    importUnavailable.value = false
     importPreview.value = resp.data
     message.success('荣誉导入校验完成')
     await loadImportBatches()
-  } catch (error) {
-    if (isHttpStatus(error, 404)) {
-      importUnavailable.value = true
-    }
+  } catch {
     return false
   } finally {
     importLoading.value = false
@@ -1211,11 +1184,6 @@ async function onCommitHonorImport() {
     message.success('荣誉导入已提交')
     importPreview.value = null
     await Promise.all([loadImportBatches(), reload(true)])
-  } catch (error) {
-    if (isHttpStatus(error, 404)) {
-      importUnavailable.value = true
-    }
-    return
   } finally {
     importLoading.value = false
   }
@@ -1230,11 +1198,6 @@ async function onOpenImportBatch(batchId: number) {
   try {
     const resp = await getHonorImport(batchId)
     importPreview.value = resp.data
-  } catch (error) {
-    if (isHttpStatus(error, 404)) {
-      importUnavailable.value = true
-    }
-    return
   } finally {
     importLoading.value = false
   }

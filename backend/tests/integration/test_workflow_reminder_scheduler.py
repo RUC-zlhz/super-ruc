@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import pytest_asyncio
+from pydantic import ValidationError
 
 from app.core.config import settings
 from app.core.workflow_reminder_scheduler import (
     _LOCK_KEY,
     WorkflowReminderScheduler,
 )
+from app.workflow.schemas import ReminderGenerateIn, WorkflowNodeIn
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True, loop_scope="session")
@@ -80,3 +82,20 @@ async def test_workflow_reminder_scheduler_run_once_honors_lock(monkeypatch) -> 
     scheduler._redis.store[_LOCK_KEY] = "occupied-by-other"
     ran_again = await scheduler.run_once()
     assert ran_again is False
+
+
+def test_workflow_reminder_schema_rejects_external_channels() -> None:
+    assert ReminderGenerateIn(channel="IN_APP").channel == "IN_APP"
+    try:
+        ReminderGenerateIn(channel="SMS")
+    except ValidationError as exc:
+        assert "流程提醒一期仅支持站内提醒 IN_APP" in str(exc)
+    else:
+        raise AssertionError("SMS reminder channel should be rejected")
+
+    try:
+        WorkflowNodeIn(code="N1", name="节点", reminder_channel="EMAIL")
+    except ValidationError as exc:
+        assert "流程提醒一期仅支持站内提醒 IN_APP" in str(exc)
+    else:
+        raise AssertionError("EMAIL reminder channel should be rejected")

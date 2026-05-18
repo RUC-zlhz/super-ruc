@@ -41,6 +41,7 @@ async def seed(db: AsyncSession) -> SeedResult:
             work_no=INITIAL_ADMIN_WORK_NO,
             display_name=INITIAL_ADMIN_DISPLAY_NAME,
             password_hash=hash_password(INITIAL_ADMIN_PLAIN),
+            must_change_password=True,
             is_active=True,
         )
         db.add(user)
@@ -48,6 +49,7 @@ async def seed(db: AsyncSession) -> SeedResult:
         inserted += 1
     elif user.password_hash is None:
         user.password_hash = hash_password(INITIAL_ADMIN_PLAIN)
+        user.must_change_password = True
         if not user.display_name:
             user.display_name = INITIAL_ADMIN_DISPLAY_NAME
         updated += 1
