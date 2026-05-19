@@ -60,9 +60,13 @@ _PROFILE_SOURCE_LABELS = {
 _FULL_VIEW_FIELD_KIND = "FIELD:"
 _FULL_VIEW_FACTS_KIND = "FACTS"
 _STUDENT_ACADEMIC_FIELDS = {
+    "full_name",
+    "gender",
     "grade_code",
     "major_code",
     "class_code",
+    "political_status",
+    "enrollment_year",
     "expected_graduation_year",
 }
 
@@ -227,12 +231,14 @@ def _build_student_basic(student: Student) -> StudentBasic:
 
 def _coerce_student_academic_value(field_name: str, value: str | int | None) -> str | int | None:
     if value in (None, ""):
+        if field_name == "full_name":
+            raise BizError("姓名不能为空", code=40186)
         return None
-    if field_name == "expected_graduation_year":
+    if field_name in {"enrollment_year", "expected_graduation_year"}:
         try:
             return int(value)
         except (TypeError, ValueError) as exc:
-            raise BizError("毕业年份必须是整数", code=40186) from exc
+            raise BizError("年份必须是整数", code=40186) from exc
     return str(value).strip() or None
 
 

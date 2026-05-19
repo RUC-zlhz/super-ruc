@@ -145,9 +145,13 @@ class AcademicCorrectionIn(BaseModel):
 
 
 class StudentAcademicInfoPatch(BaseModel):
+    full_name: str | None = None
+    gender: str | None = None
     grade_code: str | None = None
     major_code: str | None = None
     class_code: str | None = None
+    political_status: str | None = None
+    enrollment_year: int | None = None
     expected_graduation_year: int | None = None
 
 

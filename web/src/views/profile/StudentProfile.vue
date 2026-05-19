@@ -267,6 +267,12 @@
       @cancel="closeAcademicModal"
     >
       <a-form layout="vertical">
+        <a-form-item label="姓名" required>
+          <a-input v-model:value="academicForm.full_name" />
+        </a-form-item>
+        <a-form-item label="性别">
+          <a-input v-model:value="academicForm.gender" placeholder="男 / 女" />
+        </a-form-item>
         <a-form-item label="年级">
           <a-input v-model:value="academicForm.grade_code" placeholder="如 2024" />
         </a-form-item>
@@ -275,6 +281,17 @@
         </a-form-item>
         <a-form-item label="班级">
           <a-input v-model:value="academicForm.class_code" placeholder="如 CS2401" />
+        </a-form-item>
+        <a-form-item label="政治面貌">
+          <a-input v-model:value="academicForm.political_status" />
+        </a-form-item>
+        <a-form-item label="入学年份">
+          <a-input-number
+            v-model:value="academicForm.enrollment_year"
+            :min="2000"
+            :max="2100"
+            style="width: 100%"
+          />
         </a-form-item>
         <a-form-item label="预计毕业年份">
           <a-input-number
@@ -442,14 +459,22 @@ const snapshotLoading = ref<'pdf' | 'xlsx' | ''>('')
 const academicModalOpen = ref(false)
 const academicSubmitting = ref(false)
 const academicForm = reactive<{
+  full_name: string
+  gender: string
   grade_code: string
   major_code: string
   class_code: string
+  political_status: string
+  enrollment_year: number | undefined
   expected_graduation_year: number | undefined
 }>({
+  full_name: '',
+  gender: '',
   grade_code: '',
   major_code: '',
   class_code: '',
+  political_status: '',
+  enrollment_year: undefined,
   expected_graduation_year: undefined,
 })
 
@@ -597,9 +622,13 @@ function openAcademicModal() {
     message.warning('非在读学生画像仅支持查看，不能编辑学籍信息')
     return
   }
+  academicForm.full_name = profile.value.student.full_name || ''
+  academicForm.gender = profile.value.student.gender || ''
   academicForm.grade_code = profile.value.student.grade_code || ''
   academicForm.major_code = profile.value.student.major_code || ''
   academicForm.class_code = profile.value.student.class_code || ''
+  academicForm.political_status = profile.value.student.political_status || ''
+  academicForm.enrollment_year = profile.value.student.enrollment_year ?? undefined
   academicForm.expected_graduation_year = profile.value.student.expected_graduation_year ?? undefined
   academicModalOpen.value = true
 }
@@ -612,9 +641,13 @@ async function onSubmitAcademicInfo() {
   academicSubmitting.value = true
   try {
     await adminUpdateStudentAcademicInfo(studentId, {
+      full_name: normalizeOptionalText(academicForm.full_name),
+      gender: normalizeOptionalText(academicForm.gender),
       grade_code: normalizeOptionalText(academicForm.grade_code),
       major_code: normalizeOptionalText(academicForm.major_code),
       class_code: normalizeOptionalText(academicForm.class_code),
+      political_status: normalizeOptionalText(academicForm.political_status),
+      enrollment_year: academicForm.enrollment_year ?? null,
       expected_graduation_year: academicForm.expected_graduation_year ?? null,
     })
     message.success('学籍信息已更新')

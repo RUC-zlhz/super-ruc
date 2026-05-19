@@ -317,7 +317,7 @@
 - [x] `S29.2` 为内网生产 Compose 增加只读 `docs` 挂载，让后端容器可读取受控默认数据源。
 - [x] `S29.3` 新增生产默认数据导入脚本，先备份数据库，再执行默认学生与默认培养方案导入。
 - [x] `S29.4` 在 `10.10.0.13` 执行默认数据导入并验证学生、培养方案与模块数量。
-- [x] `S29.5` 补 Web 管理入口：学生画像页新增学籍信息编辑，用户管理页新增单个后台账号创建入口。
+- [x] `S29.5` 补 Web 管理入口：学生画像页新增学籍/主档信息编辑，用户管理页新增单个后台账号创建入口。
 - [x] `S29.6` 重建 Web 容器并通过 smoke。
 
 细化文件：`docs/notes/refinements/2026-05-19-s29-production-default-data-and-admin-management.md`
@@ -326,7 +326,7 @@
 
 - 生产默认数据导入脚本 `seed-default-data.sh` 已先生成备份，再调用 `python -m scripts.seed_default_data`，并输出 `students inserted=5 updated=0 skipped=0; curriculum inserted=7 updated=0 skipped=0`。
 - 服务器复核结果为 `students=5`、`curriculum_plans=7`、`curriculum_modules=134`、`users=1`。
-- Web 已新增 `学生画像 -> 编辑学籍信息` 与 `用户管理 -> 新增单个账号` 入口；`pnpm -C web build` 通过，服务器重建 `web` 后 `smoke.sh` 与 `http://10.10.0.13/` / `healthz` 均正常。
+- Web 已新增 `学生画像 -> 编辑学籍信息` 与 `用户管理 -> 新增单个账号` 入口；学生画像编辑覆盖姓名、性别、年级、专业、班级、政治面貌、入学年份与预计毕业年份等主档字段；`pnpm -C web build` 通过，服务器重建 `backend` / `web` 后 `smoke.sh` 与 `http://10.10.0.13/` / `healthz` 均正常，未登录探测 `PATCH /api/v1/admin/students/1/academic-info` 返回 `401` 而非 `404`。
 
 当前结论：
 

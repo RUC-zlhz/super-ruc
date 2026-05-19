@@ -111,9 +111,13 @@ export interface ProfileSummary {
 }
 
 export interface StudentAcademicInfoPatch {
+  full_name?: string | null
+  gender?: string | null
   grade_code?: string | null
   major_code?: string | null
   class_code?: string | null
+  political_status?: string | null
+  enrollment_year?: number | null
   expected_graduation_year?: number | null
 }
 
