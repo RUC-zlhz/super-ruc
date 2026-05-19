@@ -405,12 +405,18 @@ async def list_admin_workflows(
     db: AsyncSession,
     *,
     template_code: str | None,
+    student_no: str | None,
     grade_code: str | None,
     page: int,
     size: int,
 ) -> tuple[list[StudentWorkflowBrief], int]:
     rows, total = await repo.list_pending_workflows_admin(
-        db, template_code=template_code, grade_code=grade_code, page=page, size=size
+        db,
+        template_code=template_code,
+        student_no=student_no,
+        grade_code=grade_code,
+        page=page,
+        size=size,
     )
     items: list[StudentWorkflowBrief] = []
     for sw in rows:

@@ -1,13 +1,8 @@
-"""auth 业务逻辑：微信登录、学号绑定、教师账号登录、JWT 签发。
-
-微信部分提供两种模式：
-1. 真实模式：调用 jscode2session，需 WECHAT_APPID / WECHAT_SECRET
-2. Mock 模式：WECHAT_MOCK_ENABLED=true 时，用 code 自身作为 mock openid，便于开发调试
-"""
+﻿"""Authentication service logic for WeChat login, account binding, and JWT issuance."""
 from __future__ import annotations
 
 import logging
-from datetime import UTC
+from datetime import UTC, datetime
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,6 +39,16 @@ def _clean_optional(value: str | None) -> str | None:
     return cleaned or None
 
 
+def _is_mock_openid(value: str | None) -> bool:
+    return bool(value and value.startswith("mock_"))
+
+
+def _build_mock_openid(code: str, student_no: str | None = None) -> str:
+    if student_no:
+        return f"mock_student_{student_no}"
+    return f"mock_{code}"
+
+
 def _claims_token_version(claims: dict) -> int:
     try:
         return int(claims.get("ver", 0))
@@ -75,14 +80,16 @@ def _validate_student_binding_factor(
         raise BizError("该学生主档未配置身份证号，请填写学生姓名完成绑定", code=40072)
 
 
-# ---------- 微信 ----------
-async def wx_code2session(code: str) -> dict:
+async def wx_code2session(code: str, *, student_no: str | None = None) -> dict:
     if not code or not code.strip():
         raise AuthError("微信登录凭证不能为空")
 
     if settings.WECHAT_MOCK_ENABLED:
-        # 开发模式：code 直接当作 openid，便于测试
-        return {"openid": f"mock_{code}", "unionid": None, "session_key": "mock"}
+        return {
+            "openid": _build_mock_openid(code, student_no),
+            "unionid": None,
+            "session_key": "mock",
+        }
 
     if not settings.WECHAT_APPID or not settings.WECHAT_SECRET:
         raise BizError("未配置 WECHAT_APPID / WECHAT_SECRET", code=50001, http_status=500)
@@ -119,6 +126,7 @@ async def wx_code2session(code: str) -> dict:
             code=50201,
             http_status=502,
         ) from exc
+
     errcode = data.get("errcode")
     if errcode:
         logger.info(
@@ -135,7 +143,6 @@ async def wx_code2session(code: str) -> dict:
     return data
 
 
-# ---------- Token 构建 ----------
 async def build_user_info(db: AsyncSession, user: User) -> UserInfo:
     roles_rows = await repo.list_user_roles(db, user.id)
     normalized_roles: list[RoleInfo] = []
@@ -148,9 +155,7 @@ async def build_user_info(db: AsyncSession, user: User) -> UserInfo:
         if dedupe_key in seen_role_scope:
             continue
         seen_role_scope.add(dedupe_key)
-        normalized_roles.append(
-            RoleInfo(code=normalized_code, scope_code=row.scope_code)
-        )
+        normalized_roles.append(RoleInfo(code=normalized_code, scope_code=row.scope_code))
     return UserInfo(
         id=user.id,
         display_name=user.display_name,
@@ -180,7 +185,6 @@ async def _build_token_response(db: AsyncSession, user: User) -> TokenResponse:
     )
 
 
-# ---------- 登录入口 ----------
 async def login_with_wechat(
     db: AsyncSession,
     *,
@@ -190,11 +194,11 @@ async def login_with_wechat(
     id_card_tail: str | None = None,
     ip: str | None = None,
 ) -> TokenResponse:
-    session_data = await wx_code2session(code)
-    openid = session_data["openid"]
     normalized_student_no = _clean_optional(student_no)
     normalized_full_name = _clean_optional(full_name)
     normalized_id_card_tail = _clean_optional(id_card_tail)
+    session_data = await wx_code2session(code, student_no=normalized_student_no)
+    openid = session_data["openid"]
 
     user = await repo.get_user_by_openid(db, openid)
     if user is not None and not user.is_active:
@@ -224,7 +228,14 @@ async def login_with_wechat(
         )
         bound_user = await repo.get_user_by_student_id(db, student.id)
         if bound_user is not None and (user is None or bound_user.id != user.id):
-            raise BizError("该学生已绑定其他微信账号，请联系学院老师处理", code=40901, http_status=409)
+            if settings.WECHAT_MOCK_ENABLED and user is None and _is_mock_openid(bound_user.openid):
+                bound_user.openid = openid
+                bound_user.unionid = session_data.get("unionid")
+                bound_user.token_version += 1
+                await db.flush()
+                user = bound_user
+            else:
+                raise BizError("该学生已绑定其他微信账号，请联系学院老师处理", code=40901, http_status=409)
 
     if user is None:
         user = await repo.create_user_from_wechat(
@@ -286,7 +297,6 @@ async def login_with_work_no(
 ) -> TokenResponse:
     user = await repo.get_user_by_work_no(db, work_no)
     if user is None or not user.password_hash or not verify_password(password, user.password_hash):
-        # 记录失败登录，便于审计
         await log_action(
             db,
             event_type="AUTH",
@@ -338,15 +348,15 @@ async def change_password(
             actor_user_id=user_id,
             result_code="FAIL",
             ip_address=ip,
-            message="原密码错误",
+            message="旧密码错误",
             auto_flush=False,
         )
         await db.commit()
-        raise AuthError("原密码错误")
+        raise AuthError("旧密码错误")
     if verify_password(new_password, user.password_hash):
-        raise BizError("新密码不能与当前密码相同", code=40070)
+        raise BizError("新密码不能与旧密码相同", code=40070)
     if user.work_no == INITIAL_ADMIN_WORK_NO and new_password == INITIAL_ADMIN_PLAIN:
-        raise BizError("新密码不能继续使用初始密码", code=40071)
+        raise BizError("新密码不能继续使用默认管理员密码", code=40071)
 
     user.password_hash = hash_password(new_password)
     await log_action(
@@ -401,9 +411,7 @@ async def update_enrollment_status(
     operator_id: int,
     operator_role: str | None,
 ) -> None:
-    """v1.5 账号生命周期变更 — 写 Student.enrollment_status + 审计。"""
-    from datetime import datetime
-
+    """Update student enrollment lifecycle state."""
     from app.auth.models import (
         ENROLLMENT_ACTIVE,
         ENROLLMENT_ARCHIVED,
@@ -421,7 +429,7 @@ async def update_enrollment_status(
         ENROLLMENT_ARCHIVED,
     }
     if status_code not in valid:
-        raise BizError(f"无效的学籍状态：{status_code}", code=40060)
+        raise BizError(f"学籍状态非法：{status_code}", code=40060)
 
     student = await db.get(Student, student_id)
     if student is None:
@@ -449,17 +457,18 @@ async def refresh_access_token(db: AsyncSession, refresh_token: str) -> TokenRes
 
     try:
         claims = decode_token(refresh_token)
-    except Exception as e:
-        raise AuthError(f"刷新令牌无效：{e}") from e
+    except Exception as exc:  # noqa: BLE001
+        raise AuthError(f"刷新令牌无效：{exc}") from exc
     if claims.get("typ") != "refresh":
         raise AuthError("令牌类型错误")
     try:
         user_id = int(claims["sub"])
-    except (KeyError, ValueError) as e:
-        raise AuthError("令牌主体缺失") from e
+    except (KeyError, ValueError) as exc:
+        raise AuthError("令牌主体无效") from exc
+
     user = await repo.get_user_by_id(db, user_id)
     if user is None or user.deleted_at is not None or not user.is_active:
         raise AuthError("用户不存在或已停用")
     if _claims_token_version(claims) != user.token_version:
-        raise AuthError("刷新令牌已失效，请重新登录")
+        raise AuthError("刷新令牌版本已失效，请重新登录")
     return await _build_token_response(db, user)

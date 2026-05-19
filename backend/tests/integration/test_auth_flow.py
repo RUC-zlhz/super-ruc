@@ -1,8 +1,4 @@
-"""auth 闭环 happy-path：微信 mock 登录 → 绑定学号 → /me 返回绑定态。
-
-涉及：FR-018（enrollment_status 默认 ACTIVE）、C-03（后端鉴权）、
-WECHAT_MOCK_ENABLED=true（code 直接作为 mock openid）。
-"""
+"""Integration tests for auth happy path, mock WeChat login, and token lifecycle."""
 from __future__ import annotations
 
 import pytest
@@ -38,10 +34,16 @@ class _FakeWechatClient:
         return self.response
 
 
+def _mock_openid(student_no: str | None = None, *, code: str | None = None) -> str:
+    if student_no:
+        return f"mock_student_{student_no}"
+    assert code is not None
+    return f"mock_{code}"
+
+
 async def test_wx_login_creates_user_and_binds_student(
     client: AsyncClient, db: AsyncSession
 ) -> None:
-    # Arrange: 提前写入学生主档
     db.add(
         Student(
             student_no="2022110101",
@@ -53,7 +55,6 @@ async def test_wx_login_creates_user_and_binds_student(
     )
     await db.commit()
 
-    # Act: 首次微信登录 + 学号绑定
     resp = await client.post(
         "/api/v1/auth/wx-login",
         json={
@@ -63,7 +64,6 @@ async def test_wx_login_creates_user_and_binds_student(
         },
     )
 
-    # Assert: token + 用户信息 + STUDENT 角色
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["code"] == 0
@@ -74,7 +74,7 @@ async def test_wx_login_creates_user_and_binds_student(
     user = data["user"]
     assert user["student_no"] == "2022110101"
     assert user["display_name"] == "测试学生A"
-    assert any(r["code"] == "STUDENT" for r in user["roles"])
+    assert any(role["code"] == "STUDENT" for role in user["roles"])
 
 
 async def test_me_returns_current_user(
@@ -99,7 +99,7 @@ async def test_me_returns_current_user(
     body = resp.json()
     assert body["code"] == 0
     assert body["data"]["student_no"] == "2022110102"
-    assert any(r["code"] == "STUDENT" for r in body["data"]["roles"])
+    assert any(role["code"] == "STUDENT" for role in body["data"]["roles"])
 
 
 async def test_me_without_token_returns_401(client: AsyncClient) -> None:
@@ -143,7 +143,7 @@ async def test_default_admin_login_requires_password_change(client: AsyncClient)
     user = body["data"]["user"]
     assert user["work_no"] == "admin"
     assert user["must_change_password"] is True
-    assert any(r["code"] == "SUPER_ADMIN" for r in user["roles"])
+    assert any(role["code"] == "SUPER_ADMIN" for role in user["roles"])
 
 
 async def test_change_password_clears_default_admin_reminder(client: AsyncClient) -> None:
@@ -188,8 +188,8 @@ async def test_wx_login_without_student_no_returns_guest_session(
     user = body["data"]["user"]
     assert user["student_id"] is None
     assert user["student_no"] is None
-    assert any(r["code"] == "GUEST" for r in user["roles"])
-    assert not any(r["code"] == "STUDENT" for r in user["roles"])
+    assert any(role["code"] == "GUEST" for role in user["roles"])
+    assert not any(role["code"] == "STUDENT" for role in user["roles"])
 
 
 async def test_guest_wx_login_can_bind_student_later(
@@ -217,8 +217,8 @@ async def test_guest_wx_login_can_bind_student_later(
     user = bind_resp.json()["data"]["user"]
     assert user["student_no"] == "2022110104"
     assert user["display_name"] == "测试学生D"
-    assert any(r["code"] == "STUDENT" for r in user["roles"])
-    assert not any(r["code"] == "GUEST" for r in user["roles"])
+    assert any(role["code"] == "STUDENT" for role in user["roles"])
+    assert not any(role["code"] == "GUEST" for role in user["roles"])
 
 
 async def test_wx_login_rejects_student_no_only_binding(
@@ -235,7 +235,7 @@ async def test_wx_login_rejects_student_no_only_binding(
     assert resp.status_code == 400
 
 
-async def test_wx_login_rejects_duplicate_student_binding(
+async def test_wx_login_allows_same_student_to_sign_in_again_in_mock_mode(
     client: AsyncClient, db: AsyncSession
 ) -> None:
     db.add(Student(student_no="2022110106", full_name="测试学生F"))
@@ -260,7 +260,38 @@ async def test_wx_login_rejects_duplicate_student_binding(
         },
     )
 
-    assert second.status_code == 409
+    assert second.status_code == 200, second.text
+    user = second.json()["data"]["user"]
+    assert user["student_no"] == "2022110106"
+    row = (
+        await db.execute(select(User).where(User.openid == _mock_openid("2022110106")))
+    ).scalar_one()
+    assert row.student_id is not None
+
+
+async def test_wx_login_rebinds_legacy_mock_student_binding_to_stable_openid(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    student = Student(student_no="2022110109", full_name="测试学生I")
+    db.add(student)
+    await db.flush()
+    db.add(User(openid="mock_legacy_code", display_name="legacy", student_id=student.id))
+    await db.commit()
+
+    resp = await client.post(
+        "/api/v1/auth/wx-login",
+        json={
+            "code": "wx_code_rebind_legacy",
+            "student_no": "2022110109",
+            "full_name": "测试学生I",
+        },
+    )
+
+    assert resp.status_code == 200, resp.text
+    rebound = (
+        await db.execute(select(User).where(User.openid == _mock_openid("2022110109")))
+    ).scalar_one()
+    assert rebound.student_id == student.id
 
 
 async def test_wx_login_rejects_inactive_account(
@@ -278,14 +309,18 @@ async def test_wx_login_rejects_inactive_account(
     )
     assert login.status_code == 200, login.text
     user = (
-        await db.execute(select(User).where(User.openid == "mock_wx_code_inactive"))
+        await db.execute(select(User).where(User.openid == _mock_openid("2022110107")))
     ).scalar_one()
     user.is_active = False
     await db.commit()
 
     resp = await client.post(
         "/api/v1/auth/wx-login",
-        json={"code": "wx_code_inactive"},
+        json={
+            "code": "wx_code_inactive",
+            "student_no": "2022110107",
+            "full_name": "测试学生G",
+        },
     )
 
     assert resp.status_code == 401
@@ -364,7 +399,7 @@ async def test_wx_code2session_maps_wechat_invalid_code_to_auth_error(
         lambda **_: _FakeWechatClient(response),
     )
 
-    with pytest.raises(AuthError, match="无效或已过期"):
+    with pytest.raises(AuthError, match="微信登录凭证无效或已过期"):
         await service.wx_code2session("wx_code_bad")
 
 

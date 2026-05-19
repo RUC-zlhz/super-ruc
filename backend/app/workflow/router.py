@@ -23,6 +23,8 @@ from app.core.dependencies import (
     require_role,
 )
 from app.core.exceptions import BizError
+from app.profile import service as profile_service
+from app.profile.schemas import StudentBasic
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
 from app.workflow import pdf_generator, quiz_service, service
 from app.workflow import repository as repo
@@ -66,8 +68,17 @@ _APPROVER_ROLES = (
     *ROLE_CODE_COLLABORATOR_ROLES,
 )
 _WORKFLOW_EDITOR_ROLES = _APPROVER_ROLES
+_WORKFLOW_LAUNCHER_ROLES = (
+    "SUPER_ADMIN",
+    "COLLEGE_LEADER",
+    "COUNSELOR",
+    "HEAD_TEACHER",
+    "YOUTH_LEAGUE_TEACHER",
+    "PARTY_BUILD_TEACHER",
+)
 _ApproverRole = require_role(*_APPROVER_ROLES)
 _EditorRole = require_role(*_WORKFLOW_EDITOR_ROLES)
+_LauncherRole = require_role(*_WORKFLOW_LAUNCHER_ROLES)
 _AdminRole = require_role("SUPER_ADMIN")
 
 router = APIRouter(prefix="/workflow", tags=["workflow"])
@@ -273,7 +284,7 @@ async def admin_upsert_template(
 async def admin_start_student_workflow(
     payload: StudentWorkflowStart,
     db: DBDep,
-    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+    user: Annotated[CurrentUserDep, Depends(_LauncherRole)],
 ) -> ApiResponse[StudentWorkflowDetail]:
     return ok(
         await service.start_student_workflow(
@@ -288,12 +299,50 @@ async def admin_start_student_workflow(
 
 
 @admin_router.get(
+    "/workflow/students/search",
+    response_model=ApiResponse[Paginated[StudentBasic]],
+)
+async def admin_search_workflow_students(
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_LauncherRole)],
+    q: str | None = Query(default=None),
+    grade_code: str | None = Query(default=None),
+    major_code: str | None = Query(default=None),
+    class_code: str | None = Query(default=None),
+    include_non_active: bool = Query(default=False),
+    enrollment_status: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+) -> ApiResponse[Paginated[StudentBasic]]:
+    items, total = await profile_service.search_students_admin(
+        db,
+        q=q,
+        grade_code=grade_code,
+        major_code=major_code,
+        class_code=class_code,
+        include_non_active=include_non_active,
+        enrollment_status=enrollment_status,
+        page=page,
+        size=size,
+        viewer_user_id=user.user_id,
+        viewer_role=",".join(user.roles) or None,
+    )
+    return ok(
+        Paginated[StudentBasic](
+            items=items,
+            meta=PageMeta(page=page, size=size, total=total),
+        )
+    )
+
+
+@admin_router.get(
     "/workflow/students", response_model=ApiResponse[Paginated[StudentWorkflowBrief]]
 )
 async def admin_list_student_workflows(
     db: DBDep,
     _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
     template_code: str | None = Query(default=None),
+    student_no: str | None = Query(default=None),
     grade_code: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
@@ -301,6 +350,7 @@ async def admin_list_student_workflows(
     items, total = await service.list_admin_workflows(
         db,
         template_code=template_code,
+        student_no=student_no,
         grade_code=grade_code,
         page=page,
         size=size,

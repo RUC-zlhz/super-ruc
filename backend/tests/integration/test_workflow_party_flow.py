@@ -120,7 +120,16 @@ async def test_party_template_upsert_start_complete_workflow(
     assert tpl["nodes"][0]["max_reminders"] == 3
     assert tpl["nodes"][2]["reminder_enabled"] is False
 
-    # 2. 管理员为学生启动流程
+    # 2. 管理员可先搜索学生，再为学生启动流程
+    search = await admin_client.get(
+        "/api/v1/admin/workflow/students/search",
+        params={"q": "W10001"},
+    )
+    assert search.status_code == 200, search.text
+    search_items = search.json()["data"]["items"]
+    assert len(search_items) == 1
+    assert search_items[0]["student_no"] == "W10001"
+
     start = await admin_client.post(
         "/api/v1/admin/workflow/students",
         json={
@@ -155,6 +164,14 @@ async def test_party_template_upsert_start_complete_workflow(
     assert len(my_list) == 1
     assert my_list[0]["template_code"] == "PARTY_DEV_MAIN"
     assert my_list[0]["current_node_name"] == "递交入党申请书"
+
+    listed = await admin_client.get(
+        "/api/v1/admin/workflow/students",
+        params={"student_no": "W10001", "template_code": "PARTY_DEV_MAIN"},
+    )
+    assert listed.status_code == 200, listed.text
+    assert listed.json()["data"]["meta"]["total"] == 1
+    assert listed.json()["data"]["items"][0]["student_no"] == "W10001"
 
     # 4. 完成第 1 节点 → 第 2 节点触发
     state_apply = node_states["APPLY"]["id"]
@@ -349,3 +366,16 @@ async def test_collaborator_role_can_access_workflow_admin_tools(
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200, resp.text
+
+    search = await client.get(
+        "/api/v1/admin/workflow/students/search",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert search.status_code == 403, search.text
+
+    start = await client.post(
+        "/api/v1/admin/workflow/students",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"student_id": 1, "template_code": "PARTY_DEV_MAIN"},
+    )
+    assert start.status_code == 403, start.text

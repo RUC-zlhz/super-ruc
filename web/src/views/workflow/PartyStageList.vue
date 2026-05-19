@@ -124,6 +124,12 @@
               重置
             </a-button>
           </a-form-item>
+          <a-form-item v-if="canStartStudentWorkflow" class="toolbar-item-right">
+            <a-button type="primary" ghost @click="openStartWorkflowModal">
+              <template #icon><PlusOutlined /></template>
+              发起学生流程
+            </a-button>
+          </a-form-item>
         </a-form>
 
         <a-table
@@ -319,6 +325,194 @@
       </a-tab-pane>
     </a-tabs>
 
+    <a-modal
+      :open="showStartWorkflowModal"
+      title="发起学生流程"
+      width="1040"
+      :mask-closable="false"
+      :body-style="{ padding: '20px 24px', maxHeight: '78vh', overflowY: 'auto' }"
+      @cancel="closeStartWorkflowModal"
+    >
+      <template #footer>
+        <a-space>
+          <a-button @click="closeStartWorkflowModal">取消</a-button>
+          <a-button
+            type="primary"
+            :loading="startWorkflowSubmitting"
+            :disabled="!selectedStartStudent || !startWorkflowForm.template_code"
+            @click="submitStartWorkflow"
+          >
+            发起流程
+          </a-button>
+        </a-space>
+      </template>
+
+      <a-alert
+        class="mb16"
+        type="info"
+        show-icon
+        message="老师发起成功后，学生会在小程序“党团进度 / 进度中心”里看到当前阶段、时间线和下一步待办。"
+      />
+
+      <div class="launch-modal-grid">
+        <section class="launch-modal-main">
+          <a-card class="workspace-card" title="1. 选择流程模板" :bordered="false">
+            <a-form layout="vertical">
+              <a-form-item label="流程模板" required>
+                <a-select
+                  v-model:value="startWorkflowForm.template_code"
+                  placeholder="请选择一个已启用的流程模板"
+                  show-search
+                  option-filter-prop="label"
+                >
+                  <a-select-option
+                    v-for="item in launchableTemplates"
+                    :key="item.code"
+                    :value="item.code"
+                    :label="`${item.name}（${item.code}）`"
+                  >
+                    <div class="template-option">
+                      <strong>{{ item.name }}</strong>
+                      <span>{{ item.code }} · {{ templateKindLabel(item.kind) }}</span>
+                    </div>
+                  </a-select-option>
+                </a-select>
+              </a-form-item>
+              <a-form-item label="备注说明">
+                <a-textarea
+                  v-model:value="startWorkflowForm.note"
+                  :rows="3"
+                  placeholder="可填写发起背景、节点说明或老师备注，学生端不会直接展示该备注。"
+                />
+              </a-form-item>
+            </a-form>
+          </a-card>
+
+          <a-card class="workspace-card" title="2. 选择学生" :bordered="false">
+            <a-form layout="inline" class="launch-search-bar" @finish="onStartStudentSearch">
+              <a-form-item label="学号 / 姓名">
+                <a-input
+                  v-model:value="startWorkflowForm.q"
+                  placeholder="支持按学号或姓名搜索"
+                  allow-clear
+                />
+              </a-form-item>
+              <a-form-item>
+                <a-button type="primary" html-type="submit">
+                  <template #icon><SearchOutlined /></template>
+                  查询
+                </a-button>
+              </a-form-item>
+              <a-form-item>
+                <a-button @click="resetStartStudentSearch">
+                  重置
+                </a-button>
+              </a-form-item>
+            </a-form>
+
+            <div class="launch-result-summary">
+              <div>
+                <strong>{{ startStudentPagination.total }}</strong>
+                <span>名候选学生</span>
+                <span v-if="startWorkflowForm.q" class="launch-result-keyword">
+                  · 关键词“{{ startWorkflowForm.q }}”
+                </span>
+              </div>
+              <div v-if="selectedStartStudent" class="launch-result-selected">
+                已选中：{{ selectedStartStudent.full_name }} / {{ selectedStartStudent.student_no }}
+              </div>
+            </div>
+
+            <a-table
+              class="launch-table"
+              :columns="startStudentCols"
+              :data-source="startStudentCandidates"
+              :loading="startStudentLoading"
+              :pagination="startStudentPagination"
+              row-key="id"
+              :custom-row="startStudentRowProps"
+              :row-class-name="startStudentRowClassName"
+              :scroll="{ x: 780 }"
+              @change="onStartStudentTableChange"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'student'">
+                  <div>{{ record.full_name }}</div>
+                  <span class="cell-sub">{{ record.student_no }}</span>
+                </template>
+                <template v-else-if="column.key === 'scope'">
+                  <div>{{ record.class_code || '-' }}</div>
+                  <span class="cell-sub">{{ record.major_code || '-' }}</span>
+                </template>
+                <template v-else-if="column.key === 'status'">
+                  <a-tag :color="record.enrollment_status === 'ACTIVE' ? 'green' : 'default'">
+                    {{ record.enrollment_status || record.status || 'UNKNOWN' }}
+                  </a-tag>
+                </template>
+                <template v-else-if="column.key === 'actions'">
+                  <a-button
+                    type="link"
+                    size="small"
+                    @click.stop="selectStartStudent(record)"
+                  >
+                    {{ selectedStartStudent?.id === record.id ? '已选中' : '选择' }}
+                  </a-button>
+                </template>
+              </template>
+            </a-table>
+          </a-card>
+        </section>
+
+        <aside class="launch-modal-side">
+          <a-card class="workspace-card" title="3. 发起预览" :bordered="false">
+            <div v-if="selectedStartStudent" class="launch-preview">
+              <div class="preview-kicker">已选择学生</div>
+              <h3>{{ selectedStartStudent.full_name }}</h3>
+              <p>{{ selectedStartStudent.student_no }}</p>
+              <div class="preview-grid">
+                <div>
+                  <span>班级</span>
+                  <strong>{{ selectedStartStudent.class_code || '-' }}</strong>
+                </div>
+                <div>
+                  <span>专业</span>
+                  <strong>{{ selectedStartStudent.major_code || '-' }}</strong>
+                </div>
+                <div>
+                  <span>政治面貌</span>
+                  <strong>{{ selectedStartStudent.political_status || '-' }}</strong>
+                </div>
+                <div>
+                  <span>学籍状态</span>
+                  <strong>{{ selectedStartStudent.enrollment_status || selectedStartStudent.status || '-' }}</strong>
+                </div>
+              </div>
+            </div>
+            <a-empty v-else description="请先从左侧列表选择一位学生" />
+
+            <div class="launch-preview-foot">
+              <div>
+                <span>流程模板</span>
+                <strong>{{ selectedLaunchTemplate?.name || '未选择' }}</strong>
+              </div>
+              <div>
+                <span>模板编码</span>
+                <strong>{{ selectedLaunchTemplate?.code || '-' }}</strong>
+              </div>
+            </div>
+          </a-card>
+
+          <a-card class="workspace-card" title="说明" :bordered="false">
+            <ul class="launch-tips">
+              <li>发起后会立即创建一条进行中的党团流程实例。</li>
+              <li>学生端会自动展示当前节点、时间线和下一步待办。</li>
+              <li>同一学生在同一模板下已有进行中流程时，系统会阻止重复发起。</li>
+            </ul>
+          </a-card>
+        </aside>
+      </div>
+    </a-modal>
+
     <a-drawer
       :open="showTemplateDrawer"
       :title="templateDrawerTitle"
@@ -468,24 +662,30 @@ import {
   TeamOutlined,
 } from '@ant-design/icons-vue'
 import StatusTag from '@/components/StatusTag.vue'
+import { useAuthStore } from '@/store/auth'
+import { hasAnyRole } from '@/utils/permission'
 import {
   executeWorkflowReminderRun,
   listWorkflowReminderRecords,
   listWorkflowReminderRuns,
   listWorkflowStudents,
   listWorkflowTemplates,
+  searchWorkflowStudents,
+  startWorkflowStudent,
   saveWorkflowTemplate,
   type ReminderStatus,
   type WorkflowNode,
   type WorkflowNodePayload,
   type WorkflowReminderRecord,
   type WorkflowReminderRun,
+  type WorkflowStudentStartPayload,
   type WorkflowStudentBrief,
   type WorkflowTemplate,
   type WorkflowTemplateKind,
   type WorkflowTemplatePayload,
   type WorkflowTriggerRule,
 } from '@/api/workflow'
+import type { StudentBasic } from '@/api/profile'
 
 type EditableWorkflowNode = {
   __key: string
@@ -506,6 +706,7 @@ type EditableWorkflowNode = {
 }
 
 const activeTab = ref('templates')
+const auth = useAuthStore()
 const templates = ref<WorkflowTemplate[]>([])
 const tplLoading = ref(false)
 const tplSubmitting = ref(false)
@@ -539,6 +740,49 @@ const tplForm = reactive<{
   version_label: '',
   nodes: [],
 })
+
+const canStartStudentWorkflow = computed(() =>
+  hasAnyRole(auth.roleCodes, [
+    'SUPER_ADMIN',
+    'COLLEGE_LEADER',
+    'COUNSELOR',
+    'HEAD_TEACHER',
+    'YOUTH_LEAGUE_TEACHER',
+    'PARTY_BUILD_TEACHER',
+  ]),
+)
+const launchableTemplates = computed(() => templates.value.filter((item) => item.is_active))
+const selectedLaunchTemplate = computed(
+  () => launchableTemplates.value.find((item) => item.code === startWorkflowForm.template_code) ?? null,
+)
+const showStartWorkflowModal = ref(false)
+const startWorkflowSubmitting = ref(false)
+const startStudentLoading = ref(false)
+const startStudentCandidates = ref<StudentBasic[]>([])
+const selectedStartStudent = ref<StudentBasic | null>(null)
+const startStudentPagination = reactive({
+  current: 1,
+  pageSize: 10,
+  total: 0,
+  showSizeChanger: true,
+})
+const startWorkflowForm = reactive<{
+  template_code: string
+  q: string
+  note: string
+}>({
+  template_code: '',
+  q: '',
+  note: '',
+})
+const startStudentCols = [
+  { title: '学号', dataIndex: 'student_no', key: 'student_no', width: 140 },
+  { title: '姓名', key: 'student', width: 140 },
+  { title: '班级 / 专业', key: 'scope', width: 190 },
+  { title: '政治面貌', dataIndex: 'political_status', key: 'political_status', width: 120 },
+  { title: '学籍状态', key: 'status', width: 110 },
+  { title: '操作', key: 'actions', width: 90 },
+]
 
 const flows = ref<WorkflowStudentBrief[]>([])
 const flowLoading = ref(false)
@@ -879,13 +1123,11 @@ async function reloadStudentFlows() {
   try {
     const resp = await listWorkflowStudents({
       template_code: flowFilters.template_code,
+      student_no: flowFilters.student_no,
       page: flowPagination.current,
       size: flowPagination.pageSize,
     })
-    const items = resp.data.items
-    flows.value = flowFilters.student_no
-      ? items.filter((item) => item.student_no?.includes(flowFilters.student_no || ''))
-      : items
+    flows.value = resp.data.items
     flowPagination.total = resp.data.meta.total
   } finally {
     flowLoading.value = false
@@ -897,6 +1139,131 @@ function resetFlowFilters() {
   flowFilters.template_code = undefined
   flowPagination.current = 1
   reloadStudentFlows()
+}
+
+function openStartWorkflowModal() {
+  if (!canStartStudentWorkflow.value) return
+  if (!launchableTemplates.value.length) {
+    message.warning('请先至少启用一个流程模板')
+    return
+  }
+  startWorkflowForm.template_code = selectedTemplatePreview.value?.code ?? launchableTemplates.value[0]?.code ?? ''
+  startWorkflowForm.q = ''
+  startWorkflowForm.note = ''
+  selectedStartStudent.value = null
+  startStudentPagination.current = 1
+  showStartWorkflowModal.value = true
+  void searchStartStudents()
+}
+
+function closeStartWorkflowModal() {
+  showStartWorkflowModal.value = false
+}
+
+async function searchStartStudents() {
+  startStudentLoading.value = true
+  try {
+    const resp = await searchWorkflowStudents({
+      q: startWorkflowForm.q || undefined,
+      page: startStudentPagination.current,
+      size: startStudentPagination.pageSize,
+    })
+    startStudentCandidates.value = resp.data.items
+    startStudentPagination.total = resp.data.meta.total
+    const match = selectedStartStudent.value
+      ? resp.data.items.find((item) => item.id === selectedStartStudent.value?.id)
+      : null
+    if (match) {
+      selectedStartStudent.value = match
+    } else if (resp.data.items.length === 1) {
+      selectedStartStudent.value = resp.data.items[0]
+    } else if (startWorkflowForm.q) {
+      selectedStartStudent.value = null
+    }
+  } finally {
+    startStudentLoading.value = false
+  }
+}
+
+async function onStartStudentSearch() {
+  startStudentPagination.current = 1
+  await searchStartStudents()
+  if (startStudentPagination.total === 0) {
+    message.info('未找到匹配学生，请调整学号或姓名关键词')
+    return
+  }
+  message.success(`已找到 ${startStudentPagination.total} 名候选学生`)
+}
+
+function resetStartStudentSearch() {
+  startWorkflowForm.q = ''
+  startStudentPagination.current = 1
+  selectedStartStudent.value = null
+  void searchStartStudents()
+}
+
+function selectStartStudent(student: StudentBasic | Record<string, any>) {
+  selectedStartStudent.value = {
+    id: student.id,
+    student_no: student.student_no,
+    full_name: student.full_name,
+    gender: student.gender ?? null,
+    grade_code: student.grade_code ?? null,
+    major_code: student.major_code ?? null,
+    class_code: student.class_code ?? null,
+    political_status: student.political_status ?? null,
+    enrollment_year: student.enrollment_year ?? null,
+    expected_graduation_year: student.expected_graduation_year ?? null,
+    status: student.status ?? student.enrollment_status ?? 'UNKNOWN',
+    enrollment_status: student.enrollment_status ?? student.status ?? 'UNKNOWN',
+    enrollment_status_reason: student.enrollment_status_reason ?? null,
+    enrollment_status_updated_at: student.enrollment_status_updated_at ?? null,
+  }
+}
+
+function startStudentRowProps(record: StudentBasic) {
+  return {
+    onClick: () => selectStartStudent(record),
+  }
+}
+
+function startStudentRowClassName(record: StudentBasic) {
+  return selectedStartStudent.value?.id === record.id ? 'selected-start-student-row' : ''
+}
+
+function onStartStudentTableChange(pagination: any) {
+  startStudentPagination.current = pagination.current ?? 1
+  startStudentPagination.pageSize = pagination.pageSize ?? startStudentPagination.pageSize
+  void searchStartStudents()
+}
+
+async function submitStartWorkflow() {
+  if (!selectedStartStudent.value) {
+    message.warning('请选择一个学生')
+    return
+  }
+  if (!startWorkflowForm.template_code) {
+    message.warning('请选择流程模板')
+    return
+  }
+  const payload: WorkflowStudentStartPayload = {
+    student_id: selectedStartStudent.value.id,
+    template_code: startWorkflowForm.template_code,
+    note: startWorkflowForm.note || undefined,
+  }
+  startWorkflowSubmitting.value = true
+  try {
+    await startWorkflowStudent(payload)
+    message.success(`已为 ${selectedStartStudent.value.full_name} 发起流程，学生端可直接查看进度`)
+    showStartWorkflowModal.value = false
+    flowFilters.student_no = selectedStartStudent.value.student_no
+    flowFilters.template_code = startWorkflowForm.template_code
+    flowPagination.current = 1
+    activeTab.value = 'students'
+    await reloadStudentFlows()
+  } finally {
+    startWorkflowSubmitting.value = false
+  }
 }
 
 function onFlowTableChange(pagination: any) {
@@ -1057,6 +1424,10 @@ onMounted(async () => {
   margin-bottom: 16px;
 }
 
+.toolbar-item-right {
+  margin-left: auto;
+}
+
 .template-preview-card,
 .workspace-card,
 .run-summary-card {
@@ -1200,6 +1571,126 @@ onMounted(async () => {
   gap: 16px;
 }
 
+.launch-modal-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(280px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.launch-modal-main,
+.launch-modal-side {
+  display: grid;
+  gap: 16px;
+}
+
+.launch-search-bar {
+  margin-bottom: 14px;
+}
+
+.launch-result-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: #faf7f7;
+  border-radius: 12px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.launch-result-summary strong {
+  margin-right: 4px;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.launch-result-keyword,
+.launch-result-selected {
+  color: var(--text-3);
+}
+
+.launch-table {
+  overflow: hidden;
+}
+
+.template-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.template-option strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.template-option span {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.launch-preview {
+  display: grid;
+  gap: 12px;
+}
+
+.preview-kicker {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.launch-preview h3 {
+  margin: 2px 0 0;
+  color: var(--text);
+  font-size: 22px;
+}
+
+.launch-preview p {
+  margin: 4px 0 0;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.preview-grid,
+.launch-preview-foot {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.preview-grid > div,
+.launch-preview-foot > div {
+  padding: 12px;
+  background: #faf7f7;
+  border-radius: 12px;
+}
+
+.preview-grid span,
+.launch-preview-foot span {
+  display: block;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.preview-grid strong,
+.launch-preview-foot strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.launch-tips {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
 .node-editor-card {
   background: #fcfbfb;
   border-radius: 18px;
@@ -1227,6 +1718,10 @@ onMounted(async () => {
   background: #fff4f4 !important;
 }
 
+:deep(.selected-start-student-row > td) {
+  background: #fff8ed !important;
+}
+
 .mb16 {
   margin-bottom: 16px;
 }
@@ -1235,6 +1730,7 @@ onMounted(async () => {
   .metric-grid,
   .template-preview-grid,
   .run-summary-grid,
+  .launch-modal-grid,
   .drawer-grid,
   .node-editor-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1245,12 +1741,15 @@ onMounted(async () => {
   .metric-grid,
   .template-preview-grid,
   .run-summary-grid,
+  .launch-modal-grid,
   .drawer-grid,
   .node-editor-grid {
     grid-template-columns: 1fr;
   }
 
   .template-preview-head,
+  .launch-search-bar,
+  .launch-result-summary,
   .node-chip,
   .drawer-section-head,
   .node-editor-title,
@@ -1258,6 +1757,11 @@ onMounted(async () => {
   .drawer-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .preview-grid,
+  .launch-preview-foot {
+    grid-template-columns: 1fr;
   }
 }
 </style>
