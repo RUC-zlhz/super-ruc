@@ -28,6 +28,8 @@ from app.profile.schemas import (
     ProfileSummary,
     StudentAcademicInfoPatch,
     StudentBasic,
+    StudentCreateIn,
+    StudentWechatBindingOut,
 )
 
 _ADMIN_ROLES = (
@@ -560,3 +562,54 @@ async def admin_update_student_academic_info(
         operator_role=",".join(user.roles) or None,
     )
     return ok(StudentBasic.model_validate(row))
+
+
+@student_admin_router.post("", response_model=ApiResponse[StudentBasic])
+async def admin_create_student(
+    payload: StudentCreateIn,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+) -> ApiResponse[StudentBasic]:
+    row = await service.create_student_admin(
+        db,
+        payload.model_dump(exclude_unset=True),
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    return ok(StudentBasic.model_validate(row))
+
+
+@student_admin_router.get(
+    "/{student_id}/wechat-binding",
+    response_model=ApiResponse[StudentWechatBindingOut],
+)
+async def admin_get_student_wechat_binding(
+    student_id: int,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+) -> ApiResponse[StudentWechatBindingOut]:
+    result = await service.get_student_wechat_binding(
+        db,
+        student_id,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    return ok(result)
+
+
+@student_admin_router.delete(
+    "/{student_id}/wechat-binding",
+    response_model=ApiResponse[StudentWechatBindingOut],
+)
+async def admin_unbind_student_wechat(
+    student_id: int,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+) -> ApiResponse[StudentWechatBindingOut]:
+    result = await service.unbind_student_wechat(
+        db,
+        student_id,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    return ok(result)

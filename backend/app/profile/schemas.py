@@ -145,6 +145,7 @@ class AcademicCorrectionIn(BaseModel):
 
 
 class StudentAcademicInfoPatch(BaseModel):
+    student_no: str | None = None
     full_name: str | None = None
     gender: str | None = None
     grade_code: str | None = None
@@ -153,6 +154,31 @@ class StudentAcademicInfoPatch(BaseModel):
     political_status: str | None = None
     enrollment_year: int | None = None
     expected_graduation_year: int | None = None
+
+
+class StudentCreateIn(BaseModel):
+    student_no: str = Field(min_length=1, max_length=32)
+    full_name: str = Field(min_length=1, max_length=64)
+    gender: str | None = Field(default=None, max_length=8)
+    grade_code: str | None = Field(default=None, max_length=16)
+    major_code: str | None = Field(default=None, max_length=32)
+    class_code: str | None = Field(default=None, max_length=32)
+    political_status: str | None = Field(default=None, max_length=32)
+    enrollment_year: int | None = None
+    expected_graduation_year: int | None = None
+
+
+class StudentWechatBindingOut(BaseModel):
+    student_id: int
+    student_no: str
+    bound: bool
+    user_id: int | None = None
+    display_name: str | None = None
+    openid_masked: str | None = None
+    unionid_masked: str | None = None
+    is_active: bool | None = None
+    last_login_at: datetime | None = None
+    roles: list[str] = []
 
 
 class CorrectionOut(BaseModel):

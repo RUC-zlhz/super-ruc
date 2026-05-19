@@ -267,6 +267,9 @@
       @cancel="closeAcademicModal"
     >
       <a-form layout="vertical">
+        <a-form-item label="学号" required>
+          <a-input v-model:value="academicForm.student_no" />
+        </a-form-item>
         <a-form-item label="姓名" required>
           <a-input v-model:value="academicForm.full_name" />
         </a-form-item>
@@ -459,6 +462,7 @@ const snapshotLoading = ref<'pdf' | 'xlsx' | ''>('')
 const academicModalOpen = ref(false)
 const academicSubmitting = ref(false)
 const academicForm = reactive<{
+  student_no: string
   full_name: string
   gender: string
   grade_code: string
@@ -468,6 +472,7 @@ const academicForm = reactive<{
   enrollment_year: number | undefined
   expected_graduation_year: number | undefined
 }>({
+  student_no: '',
   full_name: '',
   gender: '',
   grade_code: '',
@@ -622,6 +627,7 @@ function openAcademicModal() {
     message.warning('非在读学生画像仅支持查看，不能编辑学籍信息')
     return
   }
+  academicForm.student_no = profile.value.student.student_no || ''
   academicForm.full_name = profile.value.student.full_name || ''
   academicForm.gender = profile.value.student.gender || ''
   academicForm.grade_code = profile.value.student.grade_code || ''
@@ -641,6 +647,7 @@ async function onSubmitAcademicInfo() {
   academicSubmitting.value = true
   try {
     await adminUpdateStudentAcademicInfo(studentId, {
+      student_no: normalizeOptionalText(academicForm.student_no),
       full_name: normalizeOptionalText(academicForm.full_name),
       gender: normalizeOptionalText(academicForm.gender),
       grade_code: normalizeOptionalText(academicForm.grade_code),

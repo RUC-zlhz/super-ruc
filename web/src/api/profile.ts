@@ -111,6 +111,7 @@ export interface ProfileSummary {
 }
 
 export interface StudentAcademicInfoPatch {
+  student_no?: string | null
   full_name?: string | null
   gender?: string | null
   grade_code?: string | null
@@ -119,6 +120,31 @@ export interface StudentAcademicInfoPatch {
   political_status?: string | null
   enrollment_year?: number | null
   expected_graduation_year?: number | null
+}
+
+export interface StudentCreateInput {
+  student_no: string
+  full_name: string
+  gender?: string | null
+  grade_code?: string | null
+  major_code?: string | null
+  class_code?: string | null
+  political_status?: string | null
+  enrollment_year?: number | null
+  expected_graduation_year?: number | null
+}
+
+export interface StudentWechatBinding {
+  student_id: number
+  student_no: string
+  bound: boolean
+  user_id?: number | null
+  display_name?: string | null
+  openid_masked?: string | null
+  unionid_masked?: string | null
+  is_active?: boolean | null
+  last_login_at?: string | null
+  roles: string[]
 }
 
 export interface ProfileFullViewRequestOut {
@@ -210,6 +236,22 @@ export async function adminUpdateStudentAcademicInfo(studentId: number, payload:
     ...resp,
     data: withEnrollmentAlias(resp.data),
   }
+}
+
+export async function adminCreateStudent(payload: StudentCreateInput) {
+  const resp = await post<ApiEnvelope<StudentBasicRaw>>('/admin/students', payload)
+  return {
+    ...resp,
+    data: withEnrollmentAlias(resp.data),
+  }
+}
+
+export function adminGetStudentWechatBinding(studentId: number) {
+  return get<ApiEnvelope<StudentWechatBinding>>(`/admin/students/${studentId}/wechat-binding`)
+}
+
+export function adminUnbindStudentWechat(studentId: number) {
+  return del<ApiEnvelope<StudentWechatBinding>>(`/admin/students/${studentId}/wechat-binding`)
 }
 
 function buildUrl(url: string, params?: Record<string, unknown>) {

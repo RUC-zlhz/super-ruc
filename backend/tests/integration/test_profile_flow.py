@@ -877,6 +877,84 @@ async def test_profile_read_only_student_and_snapshot_exports(
     assert rows[1][1] == "非在读学生"
 
 
+async def test_admin_creates_student_updates_master_data_and_unbinds_wechat(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    admin_headers, _ = await _create_headers(
+        db,
+        work_no="T500006",
+        display_name="Student Master Admin",
+        roles=[("SUPER_ADMIN", None)],
+    )
+
+    created = await client.post(
+        "/api/v1/admin/students",
+        headers=admin_headers,
+        json={
+            "student_no": "P300006",
+            "full_name": "新增学生",
+            "gender": "女",
+            "grade_code": "2024",
+            "major_code": "CS",
+            "class_code": "CS2406",
+            "political_status": "共青团员",
+            "enrollment_year": 2024,
+            "expected_graduation_year": 2028,
+        },
+    )
+    assert created.status_code == 200, created.text
+    student = created.json()["data"]
+    assert student["student_no"] == "P300006"
+    assert student["full_name"] == "新增学生"
+
+    updated = await client.patch(
+        f"/api/v1/admin/students/{student['id']}/academic-info",
+        headers=admin_headers,
+        json={"full_name": "新增学生改名", "class_code": "CS2407"},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["data"]["full_name"] == "新增学生改名"
+    assert updated.json()["data"]["class_code"] == "CS2407"
+
+    login = await client.post(
+        "/api/v1/auth/wx-login",
+        json={
+            "code": "wx_profile_unbind",
+            "student_no": "P300006",
+            "full_name": "新增学生改名",
+        },
+    )
+    assert login.status_code == 200, login.text
+
+    binding = await client.get(
+        f"/api/v1/admin/students/{student['id']}/wechat-binding",
+        headers=admin_headers,
+    )
+    assert binding.status_code == 200, binding.text
+    binding_data = binding.json()["data"]
+    assert binding_data["bound"] is True
+    assert binding_data["openid_masked"].startswith("mock_w")
+    assert "STUDENT" in binding_data["roles"]
+
+    unbound = await client.delete(
+        f"/api/v1/admin/students/{student['id']}/wechat-binding",
+        headers=admin_headers,
+    )
+    assert unbound.status_code == 200, unbound.text
+    assert unbound.json()["data"]["bound"] is False
+
+    user = (
+        await db.execute(select(User).where(User.openid == "mock_wx_profile_unbind"))
+    ).scalar_one()
+    assert user.student_id is None
+    roles = (
+        await db.execute(select(UserRole.role_code).where(UserRole.user_id == user.id))
+    ).scalars().all()
+    assert "STUDENT" not in roles
+    assert "GUEST" in roles
+
+
 async def test_profile_new_endpoints_require_auth(client: AsyncClient) -> None:
     assert (await client.get("/api/v1/profile/me/fact-submissions")).status_code == 401
     assert (await client.get("/api/v1/profile/me/full-view-requests")).status_code == 401

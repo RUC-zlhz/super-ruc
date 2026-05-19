@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S29` 已闭合；后续新阶段继续按本文件登记
+- 当前目标：`S1 ~ S30` 已闭合；后续新阶段继续按本文件登记
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -331,6 +331,27 @@
 当前结论：
 
 - `S29` 已完成；生产新库的默认学生与培养方案已补齐，学生主档和后台账号管理入口也已在 Web 暴露。
+
+### S30 学生主档与微信绑定管理补强
+
+- [x] `S30.1` 后端新增学生主档创建接口，沿用画像范围权限。
+- [x] `S30.2` 后端扩展学生主档编辑接口，支持学号和主档字段修改，并校验唯一性与目标范围。
+- [x] `S30.3` 后端新增学生微信绑定查看与解绑接口，解绑后旧微信失去学生身份并失效 token。
+- [x] `S30.4` Web 学生管理页新增“新增学生”“主档”“微信”入口。
+- [x] `S30.5` 完成本地验证、生产重建与 smoke。
+
+细化文件：`docs/notes/refinements/2026-05-19-s30-student-master-and-wechat-binding-management.md`
+
+证据：
+
+- 后端新增 `POST /api/v1/admin/students`、`GET /api/v1/admin/students/{student_id}/wechat-binding`、`DELETE /api/v1/admin/students/{student_id}/wechat-binding`，并扩展 `PATCH /api/v1/admin/students/{student_id}/academic-info` 支持学号修改。
+- Web 学生管理页已新增“新增学生”“主档”“微信”入口；画像页“编辑学籍信息”同步支持学号维护。
+- 本地 `ruff`、`py_compile`、`pnpm -C web build` 通过；新增集成用例 `test_admin_creates_student_updates_master_data_and_unbinds_wechat` 通过。
+- 服务器已重建 `backend` / `web` 并通过 `smoke.sh`；生产未登录探测新增学生、微信绑定查看、微信解绑和主档修改接口均返回 `401` 而非 `404`。
+
+当前结论：
+
+- `S30` 已完成；教师/管理员后台可新增学生、修改学生主档，并查看/解绑学生微信登录绑定。
 
 ### S6 前端体验增量优化
 
@@ -868,6 +889,7 @@
 | 2026-05-18 | S27 开发阶段冷启动脚本 | `docs/notes/refinements/2026-05-18-development-cold-start-script.md` | `S27.1, S27.2, S27.3, S27.4, S27.5` | `[x]` | 已完成开发库 schema 重置、一键启动入口、重复冷启动验证与绑定清空复核 |
 | 2026-05-19 | S28 内网生产部署与持续交付底座 | `docs/notes/refinements/2026-05-19-s28-intranet-production-deployment.md` | `S28.1, S28.2, S28.3, S28.4, S28.5, S28.6` | `[x]` | 已完成内网生产部署资产、服务器初始化、Compose 五服务上线、迁移种子、smoke、内网访问与数据库备份脚本验证 |
 | 2026-05-19 | S29 生产默认数据导入与管理入口补强 | `docs/notes/refinements/2026-05-19-s29-production-default-data-and-admin-management.md` | `S29.1, S29.2, S29.3, S29.4, S29.5, S29.6` | `[x]` | 已完成生产默认数据导入、Web 管理入口补强、服务器重建与 smoke 验证 |
+| 2026-05-19 | S30 学生主档与微信绑定管理补强 | `docs/notes/refinements/2026-05-19-s30-student-master-and-wechat-binding-management.md` | `S30.1, S30.2, S30.3, S30.4, S30.5` | `[x]` | 已补齐后台新增学生、学生主档修改和微信绑定查看/解绑，并完成本地验证与生产 smoke |
 
 ## 会话更新要求
 
@@ -951,3 +973,4 @@
 - `2026-05-18`：完成 `S24` 拉取后请求权限范围与公开预览门禁收口；班团骨干等协同角色的申请工作台、详情与处理动作已按 `scope_code` 限定可见范围，且本人申请不能绕过协同 scope 执行管理动作；`/preview/requirements` 改为仅开发或显式开关注册；申请流回归 `14 passed`、静态校验与 Web 构建通过。
 - `2026-05-19`：新增并完成 `S28` 内网生产部署与持续交付底座；已落地 `deploy/intranet-prod/` 的 Compose、Nginx、Web Dockerfile、生产 `.env` 模板、部署/迁移/备份/恢复/回滚/smoke 脚本和小程序内网出包入口，并完成本地验证；通过本机 SSH 反向 SOCKS 代理完成服务器 `git / Docker / Compose` 初始化和 Docker 镜像拉取验证；服务器生产 `.env` 就绪后完成五服务上线、Alembic 迁移、幂等基础种子、smoke、本机内网访问与数据库备份脚本验证。
 - `2026-05-19`：新增并完成 `S29` 生产默认数据导入与管理入口补强；为后端生产容器只读挂载 `docs` 默认数据源，新增 `seed-default-data.sh`，在服务器完成默认学生与 `2024-default` 培养方案导入，并补 Web 单个后台账号创建和学生学籍信息编辑入口；`pnpm -C web build`、Compose config、shell 语法检查、服务器 Web 重建与 smoke 通过。
+- `2026-05-19`：新增并完成 `S30` 学生主档与微信绑定管理补强；后台已支持新增学生、修改学生主档、查看和解绑学生微信登录绑定，Web 学生管理页已新增对应入口，并通过本地静态/构建/定向集成测试和服务器生产重建 smoke。

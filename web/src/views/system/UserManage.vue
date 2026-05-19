@@ -55,6 +55,10 @@
                 <template #icon><SearchOutlined /></template>
                 查询
               </a-button>
+              <a-button v-if="canEditStudents" type="primary" @click="openStudentEditor()">
+                <template #icon><UserAddOutlined /></template>
+                新增学生
+              </a-button>
               <a-button @click="resetStudentFilters">
                 <template #icon><ReloadOutlined /></template>
                 重置
@@ -90,6 +94,22 @@
                   </a-tag>
                 </template>
                 <template v-else-if="column.key === 'actions'">
+                  <a-button
+                    type="link"
+                    size="small"
+                    @click="onEditStudent(record)"
+                  >
+                    <template #icon><EditOutlined /></template>
+                    主档
+                  </a-button>
+                  <a-button
+                    type="link"
+                    size="small"
+                    @click="onOpenWechatBinding(record)"
+                  >
+                    <template #icon><SyncOutlined /></template>
+                    微信
+                  </a-button>
                   <a-button
                     type="link"
                     size="small"
@@ -378,6 +398,98 @@
     </a-modal>
 
     <a-modal
+      v-model:open="studentEditorOpen"
+      :title="studentEditorTitle"
+      :confirm-loading="studentEditorSubmitting"
+      @ok="onSubmitStudentEditor"
+      @cancel="closeStudentEditor"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="学号" required>
+          <a-input v-model:value="studentEditorForm.student_no" />
+        </a-form-item>
+        <a-form-item label="姓名" required>
+          <a-input v-model:value="studentEditorForm.full_name" />
+        </a-form-item>
+        <a-form-item label="性别">
+          <a-input v-model:value="studentEditorForm.gender" placeholder="男 / 女" />
+        </a-form-item>
+        <a-form-item label="年级">
+          <a-input v-model:value="studentEditorForm.grade_code" placeholder="如 2024" />
+        </a-form-item>
+        <a-form-item label="专业">
+          <a-input v-model:value="studentEditorForm.major_code" placeholder="专业代码或名称" />
+        </a-form-item>
+        <a-form-item label="班级">
+          <a-input v-model:value="studentEditorForm.class_code" placeholder="如 CS2401" />
+        </a-form-item>
+        <a-form-item label="政治面貌">
+          <a-input v-model:value="studentEditorForm.political_status" />
+        </a-form-item>
+        <a-form-item label="入学年份">
+          <a-input-number
+            v-model:value="studentEditorForm.enrollment_year"
+            :min="2000"
+            :max="2100"
+            style="width: 100%"
+          />
+        </a-form-item>
+        <a-form-item label="预计毕业年份">
+          <a-input-number
+            v-model:value="studentEditorForm.expected_graduation_year"
+            :min="2000"
+            :max="2100"
+            style="width: 100%"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <a-modal
+      v-model:open="wechatBindingOpen"
+      title="微信登录绑定"
+      :confirm-loading="wechatBindingLoading"
+      @ok="closeWechatBinding"
+      @cancel="closeWechatBinding"
+    >
+      <a-spin :spinning="wechatBindingLoading">
+        <a-descriptions :column="1" size="small" bordered>
+          <a-descriptions-item label="学生">
+            {{ wechatBindingStudent?.full_name }} ({{ wechatBindingStudent?.student_no }})
+          </a-descriptions-item>
+          <a-descriptions-item label="绑定状态">
+            <a-tag :color="wechatBinding?.bound ? 'green' : 'default'">
+              {{ wechatBinding?.bound ? '已绑定' : '未绑定' }}
+            </a-tag>
+          </a-descriptions-item>
+          <a-descriptions-item v-if="wechatBinding?.bound" label="账号 ID">
+            {{ wechatBinding.user_id }}
+          </a-descriptions-item>
+          <a-descriptions-item v-if="wechatBinding?.bound" label="账号名称">
+            {{ wechatBinding.display_name || '-' }}
+          </a-descriptions-item>
+          <a-descriptions-item v-if="wechatBinding?.bound" label="OpenID">
+            {{ wechatBinding.openid_masked || '-' }}
+          </a-descriptions-item>
+          <a-descriptions-item v-if="wechatBinding?.bound" label="UnionID">
+            {{ wechatBinding.unionid_masked || '-' }}
+          </a-descriptions-item>
+          <a-descriptions-item v-if="wechatBinding?.bound" label="最近登录">
+            {{ wechatBinding.last_login_at || '-' }}
+          </a-descriptions-item>
+          <a-descriptions-item v-if="wechatBinding?.bound" label="角色">
+            {{ wechatBinding.roles.join(', ') || '-' }}
+          </a-descriptions-item>
+        </a-descriptions>
+        <div v-if="wechatBinding?.bound" class="wechat-actions">
+          <a-button danger :loading="wechatUnbinding" @click="onUnbindWechat">
+            解绑微信
+          </a-button>
+        </div>
+      </a-spin>
+    </a-modal>
+
+    <a-modal
       v-model:open="singleAdminModalOpen"
       title="新增后台账号"
       :confirm-loading="singleAdminSubmitting"
@@ -436,7 +548,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { message } from "ant-design-vue";
+import { message, Modal } from "ant-design-vue";
 import {
   CheckCircleOutlined,
   DownloadOutlined,
@@ -466,7 +578,15 @@ import {
   type AdminUserImportPreviewResult,
 } from "@/api/adminUsers";
 import { updateEnrollmentStatus } from "@/api/auth";
-import { adminSearchStudents, type StudentBasic } from "@/api/profile";
+import {
+  adminCreateStudent,
+  adminGetStudentWechatBinding,
+  adminSearchStudents,
+  adminUnbindStudentWechat,
+  adminUpdateStudentAcademicInfo,
+  type StudentBasic,
+  type StudentWechatBinding,
+} from "@/api/profile";
 import { useAuthStore } from "@/store/auth";
 import { ADMIN_USER_IMPORT_ROLES, CURRICULUM_ADMIN_ROLES, hasAnyRole } from "@/utils/permission";
 import { get } from "@/utils/request";
@@ -486,6 +606,9 @@ const canViewPolicies = computed(() =>
 );
 const canEditEnrollment = computed(() =>
   hasAnyRole(auth.roleCodes, ["SUPER_ADMIN", "COLLEGE_LEADER", "COUNSELOR"]),
+);
+const canEditStudents = computed(() =>
+  hasAnyRole(auth.roleCodes, ["SUPER_ADMIN", "COLLEGE_LEADER", "COUNSELOR", "HEAD_TEACHER"]),
 );
 
 const ROLE_LABELS: Record<string, string> = {
@@ -565,7 +688,7 @@ const stuCols = [
     width: 110,
   },
   { title: "学籍状态", key: "enrollment_status", width: 110 },
-  { title: "操作", key: "actions", width: 140 },
+  { title: "操作", key: "actions", width: 250 },
 ];
 const stuFilters = reactive<{
   q?: string;
@@ -658,6 +781,167 @@ function resetStudentFilters() {
 
 function onViewProfile(studentId: number) {
   router.push(`/profile/student/${studentId}`);
+}
+
+function toStudentBasic(stu: StudentBasic | Record<string, any>): StudentBasic {
+  return {
+    id: Number(stu.id),
+    student_no: String(stu.student_no || ""),
+    full_name: String(stu.full_name || ""),
+    gender: stu.gender ?? null,
+    grade_code: stu.grade_code ?? null,
+    major_code: stu.major_code ?? null,
+    class_code: stu.class_code ?? null,
+    political_status: stu.political_status ?? null,
+    enrollment_year: stu.enrollment_year ?? null,
+    expected_graduation_year: stu.expected_graduation_year ?? null,
+    status: stu.status ?? stu.enrollment_status ?? "ACTIVE",
+    enrollment_status: stu.enrollment_status ?? stu.status ?? "ACTIVE",
+    enrollment_status_reason: stu.enrollment_status_reason ?? null,
+    enrollment_status_updated_at: stu.enrollment_status_updated_at ?? null,
+  };
+}
+
+// ---------- 学生主档新增 / 修改 ----------
+const studentEditorOpen = ref(false);
+const studentEditorSubmitting = ref(false);
+const editingStudent = ref<StudentBasic | null>(null);
+const studentEditorForm = reactive<{
+  student_no: string;
+  full_name: string;
+  gender: string;
+  grade_code: string;
+  major_code: string;
+  class_code: string;
+  political_status: string;
+  enrollment_year: number | undefined;
+  expected_graduation_year: number | undefined;
+}>({
+  student_no: "",
+  full_name: "",
+  gender: "",
+  grade_code: "",
+  major_code: "",
+  class_code: "",
+  political_status: "",
+  enrollment_year: undefined,
+  expected_graduation_year: undefined,
+});
+const studentEditorTitle = computed(() => (editingStudent.value ? "修改学生主档" : "新增学生"));
+
+function normalizeOptionalText(value: string) {
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function resetStudentEditorForm(stu?: StudentBasic | null) {
+  studentEditorForm.student_no = stu?.student_no || "";
+  studentEditorForm.full_name = stu?.full_name || "";
+  studentEditorForm.gender = stu?.gender || "";
+  studentEditorForm.grade_code = stu?.grade_code || "";
+  studentEditorForm.major_code = stu?.major_code || "";
+  studentEditorForm.class_code = stu?.class_code || "";
+  studentEditorForm.political_status = stu?.political_status || "";
+  studentEditorForm.enrollment_year = stu?.enrollment_year ?? undefined;
+  studentEditorForm.expected_graduation_year = stu?.expected_graduation_year ?? undefined;
+}
+
+function openStudentEditor(stu?: StudentBasic) {
+  editingStudent.value = stu || null;
+  resetStudentEditorForm(stu || null);
+  studentEditorOpen.value = true;
+}
+
+function closeStudentEditor() {
+  studentEditorOpen.value = false;
+}
+
+function onEditStudent(stu: StudentBasic | Record<string, any>) {
+  openStudentEditor(toStudentBasic(stu));
+}
+
+async function onSubmitStudentEditor() {
+  const studentNo = studentEditorForm.student_no.trim();
+  const fullName = studentEditorForm.full_name.trim();
+  if (!studentNo || !fullName) {
+    message.warning("请填写学号和姓名");
+    return;
+  }
+  const payload = {
+    student_no: studentNo,
+    full_name: fullName,
+    gender: normalizeOptionalText(studentEditorForm.gender),
+    grade_code: normalizeOptionalText(studentEditorForm.grade_code),
+    major_code: normalizeOptionalText(studentEditorForm.major_code),
+    class_code: normalizeOptionalText(studentEditorForm.class_code),
+    political_status: normalizeOptionalText(studentEditorForm.political_status),
+    enrollment_year: studentEditorForm.enrollment_year ?? null,
+    expected_graduation_year: studentEditorForm.expected_graduation_year ?? null,
+  };
+  studentEditorSubmitting.value = true;
+  try {
+    if (editingStudent.value) {
+      await adminUpdateStudentAcademicInfo(editingStudent.value.id, payload);
+      message.success("学生主档已更新");
+    } else {
+      await adminCreateStudent(payload);
+      message.success("学生已新增");
+    }
+    closeStudentEditor();
+    await reloadStudents();
+  } finally {
+    studentEditorSubmitting.value = false;
+  }
+}
+
+// ---------- 微信登录绑定 ----------
+const wechatBindingOpen = ref(false);
+const wechatBindingLoading = ref(false);
+const wechatUnbinding = ref(false);
+const wechatBindingStudent = ref<StudentBasic | null>(null);
+const wechatBinding = ref<StudentWechatBinding | null>(null);
+
+async function loadWechatBinding(studentId: number) {
+  wechatBindingLoading.value = true;
+  try {
+    const resp = await adminGetStudentWechatBinding(studentId);
+    wechatBinding.value = resp.data;
+  } finally {
+    wechatBindingLoading.value = false;
+  }
+}
+
+function onOpenWechatBinding(stu: StudentBasic | Record<string, any>) {
+  wechatBindingStudent.value = toStudentBasic(stu);
+  wechatBinding.value = null;
+  wechatBindingOpen.value = true;
+  void loadWechatBinding(wechatBindingStudent.value.id);
+}
+
+function closeWechatBinding() {
+  wechatBindingOpen.value = false;
+}
+
+function onUnbindWechat() {
+  if (!wechatBindingStudent.value || !wechatBinding.value?.bound) return;
+  const student = wechatBindingStudent.value;
+  Modal.confirm({
+    title: "解绑微信登录绑定",
+    content: `确认解绑 ${student.full_name} (${student.student_no}) 的微信登录绑定？`,
+    okText: "解绑",
+    okType: "danger",
+    cancelText: "取消",
+    async onOk() {
+      wechatUnbinding.value = true;
+      try {
+        const resp = await adminUnbindStudentWechat(student.id);
+        wechatBinding.value = resp.data;
+        message.success("微信绑定已解绑");
+      } finally {
+        wechatUnbinding.value = false;
+      }
+    },
+  });
 }
 
 // ---------- 学籍变更 ----------
@@ -1308,6 +1592,12 @@ watch(activeTab, (tab) => {
 }
 
 .admin-import-section {
+  margin-top: 16px;
+}
+
+.wechat-actions {
+  display: flex;
+  justify-content: flex-end;
   margin-top: 16px;
 }
 
