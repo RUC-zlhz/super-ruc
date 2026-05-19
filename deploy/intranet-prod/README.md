@@ -116,6 +116,28 @@ bash deploy/intranet-prod/scripts/migrate-and-seed.sh
 bash deploy/intranet-prod/scripts/smoke.sh
 ```
 
+## 默认学生与培养方案导入
+
+S28 生产初始化默认只执行迁移与基础字典种子，不会清空或重建业务数据。若新生产库需要导入仓库内受控的默认学生花名册和 `2024-default` 培养方案，执行：
+
+```bash
+cd /opt/super-ruc/app
+bash deploy/intranet-prod/scripts/seed-default-data.sh
+```
+
+脚本会先执行数据库备份，再调用 `python -m scripts.seed_default_data`。该导入是幂等的：学生按学号 upsert，培养方案只维护 `version_label=2024-default` 的默认版本，不执行 S27 开发冷启动，也不会清空学生、账号、微信绑定或业务数据。
+
+默认数据源通过 Compose 只读挂载到后端容器的 `/docs`：
+
+- `docs/source/students/students.xlsx`
+- `docs/source/training program/2024_information.md`
+
+## 管理入口
+
+- 学生数据：`用户管理 -> 学生管理` 可查询学生、查看画像，并可变更学籍状态；学生画像页可新增/删除成长事实、处理补录/纠错、导出 PDF/XLSX 快照。
+- 后台账号：`用户管理 -> 批量创建账号` 可下载模板、上传预检并创建下级管理员账号；初始密码只在提交结果中展示一次。
+- 培养方案：`培养方案管理` 可新增、编辑、删除方案、模块和课程；`导入导出中心` 也保留默认学生和默认培养方案导入入口。
+
 ## 备份与恢复
 
 生成备份：

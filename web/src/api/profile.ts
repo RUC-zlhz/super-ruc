@@ -110,6 +110,13 @@ export interface ProfileSummary {
   generated_at: string
 }
 
+export interface StudentAcademicInfoPatch {
+  grade_code?: string | null
+  major_code?: string | null
+  class_code?: string | null
+  expected_graduation_year?: number | null
+}
+
 export interface ProfileFullViewRequestOut {
   id: number
   student_id: number
@@ -191,6 +198,14 @@ export function adminUpdateFact(factId: number, payload: ProfileFactIn) {
 
 export function adminDeleteFact(factId: number) {
   return del<ApiEnvelope<{ id: number; deleted: boolean }>>(`/admin/profile/facts/${factId}`)
+}
+
+export async function adminUpdateStudentAcademicInfo(studentId: number, payload: StudentAcademicInfoPatch) {
+  const resp = await patch<ApiEnvelope<StudentBasicRaw>>(`/admin/students/${studentId}/academic-info`, payload)
+  return {
+    ...resp,
+    data: withEnrollmentAlias(resp.data),
+  }
 }
 
 function buildUrl(url: string, params?: Record<string, unknown>) {

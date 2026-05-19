@@ -171,6 +171,10 @@
               <template #icon><DownloadOutlined /></template>
               下载 CSV 模板
             </a-button>
+            <a-button @click="openSingleAdminModal">
+              <template #icon><UserAddOutlined /></template>
+              新增单个账号
+            </a-button>
             <a-upload
               :show-upload-list="false"
               accept=".xlsx,.csv"
@@ -372,6 +376,60 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-modal
+      v-model:open="singleAdminModalOpen"
+      title="新增后台账号"
+      :confirm-loading="singleAdminSubmitting"
+      @ok="onSubmitSingleAdmin"
+      @cancel="closeSingleAdminModal"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="工号" required>
+          <a-input v-model:value="singleAdminForm.work_no" placeholder="如 T2026001" />
+        </a-form-item>
+        <a-form-item label="姓名" required>
+          <a-input v-model:value="singleAdminForm.display_name" />
+        </a-form-item>
+        <a-form-item label="邮箱">
+          <a-input v-model:value="singleAdminForm.email" />
+        </a-form-item>
+        <a-form-item label="角色" required>
+          <a-select v-model:value="singleAdminForm.role_code">
+            <a-select-option
+              v-for="option in singleAdminRoleOptions"
+              :key="option.value"
+              :value="option.value"
+            >
+              {{ option.label }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="范围类型">
+          <a-select v-model:value="singleAdminForm.scope_type">
+            <a-select-option value="GLOBAL">GLOBAL（全局）</a-select-option>
+            <a-select-option value="GRADE">GRADE（年级）</a-select-option>
+            <a-select-option value="MAJOR">MAJOR（专业）</a-select-option>
+            <a-select-option value="CLASS">CLASS（班级）</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="范围编码">
+          <a-input
+            v-model:value="singleAdminForm.scope_code"
+            :disabled="singleAdminForm.scope_type === 'GLOBAL'"
+            placeholder="如 2024 / 信息安全 / CS2401"
+          />
+        </a-form-item>
+        <a-form-item label="状态">
+          <a-switch v-model:checked="singleAdminForm.is_active" checked-children="启用" un-checked-children="停用" />
+        </a-form-item>
+        <a-alert
+          type="info"
+          show-icon
+          message="该操作复用批量创建账号的预检与提交流程，初始密码只在提交结果中显示一次。"
+        />
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -429,6 +487,45 @@ const canViewPolicies = computed(() =>
 const canEditEnrollment = computed(() =>
   hasAnyRole(auth.roleCodes, ["SUPER_ADMIN", "COLLEGE_LEADER", "COUNSELOR"]),
 );
+
+const ROLE_LABELS: Record<string, string> = {
+  COLLEGE_LEADER: "学院领导",
+  COUNSELOR: "辅导员",
+  HEAD_TEACHER: "班主任",
+  YOUTH_LEAGUE_TEACHER: "团委老师",
+  PARTY_BUILD_TEACHER: "党建老师",
+  PARTY_BRANCH_SECRETARY: "党支部书记",
+  YOUTH_LEAGUE_SECRETARY: "团支书",
+  CLASS_MONITOR: "班长",
+  YOUTH_BRANCH_SECRETARY: "团支部书记",
+  CLASS_LEADER: "班委",
+};
+
+const L3_ROLE_CODES = [
+  "COUNSELOR",
+  "HEAD_TEACHER",
+  "YOUTH_LEAGUE_TEACHER",
+  "PARTY_BUILD_TEACHER",
+];
+const L4_ROLE_CODES = [
+  "PARTY_BRANCH_SECRETARY",
+  "YOUTH_LEAGUE_SECRETARY",
+  "CLASS_MONITOR",
+  "YOUTH_BRANCH_SECRETARY",
+  "CLASS_LEADER",
+];
+
+const singleAdminRoleOptions = computed(() => {
+  let roleCodes: string[] = [];
+  if (auth.roleCodes.includes("SUPER_ADMIN")) {
+    roleCodes = ["COLLEGE_LEADER", ...L3_ROLE_CODES, ...L4_ROLE_CODES];
+  } else if (auth.roleCodes.includes("COLLEGE_LEADER")) {
+    roleCodes = [...L3_ROLE_CODES, ...L4_ROLE_CODES];
+  } else if (auth.roleCodes.some((role) => L3_ROLE_CODES.includes(role))) {
+    roleCodes = [...L4_ROLE_CODES];
+  }
+  return roleCodes.map((value) => ({ value, label: `${value}（${ROLE_LABELS[value] || value}）` }));
+});
 
 const ENROLLMENT_STATUS_LABELS: Record<string, string> = {
   ACTIVE: "在读",
@@ -621,6 +718,17 @@ const adminCommitLoading = ref(false);
 const adminHistoryLoading = ref(false);
 const adminImportHistory = ref<AdminUserImportBatch[]>([]);
 const adminHistoryPagination = reactive({ current: 1, pageSize: 10, total: 0 });
+const singleAdminModalOpen = ref(false);
+const singleAdminSubmitting = ref(false);
+const singleAdminForm = reactive({
+  work_no: "",
+  display_name: "",
+  email: "",
+  role_code: "",
+  scope_type: "GLOBAL",
+  scope_code: "",
+  is_active: true,
+});
 
 const adminImportMetrics = computed(() => {
   const batch = adminPreview.value?.batch;
@@ -702,6 +810,81 @@ function adminBatchStatusColor(status: string) {
   if (status === "FAILED") return "red";
   if (status === "VALIDATED") return "blue";
   return "default";
+}
+
+function resetSingleAdminForm() {
+  singleAdminForm.work_no = "";
+  singleAdminForm.display_name = "";
+  singleAdminForm.email = "";
+  singleAdminForm.role_code = singleAdminRoleOptions.value[0]?.value || "";
+  singleAdminForm.scope_type = "GLOBAL";
+  singleAdminForm.scope_code = "";
+  singleAdminForm.is_active = true;
+}
+
+function openSingleAdminModal() {
+  resetSingleAdminForm();
+  singleAdminModalOpen.value = true;
+}
+
+function closeSingleAdminModal() {
+  singleAdminModalOpen.value = false;
+}
+
+function csvCell(value: unknown) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function buildSingleAdminCsv() {
+  const scopeType = singleAdminForm.scope_type;
+  const scopeCode = scopeType === "GLOBAL" ? "" : singleAdminForm.scope_code.trim();
+  const rows = [
+    ["work_no", "display_name", "email", "role_code", "scope_type", "scope_code", "is_active"],
+    [
+      singleAdminForm.work_no.trim(),
+      singleAdminForm.display_name.trim(),
+      singleAdminForm.email.trim(),
+      singleAdminForm.role_code,
+      scopeType,
+      scopeCode,
+      singleAdminForm.is_active ? "true" : "false",
+    ],
+  ];
+  return `\ufeff${rows.map((row) => row.map(csvCell).join(",")).join("\n")}\n`;
+}
+
+async function onSubmitSingleAdmin() {
+  if (!singleAdminForm.work_no.trim() || !singleAdminForm.display_name.trim() || !singleAdminForm.role_code) {
+    message.warning("请填写工号、姓名和角色");
+    return;
+  }
+  if (singleAdminForm.scope_type !== "GLOBAL" && !singleAdminForm.scope_code.trim()) {
+    message.warning("非 GLOBAL 范围必须填写范围编码");
+    return;
+  }
+  singleAdminSubmitting.value = true;
+  adminCredentials.value = [];
+  try {
+    const file = new File([buildSingleAdminCsv()], "single-admin-user.csv", {
+      type: "text/csv;charset=utf-8",
+    });
+    const preview = await previewAdminUserImport(file);
+    adminPreview.value = preview.data;
+    activeTab.value = "admin-import";
+    if (preview.data.batch.fatal_rows > 0) {
+      message.warning("预检失败，请查看下方错误行或下载错误报告");
+      return;
+    }
+    const committed = await commitAdminUserImport(preview.data.batch.id);
+    adminPreview.value = { batch: committed.data.batch, rows: committed.data.rows };
+    adminCredentials.value = committed.data.credentials;
+    message.success("账号已创建，初始密码只在本次结果中显示");
+    closeSingleAdminModal();
+    await reloadAdminImportHistory();
+  } finally {
+    singleAdminSubmitting.value = false;
+  }
 }
 
 async function onDownloadAdminTemplate(format: "xlsx" | "csv") {
