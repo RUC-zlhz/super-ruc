@@ -1,10 +1,21 @@
 ARG PYTHON_IMAGE=python:3.11-slim
 FROM ${PYTHON_IMAGE}
+ARG HTTP_PROXY=
+ARG HTTPS_PROXY=
+ARG NO_PROXY=
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    HTTP_PROXY=${HTTP_PROXY} \
+    HTTPS_PROXY=${HTTPS_PROXY} \
+    http_proxy=${HTTP_PROXY} \
+    https_proxy=${HTTPS_PROXY} \
+    npm_config_proxy=${HTTP_PROXY} \
+    npm_config_https_proxy=${HTTPS_PROXY} \
+    NO_PROXY=${NO_PROXY} \
+    no_proxy=${NO_PROXY}
 
 WORKDIR /app
 

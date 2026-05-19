@@ -24,22 +24,29 @@ docker compose down
 | MailHog SMTP | `1025` | 本地邮件捕获 |
 | MailHog UI | `8025` | 查看捕获邮件：http://localhost:8025 |
 
-## 生产部署
+## 内网生产部署（S28）
 
-> 生产部署脚本待编写，参考以下流程：
+`deploy/intranet-prod/` 是当前内网生产首阶段入口，目标服务器为 `10.10.0.13`：
 
-1. 替换 docker-compose.yml 中的占位镜像为 Kingbase 官方镜像
-2. 将所有密码/密钥改为环境变量或 Docker Secrets
-3. 开启 HTTPS（Nginx SSL 配置）
-4. 配置 MinIO 持久化存储和备份策略
-5. 配置 Redis 持久化（AOF）
+- Docker Compose 编排 PostgreSQL 15、Redis、MinIO、FastAPI 后端与 Web 管理端。
+- 服务目录固定为 `/opt/super-ruc/app`，备份目录固定为 `/opt/super-ruc/backups`。
+- 真实密钥只写入服务器侧 `deploy/intranet-prod/.env`，不落仓库。
+- 本阶段仅承诺内网 HTTP 访问，不处理公网域名、HTTPS、微信正式合法域名。
+
+入口文档：`deploy/intranet-prod/README.md`
+
+## 旧临时 IP 部署
+
+`deploy/temp-ip/` 保留为 `123.57.54.195` 临时直连部署记录。后续新部署优先使用 `deploy/intranet-prod/`。
 
 ## 目录说明
 
 ```
 deploy/
 ├── docker-compose.yml   本地开发环境编排
+├── intranet-prod/       S28 内网生产部署与持续交付底座
 ├── nginx/
 │   └── nginx.conf       Nginx 反向代理配置
+├── temp-ip/             旧临时 IP 直连部署资产
 └── README.md
 ```

@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S27` 已闭合；后续仅在新确认范围内继续增量推进
+- 当前目标：`S1 ~ S28` 已闭合；后续新阶段继续按本文件登记
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -285,6 +285,31 @@
 当前结论：
 
 - `S27` 已完成；开发阶段可使用一键脚本从 Excel 冷启动学生数据并生成 `admin / admin123`，重复执行会清空旧微信绑定与业务数据。该入口只服务开发阶段，正式设计仍以数据库持久化学生、账号、绑定和业务数据为准。
+
+### S28 内网生产部署与持续交付底座
+
+- [x] `S28.1` 将 `10.10.0.13` 定位为内网生产首阶段服务器，并确认本阶段不处理公网域名、HTTPS、微信正式合法域名。
+- [x] `S28.2` 新增 Docker Compose 部署资产，编排 `PostgreSQL 15 / Redis / MinIO / backend / web`。
+- [x] `S28.3` 新增服务器初始化、部署、迁移种子、备份、恢复、回滚和 smoke 脚本。
+- [x] `S28.4` 新增内网生产部署 README 与指向 `http://10.10.0.13/api/v1` 的小程序内网出包脚本。
+- [x] `S28.5` 在 `10.10.0.13` 初始化 `git / Docker / Docker Compose` 并验证版本。
+- [x] `S28.6` 完成真实内网生产部署与 smoke；服务器 `.env` 就绪后已完成 Compose 启动、迁移种子和内网访问验证。
+
+细化文件：`docs/notes/refinements/2026-05-19-s28-intranet-production-deployment.md`
+
+证据：
+
+- 已新增 `deploy/intranet-prod/`，包含 Compose、Nginx、Web 多阶段 Dockerfile、`.env.example`、README、小程序出包脚本与运维脚本。
+- 生产运行口径固定为 `APP_ENV=prod`、`APP_DEBUG=false`、`WECHAT_MOCK_ENABLED=false`，真实密钥只允许写入服务器 `.env`。
+- `S27` 开发冷启动脚本明确不进入 S28 生产初始化链路；S28 仅执行 Alembic 迁移与 `scripts.seed_initial` 幂等基础种子。
+- 本地验证通过：Compose config、shell 语法检查、PowerShell 小程序脚本语法检查、`pnpm -C web build`、后端入口/配置 `py_compile`、内网 API 小程序出包。
+- 服务器验证：免密 sudo 已可用；服务器直接访问 `archive.ubuntu.com`、`security.ubuntu.com`、`download.docker.com`、清华镜像源、阿里镜像源均不可达，但已通过 SSH 反向 SOCKS 代理完成 `git / Docker / Docker Compose` 安装，当前版本为 `git 2.43.0`、`Docker 29.5.1`、`Docker Compose v5.1.3`；Docker daemon 已配置该代理并验证 `docker pull hello-world:latest` 成功。
+- 真实部署验证通过：服务器 `PostgreSQL 15 / Redis / MinIO / backend / web` 五个 Compose 服务均为 `healthy`；`migrate-and-seed.sh` 完成 Alembic 迁移与 `scripts.seed_initial` 幂等基础种子；`smoke.sh` 返回 `Smoke passed for http://127.0.0.1`；本机访问 `http://10.10.0.13/healthz` 与 `http://10.10.0.13/` 均返回 `200`。
+- 运维脚本验证：`backup-db.sh` 已生成 `/opt/super-ruc/backups/super-ruc-20260519-185432-d9060b4.dump`。
+
+当前结论：
+
+- `S28` 部署资产、本地验证、服务器基础设施初始化、真实服务部署与 smoke 均已完成；当前内网入口为 `http://10.10.0.13/`，健康检查为 `http://10.10.0.13/healthz`，API 前缀为 `http://10.10.0.13/api/v1`。后续拉取包/镜像仍需反向代理、固定代理或正式出网。
 
 ### S6 前端体验增量优化
 
@@ -820,6 +845,7 @@
 | 2026-05-18 | S25 通知渠道收口与微信订阅消息一期接入 | `docs/notes/refinements/2026-05-18-s25-notification-channel-and-wechat-subscribe.md` | `S25.1, S25.2, S25.3, S25.4, S25.5, S25.6` | `[x]` | 已完成渠道收口、微信订阅授权/发送一期、过期文案清理，并通过后端定向回归、Web/Miniapp 类型检查和构建 |
 | 2026-05-18 | S26 后台账号批量创建功能 | `docs/notes/refinements/2026-05-18-admin-user-bulk-import.md` | `S26.1, S26.2, S26.3, S26.4, S26.5, S26.6, S26.7, S26.8` | `[x]` | 已完成独立后台账号导入接口、一次性初始密码、审计留痕、范围格式识别和 Web 批量创建入口；后端定向回归与 Web 构建通过 |
 | 2026-05-18 | S27 开发阶段冷启动脚本 | `docs/notes/refinements/2026-05-18-development-cold-start-script.md` | `S27.1, S27.2, S27.3, S27.4, S27.5` | `[x]` | 已完成开发库 schema 重置、一键启动入口、重复冷启动验证与绑定清空复核 |
+| 2026-05-19 | S28 内网生产部署与持续交付底座 | `docs/notes/refinements/2026-05-19-s28-intranet-production-deployment.md` | `S28.1, S28.2, S28.3, S28.4, S28.5, S28.6` | `[x]` | 已完成内网生产部署资产、服务器初始化、Compose 五服务上线、迁移种子、smoke、内网访问与数据库备份脚本验证 |
 
 ## 会话更新要求
 
@@ -901,3 +927,4 @@
 - `2026-05-17`：新增 “党团提醒规则配置与自动闭环实施拆分” 细化文件；基于当前工作流实现确认差距主要集中在规则查询、运行记录、自动调度、去重和提醒取消闭环，并将后续开发拆分为 `S23.1 ~ S23.6`，首版建议仅闭环 `IN_APP` 站内提醒。
 - `2026-05-18`：完成 `S23` 首版实现；后端补齐提醒运行记录、提醒记录查询、手动执行回执、节点完成/转人工自动取消未发送提醒，以及独立的提醒 scheduler；Web 端将 `PartyStageList` 升级为真实工作台并接入模板规则编辑、提醒记录与运行记录展示；`web vue-tsc --noEmit`、`vite build` 与后端目标文件 `py_compile` 通过。
 - `2026-05-18`：完成 `S24` 拉取后请求权限范围与公开预览门禁收口；班团骨干等协同角色的申请工作台、详情与处理动作已按 `scope_code` 限定可见范围，且本人申请不能绕过协同 scope 执行管理动作；`/preview/requirements` 改为仅开发或显式开关注册；申请流回归 `14 passed`、静态校验与 Web 构建通过。
+- `2026-05-19`：新增并完成 `S28` 内网生产部署与持续交付底座；已落地 `deploy/intranet-prod/` 的 Compose、Nginx、Web Dockerfile、生产 `.env` 模板、部署/迁移/备份/恢复/回滚/smoke 脚本和小程序内网出包入口，并完成本地验证；通过本机 SSH 反向 SOCKS 代理完成服务器 `git / Docker / Compose` 初始化和 Docker 镜像拉取验证；服务器生产 `.env` 就绪后完成五服务上线、Alembic 迁移、幂等基础种子、smoke、本机内网访问与数据库备份脚本验证。
