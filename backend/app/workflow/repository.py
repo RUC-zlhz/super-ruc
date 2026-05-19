@@ -329,6 +329,7 @@ async def list_pending_workflows_admin(
     db: AsyncSession,
     *,
     template_code: str | None = None,
+    student_no: str | None = None,
     grade_code: str | None = None,
     page: int = 1,
     size: int = 20,
@@ -345,6 +346,8 @@ async def list_pending_workflows_admin(
     )
     if template_code:
         stmt = stmt.where(WorkflowTemplate.code == template_code)
+    if student_no:
+        stmt = stmt.where(Student.student_no.ilike(f"%{student_no}%"))
     if grade_code:
         stmt = stmt.where(Student.grade_code == grade_code)
 

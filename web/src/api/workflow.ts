@@ -1,6 +1,7 @@
 import { del, get, patch, post } from '@/utils/request'
 import type { ApiEnvelope } from '@/utils/request'
 import type { Paginated } from './types'
+import type { StudentBasic } from './profile'
 
 export type WorkflowTemplateKind = 'PARTY' | 'YOUTH_LEAGUE' | 'OTHER'
 export type WorkflowTriggerRule = 'PREV_DONE' | 'MANUAL' | 'ON_APPLY' | 'ON_DATE'
@@ -75,6 +76,41 @@ export interface WorkflowStudentBrief {
   current_node_name?: string | null
   current_node_status?: WorkflowNodeStatus | string | null
   due_date?: string | null
+}
+
+export interface WorkflowStudentNodeDetail {
+  id: number
+  workflow_id: number
+  node_id: number
+  node_code: string
+  node_name: string
+  sort_order: number
+  status: WorkflowNodeStatus | string
+  due_date?: string | null
+  triggered_at?: string | null
+  completed_at?: string | null
+  evidence?: string | null
+  note?: string | null
+}
+
+export interface WorkflowStudentDetail {
+  id: number
+  template_code: string
+  template_name: string
+  kind: WorkflowTemplateKind | string
+  status: string
+  started_at?: string | null
+  completed_at?: string | null
+  current_node_id?: number | null
+  current_node_name?: string | null
+  next_action_hint?: string | null
+  nodes: WorkflowStudentNodeDetail[]
+}
+
+export interface WorkflowStudentStartPayload {
+  student_id: number
+  template_code: string
+  note?: string
 }
 
 export interface WorkflowReminderRecord {
@@ -232,11 +268,29 @@ export function saveWorkflowTemplate(payload: WorkflowTemplatePayload) {
 
 export function listWorkflowStudents(params: {
   template_code?: string
+  student_no?: string
   grade_code?: string
   page?: number
   size?: number
 }) {
   return get<ApiEnvelope<Paginated<WorkflowStudentBrief>>>('/admin/workflow/students', { params })
+}
+
+export function searchWorkflowStudents(params: {
+  q?: string
+  grade_code?: string
+  major_code?: string
+  class_code?: string
+  include_non_active?: boolean
+  enrollment_status?: string
+  page?: number
+  size?: number
+}) {
+  return get<ApiEnvelope<Paginated<StudentBasic>>>('/admin/workflow/students/search', { params })
+}
+
+export function startWorkflowStudent(payload: WorkflowStudentStartPayload) {
+  return post<ApiEnvelope<WorkflowStudentDetail>>('/admin/workflow/students', payload)
 }
 
 export async function listWorkflowReminderRecords(params: {
