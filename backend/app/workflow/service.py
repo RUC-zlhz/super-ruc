@@ -12,11 +12,19 @@ from app.audit.enforcement import audit_forbidden_and_raise
 from app.audit.service import build_audit_detail, log_action
 from app.auth.models import Student
 from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES, normalize_role_codes
+from app.auth.scopes import StudentScopeSet, split_student_scope_codes, student_in_scope
 from app.core.config import settings
 from app.core.exceptions import BizError, ConflictError, NotFoundError
 from app.core.storage import put_object
 from app.notice import repository as notice_repo
-from app.notice.service import create_system_in_app_notice_for_student
+from app.notice.models import (
+    WECHAT_SUBSCRIBE_SCENE_REQUEST_STATUS,
+    WECHAT_SUBSCRIBE_SCENE_WORKFLOW_REMINDER,
+)
+from app.notice.service import (
+    create_system_in_app_notice_for_student,
+    send_wechat_subscribe_for_delivery,
+)
 from app.workflow import repository as repo
 from app.workflow.models import (
     REMINDER_RUN_STATUS_COMPLETED,
@@ -69,6 +77,16 @@ from app.workflow.state_machine import (
 )
 
 logger = logging.getLogger(__name__)
+
+_REQUEST_GLOBAL_ROLES = {
+    "SUPER_ADMIN",
+    "COLLEGE_LEADER",
+    "COUNSELOR",
+    "HEAD_TEACHER",
+    "YOUTH_LEAGUE_TEACHER",
+    "PARTY_BUILD_TEACHER",
+}
+_REQUEST_COLLABORATOR_ROLES = set(ROLE_CODE_COLLABORATOR_ROLES)
 
 
 # ======================================================================
@@ -589,8 +607,7 @@ async def run_reminder_cycle(
 
             effective_channel = channel or node.reminder_channel or settings.WORKFLOW_REMINDER_CHANNEL
             if effective_channel != "IN_APP":
-                skipped_count += 1
-                continue
+                raise BizError("流程提醒一期仅支持站内提醒 IN_APP", code=40086)
 
             lead_days = node.reminder_lead_days or 0
             remind_on = state.due_date - timedelta(days=lead_days)
@@ -646,7 +663,7 @@ async def run_reminder_cycle(
                 if workflow.student_id not in user_cache:
                     user = await notice_repo.find_user_by_student_id(db, workflow.student_id)
                     user_cache[workflow.student_id] = user.id if user else None
-                await create_system_in_app_notice_for_student(
+                in_app_delivery = await create_system_in_app_notice_for_student(
                     db,
                     student_id=workflow.student_id,
                     user_id=user_cache[workflow.student_id],
@@ -657,6 +674,14 @@ async def run_reminder_cycle(
                     source_type="SYSTEM",
                     source_url=f"workflow-reminder:{reminder.id}",
                     operator_id=operator_id,
+                )
+                await send_wechat_subscribe_for_delivery(
+                    db,
+                    in_app_delivery=in_app_delivery,
+                    scene=WECHAT_SUBSCRIBE_SCENE_WORKFLOW_REMINDER,
+                    title=title,
+                    summary=summary,
+                    page="/pages/workflow/index",
                 )
                 reminder.status = REMINDER_STATUS_SENT
                 reminder.sent_at = datetime.now(UTC)
@@ -1031,54 +1056,166 @@ async def list_admin_requests(
     type_code: str | None,
     status: str | None,
     in_review_only: bool,
+    viewer_user_id: int,
+    viewer_roles: list[str],
     page: int,
     size: int,
 ) -> tuple[list[RequestBrief], int]:
+    scope_codes = await _request_scope_codes_for_viewer(
+        db,
+        viewer_user_id=viewer_user_id,
+        viewer_roles=viewer_roles,
+    )
     rows, total = await repo.list_requests_admin(
         db,
         q=q,
         type_code=type_code,
         status=status,
         in_review_only=in_review_only,
+        class_scope_codes=None if scope_codes is None else scope_codes.class_codes,
+        major_scope_codes=None if scope_codes is None else scope_codes.major_codes,
+        grade_scope_codes=None if scope_codes is None else scope_codes.grade_codes,
+        legacy_scope_codes=None if scope_codes is None else scope_codes.legacy_codes,
         page=page,
         size=size,
     )
     return [_request_to_brief(r) for r in rows], total
 
 
+def _normalized_role_set(roles: list[str]) -> set[str]:
+    return set(normalize_role_codes(roles))
+
+
+async def _request_scope_codes_for_viewer(
+    db: AsyncSession,
+    *,
+    viewer_user_id: int,
+    viewer_roles: list[str],
+) -> StudentScopeSet | None:
+    roles = _normalized_role_set(viewer_roles)
+    if roles & _REQUEST_GLOBAL_ROLES:
+        return None
+    collaborator_roles = sorted(roles & _REQUEST_COLLABORATOR_ROLES)
+    if not collaborator_roles:
+        return StudentScopeSet()
+    return split_student_scope_codes(
+        list(
+            await repo.list_user_role_scope_codes(
+                db,
+                user_id=viewer_user_id,
+                role_codes=collaborator_roles,
+            )
+        )
+    )
+
+
+async def _request_in_viewer_scope(
+    db: AsyncSession,
+    *,
+    req: Request,
+    viewer_user_id: int,
+    viewer_student_id: int | None,
+    viewer_roles: list[str],
+    allow_applicant_self: bool = True,
+) -> bool:
+    if allow_applicant_self and req.applicant_user_id == viewer_user_id:
+        return True
+    if (
+        allow_applicant_self
+        and viewer_student_id is not None
+        and req.applicant_student_id == viewer_student_id
+    ):
+        return True
+    roles = _normalized_role_set(viewer_roles)
+    if roles & _REQUEST_GLOBAL_ROLES:
+        return True
+    if not roles & _REQUEST_COLLABORATOR_ROLES:
+        return False
+    scope_codes = await _request_scope_codes_for_viewer(
+        db,
+        viewer_user_id=viewer_user_id,
+        viewer_roles=viewer_roles,
+    )
+    if scope_codes is None or scope_codes.is_empty() or req.applicant_student_id is None:
+        return False
+    student = await db.get(Student, req.applicant_student_id)
+    if student is None:
+        return False
+    return student_in_scope(student, scope_codes)
+
+
+async def _audit_request_scope_denied(
+    db: AsyncSession,
+    *,
+    req: Request,
+    viewer_user_id: int,
+    viewer_roles: list[str],
+    action: str,
+    message: str,
+    code: int = 40303,
+) -> None:
+    await audit_forbidden_and_raise(
+        db,
+        event_type="REQUEST",
+        entity_code="REQUEST",
+        action=action,
+        entity_id=req.id,
+        actor_user_id=viewer_user_id,
+        actor_role=",".join(viewer_roles) or None,
+        message=message,
+        code=code,
+        detail=build_audit_detail(target={"request_id": req.id}),
+    )
+
+
+async def _ensure_request_visible_to_viewer(
+    db: AsyncSession,
+    *,
+    req: Request,
+    viewer_user_id: int,
+    viewer_student_id: int | None,
+    viewer_roles: list[str],
+    allow_applicant_self: bool = True,
+    action: str = "READ_DETAIL_DENIED",
+    message: str = "无权查看该申请",
+    code: int = 40303,
+) -> None:
+    if not await _request_in_viewer_scope(
+        db,
+        req=req,
+        viewer_user_id=viewer_user_id,
+        viewer_student_id=viewer_student_id,
+        viewer_roles=viewer_roles,
+        allow_applicant_self=allow_applicant_self,
+    ):
+        await _audit_request_scope_denied(
+            db,
+            req=req,
+            viewer_user_id=viewer_user_id,
+            viewer_roles=viewer_roles,
+            action=action,
+            message=message,
+            code=code,
+        )
+
+
 async def get_request_detail(
-    db: AsyncSession, request_id: int, viewer_user_id: int, viewer_roles: list[str]
+    db: AsyncSession,
+    request_id: int,
+    viewer_user_id: int,
+    viewer_roles: list[str],
+    viewer_student_id: int | None = None,
 ) -> RequestDetail:
     req = await repo.get_request(db, request_id)
     if req is None:
         raise NotFoundError("申请不存在")
-    # 学生仅能查看自己提交的，其他角色按路由层放行
-    admin_roles = {
-        "SUPER_ADMIN",
-        "COLLEGE_LEADER",
-        "COUNSELOR",
-        "HEAD_TEACHER",
-        "YOUTH_LEAGUE_TEACHER",
-        "PARTY_BUILD_TEACHER",
-        *ROLE_CODE_COLLABORATOR_ROLES,
-    }
-    if req.applicant_user_id != viewer_user_id and not (
-        set(normalize_role_codes(viewer_roles)) & admin_roles
-    ):
-        await audit_forbidden_and_raise(
-            db,
-            event_type="REQUEST",
-            entity_code="REQUEST",
-            action="READ_DETAIL_DENIED",
-            entity_id=req.id,
-            actor_user_id=viewer_user_id,
-            actor_role=",".join(viewer_roles) or None,
-            message="无权查看该申请",
-            code=40303,
-            detail=build_audit_detail(
-                target={"request_id": req.id},
-            ),
-        )
+    await _ensure_request_visible_to_viewer(
+        db,
+        req=req,
+        viewer_user_id=viewer_user_id,
+        viewer_student_id=viewer_student_id,
+        viewer_roles=viewer_roles,
+    )
     detail = _request_to_detail(req)
     await log_action(
         db,
@@ -1104,6 +1241,49 @@ def _approver_has_role(rt, roles: list[str]) -> bool:
     return bool(set(normalize_role_codes(roles)) & allowed)
 
 
+def _request_status_label(status: str) -> str:
+    return {
+        "APPROVED": "已通过",
+        "REJECTED": "已驳回",
+        "OFFLINE_HANDLED": "已转线下办理",
+        "IN_REVIEW": "审核中",
+        "SUBMITTED": "已提交",
+    }.get(status, status)
+
+
+async def _notify_request_status_change(
+    db: AsyncSession,
+    *,
+    req: Request,
+    title: str,
+    body_md: str,
+    summary: str,
+    operator_id: int | None,
+) -> None:
+    if req.applicant_student_id is None:
+        return
+    in_app_delivery = await create_system_in_app_notice_for_student(
+        db,
+        student_id=req.applicant_student_id,
+        user_id=req.applicant_user_id,
+        title=title,
+        body_md=body_md,
+        summary=summary,
+        category="WORKFLOW",
+        source_type="SYSTEM",
+        source_url=f"request:{req.id}",
+        operator_id=operator_id,
+    )
+    await send_wechat_subscribe_for_delivery(
+        db,
+        in_app_delivery=in_app_delivery,
+        scene=WECHAT_SUBSCRIBE_SCENE_REQUEST_STATUS,
+        title=title,
+        summary=summary,
+        page=f"/pages/request/detail?id={req.id}",
+    )
+
+
 async def decide_request(
     db: AsyncSession,
     request_id: int,
@@ -1112,10 +1292,22 @@ async def decide_request(
     comment: str | None,
     operator_id: int,
     operator_roles: list[str],
+    operator_student_id: int | None = None,
 ) -> RequestDetail:
     req = await repo.get_request(db, request_id)
     if req is None:
         raise NotFoundError("申请不存在")
+    await _ensure_request_visible_to_viewer(
+        db,
+        req=req,
+        viewer_user_id=operator_id,
+        viewer_student_id=operator_student_id,
+        viewer_roles=operator_roles,
+        allow_applicant_self=False,
+        action="DECIDE_DENIED",
+        message="无权审批该申请",
+        code=40304,
+    )
     if not _approver_has_role(req.type_ref, operator_roles):
         raise BizError("无权审批该类型申请", code=40304, http_status=403)
 
@@ -1149,6 +1341,18 @@ async def decide_request(
         actor_role=",".join(operator_roles),
         detail={"comment": comment},
     )
+    status_label = _request_status_label(req.status)
+    await _notify_request_status_change(
+        db,
+        req=req,
+        title=f"申请{status_label}：{req.title}",
+        body_md=(
+            f"你的申请《{req.title}》{status_label}。"
+            + (f"\n\n处理意见：{comment}" if comment else "")
+        ),
+        summary=f"申请状态更新为{status_label}",
+        operator_id=operator_id,
+    )
     await db.commit()
     await db.refresh(req)
     return _request_to_detail(req)
@@ -1162,6 +1366,7 @@ async def mark_request_offline(
     note: str | None,
     operator_id: int,
     operator_roles: list[str],
+    operator_student_id: int | None = None,
 ) -> RequestDetail:
     """v1.5 涉密 / 敏感事项转线下办理。
 
@@ -1171,6 +1376,17 @@ async def mark_request_offline(
     req = await repo.get_request(db, request_id)
     if req is None:
         raise NotFoundError("申请不存在")
+    await _ensure_request_visible_to_viewer(
+        db,
+        req=req,
+        viewer_user_id=operator_id,
+        viewer_student_id=operator_student_id,
+        viewer_roles=operator_roles,
+        allow_applicant_self=False,
+        action="OFFLINE_HANDLE_DENIED",
+        message="无权处理该申请",
+        code=40304,
+    )
     if not _approver_has_role(req.type_ref, operator_roles):
         raise BizError("无权审批该类型申请", code=40304, http_status=403)
 
@@ -1206,24 +1422,19 @@ async def mark_request_offline(
         actor_role=",".join(operator_roles),
         detail={"contact": contact_info, "note": note},
     )
-    if req.applicant_student_id is not None:
-        body = (
-            f"你的申请《{req.title}》已转为线下办理。\n\n"
-            f"联系方式：{contact_info}"
-            + (f"\n\n说明：{note}" if note else "")
-        )
-        await create_system_in_app_notice_for_student(
-            db,
-            student_id=req.applicant_student_id,
-            user_id=req.applicant_user_id,
-            title=f"申请已转线下办理：{req.title}",
-            body_md=body,
-            summary=f"请按线下办理提示联系负责老师：{contact_info}",
-            category="WORKFLOW",
-            source_type="SYSTEM",
-            source_url=f"request:{req.id}",
-            operator_id=operator_id,
-        )
+    body = (
+        f"你的申请《{req.title}》已转为线下办理。\n\n"
+        f"联系方式：{contact_info}"
+        + (f"\n\n说明：{note}" if note else "")
+    )
+    await _notify_request_status_change(
+        db,
+        req=req,
+        title=f"申请已转线下办理：{req.title}",
+        body_md=body,
+        summary=f"请按线下办理提示联系负责老师：{contact_info}",
+        operator_id=operator_id,
+    )
     await db.commit()
     await db.refresh(req)
     return _request_to_detail(req)
@@ -1237,10 +1448,22 @@ async def reopen_request(
     target_status: str,
     operator_id: int,
     operator_roles: list[str],
+    operator_student_id: int | None = None,
 ) -> RequestDetail:
     req = await repo.get_request(db, request_id)
     if req is None:
         raise NotFoundError("申请不存在")
+    await _ensure_request_visible_to_viewer(
+        db,
+        req=req,
+        viewer_user_id=operator_id,
+        viewer_student_id=operator_student_id,
+        viewer_roles=operator_roles,
+        allow_applicant_self=False,
+        action="REOPEN_DENIED",
+        message="无权重开该申请",
+        code=40304,
+    )
     if not _approver_has_role(req.type_ref, operator_roles):
         raise BizError("无权重开该类型申请", code=40304, http_status=403)
 
@@ -1283,12 +1506,27 @@ async def reopen_request(
 
 
 async def claim_in_review(
-    db: AsyncSession, request_id: int, operator_id: int, operator_roles: list[str]
+    db: AsyncSession,
+    request_id: int,
+    operator_id: int,
+    operator_roles: list[str],
+    operator_student_id: int | None = None,
 ) -> RequestDetail:
     """把 SUBMITTED → IN_REVIEW，表示某审批人已认领。"""
     req = await repo.get_request(db, request_id)
     if req is None:
         raise NotFoundError("申请不存在")
+    await _ensure_request_visible_to_viewer(
+        db,
+        req=req,
+        viewer_user_id=operator_id,
+        viewer_student_id=operator_student_id,
+        viewer_roles=operator_roles,
+        allow_applicant_self=False,
+        action="CLAIM_DENIED",
+        message="无权认领该申请",
+        code=40304,
+    )
     if not _approver_has_role(req.type_ref, operator_roles):
         raise BizError("无权认领该申请", code=40304, http_status=403)
     result = ApprovalStateMachine.transition(req.status, "CLAIM")

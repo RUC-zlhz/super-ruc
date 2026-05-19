@@ -20,13 +20,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.models import AuditLog
 from app.auth.models import Student, User, UserRole
-from app.core.security import create_token
 from app.core import storage
+from app.core.security import create_token
 from app.workflow import pdf_generator
+from app.workflow.models import RequestType
 
 
 async def _login_as_student(
-    client: AsyncClient, db: AsyncSession, *, student_no: str, wx_code: str
+    client: AsyncClient,
+    db: AsyncSession,
+    *,
+    student_no: str,
+    wx_code: str,
+    class_code: str = "CS2201",
 ) -> str:
     """创建学生 + 走 mock wx-login，返回 access_token。"""
     db.add(
@@ -35,7 +41,7 @@ async def _login_as_student(
             full_name=f"req-{student_no}",
             grade_code="2022",
             major_code="CS",
-            class_code="CS2201",
+            class_code=class_code,
         )
     )
     await db.commit()
@@ -70,11 +76,12 @@ async def _headers_for_role(
     *,
     role_code: str,
     work_no: str,
+    scope_code: str | None = None,
 ) -> dict[str, str]:
     user = User(work_no=work_no, display_name=f"req-{role_code}", is_active=True)
     db.add(user)
     await db.flush()
-    db.add(UserRole(user_id=user.id, role_code=role_code))
+    db.add(UserRole(user_id=user.id, role_code=role_code, scope_code=scope_code))
     await db.commit()
     token = create_token(str(user.id), "access", extra_claims={"roles": [role_code]})
     return {"Authorization": f"Bearer {token}"}
@@ -657,6 +664,75 @@ async def test_collaborator_role_can_view_request_workbench_and_detail(
     token = await _login_as_student(
         client, db, student_no="R700001", wx_code="wx_r700001"
     )
+    other_token = await _login_as_student(
+        client,
+        db,
+        student_no="R700002",
+        wx_code="wx_r700002",
+        class_code="CS2202",
+    )
+    stu_headers = {"Authorization": f"Bearer {token}"}
+    other_headers = {"Authorization": f"Bearer {other_token}"}
+
+    async def create_leave_request(headers: dict[str, str], title: str) -> int:
+        create = await client.post(
+            "/api/v1/requests",
+            headers=headers,
+            json={
+                "type_code": "LEAVE_PERSONAL",
+                "title": title,
+                "form_data": {
+                    "reason": "活动请假",
+                    "start_date": "2026-05-18",
+                    "end_date": "2026-05-18",
+                },
+                "summary": "用于权限回归",
+            },
+        )
+        assert create.status_code == 200, create.text
+        request_id = create.json()["data"]["id"]
+        submit = await client.post(
+            f"/api/v1/requests/{request_id}/submit",
+            headers=headers,
+        )
+        assert submit.status_code == 200, submit.text
+        return request_id
+
+    request_id = await create_leave_request(stu_headers, "班团骨干查看的请假单")
+    other_request_id = await create_leave_request(other_headers, "跨班不可见请假单")
+
+    cadre_headers = await _headers_for_role(
+        db,
+        role_code="YOUTH_LEAGUE_SECRETARY",
+        work_no="REQCADRE01",
+        scope_code="CS2201",
+    )
+    workbench = await client.get("/api/v1/admin/requests", headers=cadre_headers)
+    assert workbench.status_code == 200, workbench.text
+    items = workbench.json()["data"]["items"]
+    assert {item["id"] for item in items} == {request_id}
+
+    detail = await client.get(
+        f"/api/v1/requests/{request_id}",
+        headers=cadre_headers,
+    )
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["data"]["id"] == request_id
+
+    forbidden_detail = await client.get(
+        f"/api/v1/requests/{other_request_id}",
+        headers=cadre_headers,
+    )
+    assert forbidden_detail.status_code == 403, forbidden_detail.text
+
+
+async def test_collaborator_without_scope_cannot_see_request_workbench(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    token = await _login_as_student(
+        client, db, student_no="R710001", wx_code="wx_r710001"
+    )
     stu_headers = {"Authorization": f"Bearer {token}"}
     create = await client.post(
         "/api/v1/requests",
@@ -683,14 +759,80 @@ async def test_collaborator_role_can_view_request_workbench_and_detail(
     cadre_headers = await _headers_for_role(
         db,
         role_code="YOUTH_LEAGUE_SECRETARY",
-        work_no="REQCADRE01",
+        work_no="REQCADRE02",
     )
     workbench = await client.get("/api/v1/admin/requests", headers=cadre_headers)
     assert workbench.status_code == 200, workbench.text
+    assert workbench.json()["data"]["items"] == []
+
+    detail = await client.get(
+        f"/api/v1/requests/{request_id}",
+        headers=cadre_headers,
+    )
+    assert detail.status_code == 403, detail.text
+
+
+async def test_collaborator_admin_action_requires_scope_even_for_own_request(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    token = await _login_as_student(
+        client, db, student_no="R720001", wx_code="wx_r720001"
+    )
+    stu_headers = {"Authorization": f"Bearer {token}"}
+    create = await client.post(
+        "/api/v1/requests",
+        headers=stu_headers,
+        json={
+            "type_code": "LEAVE_PERSONAL",
+            "title": "本人申请不应绕过协同 scope",
+            "form_data": {
+                "reason": "活动请假",
+                "start_date": "2026-05-18",
+                "end_date": "2026-05-18",
+            },
+            "summary": "用于权限回归",
+        },
+    )
+    assert create.status_code == 200, create.text
+    request_id = create.json()["data"]["id"]
+    submit = await client.post(
+        f"/api/v1/requests/{request_id}/submit",
+        headers=stu_headers,
+    )
+    assert submit.status_code == 200, submit.text
+
+    student = (
+        await db.execute(select(Student).where(Student.student_no == "R720001"))
+    ).scalar_one()
+    user = (await db.execute(select(User).where(User.student_id == student.id))).scalar_one()
+    db.add(UserRole(user_id=user.id, role_code="YOUTH_LEAGUE_SECRETARY"))
+    request_type = (
+        await db.execute(select(RequestType).where(RequestType.code == "LEAVE_PERSONAL"))
+    ).scalar_one()
+    request_type.approver_roles = "YOUTH_LEAGUE_SECRETARY"
+    await db.commit()
+    cadre_headers = {
+        "Authorization": "Bearer "
+        + create_token(
+            str(user.id),
+            "access",
+            extra_claims={
+                "roles": ["YOUTH_LEAGUE_SECRETARY"],
+                "sid": student.id,
+                "ver": user.token_version,
+            },
+        )
+    }
 
     detail = await client.get(
         f"/api/v1/requests/{request_id}",
         headers=cadre_headers,
     )
     assert detail.status_code == 200, detail.text
-    assert detail.json()["data"]["id"] == request_id
+
+    claim = await client.post(
+        f"/api/v1/admin/requests/{request_id}/claim",
+        headers=cadre_headers,
+    )
+    assert claim.status_code == 403, claim.text

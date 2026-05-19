@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ============================================================
@@ -25,6 +25,14 @@ class WorkflowNodeIn(BaseModel):
     max_reminders: int | None = 1
     is_terminal: bool = False
     is_active: bool = True
+
+    @field_validator("reminder_channel")
+    @classmethod
+    def validate_reminder_channel(cls, value: str) -> str:
+        normalized = (value or "IN_APP").strip().upper()
+        if normalized != "IN_APP":
+            raise ValueError("流程提醒一期仅支持站内提醒 IN_APP")
+        return normalized
 
 
 class WorkflowNodeOut(BaseModel):
@@ -141,6 +149,14 @@ class NodeMarkStatusIn(BaseModel):
 class ReminderGenerateIn(BaseModel):
     as_of_date: date | None = None
     channel: str = "IN_APP"
+
+    @field_validator("channel")
+    @classmethod
+    def validate_channel(cls, value: str) -> str:
+        normalized = (value or "IN_APP").strip().upper()
+        if normalized != "IN_APP":
+            raise ValueError("流程提醒一期仅支持站内提醒 IN_APP")
+        return normalized
 
 
 class ReminderOut(BaseModel):

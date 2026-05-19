@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class TargetRule(BaseModel):
@@ -200,3 +200,36 @@ class StudentNoticeItem(BaseModel):
     published_at: datetime | None
     read_at: datetime | None
     delivery_id: int | None
+
+
+class WechatSubscribeTemplateOut(BaseModel):
+    scene: str
+    template_id: str
+
+
+class WechatSubscribeConfigOut(BaseModel):
+    enabled: bool
+    templates: list[WechatSubscribeTemplateOut] = []
+
+
+class WechatSubscribeResultIn(BaseModel):
+    template_id: str = Field(min_length=1, max_length=128)
+    status: str = Field(description="accept/reject/ban/filter")
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        normalized = (value or "").strip().lower()
+        if normalized not in {"accept", "reject", "ban", "filter"}:
+            raise ValueError("订阅授权结果仅支持 accept/reject/ban/filter")
+        return normalized
+
+
+class WechatSubscribeAuthorizationIn(BaseModel):
+    results: list[WechatSubscribeResultIn] = Field(min_length=1)
+
+
+class WechatSubscribeAuthorizationOut(BaseModel):
+    template_id: str
+    scene: str
+    status: str

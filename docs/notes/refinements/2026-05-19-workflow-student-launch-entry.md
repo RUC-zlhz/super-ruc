@@ -2,7 +2,7 @@
 
 - 创建日期：`2026-05-19`
 - 状态：`[x]`
-- 关联主计划：`S24.1`、`S24.2`、`S24.3`、`S24.4`
+- 关联主计划：`S31.1`、`S31.2`、`S31.3`、`S31.4`
 - 实施范围：`backend/app/workflow/*`、`backend/app/profile/service.py`、`web/src/views/workflow/PartyStageList.vue`、`web/src/api/workflow.ts`
 
 ## 目标
@@ -22,20 +22,20 @@
 
 ## 本轮方案
 
-- [x] `S24.1` 老师侧发起入口
+- [x] `S31.1` 老师侧发起入口
   - 在 `PartyStageList` 的“学生流程”页增加 `发起学生流程` 按钮。
   - 使用响应式 `a-modal` 承载发起动作，分成“模板选择 / 学生搜索 / 发起预览”三块，减少遮挡和拥挤。
 
-- [x] `S24.2` 候选学生检索
+- [x] `S31.2` 候选学生检索
   - 新增 `GET /api/v1/admin/workflow/students/search`。
   - 路由权限只开放给老师/管理员角色，不给班团骨干直接发起。
   - 检索实现复用画像模块的范围化学生搜索逻辑，保证查询结果受 scope 控制。
 
-- [x] `S24.3` 发起权限收口
+- [x] `S31.3` 发起权限收口
   - `POST /api/v1/admin/workflow/students` 改为老师/管理员角色才能调用。
   - 保持班团骨干仍可访问模板/提醒等已有协同入口，但不直接创建流程实例。
 
-- [x] `S24.4` 学生流程精准筛选
+- [x] `S31.4` 学生流程精准筛选
   - `GET /api/v1/admin/workflow/students` 增加 `student_no` 服务端筛选。
   - Web 发起成功后自动回填学号与模板筛选条件，直接看到刚创建的流程。
 

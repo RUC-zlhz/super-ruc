@@ -5,6 +5,7 @@ import html as html_escape
 import io
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +18,7 @@ from app.audit.policies import EXPORT_PROFILE_SNAPSHOT_DETAIL, student_policy_fi
 from app.audit.service import build_audit_detail, log_action
 from app.auth import repository as auth_repo
 from app.auth.models import Student
+from app.auth.scopes import StudentScopeSet, split_scope_code, student_in_scope
 from app.core.exceptions import BizError, NotFoundError, PermissionError
 from app.profile import repository as repo
 from app.profile.models import (
@@ -46,6 +48,7 @@ from app.profile.schemas import (
     ProfileStudentSelfView,
     ProfileSummary,
     StudentBasic,
+    StudentWechatBindingOut,
 )
 
 _GLOBAL_PROFILE_ROLES = {"SUPER_ADMIN", "COLLEGE_LEADER"}
@@ -64,11 +67,17 @@ _PROFILE_SOURCE_LABELS = {
 _FULL_VIEW_FIELD_KIND = "FIELD:"
 _FULL_VIEW_FACTS_KIND = "FACTS"
 _STUDENT_ACADEMIC_FIELDS = {
+    "student_no",
+    "full_name",
+    "gender",
     "grade_code",
     "major_code",
     "class_code",
+    "political_status",
+    "enrollment_year",
     "expected_graduation_year",
 }
+_STUDENT_CREATE_FIELDS = set(_STUDENT_ACADEMIC_FIELDS)
 
 
 @dataclass(slots=True)
@@ -231,13 +240,59 @@ def _build_student_basic(student: Student) -> StudentBasic:
 
 def _coerce_student_academic_value(field_name: str, value: str | int | None) -> str | int | None:
     if value in (None, ""):
+        if field_name == "student_no":
+            raise BizError("学号不能为空", code=40186)
+        if field_name == "full_name":
+            raise BizError("姓名不能为空", code=40186)
         return None
-    if field_name == "expected_graduation_year":
+    if field_name in {"enrollment_year", "expected_graduation_year"}:
         try:
             return int(value)
         except (TypeError, ValueError) as exc:
-            raise BizError("毕业年份必须是整数", code=40186) from exc
-    return str(value).strip() or None
+            raise BizError("年份必须是整数", code=40186) from exc
+    cleaned = str(value).strip()
+    if field_name == "student_no" and not cleaned:
+        raise BizError("学号不能为空", code=40186)
+    if field_name == "full_name" and not cleaned:
+        raise BizError("姓名不能为空", code=40186)
+    return cleaned or None
+
+
+def _mask_wechat_identifier(value: str | None) -> str | None:
+    if not value:
+        return None
+    if len(value) <= 8:
+        return f"{value[:2]}***{value[-2:]}" if len(value) > 4 else "***"
+    return f"{value[:6]}...{value[-4:]}"
+
+
+def _student_scope_candidate(student: Student, payload: dict[str, Any] | None = None) -> SimpleNamespace:
+    payload = payload or {}
+    return SimpleNamespace(
+        class_code=payload.get("class_code", student.class_code),
+        major_code=payload.get("major_code", student.major_code),
+        grade_code=payload.get("grade_code", student.grade_code),
+    )
+
+
+async def _build_wechat_binding_out(
+    db: AsyncSession, student: Student, user
+) -> StudentWechatBindingOut:
+    roles = []
+    if user is not None:
+        roles = [row.role_code for row in await auth_repo.list_user_roles(db, user.id)]
+    return StudentWechatBindingOut(
+        student_id=student.id,
+        student_no=student.student_no,
+        bound=user is not None,
+        user_id=user.id if user is not None else None,
+        display_name=user.display_name if user is not None else None,
+        openid_masked=_mask_wechat_identifier(user.openid) if user is not None else None,
+        unionid_masked=_mask_wechat_identifier(user.unionid) if user is not None else None,
+        is_active=user.is_active if user is not None else None,
+        last_login_at=user.last_login_at if user is not None else None,
+        roles=roles,
+    )
 
 
 def _build_fact_admin_view(
@@ -315,54 +370,46 @@ async def _load_profile_scope(
             "is_global": True,
             "class_codes": set(),
             "major_codes": set(),
+            "grade_codes": set(),
             "legacy_codes": set(),
         }
 
-    class_codes: set[str] = set()
-    major_codes: set[str] = set()
-    legacy_codes: set[str] = set()
+    parsed_scope = StudentScopeSet()
     for row in roles:
         if row.role_code not in _SCOPED_PROFILE_ROLES:
             continue
-        scope_code = (row.scope_code or "").strip()
-        if not scope_code:
+        parsed = split_scope_code(row.scope_code)
+        if parsed is None:
             continue
-        upper = scope_code.upper()
-        if upper.startswith("CLASS:"):
-            value = scope_code.split(":", 1)[1].strip()
-            if value:
-                class_codes.add(value)
-        elif upper.startswith("MAJOR:"):
-            value = scope_code.split(":", 1)[1].strip()
-            if value:
-                major_codes.add(value)
+        scope_type, value = parsed
+        if scope_type == "CLASS":
+            parsed_scope.class_codes.add(value)
+        elif scope_type == "MAJOR":
+            parsed_scope.major_codes.add(value)
+        elif scope_type == "GRADE":
+            parsed_scope.grade_codes.add(value)
         else:
-            legacy_codes.add(scope_code)
+            parsed_scope.legacy_codes.add(value)
     return {
         "is_global": False,
-        "class_codes": class_codes,
-        "major_codes": major_codes,
-        "legacy_codes": legacy_codes,
+        "class_codes": parsed_scope.class_codes,
+        "major_codes": parsed_scope.major_codes,
+        "grade_codes": parsed_scope.grade_codes,
+        "legacy_codes": parsed_scope.legacy_codes,
     }
 
 
 def _scope_is_empty(scope: dict[str, Any]) -> bool:
     return not scope["is_global"] and not (
-        scope["class_codes"] or scope["major_codes"] or scope["legacy_codes"]
+        scope["class_codes"]
+        or scope["major_codes"]
+        or scope["grade_codes"]
+        or scope["legacy_codes"]
     )
 
 
 def _student_in_scope(student: Student, scope: dict[str, Any]) -> bool:
-    if scope["is_global"]:
-        return True
-    class_code = student.class_code or ""
-    major_code = student.major_code or ""
-    return bool(
-        (class_code and class_code in scope["class_codes"])
-        or (major_code and major_code in scope["major_codes"])
-        or (class_code and class_code in scope["legacy_codes"])
-        or (major_code and major_code in scope["legacy_codes"])
-    )
+    return student_in_scope(student, scope)
 
 
 async def _log_profile_forbidden(
@@ -484,6 +531,7 @@ async def search_students_admin(
         class_code=class_code,
         class_scope_codes=scope["class_codes"],
         major_scope_codes=scope["major_codes"],
+        grade_scope_codes=scope["grade_codes"],
         legacy_scope_codes=scope["legacy_codes"],
         include_non_active=include_non_active,
         enrollment_status=enrollment_status,
@@ -511,6 +559,7 @@ async def search_students_admin(
             scope={
                 "class_codes": sorted(scope["class_codes"]),
                 "major_codes": sorted(scope["major_codes"]),
+                "grade_codes": sorted(scope["grade_codes"]),
                 "legacy_codes": sorted(scope["legacy_codes"]),
             },
             refs=[
@@ -831,6 +880,7 @@ async def list_corrections_admin(
         status=status,
         class_scope_codes=scope["class_codes"],
         major_scope_codes=scope["major_codes"],
+        grade_scope_codes=scope["grade_codes"],
         legacy_scope_codes=scope["legacy_codes"],
         page=page,
         size=size,
@@ -913,13 +963,37 @@ async def update_student_academic_info(
         viewer_role=operator_role,
         denied_action="UPDATE_ACADEMIC_INFO_DENIED",
     )
+    normalized_payload: dict[str, Any] = {}
     for field_name in _STUDENT_ACADEMIC_FIELDS:
         if field_name in payload:
-            setattr(
-                student,
-                field_name,
-                _coerce_student_academic_value(field_name, payload.get(field_name)),
+            normalized_payload[field_name] = _coerce_student_academic_value(
+                field_name, payload.get(field_name)
             )
+
+    if "student_no" in normalized_payload and normalized_payload["student_no"] != student.student_no:
+        existing = await auth_repo.get_student_by_no(db, normalized_payload["student_no"])
+        if existing is not None and existing.id != student.id:
+            raise BizError("学号已存在", code=40187, http_status=409)
+
+    scope = await _load_profile_scope(db, operator_id)
+    candidate = _student_scope_candidate(student, normalized_payload)
+    if not _student_in_scope(candidate, scope):
+        await _log_profile_forbidden(
+            db,
+            action="UPDATE_ACADEMIC_INFO_DENIED",
+            student_id=student.id,
+            actor_user_id=operator_id,
+            actor_role=operator_role,
+            detail={
+                "student_id": student.id,
+                "reason": "target_scope_out_of_actor_scope",
+                "fields": sorted(normalized_payload),
+            },
+        )
+        raise PermissionError("无权将学生调整到当前管理范围之外", code=40322)
+
+    for field_name, value in normalized_payload.items():
+        setattr(student, field_name, value)
     student.updated_at = datetime.now(UTC)
     await log_action(
         db,
@@ -934,6 +1008,158 @@ async def update_student_academic_info(
     await db.commit()
     await db.refresh(student)
     return student
+
+
+async def create_student_admin(
+    db: AsyncSession,
+    payload: dict[str, Any],
+    *,
+    operator_id: int,
+    operator_role: str | None,
+) -> Student:
+    data: dict[str, Any] = {}
+    for field_name in _STUDENT_CREATE_FIELDS:
+        if field_name in payload:
+            data[field_name] = _coerce_student_academic_value(field_name, payload.get(field_name))
+
+    if "student_no" not in data:
+        raise BizError("学号不能为空", code=40186)
+    if "full_name" not in data:
+        raise BizError("姓名不能为空", code=40186)
+    if await auth_repo.get_student_by_no(db, data["student_no"]) is not None:
+        raise BizError("学号已存在", code=40187, http_status=409)
+
+    student = Student(**data)
+    scope = await _ensure_profile_scope_available(db, viewer_user_id=operator_id)
+    if not _student_in_scope(student, scope):
+        await _log_profile_forbidden(
+            db,
+            action="CREATE_STUDENT_DENIED",
+            student_id=None,
+            actor_user_id=operator_id,
+            actor_role=operator_role,
+            detail={
+                "student_no": data["student_no"],
+                "reason": "target_scope_out_of_actor_scope",
+                "grade_code": data.get("grade_code"),
+                "major_code": data.get("major_code"),
+                "class_code": data.get("class_code"),
+            },
+        )
+        raise PermissionError("无权在该范围新增学生", code=40322)
+
+    db.add(student)
+    await db.flush()
+    await log_action(
+        db,
+        event_type="PROFILE",
+        entity_code="STUDENT",
+        action="CREATE_STUDENT",
+        entity_id=student.id,
+        actor_user_id=operator_id,
+        actor_role=operator_role,
+        detail={
+            "student_id": student.id,
+            "student_no": student.student_no,
+            "grade_code": student.grade_code,
+            "major_code": student.major_code,
+            "class_code": student.class_code,
+        },
+    )
+    await db.commit()
+    await db.refresh(student)
+    return student
+
+
+async def get_student_wechat_binding(
+    db: AsyncSession,
+    student_id: int,
+    *,
+    operator_id: int,
+    operator_role: str | None,
+) -> StudentWechatBindingOut:
+    student = await _ensure_student_access(
+        db,
+        student_id,
+        viewer_user_id=operator_id,
+        viewer_role=operator_role,
+        denied_action="READ_WECHAT_BINDING_DENIED",
+    )
+    user = await auth_repo.get_user_by_student_id(db, student.id)
+    result = await _build_wechat_binding_out(db, student, user)
+    await log_action(
+        db,
+        event_type="AUTH",
+        entity_code="WECHAT_BINDING",
+        action="READ_STUDENT_WECHAT_BINDING",
+        entity_id=student.id,
+        actor_user_id=operator_id,
+        actor_role=operator_role,
+        detail={"student_id": student.id, "bound": result.bound},
+    )
+    await db.commit()
+    return result
+
+
+async def unbind_student_wechat(
+    db: AsyncSession,
+    student_id: int,
+    *,
+    operator_id: int,
+    operator_role: str | None,
+) -> StudentWechatBindingOut:
+    student = await _ensure_student_access(
+        db,
+        student_id,
+        viewer_user_id=operator_id,
+        viewer_role=operator_role,
+        denied_action="UNBIND_WECHAT_DENIED",
+    )
+    user = await auth_repo.get_user_by_student_id(db, student.id)
+    if user is None:
+        await log_action(
+            db,
+            event_type="AUTH",
+            entity_code="WECHAT_BINDING",
+            action="UNBIND_STUDENT_WECHAT",
+            entity_id=student.id,
+            actor_user_id=operator_id,
+            actor_role=operator_role,
+            result_code="NOOP",
+            detail={"student_id": student.id, "reason": "not_bound"},
+        )
+        await db.commit()
+        return await _build_wechat_binding_out(db, student, None)
+
+    previous = {
+        "user_id": user.id,
+        "openid_masked": _mask_wechat_identifier(user.openid),
+        "unionid_masked": _mask_wechat_identifier(user.unionid),
+    }
+    role_rows = await auth_repo.list_user_roles(db, user.id)
+    has_non_student_role = any(row.role_code not in {"STUDENT", "GUEST"} for row in role_rows)
+    user.student_id = None
+    user.student = None
+    user.token_version += 1
+    await auth_repo.remove_user_role(db, user_id=user.id, role_code="STUDENT")
+    if not has_non_student_role:
+        await auth_repo.ensure_user_role(db, user_id=user.id, role_code="GUEST", granted_by=operator_id)
+    await log_action(
+        db,
+        event_type="AUTH",
+        entity_code="WECHAT_BINDING",
+        action="UNBIND_STUDENT_WECHAT",
+        entity_id=student.id,
+        actor_user_id=operator_id,
+        actor_role=operator_role,
+        detail={
+            "student_id": student.id,
+            "student_no": student.student_no,
+            "previous": previous,
+        },
+    )
+    await db.commit()
+    return await _build_wechat_binding_out(db, student, None)
 
 
 async def submit_fact(
@@ -1097,6 +1323,7 @@ async def list_full_view_requests_admin(
         status=status,
         class_scope_codes=scope["class_codes"],
         major_scope_codes=scope["major_codes"],
+        grade_scope_codes=scope["grade_codes"],
         legacy_scope_codes=scope["legacy_codes"],
         page=page,
         size=size,
@@ -1183,6 +1410,7 @@ async def list_pending_facts_admin(
         approval_statuses=[PROFILE_APPROVAL_PENDING],
         class_scope_codes=scope["class_codes"],
         major_scope_codes=scope["major_codes"],
+        grade_scope_codes=scope["grade_codes"],
         legacy_scope_codes=scope["legacy_codes"],
         page=page,
         size=size,

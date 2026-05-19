@@ -64,7 +64,13 @@ export const CURRICULUM_ADMIN_ROLES: RoleCode[] = [
   "HEAD_TEACHER",
 ];
 
-export const SYSTEM_USER_ROLES: RoleCode[] = [...CURRICULUM_ADMIN_ROLES];
+export const ADMIN_USER_IMPORT_ROLES: RoleCode[] = [
+  ...CURRICULUM_ADMIN_ROLES,
+  "YOUTH_LEAGUE_TEACHER",
+  "PARTY_BUILD_TEACHER",
+];
+
+export const SYSTEM_USER_ROLES: RoleCode[] = [...ADMIN_USER_IMPORT_ROLES];
 
 export const AUDIT_VIEWER_ROLES: RoleCode[] = ["SUPER_ADMIN", "COLLEGE_LEADER"];
 

@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     WECHAT_APPID: str = ""
     WECHAT_SECRET: str = ""
     WECHAT_MOCK_ENABLED: bool = True
+    WECHAT_SUBSCRIBE_ENABLED: bool = False
+    WECHAT_SUBSCRIBE_REMINDER_TEMPLATE_ID: str = ""
+    WECHAT_SUBSCRIBE_REQUEST_TEMPLATE_ID: str = ""
 
     AI_QA_ENABLED: bool = False
     ANTHROPIC_API_KEY: str = ""
@@ -151,8 +154,16 @@ class Settings(BaseSettings):
             errors.append("WORKFLOW_REMINDER_INTERVAL_MINUTES 必须大于 0")
         if self.WORKFLOW_REMINDER_LOCK_TTL_SECONDS <= 0:
             errors.append("WORKFLOW_REMINDER_LOCK_TTL_SECONDS 必须大于 0")
-        if self.WORKFLOW_REMINDER_CHANNEL not in {"IN_APP", "EMAIL", "SMS"}:
-            errors.append("WORKFLOW_REMINDER_CHANNEL 仅支持 IN_APP / EMAIL / SMS")
+        if self.WORKFLOW_REMINDER_CHANNEL != "IN_APP":
+            errors.append("WORKFLOW_REMINDER_CHANNEL 一期仅支持 IN_APP")
+        if self.WECHAT_SUBSCRIBE_ENABLED:
+            if not self.WECHAT_APPID or not self.WECHAT_SECRET:
+                errors.append("WECHAT_SUBSCRIBE_ENABLED=True 时必须配置 WECHAT_APPID / WECHAT_SECRET")
+            if not (
+                self.WECHAT_SUBSCRIBE_REMINDER_TEMPLATE_ID
+                or self.WECHAT_SUBSCRIBE_REQUEST_TEMPLATE_ID
+            ):
+                errors.append("WECHAT_SUBSCRIBE_ENABLED=True 时至少配置一个订阅消息模板 ID")
 
         if errors:
             raise ValueError(

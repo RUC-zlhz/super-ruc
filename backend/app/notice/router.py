@@ -18,6 +18,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
+from app.auth.models import User
 from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES
 from app.core.dependencies import CurrentUserDep, DBDep, require_role
 from app.core.exceptions import BizError, NotFoundError
@@ -39,6 +40,9 @@ from app.notice.schemas import (
     StudentNoticeItem,
     TargetPreviewRequest,
     TargetPreviewResult,
+    WechatSubscribeAuthorizationIn,
+    WechatSubscribeAuthorizationOut,
+    WechatSubscribeConfigOut,
 )
 
 _NOTICE_EDITOR_ROLES = (
@@ -84,6 +88,37 @@ async def mark_read(
         raise BizError("仅学生可标记已读", code=40305, http_status=403)
     await service.mark_read(db, delivery_id, user.student_id)
     return ok({"delivery_id": delivery_id, "status": "READ"})
+
+
+@router.get(
+    "/subscribe-config",
+    response_model=ApiResponse[WechatSubscribeConfigOut],
+)
+async def get_subscribe_config(
+    _db: DBDep,
+    _user: CurrentUserDep,
+) -> ApiResponse[WechatSubscribeConfigOut]:
+    return ok(service.get_wechat_subscribe_config())
+
+
+@router.post(
+    "/subscribe-authorizations",
+    response_model=ApiResponse[list[WechatSubscribeAuthorizationOut]],
+)
+async def save_subscribe_authorizations(
+    payload: WechatSubscribeAuthorizationIn,
+    db: DBDep,
+    user: CurrentUserDep,
+) -> ApiResponse[list[WechatSubscribeAuthorizationOut]]:
+    user_row = await db.get(User, user.user_id)
+    if user_row is None:
+        raise BizError("当前账号不存在", code=40305, http_status=403)
+    saved = await service.save_wechat_subscribe_authorizations(
+        db,
+        user=user_row,
+        results=[(item.template_id, item.status) for item in payload.results],
+    )
+    return ok(saved)
 
 
 @router.get("/{notice_id}", response_model=ApiResponse[NoticeOut])

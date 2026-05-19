@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import smtplib
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from email.mime.text import MIMEText
 from html.parser import HTMLParser
 from typing import Any
@@ -30,6 +30,7 @@ from app.notice.models import (
     CHANNEL_EMAIL,
     CHANNEL_IN_APP,
     CHANNEL_SMS,
+    CHANNEL_WECHAT_SUBSCRIBE,
     DELIVERY_ATTEMPT_STATUS_FAILED,
     DELIVERY_ATTEMPT_STATUS_SENT,
     DELIVERY_ATTEMPT_STATUS_SKIPPED,
@@ -44,6 +45,9 @@ from app.notice.models import (
     NOTICE_STATUS_ARCHIVED,
     NOTICE_STATUS_DRAFT,
     NOTICE_STATUS_PUBLISHED,
+    WECHAT_SUBSCRIBE_SCENE_REQUEST_STATUS,
+    WECHAT_SUBSCRIBE_SCENE_WORKFLOW_REMINDER,
+    WECHAT_SUBSCRIBE_STATUS_ACCEPT,
     Notice,
     NoticeDelivery,
     NoticeDeliveryBatch,
@@ -62,9 +66,19 @@ from app.notice.schemas import (
     StudentNoticeItem,
     TargetPreviewResult,
     TargetRule,
+    WechatSubscribeAuthorizationOut,
+    WechatSubscribeConfigOut,
+    WechatSubscribeTemplateOut,
 )
 
 logger = logging.getLogger(__name__)
+
+WX_ACCESS_TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/token"  # noqa: S105 - official API path.
+WX_SUBSCRIBE_SEND_URL = "https://api.weixin.qq.com/cgi-bin/message/subscribe/send"
+WECHAT_SUBSCRIBE_PROVIDER = "wechat_subscribe"
+
+_wechat_access_token: str | None = None
+_wechat_access_token_expires_at: datetime | None = None
 
 
 def _channels_to_str(items: list[str]) -> str:
@@ -75,6 +89,74 @@ def _str_to_channels(s: str | None) -> list[str]:
     if not s:
         return []
     return [c.strip().upper() for c in s.split(",") if c.strip()]
+
+
+def _wechat_subscribe_templates() -> list[WechatSubscribeTemplateOut]:
+    if not settings.WECHAT_SUBSCRIBE_ENABLED:
+        return []
+    templates: list[WechatSubscribeTemplateOut] = []
+    if settings.WECHAT_SUBSCRIBE_REMINDER_TEMPLATE_ID:
+        templates.append(
+            WechatSubscribeTemplateOut(
+                scene=WECHAT_SUBSCRIBE_SCENE_WORKFLOW_REMINDER,
+                template_id=settings.WECHAT_SUBSCRIBE_REMINDER_TEMPLATE_ID,
+            )
+        )
+    if settings.WECHAT_SUBSCRIBE_REQUEST_TEMPLATE_ID:
+        templates.append(
+            WechatSubscribeTemplateOut(
+                scene=WECHAT_SUBSCRIBE_SCENE_REQUEST_STATUS,
+                template_id=settings.WECHAT_SUBSCRIBE_REQUEST_TEMPLATE_ID,
+            )
+        )
+    return templates
+
+
+def _wechat_scene_for_template(template_id: str) -> str | None:
+    for template in _wechat_subscribe_templates():
+        if template.template_id == template_id:
+            return template.scene
+    return None
+
+
+def get_wechat_subscribe_config() -> WechatSubscribeConfigOut:
+    templates = _wechat_subscribe_templates()
+    return WechatSubscribeConfigOut(enabled=bool(templates), templates=templates)
+
+
+async def save_wechat_subscribe_authorizations(
+    db: AsyncSession,
+    *,
+    user: User,
+    results: list[tuple[str, str]],
+) -> list[WechatSubscribeAuthorizationOut]:
+    if not settings.WECHAT_SUBSCRIBE_ENABLED:
+        return []
+    if not user.openid:
+        raise BizError("当前账号未绑定微信 openid，无法保存订阅授权", code=40085)
+    saved: list[WechatSubscribeAuthorizationOut] = []
+    for template_id, status in results:
+        scene = _wechat_scene_for_template(template_id)
+        if scene is None:
+            continue
+        row = await repo.upsert_wechat_subscribe_authorization(
+            db,
+            user_id=user.id,
+            student_id=user.student_id,
+            openid=user.openid,
+            template_id=template_id,
+            scene=scene,
+            status=status,
+        )
+        saved.append(
+            WechatSubscribeAuthorizationOut(
+                template_id=row.template_id,
+                scene=row.scene,
+                status=row.status,
+            )
+        )
+    await db.commit()
+    return saved
 
 
 def notice_to_out(notice: Notice) -> NoticeOut:
@@ -640,6 +722,188 @@ async def create_system_in_app_notice_for_student(
         channel=CHANNEL_IN_APP,
         status=DELIVERY_STATUS_SENT,
         sent_at=now,
+    )
+    return delivery
+
+
+async def _get_wechat_access_token() -> str:
+    global _wechat_access_token, _wechat_access_token_expires_at
+    now = datetime.now(UTC)
+    if (
+        _wechat_access_token
+        and _wechat_access_token_expires_at
+        and _wechat_access_token_expires_at > now
+    ):
+        return _wechat_access_token
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            WX_ACCESS_TOKEN_URL,
+            params={
+                "grant_type": "client_credential",
+                "appid": settings.WECHAT_APPID,
+                "secret": settings.WECHAT_SECRET,
+            },
+        )
+    resp.raise_for_status()
+    payload = resp.json()
+    errcode = payload.get("errcode")
+    if errcode:
+        raise BizError(
+            f"微信 access_token 获取失败：{payload.get('errmsg') or errcode}",
+            code=50202,
+            http_status=502,
+        )
+    token = payload.get("access_token")
+    if not token:
+        raise BizError("微信 access_token 响应缺少 token", code=50202, http_status=502)
+    expires_in = int(payload.get("expires_in") or 7200)
+    _wechat_access_token = token
+    _wechat_access_token_expires_at = now + timedelta(seconds=max(expires_in - 300, 60))
+    return token
+
+
+def _truncate_wechat_value(value: str | None, limit: int = 20) -> str:
+    text = (value or "").strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1] + "…"
+
+
+def _build_wechat_subscribe_payload(
+    *,
+    openid: str,
+    template_id: str,
+    title: str,
+    summary: str | None,
+    scene: str,
+    page: str | None,
+) -> dict[str, Any]:
+    data = {
+        "thing1": {"value": _truncate_wechat_value(title, 20)},
+        "thing2": {"value": _truncate_wechat_value(summary or title, 20)},
+        "time3": {"value": datetime.now(UTC).strftime("%Y-%m-%d %H:%M")},
+        "phrase4": {"value": "待查看" if scene == WECHAT_SUBSCRIBE_SCENE_WORKFLOW_REMINDER else "状态更新"},
+    }
+    payload: dict[str, Any] = {
+        "touser": openid,
+        "template_id": template_id,
+        "data": data,
+    }
+    if page:
+        payload["page"] = page
+    return payload
+
+
+async def _send_wechat_subscribe_message(payload: dict[str, Any]) -> dict[str, Any]:
+    access_token = await _get_wechat_access_token()
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            WX_SUBSCRIBE_SEND_URL,
+            params={"access_token": access_token},
+            json=payload,
+        )
+    resp.raise_for_status()
+    return resp.json()
+
+
+async def send_wechat_subscribe_for_delivery(
+    db: AsyncSession,
+    *,
+    in_app_delivery: NoticeDelivery,
+    scene: str,
+    title: str,
+    summary: str | None,
+    page: str | None = None,
+) -> NoticeDelivery | None:
+    """Send a WeChat Mini Program subscribe message without affecting IN_APP delivery."""
+    template_id = (
+        settings.WECHAT_SUBSCRIBE_REMINDER_TEMPLATE_ID
+        if scene == WECHAT_SUBSCRIBE_SCENE_WORKFLOW_REMINDER
+        else settings.WECHAT_SUBSCRIBE_REQUEST_TEMPLATE_ID
+    )
+    if not settings.WECHAT_SUBSCRIBE_ENABLED or not template_id:
+        return None
+    if in_app_delivery.user_id is None:
+        return None
+    user = await db.get(User, in_app_delivery.user_id)
+    if user is None or not user.openid:
+        return None
+    auth = await repo.get_wechat_subscribe_authorization(
+        db,
+        user_id=user.id,
+        template_id=template_id,
+    )
+    now = datetime.now(UTC)
+    sent_ok = False
+    status = DELIVERY_STATUS_SKIPPED
+    err_code: str | None = None
+    err_msg: str | None = None
+    provider_msg_id: str | None = None
+    if auth is None or auth.status != WECHAT_SUBSCRIBE_STATUS_ACCEPT:
+        err_code = "WECHAT_SUBSCRIBE_NOT_AUTHORIZED"
+    else:
+        try:
+            result = await _send_wechat_subscribe_message(
+                _build_wechat_subscribe_payload(
+                    openid=user.openid,
+                    template_id=template_id,
+                    title=title,
+                    summary=summary,
+                    scene=scene,
+                    page=page,
+                )
+            )
+            errcode = int(result.get("errcode") or 0)
+            if errcode == 0:
+                sent_ok = True
+                status = DELIVERY_STATUS_SENT
+                provider_msg_id = str(result.get("msgid") or "") or None
+            else:
+                status = DELIVERY_STATUS_FAILED
+                err_code = str(errcode)
+                err_msg = str(result.get("errmsg") or "微信订阅消息发送失败")[:512]
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "wechat subscribe send failed | notice_id=%s user_id=%s error=%s",
+                in_app_delivery.notice_id,
+                user.id,
+                exc,
+            )
+            status = DELIVERY_STATUS_FAILED
+            err_code = "WECHAT_SUBSCRIBE_SEND_FAILED"
+            err_msg = str(exc)[:512]
+
+    delivery = await repo.add_delivery(
+        db,
+        batch_id=in_app_delivery.batch_id,
+        notice_id=in_app_delivery.notice_id,
+        student_id=in_app_delivery.student_id,
+        user_id=user.id,
+        channel=CHANNEL_WECHAT_SUBSCRIBE,
+        status=status,
+        target_handle=user.openid,
+        sent_at=now if sent_ok else None,
+        error_code=err_code,
+        error_message=err_msg,
+    )
+    await repo.add_delivery_attempt(
+        db,
+        delivery_id=delivery.id,
+        provider=WECHAT_SUBSCRIBE_PROVIDER,
+        attempt_no=1,
+        status=(
+            DELIVERY_ATTEMPT_STATUS_SENT
+            if sent_ok
+            else (
+                DELIVERY_ATTEMPT_STATUS_SKIPPED
+                if status == DELIVERY_STATUS_SKIPPED
+                else DELIVERY_ATTEMPT_STATUS_FAILED
+            )
+        ),
+        target_handle=user.openid,
+        provider_message_id=provider_msg_id,
+        error_code=err_code,
+        error_message=err_msg,
     )
     return delivery
 

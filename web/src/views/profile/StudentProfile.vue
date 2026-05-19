@@ -3,6 +3,10 @@
     <a-page-header title="学生画像" sub-title="学生成长事实、学籍状态与治理留痕" @back="$router.back()">
       <template #extra>
         <a-space>
+          <a-button :disabled="isReadonlyProfile" @click="openAcademicModal">
+            <template #icon><EditOutlined /></template>
+            编辑学籍信息
+          </a-button>
           <a-button :loading="snapshotLoading === 'pdf'" @click="onDownloadSnapshot('pdf')">
             <template #icon><FilePdfOutlined /></template>
             导出 PDF 快照
@@ -255,6 +259,54 @@
       </template>
     </a-spin>
 
+    <a-modal
+      v-model:open="academicModalOpen"
+      title="编辑学籍信息"
+      :confirm-loading="academicSubmitting"
+      @ok="onSubmitAcademicInfo"
+      @cancel="closeAcademicModal"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="学号" required>
+          <a-input v-model:value="academicForm.student_no" />
+        </a-form-item>
+        <a-form-item label="姓名" required>
+          <a-input v-model:value="academicForm.full_name" />
+        </a-form-item>
+        <a-form-item label="性别">
+          <a-input v-model:value="academicForm.gender" placeholder="男 / 女" />
+        </a-form-item>
+        <a-form-item label="年级">
+          <a-input v-model:value="academicForm.grade_code" placeholder="如 2024" />
+        </a-form-item>
+        <a-form-item label="专业">
+          <a-input v-model:value="academicForm.major_code" placeholder="专业代码或名称" />
+        </a-form-item>
+        <a-form-item label="班级">
+          <a-input v-model:value="academicForm.class_code" placeholder="如 CS2401" />
+        </a-form-item>
+        <a-form-item label="政治面貌">
+          <a-input v-model:value="academicForm.political_status" />
+        </a-form-item>
+        <a-form-item label="入学年份">
+          <a-input-number
+            v-model:value="academicForm.enrollment_year"
+            :min="2000"
+            :max="2100"
+            style="width: 100%"
+          />
+        </a-form-item>
+        <a-form-item label="预计毕业年份">
+          <a-input-number
+            v-model:value="academicForm.expected_graduation_year"
+            :min="2000"
+            :max="2100"
+            style="width: 100%"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
     <a-drawer
       :open="showFactDrawer"
       title="新增成长事实"
@@ -365,6 +417,7 @@ import { message } from 'ant-design-vue'
 import {
   FilePdfOutlined,
   FileExcelOutlined,
+  EditOutlined,
   PlusOutlined,
   DeleteOutlined,
   SaveOutlined,
@@ -389,6 +442,7 @@ import {
   adminListCorrections,
   adminListPendingFacts,
   adminSubmitFullViewRequest,
+  adminUpdateStudentAcademicInfo,
   downloadStudentProfileSnapshot,
   type ProfileFullViewRequestOut,
   type ProfileFactOut,
@@ -405,6 +459,29 @@ const pendingFacts = ref<ProfileFactOut[]>([])
 const pendingFactsSupported = ref(true)
 const fullViewRequests = ref<ProfileFullViewRequestOut[]>([])
 const snapshotLoading = ref<'pdf' | 'xlsx' | ''>('')
+const academicModalOpen = ref(false)
+const academicSubmitting = ref(false)
+const academicForm = reactive<{
+  student_no: string
+  full_name: string
+  gender: string
+  grade_code: string
+  major_code: string
+  class_code: string
+  political_status: string
+  enrollment_year: number | undefined
+  expected_graduation_year: number | undefined
+}>({
+  student_no: '',
+  full_name: '',
+  gender: '',
+  grade_code: '',
+  major_code: '',
+  class_code: '',
+  political_status: '',
+  enrollment_year: undefined,
+  expected_graduation_year: undefined,
+})
 
 const ACTIVE_ENROLLMENT_STATUSES = new Set(['ACTIVE', 'IN_SCHOOL'])
 
@@ -534,10 +611,59 @@ function operatorLabel(name?: string | null, id?: number | null) {
   return '-'
 }
 
+function normalizeOptionalText(value: string) {
+  const text = value.trim()
+  return text || null
+}
+
 const isReadonlyProfile = computed(() => {
   const status = profile.value?.student.enrollment_status
   return !status || !ACTIVE_ENROLLMENT_STATUSES.has(status)
 })
+
+function openAcademicModal() {
+  if (!profile.value) return
+  if (isReadonlyProfile.value) {
+    message.warning('非在读学生画像仅支持查看，不能编辑学籍信息')
+    return
+  }
+  academicForm.student_no = profile.value.student.student_no || ''
+  academicForm.full_name = profile.value.student.full_name || ''
+  academicForm.gender = profile.value.student.gender || ''
+  academicForm.grade_code = profile.value.student.grade_code || ''
+  academicForm.major_code = profile.value.student.major_code || ''
+  academicForm.class_code = profile.value.student.class_code || ''
+  academicForm.political_status = profile.value.student.political_status || ''
+  academicForm.enrollment_year = profile.value.student.enrollment_year ?? undefined
+  academicForm.expected_graduation_year = profile.value.student.expected_graduation_year ?? undefined
+  academicModalOpen.value = true
+}
+
+function closeAcademicModal() {
+  academicModalOpen.value = false
+}
+
+async function onSubmitAcademicInfo() {
+  academicSubmitting.value = true
+  try {
+    await adminUpdateStudentAcademicInfo(studentId, {
+      student_no: normalizeOptionalText(academicForm.student_no),
+      full_name: normalizeOptionalText(academicForm.full_name),
+      gender: normalizeOptionalText(academicForm.gender),
+      grade_code: normalizeOptionalText(academicForm.grade_code),
+      major_code: normalizeOptionalText(academicForm.major_code),
+      class_code: normalizeOptionalText(academicForm.class_code),
+      political_status: normalizeOptionalText(academicForm.political_status),
+      enrollment_year: academicForm.enrollment_year ?? null,
+      expected_graduation_year: academicForm.expected_graduation_year ?? null,
+    })
+    message.success('学籍信息已更新')
+    closeAcademicModal()
+    await loadProfile()
+  } finally {
+    academicSubmitting.value = false
+  }
+}
 
 const readonlyMessage = computed(() => {
   if (!profile.value || !isReadonlyProfile.value) return ''
@@ -838,7 +964,7 @@ async function onDownloadSnapshot(format: 'pdf' | 'xlsx') {
   try {
     const ok = await downloadStudentProfileSnapshot(studentId, format)
     if (!ok) {
-      message.info('画像快照导出接口尚未上线，后端合并后可直接使用')
+      message.error('画像快照下载失败，请确认权限或稍后重试')
       return
     }
     message.success(`已开始下载 ${format.toUpperCase()} 快照`)

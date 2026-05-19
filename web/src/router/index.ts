@@ -16,17 +16,24 @@ import {
 
 const MainLayout = () => import("@/layouts/MainLayout.vue");
 
+const enableRequirementsPreview =
+  import.meta.env.DEV || import.meta.env.VITE_ENABLE_REQUIREMENT_PREVIEW === "true";
+
 const routes: RouteRecordRaw[] = [
   {
     path: "/login",
     component: () => import("@/views/Login.vue"),
     meta: { public: true, title: "登录" },
   },
-  {
-    path: "/preview/requirements",
-    component: () => import("@/views/preview/RequirementsPreview.vue"),
-    meta: { public: true, title: "鍓嶇棰勮" },
-  },
+  ...(enableRequirementsPreview
+    ? [
+        {
+          path: "/preview/requirements",
+          component: () => import("@/views/preview/RequirementsPreview.vue"),
+          meta: { public: true, title: "前端预览" },
+        },
+      ]
+    : []),
   {
     path: "/",
     component: MainLayout,

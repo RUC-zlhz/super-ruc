@@ -31,6 +31,21 @@ export interface NoticeDetail {
   tags: string[]
 }
 
+export interface WechatSubscribeTemplate {
+  scene: string
+  template_id: string
+}
+
+export interface WechatSubscribeConfig {
+  enabled: boolean
+  templates: WechatSubscribeTemplate[]
+}
+
+export interface WechatSubscribeAuthorizationResult {
+  template_id: string
+  status: 'accept' | 'reject' | 'ban' | 'filter'
+}
+
 export function getMyNotices(params?: { page?: number; size?: number }) {
   return get<{ items: StudentNoticeItem[]; meta: any }>('/notices/inbox', params)
 }
@@ -41,4 +56,12 @@ export function markRead(deliveryId: number) {
 
 export function getNoticeDetail(noticeId: number) {
   return get<NoticeDetail>(`/notices/${noticeId}`)
+}
+
+export function getSubscribeConfig() {
+  return get<WechatSubscribeConfig>('/notices/subscribe-config')
+}
+
+export function saveSubscribeAuthorizations(results: WechatSubscribeAuthorizationResult[]) {
+  return post<WechatSubscribeAuthorizationResult[]>('/notices/subscribe-authorizations', { results })
 }

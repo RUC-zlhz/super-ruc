@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S23` 已闭合；后续仅在新确认范围内继续增量推进
+- 当前目标：`S1 ~ S31` 已闭合；后续新阶段继续按本文件登记
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -227,6 +227,149 @@
 
 - `S5` 已闭合：追踪矩阵、验收走查、`v1.6` 正式交付件与最终一致性检查已全部落盘，并与当前 `S1 ~ S4` 代码与验证结果对齐。
 - 当前 `output/doc/` 中的 `v1.6`、`v1.6-emf`、`v1.6-emf-inkscape` 三组 `docx / pdf` 可作为正式交付基线；后续若继续迭代，只能在本结果基础上增量更新。
+
+### S25 通知渠道收口与微信订阅消息一期接入
+
+- [x] `S25.1` 新增微信订阅消息配置并保留 `WECHAT_SECRET` 服务器环境变量口径
+- [x] `S25.2` 党团流程提醒渠道收口为 `IN_APP`
+- [x] `S25.3` Web 手动提醒移除旧 `/run`、`/execute` 探测 fallback
+- [x] `S25.4` Miniapp 订阅授权入口与后端授权保存接口
+- [x] `S25.5` 后端微信订阅消息发送记录与失败隔离
+- [x] `S25.6` 过期“尚未上线/尚未部署”文案清理
+
+细化文件：`docs/notes/refinements/2026-05-18-s25-notification-channel-and-wechat-subscribe.md`
+
+证据：
+
+- 后端新增微信订阅授权表、学生侧订阅配置/授权接口、非阻塞发送 helper，并将工作流提醒保存与手动生成收口为 `IN_APP`。
+- Web 党团提醒工作台仅保留站内提醒，手动执行直接调用 `/admin/workflow/reminders/generate`；画像快照和荣誉导入旧占位文案已清理。
+- Miniapp 通知页仅在后端返回模板 ID 时展示订阅入口，并调用小程序订阅消息 API 后保存 `accept/reject/ban/filter` 结果。
+- 验证通过：后端 ruff、目标文件 `py_compile`、定向集成测试 `12 passed`，Web 类型检查与构建，Miniapp 类型检查与 `mp-weixin` 出包。
+
+### S26 后台账号批量创建功能
+
+- [x] `S26.1` 新增专用后台账号导入批次表和行表，新增 `users.must_change_password` 字段。
+- [x] `S26.2` 新增独立 `/api/v1/admin/users/*` 导入接口，不复用 `exchange/import_batches`。
+- [x] `S26.3` 固定导入模板列并拒绝 `password` 列，初始密码统一由系统生成。
+- [x] `S26.4` 落地 `SUPER_ADMIN / COLLEGE_LEADER / L3 / L4 / STUDENT` 的后台账号导入权限边界。
+- [x] `S26.5` 提交时新账号返回一次性明文初始密码，已有账号幂等补齐缺失角色/范围且不重置密码。
+- [x] `S26.6` 审计预检、提交和角色授予，且不记录明文初始密码。
+- [x] `S26.7` 将 `CLASS:/MAJOR:/GRADE:` 范围格式同步到申请和画像范围匹配逻辑。
+- [x] `S26.8` Web 用户管理页新增批量创建入口、预检/提交/历史批次/错误报告能力。
+
+细化文件：`docs/notes/refinements/2026-05-18-admin-user-bulk-import.md`
+
+证据：
+
+- 后端新增 `backend/app/admin_users/` 独立模块、迁移 `0017_admin_user_import.py`，并在 `auth` 中落地 `must_change_password` 持久字段。
+- Web 用户管理页新增“批量创建账号”tab，支持模板下载、上传预检、提交、一次性密码结果下载、历史批次和错误报告。
+- 验证通过：后端 ruff 与目标文件 `py_compile`；`test_admin_user_import_flow.py + test_auth_flow.py` 结果 `22 passed`；`test_request_flow.py + test_profile_flow.py` 结果 `22 passed`；`pnpm -C web build` 通过。
+
+### S27 开发阶段冷启动脚本
+
+- [x] `S27.1` 新增开发库 schema 重置脚本，明确拒绝 `APP_ENV=prod`。
+- [x] `S27.2` 新增一键启动脚本，设置并验证 repo-local `UV_CACHE_DIR=.uv-cache-local`。
+- [x] `S27.3` 一键脚本串联 Docker 基础设施、Alembic 迁移、基础 seed、默认学生 Excel 导入与默认培养方案导入。
+- [x] `S27.4` 重跑脚本时通过重建 schema 清空旧学生数据、微信 `openid/unionid` 和 `student_id` 绑定关系。
+- [x] `S27.5` 完成脚本语法与最小冷启动验证。
+
+细化文件：`docs/notes/refinements/2026-05-18-development-cold-start-script.md`
+
+证据：
+
+- PowerShell 解析校验与 `reset_dev_database.py` 的 `py_compile` 均通过。
+- 执行 `.\scripts\dev\start-dev.ps1 -NoLaunch -SkipDependencySync` 通过，完成 Docker 基础设施启动、schema 重置、Alembic 迁移、基础 seed、默认学生与默认培养方案导入。
+- 执行 `.\scripts\dev\start-dev.ps1 -NoLaunch -SkipDependencySync -SkipDocker` 通过，证明脚本可重复执行；重跑后导入 `students inserted=5`、`curriculum inserted=7`。
+- 数据复核结果为 `students=5`、`users=1`、`bound_users=0`、`openid_users=0`、`admin=admin`、`must_change=True`。
+
+当前结论：
+
+- `S27` 已完成；开发阶段可使用一键脚本从 Excel 冷启动学生数据并生成 `admin / admin123`，重复执行会清空旧微信绑定与业务数据。该入口只服务开发阶段，正式设计仍以数据库持久化学生、账号、绑定和业务数据为准。
+
+### S28 内网生产部署与持续交付底座
+
+- [x] `S28.1` 将 `10.10.0.13` 定位为内网生产首阶段服务器，并确认本阶段不处理公网域名、HTTPS、微信正式合法域名。
+- [x] `S28.2` 新增 Docker Compose 部署资产，编排 `PostgreSQL 15 / Redis / MinIO / backend / web`。
+- [x] `S28.3` 新增服务器初始化、部署、迁移种子、备份、恢复、回滚和 smoke 脚本。
+- [x] `S28.4` 新增内网生产部署 README 与指向 `http://10.10.0.13/api/v1` 的小程序内网出包脚本。
+- [x] `S28.5` 在 `10.10.0.13` 初始化 `git / Docker / Docker Compose` 并验证版本。
+- [x] `S28.6` 完成真实内网生产部署与 smoke；服务器 `.env` 就绪后已完成 Compose 启动、迁移种子和内网访问验证。
+
+细化文件：`docs/notes/refinements/2026-05-19-s28-intranet-production-deployment.md`
+
+证据：
+
+- 已新增 `deploy/intranet-prod/`，包含 Compose、Nginx、Web 多阶段 Dockerfile、`.env.example`、README、小程序出包脚本与运维脚本。
+- 生产运行口径固定为 `APP_ENV=prod`、`APP_DEBUG=false`、`WECHAT_MOCK_ENABLED=false`，真实密钥只允许写入服务器 `.env`。
+- `S27` 开发冷启动脚本明确不进入 S28 生产初始化链路；S28 仅执行 Alembic 迁移与 `scripts.seed_initial` 幂等基础种子。
+- 本地验证通过：Compose config、shell 语法检查、PowerShell 小程序脚本语法检查、`pnpm -C web build`、后端入口/配置 `py_compile`、内网 API 小程序出包。
+- 服务器验证：免密 sudo 已可用；服务器直接访问 `archive.ubuntu.com`、`security.ubuntu.com`、`download.docker.com`、清华镜像源、阿里镜像源均不可达，但已通过 SSH 反向 SOCKS 代理完成 `git / Docker / Docker Compose` 安装，当前版本为 `git 2.43.0`、`Docker 29.5.1`、`Docker Compose v5.1.3`；Docker daemon 已配置该代理并验证 `docker pull hello-world:latest` 成功。
+- 真实部署验证通过：服务器 `PostgreSQL 15 / Redis / MinIO / backend / web` 五个 Compose 服务均为 `healthy`；`migrate-and-seed.sh` 完成 Alembic 迁移与 `scripts.seed_initial` 幂等基础种子；`smoke.sh` 返回 `Smoke passed for http://127.0.0.1`；本机访问 `http://10.10.0.13/healthz` 与 `http://10.10.0.13/` 均返回 `200`。
+- 运维脚本验证：`backup-db.sh` 已生成 `/opt/super-ruc/backups/super-ruc-20260519-185432-d9060b4.dump`。
+
+当前结论：
+
+- `S28` 部署资产、本地验证、服务器基础设施初始化、真实服务部署与 smoke 均已完成；当前内网入口为 `http://10.10.0.13/`，健康检查为 `http://10.10.0.13/healthz`，API 前缀为 `http://10.10.0.13/api/v1`。后续拉取包/镜像仍需反向代理、固定代理或正式出网。
+
+### S29 生产默认数据导入与管理入口补强
+
+- [x] `S29.1` 复核生产库状态，确认默认学生与培养方案尚未导入。
+- [x] `S29.2` 为内网生产 Compose 增加只读 `docs` 挂载，让后端容器可读取受控默认数据源。
+- [x] `S29.3` 新增生产默认数据导入脚本，先备份数据库，再执行默认学生与默认培养方案导入。
+- [x] `S29.4` 在 `10.10.0.13` 执行默认数据导入并验证学生、培养方案与模块数量。
+- [x] `S29.5` 补 Web 管理入口：学生画像页新增学籍/主档信息编辑，用户管理页新增单个后台账号创建入口。
+- [x] `S29.6` 重建 Web 容器并通过 smoke。
+
+细化文件：`docs/notes/refinements/2026-05-19-s29-production-default-data-and-admin-management.md`
+
+证据：
+
+- 生产默认数据导入脚本 `seed-default-data.sh` 已先生成备份，再调用 `python -m scripts.seed_default_data`，并输出 `students inserted=5 updated=0 skipped=0; curriculum inserted=7 updated=0 skipped=0`。
+- 服务器复核结果为 `students=5`、`curriculum_plans=7`、`curriculum_modules=134`、`users=1`。
+- Web 已新增 `学生画像 -> 编辑学籍信息` 与 `用户管理 -> 新增单个账号` 入口；学生画像编辑覆盖姓名、性别、年级、专业、班级、政治面貌、入学年份与预计毕业年份等主档字段；`pnpm -C web build` 通过，服务器重建 `backend` / `web` 后 `smoke.sh` 与 `http://10.10.0.13/` / `healthz` 均正常，未登录探测 `PATCH /api/v1/admin/students/1/academic-info` 返回 `401` 而非 `404`。
+
+当前结论：
+
+- `S29` 已完成；生产新库的默认学生与培养方案已补齐，学生主档和后台账号管理入口也已在 Web 暴露。
+
+### S30 学生主档与微信绑定管理补强
+
+- [x] `S30.1` 后端新增学生主档创建接口，沿用画像范围权限。
+- [x] `S30.2` 后端扩展学生主档编辑接口，支持学号和主档字段修改，并校验唯一性与目标范围。
+- [x] `S30.3` 后端新增学生微信绑定查看与解绑接口，解绑后旧微信失去学生身份并失效 token。
+- [x] `S30.4` Web 学生管理页新增“新增学生”“主档”“微信”入口。
+- [x] `S30.5` 完成本地验证、生产重建与 smoke。
+
+细化文件：`docs/notes/refinements/2026-05-19-s30-student-master-and-wechat-binding-management.md`
+
+证据：
+
+- 后端新增 `POST /api/v1/admin/students`、`GET /api/v1/admin/students/{student_id}/wechat-binding`、`DELETE /api/v1/admin/students/{student_id}/wechat-binding`，并扩展 `PATCH /api/v1/admin/students/{student_id}/academic-info` 支持学号修改。
+- Web 学生管理页已新增“新增学生”“主档”“微信”入口；画像页“编辑学籍信息”同步支持学号维护。
+- 本地 `ruff`、`py_compile`、`pnpm -C web build` 通过；新增集成用例 `test_admin_creates_student_updates_master_data_and_unbinds_wechat` 通过。
+- 服务器已重建 `backend` / `web` 并通过 `smoke.sh`；生产未登录探测新增学生、微信绑定查看、微信解绑和主档修改接口均返回 `401` 而非 `404`。
+
+当前结论：
+
+- `S30` 已完成；教师/管理员后台可新增学生、修改学生主档，并查看/解绑学生微信登录绑定。
+
+### S31 党团流程发起入口补齐
+
+- [x] `S31.1` 为党团流程补齐老师侧“发起学生流程”入口，支持先搜学生、再选模板并发起实例。
+- [x] `S31.2` 将学生流程列表的学号筛选改为服务端生效，保证发起成功后能立即定位到目标学生流程。
+- [x] `S31.3` 收紧发起权限到老师/管理员角色，并为团委老师、党务老师复用范围化学生检索能力。
+- [x] `S31.4` 保持 Web 端弹窗与筛选栏排版稳定，避免在党团流程页出现按钮或表格遮挡。
+
+当前结论：
+
+- `S31` 已闭环完成：Web 端党团流程管理页新增“发起学生流程”按钮和响应式弹窗，老师可在受权范围内搜索学生、选择模板并直接发起流程；发起成功后学生端沿用现有小程序页面即可查看当前节点、时间线与进度。候选学生搜索也已补上显式反馈，能看到命中数量、关键词和单条命中自动选中，避免“点了搜索但看不出变化”。
+
+证据：
+
+- 细化方案：`docs/notes/refinements/2026-05-19-workflow-student-launch-entry.md`
+- Web 入口与布局：`web/src/views/workflow/PartyStageList.vue`、`web/src/api/workflow.ts`
+- 后端权限与检索：`backend/app/workflow/router.py`、`backend/app/workflow/service.py`、`backend/app/workflow/repository.py`、`backend/app/profile/service.py`
+- 回归样例：`backend/tests/integration/test_workflow_party_flow.py`
 
 ### S6 前端体验增量优化
 
@@ -672,23 +815,22 @@
 - 调度与配置：`backend/app/core/workflow_reminder_scheduler.py`、`backend/app/core/config.py`、`backend/app/main.py`
 - 回归样例：`backend/tests/integration/test_workflow_party_flow.py`、`backend/tests/integration/test_workflow_reminder_scheduler.py`
 
-### S24 党团流程发起入口补齐
+### S24 拉取后请求权限范围与公开预览门禁收口
 
-- [x] `S24.1` 为党团流程补齐老师侧“发起学生流程”入口，支持先搜学生、再选模板并发起实例。
-- [x] `S24.2` 将学生流程列表的学号筛选改为服务端生效，保证发起成功后能立即定位到目标学生流程。
-- [x] `S24.3` 收紧发起权限到老师/管理员角色，并为团委老师、党务老师复用范围化学生检索能力。
-- [x] `S24.4` 保持 Web 端弹窗与筛选栏排版稳定，避免在党团流程页出现按钮或表格遮挡。
+- [x] `S24.1` 将班团骨干等协同角色的申请列表、详情与处理动作按 `UserRole.scope_code` 收口到班级 / 专业 / 年级范围。
+- [x] `S24.2` 将 `/preview/requirements` 公开预览路由改为开发环境或显式开关启用，生产包默认不注册。
 
 当前结论：
 
-- `S24` 已闭环完成：Web 端党团流程管理页新增“发起学生流程”按钮和响应式弹窗，老师可在受权范围内搜索学生、选择模板并直接发起流程；发起成功后学生端沿用现有小程序页面即可查看当前节点、时间线与进度。候选学生搜索也已补上显式反馈，能看到命中数量、关键词和单条命中自动选中，避免“点了搜索但看不出变化”。
+- `S24` 已完成：协同角色不再通过申请工作台越权查看全量事务申请，生产构建也不再默认暴露需求预览页面。
 
 证据：
 
-- 细化方案：`docs/notes/refinements/2026-05-19-workflow-student-launch-entry.md`
-- Web 入口与布局：`web/src/views/workflow/PartyStageList.vue`、`web/src/api/workflow.ts`
-- 后端权限与检索：`backend/app/workflow/router.py`、`backend/app/workflow/service.py`、`backend/app/workflow/repository.py`、`backend/app/profile/service.py`
-- 回归样例：`backend/tests/integration/test_workflow_party_flow.py`
+- 细化方案：`docs/notes/refinements/2026-05-18-s24-request-scope-and-preview-gate.md`
+- 后端权限收口：`backend/app/workflow/repository.py`、`backend/app/workflow/service.py`、`backend/app/workflow/router.py`
+- 回归样例：`backend/tests/integration/test_request_flow.py`
+- 前端门禁：`web/src/router/index.ts`
+- 验证：`ruff check`、`python -m py_compile`、`pytest tests/integration/test_request_flow.py -q`（`14 passed`）、`pnpm -C web build` 均通过。
 
 ## 细化文件登记
 
@@ -762,7 +904,14 @@
 | 2026-05-18 | Web 党团提醒工作台改造 | `docs/notes/refinements/2026-05-18-web-workflow-reminder-workbench.md` | `S23.1, S23.2, S23.3` | `[x]` | 已完成模板节点提醒规则编辑、提醒记录列表、运行记录列表和手动执行结果展示；`web vue-tsc --noEmit` 与 `vite build` 通过 |
 | 2026-05-19 | 本地 Mock 微信登录稳定性修复 | `docs/notes/refinements/2026-05-19-local-mock-wechat-login-stability.md` | `S11.6（本地 mock 联调续修）` | `[x]` | 已修复微信开发者工具重开后 mock `openid` 随 `code` 变化导致的重复绑定冲突；同一学生现按 `student_no` 稳定生成 mock 身份，历史 `mock_{code}` 绑定会自动迁移，定向认证集成测试 `17 passed` |
 | 2026-05-19 | 小程序智能咨询能力核查 | `docs/notes/refinements/2026-05-19-miniapp-knowledge-consultation-audit.md` | `S8.1, S13.4（现状复核）` | `[x]` | 已确认小程序知识查询入口、关键词搜索、智能匹配、详情展示与模板下载链路存在；但默认种子未内置 `KnowledgeEntry` 正文数据，因此当前项目默认状态不能保证开箱即答，若后台未录入并发布条目，学生端会出现“可搜但无具体答复” |
-| 2026-05-19 | Web 党团流程发起入口补齐 | `docs/notes/refinements/2026-05-19-workflow-student-launch-entry.md` | `S24.1, S24.2, S24.3, S24.4` | `[x]` | 已新增老师侧“发起学生流程”按钮与弹窗，补齐流程候选学生检索、服务端学号筛选与权限收口，并增强候选学生搜索结果反馈；后端回归 `5 passed`，`web vue-tsc --noEmit` 与 `vite build` 通过 |
+| 2026-05-18 | 拉取后请求权限范围与公开预览门禁收口 | `docs/notes/refinements/2026-05-18-s24-request-scope-and-preview-gate.md` | `S24.1, S24.2` | `[x]` | 已按 `scope_code` 收口班团骨干申请列表/详情/处理动作，并让 `/preview/requirements` 仅在开发或显式开关下注册；申请流回归 `14 passed`，Web 构建通过 |
+| 2026-05-18 | S25 通知渠道收口与微信订阅消息一期接入 | `docs/notes/refinements/2026-05-18-s25-notification-channel-and-wechat-subscribe.md` | `S25.1, S25.2, S25.3, S25.4, S25.5, S25.6` | `[x]` | 已完成渠道收口、微信订阅授权/发送一期、过期文案清理，并通过后端定向回归、Web/Miniapp 类型检查和构建 |
+| 2026-05-18 | S26 后台账号批量创建功能 | `docs/notes/refinements/2026-05-18-admin-user-bulk-import.md` | `S26.1, S26.2, S26.3, S26.4, S26.5, S26.6, S26.7, S26.8` | `[x]` | 已完成独立后台账号导入接口、一次性初始密码、审计留痕、范围格式识别和 Web 批量创建入口；后端定向回归与 Web 构建通过 |
+| 2026-05-18 | S27 开发阶段冷启动脚本 | `docs/notes/refinements/2026-05-18-development-cold-start-script.md` | `S27.1, S27.2, S27.3, S27.4, S27.5` | `[x]` | 已完成开发库 schema 重置、一键启动入口、重复冷启动验证与绑定清空复核 |
+| 2026-05-19 | S28 内网生产部署与持续交付底座 | `docs/notes/refinements/2026-05-19-s28-intranet-production-deployment.md` | `S28.1, S28.2, S28.3, S28.4, S28.5, S28.6` | `[x]` | 已完成内网生产部署资产、服务器初始化、Compose 五服务上线、迁移种子、smoke、内网访问与数据库备份脚本验证 |
+| 2026-05-19 | S29 生产默认数据导入与管理入口补强 | `docs/notes/refinements/2026-05-19-s29-production-default-data-and-admin-management.md` | `S29.1, S29.2, S29.3, S29.4, S29.5, S29.6` | `[x]` | 已完成生产默认数据导入、Web 管理入口补强、服务器重建与 smoke 验证 |
+| 2026-05-19 | S30 学生主档与微信绑定管理补强 | `docs/notes/refinements/2026-05-19-s30-student-master-and-wechat-binding-management.md` | `S30.1, S30.2, S30.3, S30.4, S30.5` | `[x]` | 已补齐后台新增学生、学生主档修改和微信绑定查看/解绑，并完成本地验证与生产 smoke |
+| 2026-05-19 | Web 党团流程发起入口补齐 | `docs/notes/refinements/2026-05-19-workflow-student-launch-entry.md` | `S31.1, S31.2, S31.3, S31.4` | `[x]` | 已新增老师侧“发起学生流程”按钮与弹窗，补齐流程候选学生检索、服务端学号筛选与权限收口，并增强候选学生搜索结果反馈；后端回归 `5 passed`，`web vue-tsc --noEmit` 与 `vite build` 通过 |
 
 ## 会话更新要求
 
@@ -845,4 +994,8 @@
 - `2026-05-18`：完成 `S23` 首版实现；后端补齐提醒运行记录、提醒记录查询、手动执行回执、节点完成/转人工自动取消未发送提醒，以及独立的提醒 scheduler；Web 端将 `PartyStageList` 升级为真实工作台并接入模板规则编辑、提醒记录与运行记录展示；`web vue-tsc --noEmit`、`vite build` 与后端目标文件 `py_compile` 通过。
 - `2026-05-19`：新增并完成“本地 Mock 微信登录稳定性修复”；后端将 mock `openid` 从一次性 `mock_{code}` 收口为按 `student_no` 稳定生成的 `mock_student_{student_no}`，并兼容迁移历史旧 mock 绑定，解决微信开发者工具重开后同一学生被误判为“已绑定其他微信”的问题；`tests/integration/test_auth_flow.py` 定向回归 `17 passed`，本地 `POST /api/v1/auth/wx-login` 复测 `2024202721 / 曾翎一` 返回 `200`。
 - `2026-05-19`：新增并完成“小程序智能咨询能力核查”；确认小程序首页已提供“政策查询 / 帮助中心”等入口，学生端知识查询页具备关键词搜索、分类筛选、智能匹配、详情展示与模板下载链路，后端搜索会命中标题、摘要、适用条件、材料、步骤和正文；但当前仓库默认种子只注册知识分类，不内置已发布知识正文，因此默认状态不能保证学生开箱即搜即答，若后台未手工录入并发布知识条目，将出现“有入口和搜索，但得不到具体答复”的现象。
-- `2026-05-19`：新增并完成 `S24` Web 党团流程发起入口补齐；在 `PartyStageList` 学生流程页加入“发起学生流程”按钮和响应式弹窗，老师可直接搜索学生、选择模板并发起流程；后端同步补齐 `GET /admin/workflow/students/search`、学生流程服务端学号筛选以及启动权限收口，学生端无需改造即可查看新流程进度；随后补强候选学生搜索反馈，前端会显式展示命中数量并在单条命中时自动选中结果；`backend/tests/integration/test_workflow_party_flow.py` 回归 `5 passed`，`web vue-tsc --noEmit` 与 `vite build` 通过。
+- `2026-05-19`：新增并完成 `S31` Web 党团流程发起入口补齐；在 `PartyStageList` 学生流程页加入“发起学生流程”按钮和响应式弹窗，老师可直接搜索学生、选择模板并发起流程；后端同步补齐 `GET /admin/workflow/students/search`、学生流程服务端学号筛选以及启动权限收口，学生端无需改造即可查看新流程进度；随后补强候选学生搜索反馈，前端会显式展示命中数量并在单条命中时自动选中结果；`backend/tests/integration/test_workflow_party_flow.py` 回归 `5 passed`，`web vue-tsc --noEmit` 与 `vite build` 通过。
+- `2026-05-18`：完成 `S24` 拉取后请求权限范围与公开预览门禁收口；班团骨干等协同角色的申请工作台、详情与处理动作已按 `scope_code` 限定可见范围，且本人申请不能绕过协同 scope 执行管理动作；`/preview/requirements` 改为仅开发或显式开关注册；申请流回归 `14 passed`、静态校验与 Web 构建通过。
+- `2026-05-19`：新增并完成 `S28` 内网生产部署与持续交付底座；已落地 `deploy/intranet-prod/` 的 Compose、Nginx、Web Dockerfile、生产 `.env` 模板、部署/迁移/备份/恢复/回滚/smoke 脚本和小程序内网出包入口，并完成本地验证；通过本机 SSH 反向 SOCKS 代理完成服务器 `git / Docker / Compose` 初始化和 Docker 镜像拉取验证；服务器生产 `.env` 就绪后完成五服务上线、Alembic 迁移、幂等基础种子、smoke、本机内网访问与数据库备份脚本验证。
+- `2026-05-19`：新增并完成 `S29` 生产默认数据导入与管理入口补强；为后端生产容器只读挂载 `docs` 默认数据源，新增 `seed-default-data.sh`，在服务器完成默认学生与 `2024-default` 培养方案导入，并补 Web 单个后台账号创建和学生学籍信息编辑入口；`pnpm -C web build`、Compose config、shell 语法检查、服务器 Web 重建与 smoke 通过。
+- `2026-05-19`：新增并完成 `S30` 学生主档与微信绑定管理补强；后台已支持新增学生、修改学生主档、查看和解绑学生微信登录绑定，Web 学生管理页已新增对应入口，并通过本地静态/构建/定向集成测试和服务器生产重建 smoke。

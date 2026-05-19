@@ -61,6 +61,9 @@ class User(Base):
     email: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 

@@ -25,6 +25,7 @@ def _apply_student_scope(
     *,
     class_codes: set[str] | None = None,
     major_codes: set[str] | None = None,
+    grade_codes: set[str] | None = None,
     legacy_codes: set[str] | None = None,
 ):
     scope_conds = []
@@ -32,10 +33,13 @@ def _apply_student_scope(
         scope_conds.append(Student.class_code.in_(sorted(class_codes)))
     if major_codes:
         scope_conds.append(Student.major_code.in_(sorted(major_codes)))
+    if grade_codes:
+        scope_conds.append(Student.grade_code.in_(sorted(grade_codes)))
     if legacy_codes:
         codes = sorted(legacy_codes)
         scope_conds.append(Student.class_code.in_(codes))
         scope_conds.append(Student.major_code.in_(codes))
+        scope_conds.append(Student.grade_code.in_(codes))
     if scope_conds:
         stmt = stmt.where(or_(*scope_conds))
     return stmt
@@ -67,6 +71,7 @@ async def search_students(
     class_code: str | None,
     class_scope_codes: set[str] | None = None,
     major_scope_codes: set[str] | None = None,
+    grade_scope_codes: set[str] | None = None,
     legacy_scope_codes: set[str] | None = None,
     include_non_active: bool = False,
     enrollment_status: str | None = None,
@@ -78,6 +83,7 @@ async def search_students(
         stmt,
         class_codes=class_scope_codes,
         major_codes=major_scope_codes,
+        grade_codes=grade_scope_codes,
         legacy_codes=legacy_scope_codes,
     )
     if q:
@@ -154,6 +160,7 @@ async def list_pending_facts(
     approval_statuses: list[str],
     class_scope_codes: set[str] | None = None,
     major_scope_codes: set[str] | None = None,
+    grade_scope_codes: set[str] | None = None,
     legacy_scope_codes: set[str] | None = None,
     page: int,
     size: int,
@@ -168,6 +175,7 @@ async def list_pending_facts(
         stmt,
         class_codes=class_scope_codes,
         major_codes=major_scope_codes,
+        grade_codes=grade_scope_codes,
         legacy_codes=legacy_scope_codes,
     )
     if student_id is not None:
@@ -239,17 +247,19 @@ async def list_corrections(
     status: str | None,
     class_scope_codes: set[str] | None = None,
     major_scope_codes: set[str] | None = None,
+    grade_scope_codes: set[str] | None = None,
     legacy_scope_codes: set[str] | None = None,
     page: int,
     size: int,
 ) -> tuple[list[ProfileCorrection], int]:
     stmt = select(ProfileCorrection).where(_normal_correction_condition())
-    if class_scope_codes or major_scope_codes or legacy_scope_codes:
+    if class_scope_codes or major_scope_codes or grade_scope_codes or legacy_scope_codes:
         stmt = stmt.join(Student, Student.id == ProfileCorrection.student_id)
         stmt = _apply_student_scope(
             stmt,
             class_codes=class_scope_codes,
             major_codes=major_scope_codes,
+            grade_codes=grade_scope_codes,
             legacy_codes=legacy_scope_codes,
         )
     conds = []
@@ -322,17 +332,19 @@ async def list_full_view_requests(
     requester_user_id: int | None = None,
     class_scope_codes: set[str] | None = None,
     major_scope_codes: set[str] | None = None,
+    grade_scope_codes: set[str] | None = None,
     legacy_scope_codes: set[str] | None = None,
     page: int,
     size: int,
 ) -> tuple[list[ProfileCorrection], int]:
     stmt = select(ProfileCorrection).where(_full_view_request_condition())
-    if class_scope_codes or major_scope_codes or legacy_scope_codes:
+    if class_scope_codes or major_scope_codes or grade_scope_codes or legacy_scope_codes:
         stmt = stmt.join(Student, Student.id == ProfileCorrection.student_id)
         stmt = _apply_student_scope(
             stmt,
             class_codes=class_scope_codes,
             major_codes=major_scope_codes,
+            grade_codes=grade_scope_codes,
             legacy_codes=legacy_scope_codes,
         )
     conds = []
