@@ -237,11 +237,15 @@
 - [x] `S25.5` 后端微信订阅消息发送记录与失败隔离
 - [x] `S25.6` 过期“尚未上线/尚未部署”文案清理
 
-细化文件：`docs/notes/refinements/2026-05-18-s25-notification-channel-and-wechat-subscribe.md`
+细化文件：
+
+- `docs/notes/refinements/2026-05-18-s25-notification-channel-and-wechat-subscribe.md`
+- `docs/notes/refinements/2026-05-20-s25-wechat-template-field-alignment.md`
 
 证据：
 
 - 后端新增微信订阅授权表、学生侧订阅配置/授权接口、非阻塞发送 helper，并将工作流提醒保存与手动生成收口为 `IN_APP`。
+- `2026-05-20`：已按微信公众平台实际添加的两个模板调整发送字段；活动日程提醒模板 ID 为 `PEiTeRUhzOL3bbYgf3UBWTnSKg_R6j8jrPInZeqvh8s`，字段映射为 `thing4 / thing1 / thing2 / thing5 / thing3`；申请状态变更通知模板 ID 为 `5zETE9uyoWXH54hBx7nUYchsb1BJEhBUPiiGkbIJgLU`，字段映射为 `thing11 / thing2 / time12 / character_string7`。
 - Web 党团提醒工作台仅保留站内提醒，手动执行直接调用 `/admin/workflow/reminders/generate`；画像快照和荣誉导入旧占位文案已清理。
 - Miniapp 通知页仅在后端返回模板 ID 时展示订阅入口，并调用小程序订阅消息 API 后保存 `accept/reject/ban/filter` 结果。
 - 验证通过：后端 ruff、目标文件 `py_compile`、定向集成测试 `12 passed`，Web 类型检查与构建，Miniapp 类型检查与 `mp-weixin` 出包。
@@ -945,6 +949,7 @@
 | 2026-05-19 | 小程序智能咨询能力核查 | `docs/notes/refinements/2026-05-19-miniapp-knowledge-consultation-audit.md` | `S8.1, S13.4（现状复核）` | `[x]` | 已确认小程序知识查询入口、关键词搜索、智能匹配、详情展示与模板下载链路存在；但默认种子未内置 `KnowledgeEntry` 正文数据，因此当前项目默认状态不能保证开箱即答，若后台未录入并发布条目，学生端会出现“可搜但无具体答复” |
 | 2026-05-18 | 拉取后请求权限范围与公开预览门禁收口 | `docs/notes/refinements/2026-05-18-s24-request-scope-and-preview-gate.md` | `S24.1, S24.2` | `[x]` | 已按 `scope_code` 收口班团骨干申请列表/详情/处理动作，并让 `/preview/requirements` 仅在开发或显式开关下注册；申请流回归 `14 passed`，Web 构建通过 |
 | 2026-05-18 | S25 通知渠道收口与微信订阅消息一期接入 | `docs/notes/refinements/2026-05-18-s25-notification-channel-and-wechat-subscribe.md` | `S25.1, S25.2, S25.3, S25.4, S25.5, S25.6` | `[x]` | 已完成渠道收口、微信订阅授权/发送一期、过期文案清理，并通过后端定向回归、Web/Miniapp 类型检查和构建 |
+| 2026-05-20 | S25 微信订阅消息模板字段对齐 | `docs/notes/refinements/2026-05-20-s25-wechat-template-field-alignment.md` | `S25.1, S25.4, S25.5, S25.6` | `[x]` | 已按微信公众平台实际模板 ID 与字段编号更新后端发送映射、配置样例和字段断言；`ruff` 与 `py_compile` 通过，定向集成测试受本机测试库连接拒绝阻塞 |
 | 2026-05-18 | S26 后台账号批量创建功能 | `docs/notes/refinements/2026-05-18-admin-user-bulk-import.md` | `S26.1, S26.2, S26.3, S26.4, S26.5, S26.6, S26.7, S26.8` | `[x]` | 已完成独立后台账号导入接口、一次性初始密码、审计留痕、范围格式识别和 Web 批量创建入口；后端定向回归与 Web 构建通过 |
 | 2026-05-18 | S27 开发阶段冷启动脚本 | `docs/notes/refinements/2026-05-18-development-cold-start-script.md` | `S27.1, S27.2, S27.3, S27.4, S27.5` | `[x]` | 已完成开发库 schema 重置、一键启动入口、重复冷启动验证与绑定清空复核 |
 | 2026-05-19 | S28 内网生产部署与持续交付底座 | `docs/notes/refinements/2026-05-19-s28-intranet-production-deployment.md` | `S28.1, S28.2, S28.3, S28.4, S28.5, S28.6` | `[x]` | 已完成内网生产部署资产、服务器初始化、Compose 五服务上线、迁移种子、smoke、内网访问与数据库备份脚本验证 |

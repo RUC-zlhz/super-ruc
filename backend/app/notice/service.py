@@ -769,6 +769,18 @@ def _truncate_wechat_value(value: str | None, limit: int = 20) -> str:
     return text[: limit - 1] + "…"
 
 
+def _format_wechat_time(value: datetime | None = None) -> str:
+    return (value or datetime.now(UTC)).strftime("%Y-%m-%d %H:%M")
+
+
+def _wechat_request_work_order(*, notice_id: int, source_url: str | None) -> str:
+    if source_url and ":" in source_url:
+        prefix, value = source_url.split(":", 1)
+        if prefix == "request" and value.strip():
+            return value.strip()[:32]
+    return str(notice_id)[:32]
+
+
 def _build_wechat_subscribe_payload(
     *,
     openid: str,
@@ -776,14 +788,30 @@ def _build_wechat_subscribe_payload(
     title: str,
     summary: str | None,
     scene: str,
+    in_app_delivery: NoticeDelivery,
+    source_url: str | None,
     page: str | None,
 ) -> dict[str, Any]:
-    data = {
-        "thing1": {"value": _truncate_wechat_value(title, 20)},
-        "thing2": {"value": _truncate_wechat_value(summary or title, 20)},
-        "time3": {"value": datetime.now(UTC).strftime("%Y-%m-%d %H:%M")},
-        "phrase4": {"value": "待查看" if scene == WECHAT_SUBSCRIBE_SCENE_WORKFLOW_REMINDER else "状态更新"},
-    }
+    if scene == WECHAT_SUBSCRIBE_SCENE_WORKFLOW_REMINDER:
+        data = {
+            "thing4": {"value": _truncate_wechat_value(title, 20)},
+            "thing1": {"value": _truncate_wechat_value(_format_wechat_time(), 20)},
+            "thing2": {"value": _truncate_wechat_value(summary or title, 20)},
+            "thing5": {"value": "信息学院学生服务"},
+            "thing3": {"value": "请进入小程序查看详情"},
+        }
+    else:
+        data = {
+            "thing11": {"value": _truncate_wechat_value(title, 20)},
+            "thing2": {"value": _truncate_wechat_value(summary or "状态更新", 20)},
+            "time12": {"value": _format_wechat_time()},
+            "character_string7": {
+                "value": _wechat_request_work_order(
+                    notice_id=in_app_delivery.notice_id,
+                    source_url=source_url,
+                )
+            },
+        }
     payload: dict[str, Any] = {
         "touser": openid,
         "template_id": template_id,
@@ -828,6 +856,8 @@ async def send_wechat_subscribe_for_delivery(
     user = await db.get(User, in_app_delivery.user_id)
     if user is None or not user.openid:
         return None
+    notice = await db.get(Notice, in_app_delivery.notice_id)
+    source_url = notice.source_url if notice else None
     auth = await repo.get_wechat_subscribe_authorization(
         db,
         user_id=user.id,
@@ -850,6 +880,8 @@ async def send_wechat_subscribe_for_delivery(
                     title=title,
                     summary=summary,
                     scene=scene,
+                    in_app_delivery=in_app_delivery,
+                    source_url=source_url,
                     page=page,
                 )
             )

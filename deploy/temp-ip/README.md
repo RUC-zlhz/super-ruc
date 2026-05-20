@@ -23,8 +23,8 @@ WECHAT_APPID=...
 WECHAT_SECRET=...
 WECHAT_MOCK_ENABLED=false
 WECHAT_SUBSCRIBE_ENABLED=false
-WECHAT_SUBSCRIBE_REMINDER_TEMPLATE_ID=...
-WECHAT_SUBSCRIBE_REQUEST_TEMPLATE_ID=...
+WECHAT_SUBSCRIBE_REMINDER_TEMPLATE_ID=PEiTeRUhzOL3bbYgf3UBWTnSKg_R6j8jrPInZeqvh8s
+WECHAT_SUBSCRIBE_REQUEST_TEMPLATE_ID=5zETE9uyoWXH54hBx7nUYchsb1BJEhBUPiiGkbIJgLU
 ```
 
 `WECHAT_MOCK_ENABLED=true` 只允许本地或临时 mock smoke 使用。接入真实微信小程序时必须配置
@@ -32,8 +32,9 @@ WECHAT_SUBSCRIBE_REQUEST_TEMPLATE_ID=...
 流程换取 OpenID。
 启用微信订阅消息前，需要在微信公众平台配置小程序订阅消息模板，并把党团流程提醒、
 申请状态提醒两个模板 ID 写入服务器环境变量；`WECHAT_SECRET` 只能放在服务器环境，不得写入仓库。
-当前一期发送字段按 `thing1=标题`、`thing2=摘要`、`time3=发送时间`、`phrase4=状态` 组织，
-微信公众平台选择模板关键词时需与该关键词类型对齐。
+当前一期按已申请模板字段发送：活动日程提醒使用 `thing4/thing1/thing2/thing5/thing3`，
+申请状态变更通知使用 `thing11/thing2/time12/character_string7`。如微信公众平台模板字段再次变化，
+需要同步调整后端发送字段映射。
 
 临时验收地址：
 

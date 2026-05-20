@@ -637,10 +637,15 @@ async def test_wechat_subscribe_send_records_success_and_failure(
         "WECHAT_SUBSCRIBE_REQUEST_TEMPLATE_ID",
         "tmpl-request",
     )
+    monkeypatch.setattr(
+        notice_service.settings,
+        "WECHAT_SUBSCRIBE_REMINDER_TEMPLATE_ID",
+        "tmpl-reminder",
+    )
     await notice_service.save_wechat_subscribe_authorizations(
         db,
         user=user,
-        results=[("tmpl-request", "accept")],
+        results=[("tmpl-request", "accept"), ("tmpl-reminder", "accept")],
     )
 
     sent_payloads: list[dict] = []
@@ -657,6 +662,7 @@ async def test_wechat_subscribe_send_records_success_and_failure(
         title="申请状态更新",
         body_md="正文",
         summary="申请已通过",
+        source_url="request:1",
     )
     delivery = await notice_service.send_wechat_subscribe_for_delivery(
         db,
@@ -677,6 +683,38 @@ async def test_wechat_subscribe_send_records_success_and_failure(
     ).scalar_one()
     assert attempt.provider_message_id == "wx-msg-1"
     assert sent_payloads[0]["touser"] == "mock_wx_n21002"
+    assert set(sent_payloads[0]["data"]) == {
+        "thing11",
+        "thing2",
+        "time12",
+        "character_string7",
+    }
+    assert sent_payloads[0]["data"]["thing11"]["value"] == "申请状态更新"
+    assert sent_payloads[0]["data"]["thing2"]["value"] == "申请已通过"
+    assert sent_payloads[0]["data"]["character_string7"]["value"] == "1"
+
+    in_app_reminder = await notice_service.create_system_in_app_notice_for_student(
+        db,
+        student_id=student_id,
+        user_id=user.id,
+        title="党团流程提醒",
+        body_md="正文",
+        summary="请查看当前流程节点",
+    )
+    reminder_delivery = await notice_service.send_wechat_subscribe_for_delivery(
+        db,
+        in_app_delivery=in_app_reminder,
+        scene=WECHAT_SUBSCRIBE_SCENE_WORKFLOW_REMINDER,
+        title="党团流程提醒",
+        summary="请查看当前流程节点",
+        page="/pages/workflow/index",
+    )
+    await db.commit()
+    assert reminder_delivery is not None
+    assert set(sent_payloads[1]["data"]) == {"thing4", "thing1", "thing2", "thing5", "thing3"}
+    assert sent_payloads[1]["data"]["thing4"]["value"] == "党团流程提醒"
+    assert sent_payloads[1]["data"]["thing2"]["value"] == "请查看当前流程节点"
+    assert sent_payloads[1]["data"]["thing5"]["value"] == "信息学院学生服务"
 
     async def fake_fail(_payload: dict):
         return {"errcode": 43101, "errmsg": "user refuse to accept the msg"}
