@@ -23,9 +23,9 @@ from app.core.dependencies import (
     require_role,
 )
 from app.core.exceptions import BizError
+from app.core.response import ApiResponse, PageMeta, Paginated, ok
 from app.profile import service as profile_service
 from app.profile.schemas import StudentBasic
-from app.core.response import ApiResponse, PageMeta, Paginated, ok
 from app.workflow import pdf_generator, quiz_service, service
 from app.workflow import repository as repo
 from app.workflow.schemas import (
@@ -104,7 +104,7 @@ async def get_workflow(
     workflow_id: int, db: DBDep, user: CurrentUserDep
 ) -> ApiResponse[StudentWorkflowDetail]:
     detail = await service.get_workflow_for_student(
-        db, workflow_id, user.student_id, user.roles
+        db, workflow_id, user.user_id, user.student_id, user.roles
     )
     return ok(detail)
 
@@ -306,6 +306,7 @@ async def admin_start_student_workflow(
             note=payload.note,
             operator_id=user.user_id,
             operator_role=",".join(user.roles) or None,
+            operator_roles=user.roles,
         )
     )
 
@@ -352,7 +353,7 @@ async def admin_search_workflow_students(
 )
 async def admin_list_student_workflows(
     db: DBDep,
-    _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
     template_code: str | None = Query(default=None),
     student_no: str | None = Query(default=None),
     grade_code: str | None = Query(default=None),
@@ -366,6 +367,8 @@ async def admin_list_student_workflows(
         grade_code=grade_code,
         page=page,
         size=size,
+        viewer_user_id=user.user_id,
+        viewer_roles=user.roles,
     )
     return ok(
         Paginated[StudentWorkflowBrief](
@@ -392,6 +395,7 @@ async def admin_complete_node(
             note=payload.note,
             operator_id=user.user_id,
             operator_role=",".join(user.roles) or None,
+            operator_roles=user.roles,
         )
     )
 
@@ -414,6 +418,7 @@ async def admin_mark_node_status(
             payload.note,
             user.user_id,
             ",".join(user.roles) or None,
+            user.roles,
         )
     )
 
@@ -443,7 +448,7 @@ async def admin_generate_reminders(
 )
 async def admin_list_reminders(
     db: DBDep,
-    _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
     template_code: str | None = Query(default=None),
     student_no: str | None = Query(default=None),
     status: str | None = Query(default=None),
@@ -457,6 +462,8 @@ async def admin_list_reminders(
         status=status,
         page=page,
         size=size,
+        viewer_user_id=user.user_id,
+        viewer_roles=user.roles,
     )
     return ok(
         Paginated[ReminderAdminOut](

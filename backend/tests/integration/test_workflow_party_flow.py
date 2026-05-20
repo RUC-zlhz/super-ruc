@@ -16,6 +16,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit.models import AuditLog
 from app.auth.models import Student, User, UserRole
 from app.core.security import create_token
 from app.workflow.models import (
@@ -46,6 +47,44 @@ async def _login_as_student(
     )
     assert resp.status_code == 200, resp.text
     return resp.json()["data"]["access_token"], stu.id
+
+
+async def _create_student(
+    db: AsyncSession,
+    *,
+    student_no: str,
+    class_code: str,
+    major_code: str = "CS",
+    grade_code: str = "2022",
+) -> int:
+    stu = Student(
+        student_no=student_no,
+        full_name=f"w-{student_no}",
+        grade_code=grade_code,
+        major_code=major_code,
+        class_code=class_code,
+        political_status="入党申请人",
+    )
+    db.add(stu)
+    await db.commit()
+    await db.refresh(stu)
+    return stu.id
+
+
+async def _create_role_token(
+    db: AsyncSession,
+    *,
+    work_no: str,
+    role_code: str,
+    scope_code: str | None = None,
+) -> str:
+    user = User(work_no=work_no, display_name=work_no, is_active=True)
+    db.add(user)
+    await db.flush()
+    if scope_code is not None:
+        db.add(UserRole(user_id=user.id, role_code=role_code, scope_code=scope_code))
+    await db.commit()
+    return create_token(str(user.id), "access", extra_claims={"roles": [role_code]})
 
 
 def _party_template_payload() -> dict:
@@ -332,6 +371,332 @@ async def test_complete_node_cancels_unsent_workflow_reminders(
     assert reminder.cancel_reason == "节点已完成，自动关闭未发送提醒"
 
 
+async def test_scoped_launcher_can_start_only_students_in_scope(
+    client: AsyncClient, db: AsyncSession, admin_client: AsyncClient,
+) -> None:
+    in_scope_student_id = await _create_student(
+        db,
+        student_no="W41001",
+        class_code="CS2201",
+    )
+    out_scope_student_id = await _create_student(
+        db,
+        student_no="W41002",
+        class_code="CS2202",
+    )
+    token = await _create_role_token(
+        db,
+        work_no="WFCOUNSELOR01",
+        role_code="COUNSELOR",
+        scope_code="CLASS:CS2201",
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    upsert = await admin_client.post(
+        "/api/v1/admin/workflow/templates",
+        json=_party_template_payload(),
+    )
+    assert upsert.status_code == 200, upsert.text
+
+    ok_start = await client.post(
+        "/api/v1/admin/workflow/students",
+        headers=headers,
+        json={"student_id": in_scope_student_id, "template_code": "PARTY_DEV_MAIN"},
+    )
+    assert ok_start.status_code == 200, ok_start.text
+
+    denied = await client.post(
+        "/api/v1/admin/workflow/students",
+        headers=headers,
+        json={"student_id": out_scope_student_id, "template_code": "PARTY_DEV_MAIN"},
+    )
+    assert denied.status_code == 403, denied.text
+    assert "无权为该学生发起流程" in denied.text
+
+    denied_log = (
+        await db.execute(
+            select(AuditLog)
+            .where(
+                AuditLog.event_type == "WORKFLOW",
+                AuditLog.entity_code == "STUDENT_WORKFLOW",
+                AuditLog.action == "START",
+                AuditLog.entity_id == out_scope_student_id,
+            )
+            .order_by(AuditLog.id.desc())
+        )
+    ).scalar_one()
+    assert denied_log.result_code == "DENIED"
+    assert denied_log.detail["student_id"] == out_scope_student_id
+    assert denied_log.detail["template_code"] == "PARTY_DEV_MAIN"
+    assert denied_log.detail["reason"] == "OUT_OF_SCOPE"
+
+
+async def test_scoped_launcher_without_scope_cannot_start_student_workflow(
+    client: AsyncClient, db: AsyncSession, admin_client: AsyncClient,
+) -> None:
+    student_id = await _create_student(
+        db,
+        student_no="W42001",
+        class_code="CS2201",
+    )
+    token = await _create_role_token(
+        db,
+        work_no="WFCOUNSELOR02",
+        role_code="COUNSELOR",
+    )
+
+    upsert = await admin_client.post(
+        "/api/v1/admin/workflow/templates",
+        json=_party_template_payload(),
+    )
+    assert upsert.status_code == 200, upsert.text
+
+    denied = await client.post(
+        "/api/v1/admin/workflow/students",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"student_id": student_id, "template_code": "PARTY_DEV_MAIN"},
+    )
+    assert denied.status_code == 403, denied.text
+
+    denied_log = (
+        await db.execute(
+            select(AuditLog)
+            .where(
+                AuditLog.event_type == "WORKFLOW",
+                AuditLog.entity_code == "STUDENT_WORKFLOW",
+                AuditLog.action == "START",
+                AuditLog.entity_id == student_id,
+            )
+            .order_by(AuditLog.id.desc())
+        )
+    ).scalar_one()
+    assert denied_log.result_code == "DENIED"
+    assert denied_log.detail["reason"] == "EMPTY_SCOPE"
+
+
+async def test_super_admin_can_start_student_workflow_outside_scoped_boundaries(
+    client: AsyncClient, db: AsyncSession, admin_client: AsyncClient,
+) -> None:
+    student_id = await _create_student(
+        db,
+        student_no="W43001",
+        class_code="CS9999",
+    )
+    token = await _create_role_token(
+        db,
+        work_no="WFSUPER01",
+        role_code="SUPER_ADMIN",
+    )
+
+    upsert = await admin_client.post(
+        "/api/v1/admin/workflow/templates",
+        json=_party_template_payload(),
+    )
+    assert upsert.status_code == 200, upsert.text
+
+    start = await client.post(
+        "/api/v1/admin/workflow/students",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"student_id": student_id, "template_code": "PARTY_DEV_MAIN"},
+    )
+    assert start.status_code == 200, start.text
+
+    detail = await client.get(
+        f"/api/v1/workflow/{start.json()['data']['id']}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert detail.status_code == 200, detail.text
+
+
+async def test_workflow_detail_requires_student_self_or_authorized_scope(
+    client: AsyncClient, db: AsyncSession, admin_client: AsyncClient,
+) -> None:
+    token_a, student_a_id = await _login_as_student(
+        client, db, student_no="W44001", wx_code="wx_w44001",
+    )
+    token_b, _student_b_id = await _login_as_student(
+        client, db, student_no="W44002", wx_code="wx_w44002",
+    )
+    guest_user = User(work_no="WFGUEST01", display_name="Workflow Guest", is_active=True)
+    db.add(guest_user)
+    await db.commit()
+    guest_token = create_token(str(guest_user.id), "access", extra_claims={"roles": []})
+
+    upsert = await admin_client.post(
+        "/api/v1/admin/workflow/templates",
+        json=_party_template_payload(),
+    )
+    assert upsert.status_code == 200, upsert.text
+    start = await admin_client.post(
+        "/api/v1/admin/workflow/students",
+        json={"student_id": student_a_id, "template_code": "PARTY_DEV_MAIN"},
+    )
+    assert start.status_code == 200, start.text
+    workflow_id = start.json()["data"]["id"]
+
+    own = await client.get(
+        f"/api/v1/workflow/{workflow_id}",
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    assert own.status_code == 200, own.text
+
+    other = await client.get(
+        f"/api/v1/workflow/{workflow_id}",
+        headers={"Authorization": f"Bearer {token_b}"},
+    )
+    assert other.status_code == 403, other.text
+
+    guest = await client.get(
+        f"/api/v1/workflow/{workflow_id}",
+        headers={"Authorization": f"Bearer {guest_token}"},
+    )
+    assert guest.status_code == 403, guest.text
+
+
+async def test_scoped_workflow_admin_lists_and_reminders_are_scope_filtered(
+    client: AsyncClient, db: AsyncSession, admin_client: AsyncClient,
+) -> None:
+    in_scope_student_id = await _create_student(
+        db,
+        student_no="W45001",
+        class_code="CS2201",
+    )
+    out_scope_student_id = await _create_student(
+        db,
+        student_no="W45002",
+        class_code="CS2202",
+    )
+    token = await _create_role_token(
+        db,
+        work_no="WFCOUNSELOR03",
+        role_code="COUNSELOR",
+        scope_code="CLASS:CS2201",
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    upsert = await admin_client.post(
+        "/api/v1/admin/workflow/templates",
+        json=_party_template_payload(),
+    )
+    assert upsert.status_code == 200, upsert.text
+    in_start = await admin_client.post(
+        "/api/v1/admin/workflow/students",
+        json={"student_id": in_scope_student_id, "template_code": "PARTY_DEV_MAIN"},
+    )
+    assert in_start.status_code == 200, in_start.text
+    out_start = await admin_client.post(
+        "/api/v1/admin/workflow/students",
+        json={"student_id": out_scope_student_id, "template_code": "PARTY_DEV_MAIN"},
+    )
+    assert out_start.status_code == 200, out_start.text
+
+    in_state = next(
+        node for node in in_start.json()["data"]["nodes"] if node["node_code"] == "APPLY"
+    )
+    out_state = next(
+        node for node in out_start.json()["data"]["nodes"] if node["node_code"] == "APPLY"
+    )
+    db.add(
+        WorkflowReminder(
+            workflow_node_state_id=in_state["id"],
+            student_id=in_scope_student_id,
+            reminder_date=date.today(),
+            channel="IN_APP",
+            status="SENT",
+            message="scope in",
+        )
+    )
+    db.add(
+        WorkflowReminder(
+            workflow_node_state_id=out_state["id"],
+            student_id=out_scope_student_id,
+            reminder_date=date.today(),
+            channel="IN_APP",
+            status="SENT",
+            message="scope out",
+        )
+    )
+    await db.commit()
+
+    workflows = await client.get(
+        "/api/v1/admin/workflow/students",
+        headers=headers,
+    )
+    assert workflows.status_code == 200, workflows.text
+    workflow_items = workflows.json()["data"]["items"]
+    assert workflows.json()["data"]["meta"]["total"] == 1
+    assert [item["student_no"] for item in workflow_items] == ["W45001"]
+
+    reminders = await client.get(
+        "/api/v1/admin/workflow/reminders",
+        headers=headers,
+    )
+    assert reminders.status_code == 200, reminders.text
+    reminder_items = reminders.json()["data"]["items"]
+    assert reminders.json()["data"]["meta"]["total"] == 1
+    assert [item["student_no"] for item in reminder_items] == ["W45001"]
+
+
+async def test_scoped_workflow_node_operations_reject_out_of_scope_and_audit(
+    client: AsyncClient, db: AsyncSession, admin_client: AsyncClient,
+) -> None:
+    out_scope_student_id = await _create_student(
+        db,
+        student_no="W46001",
+        class_code="CS2202",
+    )
+    token = await _create_role_token(
+        db,
+        work_no="WFCOUNSELOR04",
+        role_code="COUNSELOR",
+        scope_code="CLASS:CS2201",
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    upsert = await admin_client.post(
+        "/api/v1/admin/workflow/templates",
+        json=_party_template_payload(),
+    )
+    assert upsert.status_code == 200, upsert.text
+    start = await admin_client.post(
+        "/api/v1/admin/workflow/students",
+        json={"student_id": out_scope_student_id, "template_code": "PARTY_DEV_MAIN"},
+    )
+    assert start.status_code == 200, start.text
+    apply_state = next(
+        node for node in start.json()["data"]["nodes"] if node["node_code"] == "APPLY"
+    )
+
+    denied_complete = await client.post(
+        f"/api/v1/admin/workflow/node-states/{apply_state['id']}/complete",
+        headers=headers,
+        json={"evidence": "越权材料"},
+    )
+    assert denied_complete.status_code == 403, denied_complete.text
+    assert "无权操作该流程节点" in denied_complete.text
+
+    denied_status = await client.post(
+        f"/api/v1/admin/workflow/node-states/{apply_state['id']}/status",
+        headers=headers,
+        json={"status": "DEFERRED", "note": "越权延期"},
+    )
+    assert denied_status.status_code == 403, denied_status.text
+
+    logs = (
+        await db.execute(
+            select(AuditLog)
+            .where(
+                AuditLog.event_type == "WORKFLOW",
+                AuditLog.entity_code == "STUDENT_WORKFLOW_NODE",
+                AuditLog.entity_id == apply_state["id"],
+            )
+            .order_by(AuditLog.id)
+        )
+    ).scalars().all()
+    denied_actions = {log.action for log in logs if log.result_code == "DENIED"}
+    assert {"COMPLETE_DENIED", "MARK_STATUS_DENIED"} <= denied_actions
+
+
 async def test_workflow_endpoints_reject_anonymous_and_student(
     client: AsyncClient, db: AsyncSession,
 ) -> None:
@@ -353,7 +718,26 @@ async def test_workflow_endpoints_reject_anonymous_and_student(
 async def test_collaborator_role_can_access_workflow_admin_tools(
     client: AsyncClient,
     db: AsyncSession,
+    admin_client: AsyncClient,
 ) -> None:
+    student_id = await _create_student(
+        db,
+        student_no="W47001",
+        class_code="CS2201",
+    )
+    await admin_client.post(
+        "/api/v1/admin/workflow/templates",
+        json=_party_template_payload(),
+    )
+    started = await admin_client.post(
+        "/api/v1/admin/workflow/students",
+        json={"student_id": student_id, "template_code": "PARTY_DEV_MAIN"},
+    )
+    assert started.status_code == 200, started.text
+    apply_state = next(
+        node for node in started.json()["data"]["nodes"] if node["node_code"] == "APPLY"
+    )
+
     user = User(work_no="WFCADRE01", display_name="Workflow Cadre", is_active=True)
     db.add(user)
     await db.flush()
@@ -372,6 +756,20 @@ async def test_collaborator_role_can_access_workflow_admin_tools(
         headers={"Authorization": f"Bearer {token}"},
     )
     assert search.status_code == 403, search.text
+
+    workflows = await client.get(
+        "/api/v1/admin/workflow/students",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert workflows.status_code == 200, workflows.text
+    assert workflows.json()["data"]["meta"]["total"] == 0
+
+    node_status = await client.post(
+        f"/api/v1/admin/workflow/node-states/{apply_state['id']}/status",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"status": "DEFERRED", "note": "无范围协同角色不可操作"},
+    )
+    assert node_status.status_code == 403, node_status.text
 
     start = await client.post(
         "/api/v1/admin/workflow/students",

@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S31` 已闭合；后续新阶段继续按本文件登记
+- 当前目标：`S1 ~ S33` 已闭合；后续新阶段继续按本文件登记
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -370,6 +370,45 @@
 - Web 入口与布局：`web/src/views/workflow/PartyStageList.vue`、`web/src/api/workflow.ts`
 - 后端权限与检索：`backend/app/workflow/router.py`、`backend/app/workflow/service.py`、`backend/app/workflow/repository.py`、`backend/app/profile/service.py`
 - 回归样例：`backend/tests/integration/test_workflow_party_flow.py`
+
+### S32 工作流发起服务端范围校验修复
+
+- [x] `S32.1` 将 `POST /admin/workflow/students` 的学生范围校验下沉到服务层，避免绕过前端搜索直接发起范围外学生流程。
+- [x] `S32.2` 对 `SUPER_ADMIN / COLLEGE_LEADER` 保持全局发起能力，对 `COUNSELOR / HEAD_TEACHER / YOUTH_LEAGUE_TEACHER / PARTY_BUILD_TEACHER` 按 `scope_code` 限定目标学生。
+- [x] `S32.3` 对空 scope 或范围外学生写入 `WORKFLOW / STUDENT_WORKFLOW / START` 拒绝审计，并返回 403。
+- [x] `S32.4` 补充工作流发起权限回归用例，并恢复 `workflow/router.py` 的 ruff import gate。
+
+当前结论：
+
+- `S32` 已完成代码收口：工作流发起接口不再只依赖前端学生搜索过滤，服务端会在创建流程实例前按角色与 `scope_code` 校验目标学生；范围外或空范围操作会拒绝并留痕。由于当前本机测试库连接被拒绝，本轮集成测试未进入业务断言，但相关代码已通过 ruff 与 py_compile。
+
+证据：
+
+- 细化方案：`docs/notes/refinements/2026-05-20-workflow-start-scope-guard.md`
+- 后端权限收口：`backend/app/workflow/service.py`、`backend/app/workflow/router.py`
+- 回归样例：`backend/tests/integration/test_workflow_party_flow.py`
+- 静态验证：`uv run --extra dev ruff check app/workflow/router.py app/workflow/service.py tests/integration/test_workflow_party_flow.py` 通过；`uv run --extra dev python -m py_compile app/workflow/router.py app/workflow/service.py tests/integration/test_workflow_party_flow.py` 通过。
+- 阻塞验证：`uv run --extra dev pytest tests/integration/test_workflow_party_flow.py -q --basetemp=.tmp/pytest-tmp-workflow-scope` 因 `localhost` 测试数据库连接拒绝（`WinError 1225`）在 fixture setup 阶段失败，未执行到业务断言。
+
+### S33 党团流程范围权限二次收口
+
+- [x] `S33.1` 抽取党团流程通用学生范围 helper，统一支撑详情、列表、提醒和节点操作的后端校验。
+- [x] `S33.2` 收紧流程详情读取：学生仅本人可见，`SUPER_ADMIN / COLLEGE_LEADER` 全局可见，范围化老师与协同角色仅 scope 内可见，无绑定且无有效角色账号返回 403。
+- [x] `S33.3` 收紧管理列表与提醒列表：按当前用户 scope 过滤返回 items 与 total，空 scope 返回空结果。
+- [x] `S33.4` 收紧节点操作：`complete_node()` 与 `mark_node_status()` 在变更前校验节点所属学生范围，范围外返回 403 并写入拒绝审计。
+- [x] `S33.5` 补充详情读取、列表过滤、提醒过滤和节点越权操作回归样例。
+
+当前结论：
+
+- `S33` 已完成代码收口：党团流程所有按学生归属授权的读写入口均在后端服务层复用同一套 scope 校验；协同角色保留模板工具访问能力，但学生流程数据与节点操作受 scope 限制。当前本机测试库连接仍被拒绝，集成测试未进入业务断言；静态校验与编译校验通过。
+
+证据：
+
+- 细化方案：`docs/notes/refinements/2026-05-20-workflow-scope-closure.md`
+- 后端权限收口：`backend/app/workflow/service.py`、`backend/app/workflow/router.py`、`backend/app/workflow/repository.py`
+- 回归样例：`backend/tests/integration/test_workflow_party_flow.py`
+- 静态验证：`uv run --extra dev ruff check app/workflow/router.py app/workflow/service.py app/workflow/repository.py tests/integration/test_workflow_party_flow.py` 通过；`uv run --extra dev python -m py_compile app/workflow/router.py app/workflow/service.py app/workflow/repository.py tests/integration/test_workflow_party_flow.py` 通过。
+- 阻塞验证：`uv run --extra dev pytest tests/integration/test_workflow_party_flow.py -q --basetemp=.tmp/pytest-tmp-workflow-scope-closure` 因测试数据库连接拒绝在 fixture setup 阶段失败，当前结果为 `11 errors`，未执行到业务断言。
 
 ### S6 前端体验增量优化
 
@@ -912,6 +951,8 @@
 | 2026-05-19 | S29 生产默认数据导入与管理入口补强 | `docs/notes/refinements/2026-05-19-s29-production-default-data-and-admin-management.md` | `S29.1, S29.2, S29.3, S29.4, S29.5, S29.6` | `[x]` | 已完成生产默认数据导入、Web 管理入口补强、服务器重建与 smoke 验证 |
 | 2026-05-19 | S30 学生主档与微信绑定管理补强 | `docs/notes/refinements/2026-05-19-s30-student-master-and-wechat-binding-management.md` | `S30.1, S30.2, S30.3, S30.4, S30.5` | `[x]` | 已补齐后台新增学生、学生主档修改和微信绑定查看/解绑，并完成本地验证与生产 smoke |
 | 2026-05-19 | Web 党团流程发起入口补齐 | `docs/notes/refinements/2026-05-19-workflow-student-launch-entry.md` | `S31.1, S31.2, S31.3, S31.4` | `[x]` | 已新增老师侧“发起学生流程”按钮与弹窗，补齐流程候选学生检索、服务端学号筛选与权限收口，并增强候选学生搜索结果反馈；后端回归 `5 passed`，`web vue-tsc --noEmit` 与 `vite build` 通过 |
+| 2026-05-20 | 工作流发起服务端范围校验修复 | `docs/notes/refinements/2026-05-20-workflow-start-scope-guard.md` | `S32.1, S32.2, S32.3, S32.4` | `[x]` | 已将发起学生流程的范围校验下沉到后端服务层，补范围外/空 scope 拒绝审计与回归样例；ruff 与 py_compile 通过，集成测试受本机测试库连接拒绝阻塞 |
+| 2026-05-20 | 党团流程范围权限二次收口 | `docs/notes/refinements/2026-05-20-workflow-scope-closure.md` | `S33.1, S33.2, S33.3, S33.4, S33.5` | `[x]` | 已将流程详情、节点操作、流程列表与提醒列表统一接入后端学生 scope 校验；ruff 与 py_compile 通过，集成测试受本机测试库连接拒绝阻塞 |
 
 ## 会话更新要求
 
@@ -995,6 +1036,8 @@
 - `2026-05-19`：新增并完成“本地 Mock 微信登录稳定性修复”；后端将 mock `openid` 从一次性 `mock_{code}` 收口为按 `student_no` 稳定生成的 `mock_student_{student_no}`，并兼容迁移历史旧 mock 绑定，解决微信开发者工具重开后同一学生被误判为“已绑定其他微信”的问题；`tests/integration/test_auth_flow.py` 定向回归 `17 passed`，本地 `POST /api/v1/auth/wx-login` 复测 `2024202721 / 曾翎一` 返回 `200`。
 - `2026-05-19`：新增并完成“小程序智能咨询能力核查”；确认小程序首页已提供“政策查询 / 帮助中心”等入口，学生端知识查询页具备关键词搜索、分类筛选、智能匹配、详情展示与模板下载链路，后端搜索会命中标题、摘要、适用条件、材料、步骤和正文；但当前仓库默认种子只注册知识分类，不内置已发布知识正文，因此默认状态不能保证学生开箱即搜即答，若后台未手工录入并发布知识条目，将出现“有入口和搜索，但得不到具体答复”的现象。
 - `2026-05-19`：新增并完成 `S31` Web 党团流程发起入口补齐；在 `PartyStageList` 学生流程页加入“发起学生流程”按钮和响应式弹窗，老师可直接搜索学生、选择模板并发起流程；后端同步补齐 `GET /admin/workflow/students/search`、学生流程服务端学号筛选以及启动权限收口，学生端无需改造即可查看新流程进度；随后补强候选学生搜索反馈，前端会显式展示命中数量并在单条命中时自动选中结果；`backend/tests/integration/test_workflow_party_flow.py` 回归 `5 passed`，`web vue-tsc --noEmit` 与 `vite build` 通过。
+- `2026-05-20`：新增并完成 `S32` 工作流发起服务端范围校验修复；`POST /admin/workflow/students` 现会在服务层按角色与 `scope_code` 校验目标学生，范围外或空 scope 发起会返回 403 并写入 `WORKFLOW / STUDENT_WORKFLOW / START` 拒绝审计；新增 scoped 成功、范围外拒绝、空 scope 拒绝和超管全局发起回归样例。`ruff check` 与 `py_compile` 通过；`pytest tests/integration/test_workflow_party_flow.py` 因当前测试数据库连接拒绝在 setup 阶段失败，未进入业务断言。
+- `2026-05-20`：新增并完成 `S33` 党团流程范围权限二次收口；流程详情、节点操作、管理列表和提醒列表均已按当前用户角色与 `scope_code` 在后端二次校验，范围外节点操作写入 `WORKFLOW / STUDENT_WORKFLOW_NODE` 拒绝审计；新增详情读取、列表/提醒过滤和节点越权回归样例。`ruff check` 与 `py_compile` 通过；`pytest tests/integration/test_workflow_party_flow.py` 因当前测试数据库连接拒绝在 setup 阶段失败，未进入业务断言。
 - `2026-05-18`：完成 `S24` 拉取后请求权限范围与公开预览门禁收口；班团骨干等协同角色的申请工作台、详情与处理动作已按 `scope_code` 限定可见范围，且本人申请不能绕过协同 scope 执行管理动作；`/preview/requirements` 改为仅开发或显式开关注册；申请流回归 `14 passed`、静态校验与 Web 构建通过。
 - `2026-05-19`：新增并完成 `S28` 内网生产部署与持续交付底座；已落地 `deploy/intranet-prod/` 的 Compose、Nginx、Web Dockerfile、生产 `.env` 模板、部署/迁移/备份/恢复/回滚/smoke 脚本和小程序内网出包入口，并完成本地验证；通过本机 SSH 反向 SOCKS 代理完成服务器 `git / Docker / Compose` 初始化和 Docker 镜像拉取验证；服务器生产 `.env` 就绪后完成五服务上线、Alembic 迁移、幂等基础种子、smoke、本机内网访问与数据库备份脚本验证。
 - `2026-05-19`：新增并完成 `S29` 生产默认数据导入与管理入口补强；为后端生产容器只读挂载 `docs` 默认数据源，新增 `seed-default-data.sh`，在服务器完成默认学生与 `2024-default` 培养方案导入，并补 Web 单个后台账号创建和学生学籍信息编辑入口；`pnpm -C web build`、Compose config、shell 语法检查、服务器 Web 重建与 smoke 通过。

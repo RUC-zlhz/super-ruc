@@ -87,6 +87,20 @@ _REQUEST_GLOBAL_ROLES = {
     "PARTY_BUILD_TEACHER",
 }
 _REQUEST_COLLABORATOR_ROLES = set(ROLE_CODE_COLLABORATOR_ROLES)
+_WORKFLOW_START_SCOPED_ROLES = {
+    "COUNSELOR",
+    "HEAD_TEACHER",
+    "YOUTH_LEAGUE_TEACHER",
+    "PARTY_BUILD_TEACHER",
+}
+_WORKFLOW_GLOBAL_ROLES = {"SUPER_ADMIN", "COLLEGE_LEADER"}
+_WORKFLOW_SCOPED_ROLES = {
+    "COUNSELOR",
+    "HEAD_TEACHER",
+    "YOUTH_LEAGUE_TEACHER",
+    "PARTY_BUILD_TEACHER",
+    *ROLE_CODE_COLLABORATOR_ROLES,
+}
 
 
 # ======================================================================
@@ -230,6 +244,7 @@ async def start_student_workflow(
     note: str | None,
     operator_id: int,
     operator_role: str | None,
+    operator_roles: list[str],
 ) -> StudentWorkflowDetail:
     tpl = await repo.get_template_by_code(db, template_code)
     if tpl is None or not tpl.is_active:
@@ -237,6 +252,14 @@ async def start_student_workflow(
     student = await db.get(Student, student_id)
     if student is None:
         raise NotFoundError(f"学生不存在：{student_id}")
+    await _ensure_workflow_start_allowed(
+        db,
+        student=student,
+        template_code=template_code,
+        operator_id=operator_id,
+        operator_role=operator_role,
+        operator_roles=operator_roles,
+    )
 
     exist = await repo.find_active_student_workflow(db, student_id, tpl.id)
     if exist is not None:
@@ -289,25 +312,227 @@ async def start_student_workflow(
     return _workflow_to_detail(sw_full)
 
 
+async def _ensure_workflow_start_allowed(
+    db: AsyncSession,
+    *,
+    student: Student,
+    template_code: str,
+    operator_id: int,
+    operator_role: str | None,
+    operator_roles: list[str],
+) -> None:
+    allowed = await _workflow_student_visible(
+        db,
+        student=student,
+        viewer_user_id=operator_id,
+        viewer_student_id=None,
+        viewer_roles=operator_roles,
+        scoped_roles=_WORKFLOW_START_SCOPED_ROLES,
+        allow_student_self=False,
+    )
+    if allowed:
+        return
+    reason = await _workflow_denial_reason(
+        db,
+        student=student,
+        viewer_user_id=operator_id,
+        viewer_roles=operator_roles,
+        scoped_roles=_WORKFLOW_START_SCOPED_ROLES,
+    )
+    await audit_forbidden_and_raise(
+        db,
+        event_type="WORKFLOW",
+        entity_code="STUDENT_WORKFLOW",
+        action="START",
+        entity_id=student.id,
+        actor_user_id=operator_id,
+        actor_role=operator_role,
+        message="无权为该学生发起流程",
+        code=40306,
+        detail={
+            "student_id": student.id,
+            "template_code": template_code,
+            "reason": reason,
+        },
+    )
+
+
+async def _workflow_scope_codes_for_viewer(
+    db: AsyncSession,
+    *,
+    viewer_user_id: int,
+    viewer_roles: list[str],
+    scoped_roles: set[str] | None = None,
+) -> StudentScopeSet | None:
+    roles = _normalized_role_set(viewer_roles)
+    if roles & _WORKFLOW_GLOBAL_ROLES:
+        return None
+    effective_scoped_roles = scoped_roles or _WORKFLOW_SCOPED_ROLES
+    role_codes = sorted(roles & effective_scoped_roles)
+    if not role_codes:
+        return StudentScopeSet()
+    return split_student_scope_codes(
+        list(
+            await repo.list_user_role_scope_codes(
+                db,
+                user_id=viewer_user_id,
+                role_codes=role_codes,
+            )
+        )
+    )
+
+
+async def _workflow_student_visible(
+    db: AsyncSession,
+    *,
+    student: Student,
+    viewer_user_id: int,
+    viewer_student_id: int | None,
+    viewer_roles: list[str],
+    scoped_roles: set[str] | None = None,
+    allow_student_self: bool = True,
+) -> bool:
+    if allow_student_self and viewer_student_id is not None and student.id == viewer_student_id:
+        return True
+    scope = await _workflow_scope_codes_for_viewer(
+        db,
+        viewer_user_id=viewer_user_id,
+        viewer_roles=viewer_roles,
+        scoped_roles=scoped_roles,
+    )
+    if scope is None:
+        return True
+    if scope.is_empty():
+        return False
+    return student_in_scope(student, scope)
+
+
+async def _workflow_denial_reason(
+    db: AsyncSession,
+    *,
+    student: Student,
+    viewer_user_id: int,
+    viewer_roles: list[str],
+    scoped_roles: set[str] | None = None,
+) -> str:
+    roles = _normalized_role_set(viewer_roles)
+    effective_scoped_roles = scoped_roles or _WORKFLOW_SCOPED_ROLES
+    if not roles & effective_scoped_roles:
+        return "NO_WORKFLOW_SCOPE_ROLE"
+    scope = await _workflow_scope_codes_for_viewer(
+        db,
+        viewer_user_id=viewer_user_id,
+        viewer_roles=viewer_roles,
+        scoped_roles=effective_scoped_roles,
+    )
+    if scope is None:
+        return "GLOBAL"
+    if scope.is_empty():
+        return "EMPTY_SCOPE"
+    if not student_in_scope(student, scope):
+        return "OUT_OF_SCOPE"
+    return "UNKNOWN"
+
+
+async def _ensure_workflow_student_visible(
+    db: AsyncSession,
+    *,
+    student: Student,
+    workflow_id: int,
+    viewer_user_id: int,
+    viewer_student_id: int | None,
+    viewer_roles: list[str],
+    action: str,
+    entity_code: str,
+    entity_id: int,
+    message: str,
+    code: int,
+) -> None:
+    allowed = await _workflow_student_visible(
+        db,
+        student=student,
+        viewer_user_id=viewer_user_id,
+        viewer_student_id=viewer_student_id,
+        viewer_roles=viewer_roles,
+    )
+    if allowed:
+        return
+    reason = await _workflow_denial_reason(
+        db,
+        student=student,
+        viewer_user_id=viewer_user_id,
+        viewer_roles=viewer_roles,
+    )
+    await audit_forbidden_and_raise(
+        db,
+        event_type="WORKFLOW",
+        entity_code=entity_code,
+        action=action,
+        entity_id=entity_id,
+        actor_user_id=viewer_user_id,
+        actor_role=",".join(viewer_roles) or None,
+        message=message,
+        code=code,
+        detail=build_audit_detail(
+            target={"workflow_id": workflow_id, "student_id": student.id},
+            refs=[{"reason": reason}],
+        ),
+    )
+
+
+async def _ensure_workflow_node_operable(
+    db: AsyncSession,
+    *,
+    state: StudentWorkflowNode,
+    operator_id: int,
+    operator_roles: list[str],
+    action: str,
+) -> None:
+    workflow = state.workflow
+    student = await db.get(Student, workflow.student_id) if workflow else None
+    if student is None or workflow is None:
+        raise NotFoundError("流程实例不存在")
+    await _ensure_workflow_student_visible(
+        db,
+        student=student,
+        workflow_id=workflow.id,
+        viewer_user_id=operator_id,
+        viewer_student_id=None,
+        viewer_roles=operator_roles,
+        action=action,
+        entity_code="STUDENT_WORKFLOW_NODE",
+        entity_id=state.id,
+        message="无权操作该流程节点",
+        code=40307,
+    )
+
+
 async def get_workflow_for_student(
-    db: AsyncSession, workflow_id: int, viewer_student_id: int | None, viewer_roles: list[str]
+    db: AsyncSession,
+    workflow_id: int,
+    viewer_user_id: int,
+    viewer_student_id: int | None,
+    viewer_roles: list[str],
 ) -> StudentWorkflowDetail:
     sw = await repo.get_student_workflow(db, workflow_id)
     if sw is None:
         raise NotFoundError("流程实例不存在")
-    # 学生仅能查看本人；老师/管理员按角色已放行（路由层做）
-    if viewer_student_id is not None and sw.student_id != viewer_student_id:
-        allowed = {
-            "SUPER_ADMIN",
-            "COLLEGE_LEADER",
-            "COUNSELOR",
-            "HEAD_TEACHER",
-            "YOUTH_LEAGUE_TEACHER",
-            "PARTY_BUILD_TEACHER",
-            *ROLE_CODE_COLLABORATOR_ROLES,
-        }
-        if not (set(normalize_role_codes(viewer_roles)) & allowed):
-            raise BizError("无权查看该流程", code=40301, http_status=403)
+    student = await db.get(Student, sw.student_id)
+    if student is None:
+        raise NotFoundError("流程学生不存在")
+    await _ensure_workflow_student_visible(
+        db,
+        student=student,
+        workflow_id=sw.id,
+        viewer_user_id=viewer_user_id,
+        viewer_student_id=viewer_student_id,
+        viewer_roles=viewer_roles,
+        action="READ_DETAIL_DENIED",
+        entity_code="STUDENT_WORKFLOW",
+        entity_id=sw.id,
+        message="无权访问该流程",
+        code=40301,
+    )
     return _workflow_to_detail(sw)
 
 
@@ -325,10 +550,18 @@ async def complete_node(
     note: str | None,
     operator_id: int,
     operator_role: str | None,
+    operator_roles: list[str],
 ) -> StudentWorkflowDetail:
     state = await repo.get_student_node_state(db, state_id)
     if state is None:
         raise NotFoundError("节点状态不存在")
+    await _ensure_workflow_node_operable(
+        db,
+        state=state,
+        operator_id=operator_id,
+        operator_roles=operator_roles,
+        action="COMPLETE_DENIED",
+    )
     NodeStateMachine.assert_completable(state.status)
 
     state.status = WORKFLOW_NODE_DONE
@@ -386,11 +619,19 @@ async def mark_node_status(
     note: str | None,
     operator_id: int,
     operator_role: str | None,
+    operator_roles: list[str],
 ) -> StudentWorkflowDetail:
     NodeStateMachine.assert_manual_status_allowed(new_status)
     state = await repo.get_student_node_state(db, state_id)
     if state is None:
         raise NotFoundError("节点状态不存在")
+    await _ensure_workflow_node_operable(
+        db,
+        state=state,
+        operator_id=operator_id,
+        operator_roles=operator_roles,
+        action="MARK_STATUS_DENIED",
+    )
     if state.status == WORKFLOW_NODE_DONE:
         raise ConflictError("已完成的节点不可再改状态")
     state.status = new_status
@@ -427,12 +668,23 @@ async def list_admin_workflows(
     grade_code: str | None,
     page: int,
     size: int,
+    viewer_user_id: int,
+    viewer_roles: list[str],
 ) -> tuple[list[StudentWorkflowBrief], int]:
+    scope = await _workflow_scope_codes_for_viewer(
+        db,
+        viewer_user_id=viewer_user_id,
+        viewer_roles=viewer_roles,
+    )
     rows, total = await repo.list_pending_workflows_admin(
         db,
         template_code=template_code,
         student_no=student_no,
         grade_code=grade_code,
+        class_scope_codes=None if scope is None else scope.class_codes,
+        major_scope_codes=None if scope is None else scope.major_codes,
+        grade_scope_codes=None if scope is None else scope.grade_codes,
+        legacy_scope_codes=None if scope is None else scope.legacy_codes,
         page=page,
         size=size,
     )
@@ -513,12 +765,23 @@ async def list_reminders_admin(
     status: str | None,
     page: int,
     size: int,
+    viewer_user_id: int,
+    viewer_roles: list[str],
 ) -> tuple[list[ReminderAdminOut], int]:
+    scope = await _workflow_scope_codes_for_viewer(
+        db,
+        viewer_user_id=viewer_user_id,
+        viewer_roles=viewer_roles,
+    )
     rows, total = await repo.list_workflow_reminders_admin(
         db,
         template_code=template_code,
         student_no=student_no,
         status=status,
+        class_scope_codes=None if scope is None else scope.class_codes,
+        major_scope_codes=None if scope is None else scope.major_codes,
+        grade_scope_codes=None if scope is None else scope.grade_codes,
+        legacy_scope_codes=None if scope is None else scope.legacy_codes,
         page=page,
         size=size,
     )

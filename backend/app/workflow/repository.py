@@ -285,6 +285,10 @@ async def list_workflow_reminders_admin(
     template_code: str | None = None,
     student_no: str | None = None,
     status: str | None = None,
+    class_scope_codes: set[str] | None = None,
+    major_scope_codes: set[str] | None = None,
+    grade_scope_codes: set[str] | None = None,
+    legacy_scope_codes: set[str] | None = None,
     page: int = 1,
     size: int = 20,
 ) -> tuple[list[tuple[WorkflowReminder, StudentWorkflowNode, StudentWorkflow, WorkflowTemplate, Student]], int]:
@@ -307,6 +311,13 @@ async def list_workflow_reminders_admin(
         stmt = stmt.where(Student.student_no.ilike(f"%{student_no}%"))
     if status:
         stmt = stmt.where(WorkflowReminder.status == status)
+    stmt = _apply_student_scope_filters(
+        stmt,
+        class_scope_codes=class_scope_codes,
+        major_scope_codes=major_scope_codes,
+        grade_scope_codes=grade_scope_codes,
+        legacy_scope_codes=legacy_scope_codes,
+    )
 
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar_one()
@@ -331,6 +342,10 @@ async def list_pending_workflows_admin(
     template_code: str | None = None,
     student_no: str | None = None,
     grade_code: str | None = None,
+    class_scope_codes: set[str] | None = None,
+    major_scope_codes: set[str] | None = None,
+    grade_scope_codes: set[str] | None = None,
+    legacy_scope_codes: set[str] | None = None,
     page: int = 1,
     size: int = 20,
 ) -> tuple[Sequence[StudentWorkflow], int]:
@@ -350,6 +365,13 @@ async def list_pending_workflows_admin(
         stmt = stmt.where(Student.student_no.ilike(f"%{student_no}%"))
     if grade_code:
         stmt = stmt.where(Student.grade_code == grade_code)
+    stmt = _apply_student_scope_filters(
+        stmt,
+        class_scope_codes=class_scope_codes,
+        major_scope_codes=major_scope_codes,
+        grade_scope_codes=grade_scope_codes,
+        legacy_scope_codes=legacy_scope_codes,
+    )
 
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar_one()
@@ -357,6 +379,42 @@ async def list_pending_workflows_admin(
     stmt = stmt.order_by(StudentWorkflow.id).offset((page - 1) * size).limit(size)
     rows = (await db.execute(stmt)).scalars().unique().all()
     return rows, total
+
+
+def _apply_student_scope_filters(
+    stmt,
+    *,
+    class_scope_codes: set[str] | None,
+    major_scope_codes: set[str] | None,
+    grade_scope_codes: set[str] | None,
+    legacy_scope_codes: set[str] | None,
+):
+    if (
+        class_scope_codes is None
+        and major_scope_codes is None
+        and grade_scope_codes is None
+        and legacy_scope_codes is None
+    ):
+        return stmt
+    scope_conds = []
+    if class_scope_codes:
+        scope_conds.append(Student.class_code.in_(sorted(class_scope_codes)))
+    if major_scope_codes:
+        scope_conds.append(Student.major_code.in_(sorted(major_scope_codes)))
+    if grade_scope_codes:
+        scope_conds.append(Student.grade_code.in_(sorted(grade_scope_codes)))
+    if legacy_scope_codes:
+        legacy = sorted(legacy_scope_codes)
+        scope_conds.extend(
+            [
+                Student.class_code.in_(legacy),
+                Student.major_code.in_(legacy),
+                Student.grade_code.in_(legacy),
+            ]
+        )
+    if not scope_conds:
+        return stmt.where(false())
+    return stmt.where(or_(*scope_conds))
 
 
 # ==================================================================
