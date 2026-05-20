@@ -4,7 +4,7 @@ student 侧（前缀 /knowledge）：
 - GET /categories           分类列表
 - GET /search               搜索已发布条目
 - GET /{entry_id}           条目详情
-- POST /ai-match            受控 AI / 关键词匹配
+- POST /ai-match            检索式匹配（旧接口名保留）
 - GET /templates/{id}/download  模板下载（短期预签名链接）
 
 admin 侧（前缀 /admin/knowledge）：
@@ -18,8 +18,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
-from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES
 from app.audit.service import build_audit_detail, log_action
+from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES
 from app.core.dependencies import CurrentUserDep, DBDep, require_role
 from app.core.exceptions import BizError, NotFoundError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok

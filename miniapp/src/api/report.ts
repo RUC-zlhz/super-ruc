@@ -38,6 +38,9 @@ export interface AcademicGapResult {
   plan_name?: string | null
   total_credits_required?: number | null
   total_credits_earned: number
+  credits_gap?: number | null
+  risk_level?: 'HIGH' | 'MEDIUM' | 'LOW'
+  conclusion_text?: string | null
   modules: AcademicModuleGap[]
   suggested_courses: SuggestedCourse[]
   disclaimer: string

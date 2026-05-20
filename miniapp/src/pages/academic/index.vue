@@ -24,7 +24,7 @@
         <view class="weak-hint">
         <text class="weak-icon">i</text>
         <view class="weak-copy">
-          <text class="weak-title">弱结论免责声明</text>
+          <text class="weak-title">学业结论边界</text>
           <text class="weak-text">{{ result?.disclaimer || defaultDisclaimer }}</text>
         </view>
       </view>
@@ -44,6 +44,26 @@
               {{ formatCredits(totalGapCredits) }}
             </text>
             <text class="lbl">差额参考</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="conclusion-card" :class="riskToneClass">
+        <view class="conclusion-head">
+          <text class="conclusion-kicker">学分缺口结论</text>
+          <text class="conclusion-pill">{{ riskLabel }}</text>
+        </view>
+        <text class="conclusion-text">
+          {{ result.conclusion_text || fallbackConclusion }}
+        </text>
+        <view class="conclusion-grid">
+          <view>
+            <text class="conclusion-num">{{ gapModuleCount }}</text>
+            <text class="conclusion-label">缺口模块</text>
+          </view>
+          <view>
+            <text class="conclusion-num">{{ highPrioritySuggestionCount }}</text>
+            <text class="conclusion-label">建议课程</text>
           </view>
         </view>
       </view>
@@ -262,6 +282,11 @@ const pageError = ref('')
 const hasLoaded = ref(false)
 const defaultDisclaimer = '本结果仅为辅助提示，不构成毕业资格、课程替代或教务最终结论；请以学院/学校正式审核结果为准。'
 const isGuest = computed(() => auth.isLoggedIn && !auth.user?.student_id)
+const RISK_LABELS: Record<string, string> = {
+  HIGH: '高关注',
+  MEDIUM: '待跟进',
+  LOW: '低关注',
+}
 
 const MODULE_TYPE_LABELS: Record<string, string> = {
   REQUIRED: '必修模块',
@@ -271,11 +296,23 @@ const MODULE_TYPE_LABELS: Record<string, string> = {
 }
 
 const totalGapCredits = computed(() => {
-  if (result.value?.total_credits_required == null) return null
+  if (!result.value) return null
+  if (result.value.credits_gap != null) return result.value.credits_gap
+  if (result.value.total_credits_required == null) return null
   return Math.max(result.value.total_credits_required - result.value.total_credits_earned, 0)
 })
 
 const totalGapPositive = computed(() => (totalGapCredits.value == null ? 0 : totalGapCredits.value) > 0)
+const riskLevel = computed(() => result.value?.risk_level || (totalGapPositive.value ? 'MEDIUM' : 'LOW'))
+const riskLabel = computed(() => RISK_LABELS[riskLevel.value] || '待核验')
+const riskToneClass = computed(() => `risk-${riskLevel.value.toLowerCase()}`)
+const gapModuleCount = computed(() => result.value?.modules.filter((item) => item.credits_gap > 0).length || 0)
+const highPrioritySuggestionCount = computed(() => result.value?.suggested_courses?.length || 0)
+const fallbackConclusion = computed(() => {
+  if (totalGapCredits.value == null) return '当前缺少培养方案或成绩数据，暂不能形成学分差额结论。'
+  if (totalGapCredits.value <= 0) return '按当前数据未发现总学分差额。'
+  return `按当前数据仍有 ${formatCredits(totalGapCredits.value)} 学分缺口。`
+})
 const candidateCourses = computed(() => transcriptUpload.value?.parsed_courses || [])
 const transcriptBoundaryText = computed(() => {
   if (!transcriptUpload.value) return ''
@@ -456,6 +493,85 @@ onPullDownRefresh(async () => {
 .num.gap { color: #16a34a; }
 .num.gap.positive { color: #b70f24; }
 .lbl { font-size: 25rpx; color: #6b7280; margin-top: 6rpx; }
+
+.conclusion-card {
+  margin-bottom: 28rpx;
+  padding: 28rpx;
+  border-radius: 28rpx;
+  background: #fff;
+  border: 1rpx solid #f0e2e5;
+  box-shadow: var(--shadow-card);
+}
+.conclusion-card.risk-high {
+  background: linear-gradient(180deg, #fff7f7, #fff);
+  border-color: #efc2c8;
+}
+.conclusion-card.risk-medium {
+  background: linear-gradient(180deg, #fffaf0, #fff);
+  border-color: #f1d9a8;
+}
+.conclusion-card.risk-low {
+  background: linear-gradient(180deg, #f4fff8, #fff);
+  border-color: #bfe8cf;
+}
+.conclusion-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18rpx;
+}
+.conclusion-kicker {
+  font-size: 24rpx;
+  color: #6b7280;
+}
+.conclusion-pill {
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+  background: #fff1f2;
+  color: #b70f24;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+.risk-medium .conclusion-pill {
+  background: #fff7ed;
+  color: #b45309;
+}
+.risk-low .conclusion-pill {
+  background: #ecfdf3;
+  color: #15803d;
+}
+.conclusion-text {
+  display: block;
+  margin-top: 14rpx;
+  color: #202124;
+  font-size: 31rpx;
+  line-height: 1.55;
+  font-weight: 800;
+}
+.conclusion-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+.conclusion-grid > view {
+  padding: 18rpx;
+  border-radius: 20rpx;
+  background: rgba(255,255,255,0.76);
+  border: 1rpx solid #f3e8eb;
+}
+.conclusion-num {
+  display: block;
+  color: #b70f24;
+  font-size: 36rpx;
+  font-weight: 900;
+}
+.conclusion-label {
+  display: block;
+  margin-top: 4rpx;
+  color: #6b7280;
+  font-size: 22rpx;
+}
 
 .warning-card {
   display: flex;

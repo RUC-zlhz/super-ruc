@@ -248,6 +248,9 @@
                       {{ formatCredits(record.credits_gap) }}
                     </span>
                   </template>
+                  <template v-else-if="column.key === 'conclusion'">
+                    <span>{{ record.conclusion_text || gapConclusion(record as AcademicGapAggregateItem) }}</span>
+                  </template>
                   <template v-else-if="column.key === 'warnings'">
                     <span v-if="record.data_warnings.length">
                       {{ record.data_warnings[0] }}
@@ -288,6 +291,9 @@
             <a-spin :spinning="selectedGapDetailLoading">
               <div class="side-section">
                 <h3>缺口描述</h3>
+                <p class="gap-conclusion">
+                  {{ selectedGapDetail?.conclusion_text || selectedGapRow.conclusion_text || gapConclusion(selectedGapRow) }}
+                </p>
                 <p>
                   当前参考要求 {{ formatCredits(selectedGapRow.total_credits_required) }}，
                   已获 {{ formatCredits(selectedGapRow.total_credits_earned) }}，
@@ -353,7 +359,7 @@
             type="warning"
             show-icon
             class="mb16"
-            message="学业弱结论边界"
+            message="学业结论边界"
             :description="academicGapDetail.disclaimer"
           />
 
@@ -385,6 +391,15 @@
             </a-descriptions-item>
             <a-descriptions-item label="已获学分">
               {{ formatCredits(academicGapDetail.total_credits_earned) }}
+            </a-descriptions-item>
+            <a-descriptions-item label="学分差额">
+              {{ formatCredits(academicGapDetail.credits_gap) }}
+            </a-descriptions-item>
+            <a-descriptions-item label="风险级别">
+              {{ academicGapDetail.risk_level || '-' }}
+            </a-descriptions-item>
+            <a-descriptions-item label="缺口结论" :span="2">
+              {{ academicGapDetail.conclusion_text || '-' }}
             </a-descriptions-item>
             <a-descriptions-item label="生成时间" :span="2">
               {{ formatDateTime(academicGapDetail.generated_at) }}
@@ -493,6 +508,7 @@ const academicGapColumns = [
   { title: '风险级别', key: 'risk_level', width: 100 },
   { title: '学分概况', key: 'credits', width: 150 },
   { title: '差额参考', key: 'credits_gap', width: 100 },
+  { title: '缺口结论', key: 'conclusion', width: 220 },
   { title: '数据提示', key: 'warnings' },
   { title: '生成时间', key: 'generated_at', width: 170 },
   { title: '操作', key: 'actions', width: 100 },
@@ -631,6 +647,13 @@ function academicRiskClass(item: AcademicGapAggregateItem) {
   if (risk === 'HIGH') return 'high'
   if (risk === 'MEDIUM') return 'medium'
   return 'low'
+}
+
+function gapConclusion(item: AcademicGapAggregateItem) {
+  if (item.credits_gap == null) return '当前缺少培养方案或成绩数据，暂不能形成学分差额结论。'
+  if (item.credits_gap <= 0 && !item.data_warnings.length) return '按当前数据未发现总学分差额。'
+  if (item.credits_gap <= 0) return '按当前数据未发现总学分差额，但仍需处理数据提示。'
+  return `按当前数据仍有 ${formatCredits(item.credits_gap)} 学分缺口。`
 }
 
 function clearSelectedGap() {
@@ -1339,6 +1362,17 @@ onMounted(async () => {
   color: #8c8c8c;
   font-size: 12px;
   line-height: 1.6;
+}
+
+.gap-conclusion {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  color: #7f1722;
+  font-weight: 700;
+  line-height: 1.7;
+  background: #fff6f7;
+  border: 1px solid #f0c8ce;
+  border-radius: 12px;
 }
 
 .gap-emphasis {

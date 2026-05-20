@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     WECHAT_APPID: str = ""
     WECHAT_SECRET: str = ""
     WECHAT_MOCK_ENABLED: bool = True
+    WECHAT_GUEST_LOGIN_ENABLED: bool = False
     WECHAT_SUBSCRIBE_ENABLED: bool = False
     WECHAT_SUBSCRIBE_REMINDER_TEMPLATE_ID: str = ""
     WECHAT_SUBSCRIBE_REQUEST_TEMPLATE_ID: str = ""
@@ -125,14 +126,16 @@ class Settings(BaseSettings):
                 errors.append("FIELD_ENCRYPTION_KEY 仍为开发默认值，必须在生产环境替换")
             if self.WECHAT_MOCK_ENABLED:
                 errors.append("生产环境必须关闭 WECHAT_MOCK_ENABLED")
+            if self.WECHAT_GUEST_LOGIN_ENABLED:
+                errors.append("生产环境必须关闭 WECHAT_GUEST_LOGIN_ENABLED")
             if not self.WECHAT_APPID or not self.WECHAT_SECRET:
                 errors.append(
                     "生产环境启用真实微信登录时必须配置 WECHAT_APPID / WECHAT_SECRET"
                 )
 
         # 非生产也生效的功能开关守卫
-        if self.AI_QA_ENABLED and not self.ANTHROPIC_API_KEY:
-            errors.append("AI_QA_ENABLED=True 时必须配置 ANTHROPIC_API_KEY")
+        if self.AI_QA_ENABLED:
+            errors.append("当前知识问答只支持检索式回答，必须保持 AI_QA_ENABLED=False")
         sms_provider = (self.SMS_PROVIDER or "").strip().lower()
         if (
             self.SMS_ENABLED

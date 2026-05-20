@@ -164,64 +164,37 @@ async def get_for_admin(db: AsyncSession, entry_id: int) -> EntryDetail:
     return entry_to_detail(entry)
 
 
-# ---------- AI 问答 ----------
+# ---------- 检索式知识匹配 ----------
 async def ai_match(db: AsyncSession, query: str, top_k: int) -> AiMatchResponse:
-    # 先以关键词预筛一批候选（避免把全库喂给 Claude）
+    # 兼容旧接口名；当前产品口径只做检索式匹配，不调用生成式模型。
     prefetched, _ = await repo.search_published_entries(db, q=query, page=1, size=20)
     if not prefetched:
         return AiMatchResponse(
-            engine="keyword",
+            engine="retrieval",
             candidates=[],
             manual_consult_required=True,
             manual_consult_hint="未检索到相关条目，建议转人工咨询",
         )
 
-    engine = "keyword"
     candidates: list[AiMatchCandidate] = []
 
-    if settings.AI_QA_ENABLED:
-        ranked = await ai_matcher.rank_by_claude(list(prefetched), query, top_k)
-        if ranked is not None:
-            engine = "claude-haiku"
-            by_id = {e.id: e for e in prefetched}
-            for item in ranked:
-                e = by_id.get(item["entry_id"])
-                if not e:
-                    continue
-                candidates.append(
-                    AiMatchCandidate(
-                        entry_id=e.id,
-                        slug=e.slug,
-                        title=e.title,
-                        score=item["score"],
-                        reason=item.get("reason"),
-                        source_name=e.source.source_name if e.source else None,
-                        source_url=e.source.source_url if e.source else None,
-                        source_is_official=_entry_source_is_official(e),
-                        version_label=e.version_label,
-                        ambiguity_flag=e.ambiguity_flag,
-                    )
-                )
-
-    if not candidates:
-        scored = ai_matcher.rank_by_keyword(list(prefetched), query, top_k)
-        for e, score in scored:
-            # 归一化到 0~1，简易按分桶
-            norm = min(1.0, score / 10.0)
-            candidates.append(
-                AiMatchCandidate(
-                    entry_id=e.id,
-                    slug=e.slug,
-                    title=e.title,
-                    score=round(norm, 3),
-                    reason="关键词命中",
-                    source_name=e.source.source_name if e.source else None,
-                    source_url=e.source.source_url if e.source else None,
-                    source_is_official=_entry_source_is_official(e),
-                    version_label=e.version_label,
-                    ambiguity_flag=e.ambiguity_flag,
-                )
+    scored = ai_matcher.rank_by_keyword(list(prefetched), query, top_k)
+    for e, score in scored:
+        norm = min(1.0, score / 10.0)
+        candidates.append(
+            AiMatchCandidate(
+                entry_id=e.id,
+                slug=e.slug,
+                title=e.title,
+                score=round(norm, 3),
+                reason="检索命中",
+                source_name=e.source.source_name if e.source else None,
+                source_url=e.source.source_url if e.source else None,
+                source_is_official=_entry_source_is_official(e),
+                version_label=e.version_label,
+                ambiguity_flag=e.ambiguity_flag,
             )
+        )
 
     manual = not candidates or any(c.ambiguity_flag for c in candidates)
     hint = None
@@ -237,11 +210,11 @@ async def ai_match(db: AsyncSession, query: str, top_k: int) -> AiMatchResponse:
         event_type="KNOWLEDGE",
         entity_code="KNOWLEDGE_QUERY",
         action="AI_MATCH",
-        detail={"query": query[:200], "engine": engine, "count": len(candidates)},
+        detail={"query": query[:200], "engine": "retrieval", "count": len(candidates)},
     )
     await db.commit()
     return AiMatchResponse(
-        engine=engine,
+        engine="retrieval",
         candidates=candidates,
         manual_consult_required=manual,
         manual_consult_hint=hint,

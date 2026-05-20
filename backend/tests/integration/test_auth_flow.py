@@ -192,6 +192,19 @@ async def test_wx_login_without_student_no_returns_guest_session(
     assert not any(role["code"] == "STUDENT" for role in user["roles"])
 
 
+async def test_wx_login_without_student_no_requires_guest_dev_switch(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service.settings, "WECHAT_GUEST_LOGIN_ENABLED", False)
+
+    resp = await client.post(
+        "/api/v1/auth/wx-login", json={"code": "wx_code_guest_disabled"}
+    )
+
+    assert resp.status_code == 403
+
+
 async def test_guest_wx_login_can_bind_student_later(
     client: AsyncClient, db: AsyncSession
 ) -> None:

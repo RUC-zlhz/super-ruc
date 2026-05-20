@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；后续新阶段继续按本文件登记
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -413,6 +413,29 @@
 - 回归样例：`backend/tests/integration/test_workflow_party_flow.py`
 - 静态验证：`uv run --extra dev ruff check app/workflow/router.py app/workflow/service.py app/workflow/repository.py tests/integration/test_workflow_party_flow.py` 通过；`uv run --extra dev python -m py_compile app/workflow/router.py app/workflow/service.py app/workflow/repository.py tests/integration/test_workflow_party_flow.py` 通过。
 - 阻塞验证：`uv run --extra dev pytest tests/integration/test_workflow_party_flow.py -q --basetemp=.tmp/pytest-tmp-workflow-scope-closure` 因测试数据库连接拒绝在 fixture setup 阶段失败，当前结果为 `11 errors`，未执行到业务断言。
+
+### S34 最终缺口闭合方向
+
+- 细化文件：`docs/notes/refinements/2026-05-20-s34-final-gap-closure-direction.md`
+- 当前状态：`[!]` 可直接落地项已完成；真实微信联调与真实学院数据仍等待外部输入
+- [x] `S34.1` 访客登录收口为显式开发模式开关，生产环境默认关闭
+- [x] `S34.2` 班团骨干工作台向老师后台强协同靠拢，但继续执行 scope 校验与审计
+- [x] `S34.3` 学业分析输出更明确的学分缺口结论，并优化管理端/小程序展示
+- [!] `S34.4` 微信订阅消息保持真实模板发送链路，正式联调仍需真实 AppID/Secret、模板字段与小程序订阅权限
+- [!] `S34.5` 演示数据改用真实学院数据导入口径，仍需用户提供可使用的真实学院数据文件与脱敏/授权边界
+- [x] `S34.6` 知识问答固定为检索式回答，不做生成式答复
+
+当前结论：
+
+- `S34` 的代码可落地部分已完成：访客登录只在显式开发开关下启用；知识问答接口保留旧路径但固定检索式排序；班团骨干可使用党团流程发起入口且后端继续按 `scope_code` 校验；学业缺口接口与 Web/Miniapp 页面均增加学分差额、风险等级和结论文本。
+- 真实微信订阅消息与真实学院演示数据不能由代码替代，需要外部配置与数据文件后才能闭环。
+
+证据：
+
+- 细化方案：`docs/notes/refinements/2026-05-20-s34-final-gap-closure-direction.md`
+- 后端静态验证：`uv run --extra dev ruff check ...` 通过；`uv run --extra dev python -m py_compile ...` 通过。
+- 前端构建：`pnpm -C web build` 通过；`pnpm -C miniapp build:mp-weixin` 通过。
+- 阻塞验证：`uv run --extra dev pytest tests/integration/test_auth_flow.py -q --basetemp=.tmp/pytest-tmp-s34-auth` 因 `localhost:54322/sip_db_test` 连接拒绝在 fixture setup 阶段失败，未进入业务断言。
 
 ### S6 前端体验增量优化
 
@@ -958,6 +981,7 @@
 | 2026-05-19 | Web 党团流程发起入口补齐 | `docs/notes/refinements/2026-05-19-workflow-student-launch-entry.md` | `S31.1, S31.2, S31.3, S31.4` | `[x]` | 已新增老师侧“发起学生流程”按钮与弹窗，补齐流程候选学生检索、服务端学号筛选与权限收口，并增强候选学生搜索结果反馈；后端回归 `5 passed`，`web vue-tsc --noEmit` 与 `vite build` 通过 |
 | 2026-05-20 | 工作流发起服务端范围校验修复 | `docs/notes/refinements/2026-05-20-workflow-start-scope-guard.md` | `S32.1, S32.2, S32.3, S32.4` | `[x]` | 已将发起学生流程的范围校验下沉到后端服务层，补范围外/空 scope 拒绝审计与回归样例；ruff 与 py_compile 通过，集成测试受本机测试库连接拒绝阻塞 |
 | 2026-05-20 | 党团流程范围权限二次收口 | `docs/notes/refinements/2026-05-20-workflow-scope-closure.md` | `S33.1, S33.2, S33.3, S33.4, S33.5` | `[x]` | 已将流程详情、节点操作、流程列表与提醒列表统一接入后端学生 scope 校验；ruff 与 py_compile 通过，集成测试受本机测试库连接拒绝阻塞 |
+| 2026-05-20 | S34 最终缺口闭合方向 | `docs/notes/refinements/2026-05-20-s34-final-gap-closure-direction.md` | `S34.1, S34.2, S34.3, S34.4, S34.5, S34.6` | `[!]` | 可直接落地项已完成并通过静态/构建验证；真实微信订阅联调和真实学院数据仍等待外部输入 |
 
 ## 会话更新要求
 

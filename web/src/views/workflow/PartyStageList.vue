@@ -745,6 +745,11 @@ const canStartStudentWorkflow = computed(() =>
     'HEAD_TEACHER',
     'YOUTH_LEAGUE_TEACHER',
     'PARTY_BUILD_TEACHER',
+    'PARTY_BRANCH_SECRETARY',
+    'YOUTH_LEAGUE_SECRETARY',
+    'CLASS_MONITOR',
+    'YOUTH_BRANCH_SECRETARY',
+    'CLASS_LEADER',
   ]),
 )
 const launchableTemplates = computed(() => templates.value.filter((item) => item.is_active))

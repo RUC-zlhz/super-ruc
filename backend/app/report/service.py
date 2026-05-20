@@ -1,7 +1,7 @@
 """report 服务层 — FR-014 学业缺口 / FR-016 运营看板。
 
-FR-014 原则（C-05 弱结论）：
-- 输出"未满足模块"清单，不输出"可以毕业"。
+FR-014 原则：
+- 输出明确的学分缺口与未满足模块清单，不输出"可以毕业"。
 - 如果培养方案缺失或成绩数据为空 → data_warnings 明确提示。
 - 使用 CourseEquivalence 做等价折算（ratio × 实际学分）。
 
@@ -395,7 +395,7 @@ async def compute_academic_gap(
 
     if plan is None:
         data_warnings.append("未找到该学生对应的培养方案（grade_code + major_code）；")
-        return AcademicGapResult(
+        result = AcademicGapResult(
             student_no=student.student_no,
             student_name=student.full_name,
             grade_code=student.grade_code,
@@ -403,6 +403,10 @@ async def compute_academic_gap(
             data_warnings=data_warnings,
             generated_at=datetime.now(UTC),
         )
+        result.credits_gap = _compute_gap_value(result)
+        result.risk_level = _derive_risk_level(result)
+        result.conclusion_text = _build_academic_gap_conclusion(result)
+        return result
 
     modules = (await db.execute(
         select(CurriculumModule)
@@ -576,7 +580,7 @@ async def compute_academic_gap(
     ranked_suggestions.sort(key=lambda item: (-item[0], -item[1], item[2], item[3], item[4]))
     suggested = [item for _, _, _, _, _, item in ranked_suggestions]
 
-    return AcademicGapResult(
+    result = AcademicGapResult(
         student_no=student.student_no,
         student_name=student.full_name,
         grade_code=student.grade_code,
@@ -590,6 +594,10 @@ async def compute_academic_gap(
         data_warnings=data_warnings,
         generated_at=datetime.now(UTC),
     )
+    result.credits_gap = _compute_gap_value(result)
+    result.risk_level = _derive_risk_level(result)
+    result.conclusion_text = _build_academic_gap_conclusion(result)
+    return result
 
 
 def _compute_gap_value(result: AcademicGapResult) -> float | None:
@@ -614,6 +622,18 @@ def _derive_risk_level(result: AcademicGapResult) -> str:
     if gap >= 6 or ratio >= 0.3:
         return "HIGH"
     return "MEDIUM"
+
+
+def _build_academic_gap_conclusion(result: AcademicGapResult) -> str:
+    gap = _compute_gap_value(result)
+    if gap is None:
+        return "当前缺少匹配培养方案，无法形成学分差额结论。"
+    if gap <= 0 and not result.data_warnings:
+        return "按当前已核验成绩与培养方案口径，未发现总学分差额。"
+    if gap <= 0:
+        return "按当前数据未发现总学分差额，但存在数据提示，需人工复核后确认。"
+    module_count = sum(1 for item in result.modules if item.credits_gap > 0)
+    return f"按当前已核验成绩与培养方案口径，仍有 {gap:.1f} 学分缺口，涉及 {module_count} 个模块。"
 
 
 async def list_academic_gap_overview(
@@ -659,6 +679,8 @@ async def list_academic_gap_overview(
             total_credits_required=result.total_credits_required,
             total_credits_earned=result.total_credits_earned,
             credits_gap=gap,
+            risk_level=current_risk,
+            conclusion_text=_build_academic_gap_conclusion(result),
             data_warnings=result.data_warnings,
             generated_at=result.generated_at,
         )

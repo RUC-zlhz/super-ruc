@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 
 # ============================================================
-# FR-014 学业缺口（弱结论）
+# FR-014 学业缺口
 # ============================================================
 class AcademicModuleGap(BaseModel):
     module_code: str
@@ -21,7 +21,7 @@ class AcademicModuleGap(BaseModel):
 
 
 class AcademicGapResult(BaseModel):
-    """学业缺口展示结果。**不得输出毕业结论**。"""
+    """学业缺口展示结果。只输出学分缺口结论，不输出毕业资格结论。"""
 
     student_no: str
     student_name: str
@@ -31,6 +31,9 @@ class AcademicGapResult(BaseModel):
     plan_name: str | None = None
     total_credits_required: float | None = None
     total_credits_earned: float = 0
+    credits_gap: float | None = None
+    risk_level: str = "MEDIUM"
+    conclusion_text: str = "当前数据不足，需补充培养方案或成绩记录后再判断学分缺口。"
     modules: list[AcademicModuleGap] = []
     suggested_courses: list[dict] = []
     disclaimer: str = (
@@ -50,6 +53,8 @@ class AcademicGapAggregateItem(BaseModel):
     total_credits_required: float | None = None
     total_credits_earned: float = 0
     credits_gap: float | None = None
+    risk_level: str = "MEDIUM"
+    conclusion_text: str | None = None
     data_warnings: list[str] = []
     generated_at: datetime
 

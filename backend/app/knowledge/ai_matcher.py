@@ -1,9 +1,7 @@
-"""受控 AI 问答引擎（Claude）。
+"""知识条目检索匹配工具。
 
-约束（C-07）：
-- 由 settings.AI_QA_ENABLED 开关控制；False 时返回关键词匹配降级结果
-- 所有候选必须携带 knowledge_entry_id 与官方来源
-- Claude 只负责对已检索出的候选做"语义匹配/重排序"，不生成新内容
+当前产品口径只做检索式回答；Claude 重排序函数保留为历史兼容代码，
+但配置层会拒绝启用生成式问答。
 """
 from __future__ import annotations
 
@@ -66,14 +64,14 @@ async def rank_by_claude(
     if not settings.AI_QA_ENABLED:
         return None
     if not settings.ANTHROPIC_API_KEY:
-        logger.warning("AI_QA_ENABLED 为 true 但 ANTHROPIC_API_KEY 为空，降级为关键词匹配")
+        logger.warning("AI_QA_ENABLED 已被配置层禁用；返回关键词匹配")
         return None
 
     try:
         # 延迟导入，避免未安装时启动失败
         import anthropic  # type: ignore
     except ImportError:
-        logger.warning("anthropic 包未安装，AI 问答降级")
+        logger.warning("anthropic 包未安装；返回关键词匹配")
         return None
 
     candidates = [

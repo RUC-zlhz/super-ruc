@@ -23,6 +23,7 @@ from pathlib import Path
 os.environ["APP_ENV"] = "test"
 os.environ["APP_DEBUG"] = "true"
 os.environ["WECHAT_MOCK_ENABLED"] = "true"
+os.environ["WECHAT_GUEST_LOGIN_ENABLED"] = "true"
 _TESTS_ROOT = Path(__file__).resolve().parent
 _MANAGED_LOCAL_OBJECT_STORAGE_ROOT = (
     _TESTS_ROOT / "_runtime" / "local-object-storage"

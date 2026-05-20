@@ -22,6 +22,9 @@ export interface AcademicGapResult {
   plan_name?: string | null
   total_credits_required?: number | null
   total_credits_earned: number
+  credits_gap?: number | null
+  risk_level?: 'HIGH' | 'MEDIUM' | 'LOW'
+  conclusion_text?: string
   modules: AcademicModuleGap[]
   suggested_courses: Record<string, unknown>[]
   disclaimer: string
@@ -38,6 +41,8 @@ export interface AcademicGapAggregateItem {
   total_credits_required?: number | null
   total_credits_earned: number
   credits_gap?: number | null
+  risk_level?: 'HIGH' | 'MEDIUM' | 'LOW'
+  conclusion_text?: string | null
   data_warnings: string[]
   generated_at: string
 }
@@ -150,7 +155,7 @@ export interface DashboardViewModel {
 }
 
 export const DEFAULT_DASHBOARD_DISCLAIMER =
-  '本页仅展示运营概览与弱提示，不构成个人学业风险、审批结论或正式管理决定；请结合业务台账与正式审核流程复核。'
+  '本页展示运营概览、学分差额与风险分层，不构成毕业资格或审批结论；请结合业务台账与正式审核流程复核。'
 
 function pickMetric(metrics: OverviewMetric[], key: string) {
   return metrics.find((metric) => metric.key === key)
@@ -299,6 +304,7 @@ export function buildAcademicGapReservedSection(): DashboardAcademicGapSection {
 }
 
 export function deriveAcademicRiskLevel(item: AcademicGapAggregateItem): 'HIGH' | 'MEDIUM' | 'LOW' {
+  if (item.risk_level) return item.risk_level
   if (item.total_credits_required == null) {
     return item.data_warnings.length ? 'HIGH' : 'MEDIUM'
   }
@@ -330,7 +336,7 @@ export function adaptAcademicGapSection(items: AcademicGapAggregateItem[]): Dash
 
   return {
     title: '学业缺口聚合',
-    description: '当前列表基于管理侧 academic-gap 聚合查询，保持弱结论口径，只用于定位需要进一步核验的学生。',
+    description: '当前列表基于管理侧 academic-gap 聚合查询，直接呈现学分差额与风险分层，毕业资格仍以正式审核为准。',
     source: 'aggregated-query',
     items: [
       {

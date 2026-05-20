@@ -35,7 +35,7 @@
       <view class="match-hint">
         <text class="hint-label">匹配方式提示：</text>
         <text class="hint-chip" :class="{ active: matchedBy }">
-          {{ matchedBy === 'ai' ? '智能匹配' : '标题匹配' }}
+          {{ matchedBy === 'retrieval' ? '检索排序' : '标题匹配' }}
         </text>
         <text class="hint-chip">全文匹配</text>
         <text class="hint-chip">标签匹配</text>
@@ -51,7 +51,7 @@
         :disabled="aiLoading"
         @tap="onAiMatch"
       >
-        <text class="btn-icon">智</text>{{ aiLoading ? '匹配中' : '智能匹配' }}
+        <text class="btn-icon">检</text>{{ aiLoading ? '检索中' : '检索匹配' }}
       </button>
     </view>
 
@@ -106,7 +106,7 @@
 
     <view v-if="aiResult" class="ai-panel">
       <view class="ai-panel-head">
-        <text class="ai-title">智能匹配</text>
+        <text class="ai-title">检索匹配</text>
         <text class="ai-engine">{{ aiResult.engine }}</text>
       </view>
       <view
@@ -313,10 +313,10 @@ async function onAiMatch() {
   try {
     const resp = await aiMatchKnowledge(query.value, 3)
     aiResult.value = resp.data
-    matchedBy.value = 'ai'
+    matchedBy.value = 'retrieval'
   } catch {
     aiResult.value = null
-    uni.showToast({ title: '智能匹配暂不可用', icon: 'none' })
+    uni.showToast({ title: '检索匹配暂不可用', icon: 'none' })
   } finally {
     aiLoading.value = false
   }

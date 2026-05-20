@@ -32,7 +32,7 @@ miniapp/
 │   ├── notice/                        通知中心 (FR-011)
 │   │   ├── list.vue                   我的通知列表
 │   │   └── detail.vue                 通知详情
-│   ├── academic/                      学业分析 (FR-014) — 弱结论
+│   ├── academic/                      学业分析 (FR-014) — 学分缺口结论
 │   │   └── gap-view.vue               学业缺口展示（含边界提示）
 │   └── profile/                       个人中心
 │       └── index.vue                  基本信息、绑定学号 / 微信登录
@@ -40,7 +40,7 @@ miniapp/
 │   ├── StepProgress.vue               流程步骤进度条（党团阶段可视化）
 │   ├── RequestTypeCard.vue            事务类型选择卡片
 │   ├── BoundaryNotice.vue             "仅学院预检/非正式生效"提示组件（强制显示）
-│   ├── AcademicBoundaryTip.vue        学业弱结论边界提示组件（强制显示）
+│   ├── AcademicBoundaryTip.vue        学业结论边界提示组件（强制显示）
 │   └── FileUploadItem.vue             附件上传项
 ├── api/                               请求封装
 │   ├── knowledge.ts
@@ -77,7 +77,7 @@ miniapp/
 | `request/create` | FR-006 | 证明类型触发 PDF 预览入口 |
 | `request/detail` | FR-007, FR-008 | 驳回后可重提，保留原表单内容 |
 | `notice/list` | FR-011 | 仅展示本人相关通知 |
-| `academic/gap-view` | FR-014 | 必须显示弱结论边界提示 |
+| `academic/gap-view` | FR-014 | 必须显示学分缺口结论与正式审核边界提示 |
 
 ---
 
@@ -104,6 +104,14 @@ PowerShell 示例：
 
 ```powershell
 $env:VITE_MINIAPP_API_BASE_URL = 'https://example.edu.cn/api/v1'
+pnpm build:mp-weixin
+```
+
+访客登录仅用于开发调试。若确需在本地打开访客态入口，需要同时设置小程序构建变量和后端环境变量：
+
+```powershell
+$env:VITE_MINIAPP_GUEST_LOGIN_ENABLED = 'true'
+# 后端 .env 同步设置 WECHAT_GUEST_LOGIN_ENABLED=true
 pnpm build:mp-weixin
 ```
 

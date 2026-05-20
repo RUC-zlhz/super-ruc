@@ -33,7 +33,7 @@
           <input
             class="bind-input"
             v-model="studentNoForBinding"
-            placeholder="填写学号绑定，留空以访客登录"
+            :placeholder="guestLoginEnabled ? '填写学号绑定，留空以开发访客登录' : '填写学号绑定登录'"
             confirm-type="next"
           />
           <input
@@ -60,7 +60,13 @@
           >
             <text class="btn-icon">微</text> 微信一键登录
           </button>
-          <text class="login-note">已绑定微信可直接登录；首次绑定需填写学号和姓名，或身份证号后 6 位。</text>
+          <text class="login-note">
+            {{
+              guestLoginEnabled
+                ? '已绑定微信可直接登录；首次绑定需填写学号和姓名，或身份证号后 6 位。留空仅用于开发访客态调试。'
+                : '已绑定微信可直接登录；首次绑定需填写学号和姓名，或身份证号后 6 位。'
+            }}
+          </text>
         </view>
       </view>
     </view>
@@ -561,6 +567,8 @@ type SettledResult<T> =
   | { status: 'rejected'; reason: unknown }
 
 const auth = useAuthStore()
+const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env
+const guestLoginEnabled = env?.VITE_MINIAPP_GUEST_LOGIN_ENABLED === 'true'
 const profile = ref<ProfileSelfView | null>(null)
 const corrections = ref<CorrectionOut[]>([])
 const factSubmissions = ref<ProfileFactSubmissionOut[]>([])
@@ -808,6 +816,10 @@ async function onWxLogin() {
   const normalizedStudentNo = studentNoForBinding.value.trim()
   const normalizedFullName = fullNameForBinding.value.trim()
   const normalizedIdCardTail = idCardTailForBinding.value.trim()
+  if (!guestLoginEnabled && !normalizedStudentNo) {
+    uni.showToast({ title: '请填写学号完成绑定登录', icon: 'none' })
+    return
+  }
   if (!normalizedStudentNo && (normalizedFullName || normalizedIdCardTail)) {
     uni.showToast({ title: '绑定学生时请先填写学号', icon: 'none' })
     return

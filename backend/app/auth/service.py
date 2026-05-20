@@ -197,6 +197,13 @@ async def login_with_wechat(
     normalized_student_no = _clean_optional(student_no)
     normalized_full_name = _clean_optional(full_name)
     normalized_id_card_tail = _clean_optional(id_card_tail)
+    guest_login_requested = normalized_student_no is None
+    if guest_login_requested and not settings.WECHAT_GUEST_LOGIN_ENABLED:
+        raise BizError(
+            "访客登录仅在开发模式开关开启时可用，请填写学号完成绑定",
+            code=40320,
+            http_status=403,
+        )
     session_data = await wx_code2session(code, student_no=normalized_student_no)
     openid = session_data["openid"]
 
