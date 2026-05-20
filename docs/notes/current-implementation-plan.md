@@ -428,6 +428,7 @@
 当前结论：
 
 - `S34` 的代码可落地部分已完成：访客登录只在显式开发开关下启用；知识问答接口保留旧路径但固定检索式排序；班团骨干可使用党团流程发起入口且后端继续按 `scope_code` 校验；学业缺口接口与 Web/Miniapp 页面均增加学分差额、风险等级和结论文本。
+- `2026-05-20` 生产部署验证：本地提交 `f35cf98` 已通过 bundle 同步到 `10.10.0.13:/opt/super-ruc/app`，先生成数据库备份 `/opt/super-ruc/backups/super-ruc-20260520-233518-f35cf98.dump`，随后执行 `deploy.sh local`、`migrate-and-seed.sh` 与 `smoke.sh` 通过；本机访问 `http://10.10.0.13/healthz` 返回 `200` 与 `{"status":"ok"}`。同一提交已推送到 GitHub `origin/main`。
 - 真实微信订阅消息与真实学院演示数据不能由代码替代，需要外部配置与数据文件后才能闭环。
 
 证据：
@@ -981,7 +982,7 @@
 | 2026-05-19 | Web 党团流程发起入口补齐 | `docs/notes/refinements/2026-05-19-workflow-student-launch-entry.md` | `S31.1, S31.2, S31.3, S31.4` | `[x]` | 已新增老师侧“发起学生流程”按钮与弹窗，补齐流程候选学生检索、服务端学号筛选与权限收口，并增强候选学生搜索结果反馈；后端回归 `5 passed`，`web vue-tsc --noEmit` 与 `vite build` 通过 |
 | 2026-05-20 | 工作流发起服务端范围校验修复 | `docs/notes/refinements/2026-05-20-workflow-start-scope-guard.md` | `S32.1, S32.2, S32.3, S32.4` | `[x]` | 已将发起学生流程的范围校验下沉到后端服务层，补范围外/空 scope 拒绝审计与回归样例；ruff 与 py_compile 通过，集成测试受本机测试库连接拒绝阻塞 |
 | 2026-05-20 | 党团流程范围权限二次收口 | `docs/notes/refinements/2026-05-20-workflow-scope-closure.md` | `S33.1, S33.2, S33.3, S33.4, S33.5` | `[x]` | 已将流程详情、节点操作、流程列表与提醒列表统一接入后端学生 scope 校验；ruff 与 py_compile 通过，集成测试受本机测试库连接拒绝阻塞 |
-| 2026-05-20 | S34 最终缺口闭合方向 | `docs/notes/refinements/2026-05-20-s34-final-gap-closure-direction.md` | `S34.1, S34.2, S34.3, S34.4, S34.5, S34.6` | `[!]` | 可直接落地项已完成并通过静态/构建验证；真实微信订阅联调和真实学院数据仍等待外部输入 |
+| 2026-05-20 | S34 最终缺口闭合方向 | `docs/notes/refinements/2026-05-20-s34-final-gap-closure-direction.md` | `S34.1, S34.2, S34.3, S34.4, S34.5, S34.6` | `[!]` | 可直接落地项已完成并通过静态/构建验证，且 `f35cf98` 已部署到 `10.10.0.13` 并推送 `origin/main`；真实微信订阅联调和真实学院数据仍等待外部输入 |
 
 ## 会话更新要求
 
@@ -1067,6 +1068,7 @@
 - `2026-05-19`：新增并完成 `S31` Web 党团流程发起入口补齐；在 `PartyStageList` 学生流程页加入“发起学生流程”按钮和响应式弹窗，老师可直接搜索学生、选择模板并发起流程；后端同步补齐 `GET /admin/workflow/students/search`、学生流程服务端学号筛选以及启动权限收口，学生端无需改造即可查看新流程进度；随后补强候选学生搜索反馈，前端会显式展示命中数量并在单条命中时自动选中结果；`backend/tests/integration/test_workflow_party_flow.py` 回归 `5 passed`，`web vue-tsc --noEmit` 与 `vite build` 通过。
 - `2026-05-20`：新增并完成 `S32` 工作流发起服务端范围校验修复；`POST /admin/workflow/students` 现会在服务层按角色与 `scope_code` 校验目标学生，范围外或空 scope 发起会返回 403 并写入 `WORKFLOW / STUDENT_WORKFLOW / START` 拒绝审计；新增 scoped 成功、范围外拒绝、空 scope 拒绝和超管全局发起回归样例。`ruff check` 与 `py_compile` 通过；`pytest tests/integration/test_workflow_party_flow.py` 因当前测试数据库连接拒绝在 setup 阶段失败，未进入业务断言。
 - `2026-05-20`：新增并完成 `S33` 党团流程范围权限二次收口；流程详情、节点操作、管理列表和提醒列表均已按当前用户角色与 `scope_code` 在后端二次校验，范围外节点操作写入 `WORKFLOW / STUDENT_WORKFLOW_NODE` 拒绝审计；新增详情读取、列表/提醒过滤和节点越权回归样例。`ruff check` 与 `py_compile` 通过；`pytest tests/integration/test_workflow_party_flow.py` 因当前测试数据库连接拒绝在 setup 阶段失败，未进入业务断言。
+- `2026-05-20`：`S34` 可直接落地项已部署到内网生产 `10.10.0.13`。部署前备份 `/opt/super-ruc/backups/super-ruc-20260520-233518-f35cf98.dump`，`deploy.sh local`、`migrate-and-seed.sh`、`smoke.sh` 均通过；`http://10.10.0.13/healthz` 返回 `200`。提交 `f35cf98` 已推送到 GitHub `origin/main`。
 - `2026-05-18`：完成 `S24` 拉取后请求权限范围与公开预览门禁收口；班团骨干等协同角色的申请工作台、详情与处理动作已按 `scope_code` 限定可见范围，且本人申请不能绕过协同 scope 执行管理动作；`/preview/requirements` 改为仅开发或显式开关注册；申请流回归 `14 passed`、静态校验与 Web 构建通过。
 - `2026-05-19`：新增并完成 `S28` 内网生产部署与持续交付底座；已落地 `deploy/intranet-prod/` 的 Compose、Nginx、Web Dockerfile、生产 `.env` 模板、部署/迁移/备份/恢复/回滚/smoke 脚本和小程序内网出包入口，并完成本地验证；通过本机 SSH 反向 SOCKS 代理完成服务器 `git / Docker / Compose` 初始化和 Docker 镜像拉取验证；服务器生产 `.env` 就绪后完成五服务上线、Alembic 迁移、幂等基础种子、smoke、本机内网访问与数据库备份脚本验证。
 - `2026-05-19`：新增并完成 `S29` 生产默认数据导入与管理入口补强；为后端生产容器只读挂载 `docs` 默认数据源，新增 `seed-default-data.sh`，在服务器完成默认学生与 `2024-default` 培养方案导入，并补 Web 单个后台账号创建和学生学籍信息编辑入口；`pnpm -C web build`、Compose config、shell 语法检查、服务器 Web 重建与 smoke 通过。

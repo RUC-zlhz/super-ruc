@@ -46,3 +46,6 @@
 - Web 构建：`pnpm -C web build` 通过。
 - Miniapp 微信小程序构建：`pnpm -C miniapp build:mp-weixin` 通过。
 - 阻塞验证：`uv run --extra dev pytest tests/integration/test_auth_flow.py -q --basetemp=.tmp/pytest-tmp-s34-auth` 在 fixture setup 阶段因 `localhost:54322/sip_db_test` 连接拒绝失败，未进入业务断言。
+- 生产部署：本地提交 `f35cf98` 通过 bundle 同步到 `10.10.0.13:/opt/super-ruc/app`，部署前备份 `/opt/super-ruc/backups/super-ruc-20260520-233518-f35cf98.dump`，随后执行 `bash deploy/intranet-prod/scripts/deploy.sh local`、`bash deploy/intranet-prod/scripts/migrate-and-seed.sh`、`bash deploy/intranet-prod/scripts/smoke.sh` 通过。
+- 内网健康检查：本机访问 `http://10.10.0.13/healthz` 返回 `200` 与 `{"status":"ok"}`。
+- GitHub 推送：提交 `f35cf98` 已推送到 `origin/main`。
