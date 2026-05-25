@@ -76,11 +76,9 @@
         <a-empty description="overview 已返回，但当前没有可视化价值较高的运营数据" />
       </a-card>
 
-      <div class="dashboard-board">
-        <section class="dashboard-canvas">
-          <div class="chart-mosaic">
-            <a-card title="事务申请分布" :bordered="false" class="visual-card donut-card">
-              <template v-if="dashboard.requestDistribution.length">
+      <div class="chart-mosaic">
+        <a-card title="事务申请分布" :bordered="false" class="visual-card donut-card">
+          <template v-if="dashboard.requestDistribution.length">
                 <div class="donut-row">
                   <div class="donut-visual">
                     <div class="donut-core">
@@ -270,81 +268,6 @@
               </a-table>
             </a-card>
           </div>
-        </section>
-
-        <aside class="dashboard-side-panel">
-          <div class="side-head">
-            <strong>学业缺口详情</strong>
-            <a-button type="text" size="small" :disabled="!selectedGapRow" @click="clearSelectedGap">
-              <template #icon><CloseOutlined /></template>
-            </a-button>
-          </div>
-          <template v-if="selectedGapRow">
-            <div class="side-section student-card">
-              <div class="side-avatar">{{ selectedGapRow.student_name.slice(0, 1) }}</div>
-              <div>
-                <strong>{{ selectedGapRow.student_name }}</strong>
-                <p>{{ selectedGapRow.student_no }}</p>
-                <p>{{ selectedGapRow.major_code || '-' }} · {{ selectedGapRow.grade_code || '-' }}</p>
-              </div>
-            </div>
-            <a-spin :spinning="selectedGapDetailLoading">
-              <div class="side-section">
-                <h3>缺口描述</h3>
-                <p class="gap-conclusion">
-                  {{ selectedGapDetail?.conclusion_text || selectedGapRow.conclusion_text || gapConclusion(selectedGapRow) }}
-                </p>
-                <p>
-                  当前参考要求 {{ formatCredits(selectedGapRow.total_credits_required) }}，
-                  已获 {{ formatCredits(selectedGapRow.total_credits_earned) }}，
-                  差额参考 {{ formatCredits(selectedGapRow.credits_gap) }}。
-                </p>
-                <p class="detail-muted">
-                  风险等级：{{ academicRiskLabel(selectedGapRow) }} · 生成时间：{{ formatDateTime(selectedGapRow.generated_at) }}
-                </p>
-              </div>
-              <div class="side-section">
-                <h3>培养方案</h3>
-                <p>{{ selectedGapDetail?.plan_name || '当前明细未返回培养方案名称' }}</p>
-              </div>
-              <div class="side-section">
-                <h3>数据提示</h3>
-                <ul v-if="selectedGapWarnings.length">
-                  <li v-for="warning in selectedGapWarnings" :key="warning">{{ warning }}</li>
-                </ul>
-                <p v-else class="detail-muted">当前未返回额外 warning。</p>
-              </div>
-              <div class="side-section">
-                <h3>模块概况</h3>
-                <div v-if="selectedGapModules.length" class="module-list">
-                  <div v-for="module in selectedGapModules.slice(0, 5)" :key="module.module_code" class="module-row">
-                    <div>
-                      <strong>{{ module.module_name }}</strong>
-                      <p>{{ module.module_code }} · {{ module.module_type }}</p>
-                    </div>
-                    <div class="module-metrics">
-                      <span>差额 {{ formatCredits(module.credits_gap) }}</span>
-                      <span>已获 {{ formatCredits(module.credits_earned) }}</span>
-                    </div>
-                  </div>
-                </div>
-                <p v-else class="detail-muted">当前明细未返回模块差额。</p>
-              </div>
-              <div class="side-actions">
-                <a-button @click="openAcademicGapDetail(selectedGapRow.student_id)">
-                  <template #icon><EyeOutlined /></template>
-                  查看完整明细
-                </a-button>
-                <a-button type="primary" @click="goToStudentProfile(selectedGapRow.student_id)">
-                  <template #icon><CheckCircleOutlined /></template>
-                  查看学生画像
-                </a-button>
-              </div>
-            </a-spin>
-          </template>
-          <a-empty v-else description="请选择记录" />
-        </aside>
-      </div>
     </a-spin>
 
     <a-drawer
@@ -353,6 +276,12 @@
       title="学业缺口明细"
       @close="closeAcademicGapDrawer"
     >
+      <template #extra>
+        <a-button type="primary" @click="currentDrawerStudentId && goToStudentProfile(currentDrawerStudentId)" v-if="academicGapDetail">
+          <template #icon><CheckCircleOutlined /></template>
+          查看学生画像
+        </a-button>
+      </template>
       <a-spin :spinning="academicGapDetailLoading">
         <template v-if="academicGapDetail">
           <a-alert
@@ -448,7 +377,6 @@ import { useRouter } from 'vue-router'
 import {
   AlertOutlined,
   BellOutlined,
-  CloseOutlined,
   FileDoneOutlined,
   FormOutlined,
   TeamOutlined,
@@ -496,9 +424,7 @@ const academicGapPagination = reactive({
 const academicGapDrawerOpen = ref(false)
 const academicGapDetailLoading = ref(false)
 const academicGapDetail = ref<AcademicGapResult | null>(null)
-const selectedGapStudentId = ref<number | null>(null)
-const selectedGapDetailLoading = ref(false)
-const selectedGapDetail = ref<AcademicGapResult | null>(null)
+const currentDrawerStudentId = ref<number | null>(null)
 const academicGapDetailCache = new Map<number, AcademicGapResult>()
 
 const academicGapColumns = [
@@ -523,20 +449,6 @@ const academicGapDetailColumns = [
 ]
 
 const dashboard = computed(() => buildDashboardViewModel(overview.value, academicGapRows.value))
-const selectedGapRow = computed(() => {
-  if (selectedGapStudentId.value == null) return null
-  return academicGapRows.value.find((item) => item.student_id === selectedGapStudentId.value) ?? null
-})
-const selectedGapWarnings = computed(() => {
-  if (selectedGapDetail.value?.data_warnings?.length) {
-    return selectedGapDetail.value.data_warnings
-  }
-  return selectedGapRow.value?.data_warnings ?? []
-})
-const selectedGapModules = computed(() => {
-  const modules = selectedGapDetail.value?.modules ?? []
-  return modules.filter((item) => item.credits_gap > 0 || Boolean(item.note))
-})
 
 const METRIC_ICON: Record<string, unknown> = {
   students: TeamOutlined,
@@ -597,11 +509,9 @@ async function loadAcademicGapList() {
     })
     academicGapRows.value = resp.data.items
     academicGapPagination.total = resp.data.meta.total
-    syncSelectedGap()
   } catch {
     academicGapRows.value = []
     academicGapPagination.total = 0
-    clearSelectedGap()
     academicGapError.value = '请检查 academic-gap 聚合接口是否可用，或稍后重试。'
   } finally {
     loadingAcademicGap.value = false
@@ -656,65 +566,21 @@ function gapConclusion(item: AcademicGapAggregateItem) {
   return `按当前数据仍有 ${formatCredits(item.credits_gap)} 学分缺口。`
 }
 
-function clearSelectedGap() {
-  selectedGapStudentId.value = null
-  selectedGapDetail.value = null
-  selectedGapDetailLoading.value = false
-}
-
-function syncSelectedGap() {
-  if (selectedGapStudentId.value == null) return
-  if (!academicGapRows.value.some((item) => item.student_id === selectedGapStudentId.value)) {
-    clearSelectedGap()
-  }
-}
-
-async function loadGapDetailIntoPanel(studentId: number, force = false) {
-  if (!force && academicGapDetailCache.has(studentId)) {
-    selectedGapDetail.value = academicGapDetailCache.get(studentId) ?? null
-    return
-  }
-  selectedGapDetailLoading.value = true
-  try {
-    const resp = await fetchAcademicGap(studentId)
-    academicGapDetailCache.set(studentId, resp.data)
-    if (selectedGapStudentId.value === studentId) {
-      selectedGapDetail.value = resp.data
-    }
-  } catch {
-    if (selectedGapStudentId.value === studentId) {
-      selectedGapDetail.value = null
-    }
-  } finally {
-    if (selectedGapStudentId.value === studentId) {
-      selectedGapDetailLoading.value = false
-    }
-  }
-}
-
-async function selectAcademicGap(studentId: number, force = false) {
-  selectedGapStudentId.value = studentId
-  selectedGapDetail.value = academicGapDetailCache.get(studentId) ?? null
-  await loadGapDetailIntoPanel(studentId, force)
-}
-
 function academicGapRowProps(record: AcademicGapAggregateItem) {
   return {
     class: 'selectable-gap-row',
     onClick: () => {
-      void selectAcademicGap(record.student_id)
+      void openAcademicGapDetail(record.student_id)
     },
   }
 }
 
 function academicGapRowClassName(record: AcademicGapAggregateItem) {
-  return record.student_id === selectedGapStudentId.value
-    ? 'selectable-gap-row selected-gap-row'
-    : 'selectable-gap-row'
+  return 'selectable-gap-row'
 }
 
 async function openAcademicGapDetail(studentId: number) {
-  await selectAcademicGap(studentId)
+  currentDrawerStudentId.value = studentId
   academicGapDrawerOpen.value = true
   academicGapDetailLoading.value = true
   try {
@@ -735,6 +601,7 @@ async function openAcademicGapDetail(studentId: number) {
 function closeAcademicGapDrawer() {
   academicGapDrawerOpen.value = false
   academicGapDetail.value = null
+  currentDrawerStudentId.value = null
 }
 
 function goToStudentProfile(studentId: number) {
@@ -757,32 +624,20 @@ onMounted(async () => {
 }
 
 .operation-dashboard {
-  padding-right: 394px;
-}
-
-.dashboard-board {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
-}
-
-.dashboard-canvas {
-  min-width: 0;
+  /* removed padding-right */
 }
 
 .chart-mosaic {
   display: grid;
-  grid-template-columns: 1.08fr 1fr 1fr;
-  gap: 14px;
-  margin-bottom: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 .dashboard-lower {
-  display: grid;
-  grid-template-columns: minmax(260px, 0.78fr) minmax(0, 1.42fr);
-  gap: 14px;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .visual-card {
@@ -858,8 +713,8 @@ onMounted(async () => {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
 }
 
 .summary-tile {
@@ -1078,8 +933,7 @@ onMounted(async () => {
   margin: 8px 0;
 }
 
-.risk-card-body ul,
-.dashboard-side-panel ul {
+.risk-card-body ul {
   margin: 8px 0 0;
   padding-left: 16px;
 }
@@ -1111,139 +965,12 @@ onMounted(async () => {
   box-shadow: none;
 }
 
-.dashboard-side-panel {
-  position: fixed;
-  top: 58px;
-  right: 0;
-  bottom: 0;
-  z-index: 12;
-  width: 380px;
-  overflow-y: auto;
-  padding: 20px 20px 18px;
-  background: #fff;
-  border: 1px solid var(--line-soft);
-  border-top: 0;
-  border-right: 0;
-  border-bottom: 0;
-  border-radius: 0;
-  box-shadow: var(--shadow-card);
-}
-
-.side-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: -2px -2px 16px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.side-head strong {
-  font-size: 16px;
-}
-
-.side-head :deep(.ant-btn) {
-  color: var(--text-3);
-}
-
-.side-section {
-  padding: 14px 0;
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.side-section h3 {
-  margin: 0 0 8px;
-  color: var(--text);
-  font-size: 14px;
-}
-
-.side-section p,
-.side-section li {
-  margin: 0;
-  color: var(--text-2);
-  font-size: 12px;
-  line-height: 1.7;
-}
-
-.student-card {
-  display: grid;
-  grid-template-columns: 58px minmax(0, 1fr);
-  gap: 12px;
-  align-items: center;
-}
-
-.side-avatar {
-  display: grid;
-  width: 56px;
-  height: 56px;
-  place-items: center;
-  color: #fff;
-  background: var(--ruc-red);
-  border-radius: 999px;
-  font-size: 24px;
-  font-weight: 800;
-}
-
-.side-trend {
-  width: 100%;
-  height: 118px;
-  background:
-    repeating-linear-gradient(0deg, transparent 0 28px, #eef1f5 28px 29px),
-    linear-gradient(180deg, #fff, #fff7f8);
-  border-radius: 10px;
-}
-
-.side-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.module-list {
-  display: grid;
-  gap: 10px;
-}
-
-.module-row {
-  align-items: flex-start;
-  padding: 12px;
-  background: #fbfcfe;
-  border: 1px solid var(--line-soft);
-  border-radius: 12px;
-}
-
-.module-metrics {
-  display: grid;
-  justify-items: end;
-  gap: 4px;
-  color: var(--text-2);
-  font-size: 12px;
-}
-
 :deep(.selectable-gap-row > td) {
   cursor: pointer;
 }
 
-:deep(.selected-gap-row > td) {
-  background: #fff4f5 !important;
-}
-
-@media (max-width: 1320px) {
-  .operation-dashboard {
-    padding-right: 0;
-  }
-
-  .dashboard-side-panel {
-    position: static;
-    width: auto;
-    border: 1px solid var(--line-soft);
-    border-radius: 12px;
-  }
-
-  .summary-grid {
-    grid-template-columns: 1fr;
-  }
+:deep(.selectable-gap-row:hover > td) {
+  background: #fafafa !important;
 }
 
 .chart-stack {
