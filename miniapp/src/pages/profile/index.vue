@@ -2159,6 +2159,18 @@ onMounted(async () => {
   box-sizing: border-box;
 }
 
+.input {
+  height: 88rpx;
+  padding: 0 20rpx;
+}
+
+.picker-value {
+  min-height: 88rpx;
+  padding: 0 20rpx;
+  display: flex;
+  align-items: center;
+}
+
 .textarea {
   min-height: 180rpx;
   width: 100%;

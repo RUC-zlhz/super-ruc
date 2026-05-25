@@ -1278,6 +1278,11 @@ onMounted(async () => {
   box-shadow: inset 0 2rpx 8rpx rgba(82, 28, 38, 0.03);
 }
 
+.input {
+  height: 88rpx;
+  padding: 0 18rpx;
+}
+
 .textarea {
   min-height: 160rpx;
 }
