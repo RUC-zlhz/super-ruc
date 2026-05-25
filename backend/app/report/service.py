@@ -83,7 +83,7 @@ _TERM_CODE_PATTERN = re.compile(r"(\d{4})-(SPRING|SUMMER|FALL|WINTER)")
 
 
 def _generate_transcript_pdf_batch_no() -> str:
-    return f"IM-TPDF-{datetime.now(UTC).strftime('%y%m%d%H%M%S')}-" f"{uuid.uuid4().hex[:6].upper()}"
+    return f"IM-TPDF-{datetime.now(UTC).strftime('%y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}"
 
 
 def _safe_filename(filename: str | None) -> str:
@@ -698,40 +698,119 @@ async def list_academic_gap_overview(
         stmt = stmt.where(Student.grade_code == grade_code)
     if major_code:
         stmt = stmt.where(Student.major_code == major_code)
-    students = (await db.execute(stmt.order_by(Student.student_no.asc(), Student.id.asc()))).scalars().all()
+
+    # 先计算满足基础条件的总人数
+    total_stmt = select(func.count()).select_from(stmt.subquery())
+    total_students_count = (await db.execute(total_stmt)).scalar_one()
+
+    if total_students_count == 0:
+        return [], 0
+
+    # 修复崩溃类 Bug: 取消全量内存计算，改为仅在当前分页内进行学业缺口计算
+    # 这里我们通过学号和 ID 进行稳定排序后分页。
+    # 由于不进行全量计算就无法得知精确的 risk_level 和 credits_gap，
+    # 我们如果遇到 risk_level 过滤，目前只能通过逐页向后扫描的方式来满足过滤条件，
+    # 为了防止死循环或超时，我们设定一个扫描上限。但在没有 risk_level 过滤时，直接走数据库分页。
 
     desired_risk = risk_level.upper() if risk_level else None
-    rank_map = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
-    items: list[tuple[int, float, AcademicGapAggregateItem]] = []
-    for student in students:
-        result = await compute_academic_gap(db, student.id)
-        current_risk = _derive_risk_level(result)
-        if desired_risk and current_risk != desired_risk:
-            continue
-        gap = _compute_gap_value(result)
-        item = AcademicGapAggregateItem(
-            student_id=student.id,
-            student_no=result.student_no,
-            student_name=result.student_name,
-            grade_code=result.grade_code,
-            major_code=result.major_code,
-            total_credits_required=result.total_credits_required,
-            total_credits_earned=result.total_credits_earned,
-            credits_gap=gap,
-            risk_level=current_risk,
-            conclusion_text=_build_academic_gap_conclusion(result),
-            data_warnings=result.data_warnings,
-            generated_at=result.generated_at,
-        )
-        gap_sort = gap if gap is not None else float("inf")
-        items.append((rank_map.get(current_risk, 99), gap_sort, item))
 
-    items.sort(key=lambda row: (row[0], -row[1], row[2].student_no, row[2].student_id))
-    flattened = [item for _, _, item in items]
-    total = len(flattened)
-    start = max(page - 1, 0) * page_size
-    end = start + page_size
-    return flattened[start:end], total
+    if not desired_risk:
+        # 没有 risk_level 过滤时，直接数据库分页，极大提升性能
+        start = max(page - 1, 0) * page_size
+        paged_students = (
+            (
+                await db.execute(
+                    stmt.order_by(Student.student_no.asc(), Student.id.asc()).offset(start).limit(page_size)
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        items: list[AcademicGapAggregateItem] = []
+        for student in paged_students:
+            result = await compute_academic_gap(db, student.id)
+            current_risk = _derive_risk_level(result)
+            gap = _compute_gap_value(result)
+            item = AcademicGapAggregateItem(
+                student_id=student.id,
+                student_no=result.student_no,
+                student_name=result.student_name,
+                grade_code=result.grade_code,
+                major_code=result.major_code,
+                total_credits_required=result.total_credits_required,
+                total_credits_earned=result.total_credits_earned,
+                credits_gap=gap,
+                risk_level=current_risk,
+                conclusion_text=_build_academic_gap_conclusion(result),
+                data_warnings=result.data_warnings,
+                generated_at=result.generated_at,
+            )
+            items.append(item)
+
+        return items, total_students_count
+
+    # 存在 risk_level 过滤时的 fallback 方案 (流式扫描，带安全熔断)
+    # 注意：这里的 total 无法精准返回满足该风险等级的总人数（除非全量算），
+    # 故返回基础查询的总数，前端分页页码可能不准，但防止了服务卡死。
+    items = []
+    chunk_size = 100
+    offset = 0
+    max_scan_students = 2000  # 安全熔断阈值，防止把数据库扫爆
+    scanned = 0
+    target_start_index = max(page - 1, 0) * page_size
+    collected_count = 0
+
+    while scanned < max_scan_students and offset < total_students_count:
+        chunk_students = (
+            (
+                await db.execute(
+                    stmt.order_by(Student.student_no.asc(), Student.id.asc()).offset(offset).limit(chunk_size)
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        if not chunk_students:
+            break
+
+        offset += chunk_size
+
+        for student in chunk_students:
+            scanned += 1
+            result = await compute_academic_gap(db, student.id)
+            current_risk = _derive_risk_level(result)
+
+            if current_risk != desired_risk:
+                continue
+
+            collected_count += 1
+            if collected_count <= target_start_index:
+                # 还没到当前页的起始位置，跳过
+                continue
+
+            gap = _compute_gap_value(result)
+            item = AcademicGapAggregateItem(
+                student_id=student.id,
+                student_no=result.student_no,
+                student_name=result.student_name,
+                grade_code=result.grade_code,
+                major_code=result.major_code,
+                total_credits_required=result.total_credits_required,
+                total_credits_earned=result.total_credits_earned,
+                credits_gap=gap,
+                risk_level=current_risk,
+                conclusion_text=_build_academic_gap_conclusion(result),
+                data_warnings=result.data_warnings,
+                generated_at=result.generated_at,
+            )
+            items.append(item)
+
+            if len(items) >= page_size:
+                return items, total_students_count
+
+    return items, total_students_count
 
 
 # ============================================================
