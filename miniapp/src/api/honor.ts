@@ -19,6 +19,7 @@ export interface HonorRecordBrief {
   announced_at: string
   status: string
   is_collective: boolean
+  display_order: number
   cover_image_url?: string | null
   summary?: string | null
   effective_to?: string | null
@@ -50,6 +51,7 @@ export interface HonorRecordDetail {
   effective_from?: string | null
   effective_to?: string | null
   is_collective: boolean
+  display_order: number
   summary?: string | null
   story_md?: string | null
   acceptance_speech?: string | null
@@ -74,6 +76,7 @@ export function listPublicHonors(params?: {
   category_code?: string
   level?: string
   year?: number
+  is_collective?: boolean
   q?: string
   include_archived?: boolean
   page?: number

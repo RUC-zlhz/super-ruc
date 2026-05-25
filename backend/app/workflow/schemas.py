@@ -346,6 +346,45 @@ class ReopenRequestIn(BaseModel):
     target_status: Literal["IN_REVIEW", "SUBMITTED"] = "IN_REVIEW"
 
 
+class ProofTemplateIn(BaseModel):
+    code: str = Field(min_length=2, max_length=64)
+    name: str = Field(min_length=1, max_length=128)
+    request_type_code: str = Field(min_length=2, max_length=64)
+    version_label: str = Field(default="v1", min_length=1, max_length=32)
+    html_template: str = Field(min_length=1)
+    field_schema: dict[str, Any] | None = None
+    is_active: bool = True
+    is_default: bool = True
+
+
+class ProofTemplateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    code: str
+    name: str
+    request_type_code: str
+    version_label: str
+    html_template: str
+    field_schema: dict[str, Any] | None
+    is_active: bool
+    is_default: bool
+    created_by: int | None
+    updated_by: int | None
+    updated_at: datetime
+
+
+class ProofTemplatePreviewIn(BaseModel):
+    html_template: str = Field(min_length=1)
+    request_id: int | None = None
+    sample_data: dict[str, Any] | None = None
+
+
+class ProofTemplatePreviewOut(BaseModel):
+    html: str
+    placeholders: list[str]
+
+
 # ============================================================
 # C. 理论自测题库（FR-005）
 # ============================================================

@@ -65,6 +65,16 @@
                 <a-select-option value="REVOKED">撤销</a-select-option>
               </a-select>
             </a-form-item>
+            <a-form-item label="类型">
+              <a-select
+                v-model:value="filters.honor_type"
+                style="width: 130px"
+                allow-clear
+              >
+                <a-select-option value="PERSONAL">个人</a-select-option>
+                <a-select-option value="COLLECTIVE">集体</a-select-option>
+              </a-select>
+            </a-form-item>
             <a-form-item>
               <a-space wrap>
       <a-button type="primary" html-type="submit">
@@ -97,7 +107,7 @@
           :data-source="rows"
           :loading="loading"
           :pagination="pagination"
-          :scroll="{ x: 1520 }"
+          :scroll="{ x: 1610 }"
           row-key="id"
           @change="onTableChange"
         >
@@ -126,6 +136,12 @@
 
             <template v-else-if="column.key === 'level'">
               {{ levelLabel(record.level) }}
+            </template>
+
+            <template v-else-if="column.key === 'honor_type'">
+              <a-tag :color="record.is_collective ? 'blue' : 'purple'">
+                {{ record.is_collective ? '集体' : '个人' }}
+              </a-tag>
             </template>
 
             <template v-else-if="column.key === 'recipients'">
@@ -348,6 +364,77 @@
           </a-form-item>
           <a-form-item label="获奖感言">
             <a-textarea v-model:value="form.acceptance_speech" :rows="3" />
+          </a-form-item>
+
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item label="展示顺序">
+                <a-input-number
+                  v-model:value="form.display_order"
+                  :min="0"
+                  style="width: 100%"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="封面图片 URL">
+                <a-input
+                  v-model:value="form.cover_image_url"
+                  placeholder="用于榜样宣传卡片展示"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+
+          <a-form-item label="媒体 JSON">
+            <a-textarea
+              v-model:value="form.media_text"
+              :rows="3"
+              placeholder='如 {"photos":["https://..."],"videos":[]}'
+            />
+          </a-form-item>
+
+          <a-form-item label="获奖人 / 集体成员" required>
+            <div class="recipient-editor">
+              <div
+                v-for="(recipient, index) in form.recipients"
+                :key="index"
+                class="recipient-row-editor"
+              >
+                <a-input
+                  v-model:value="recipient.display_name"
+                  placeholder="姓名或集体名称"
+                />
+                <a-input
+                  v-model:value="recipient.student_no_snapshot"
+                  placeholder="学号"
+                />
+                <a-input
+                  v-model:value="recipient.major_snapshot"
+                  placeholder="专业"
+                />
+                <a-input
+                  v-model:value="recipient.grade_snapshot"
+                  placeholder="年级"
+                />
+                <a-input
+                  v-model:value="recipient.class_snapshot"
+                  placeholder="班级"
+                />
+                <a-input
+                  v-model:value="recipient.role_in_collective"
+                  placeholder="集体角色"
+                />
+                <a-button
+                  danger
+                  :disabled="form.recipients.length <= 1"
+                  @click="removeRecipient(index)"
+                >
+                  删除
+                </a-button>
+              </div>
+              <a-button block @click="addRecipient">新增获奖人 / 成员</a-button>
+            </div>
           </a-form-item>
 
           <a-space direction="vertical" style="width: 100%">
@@ -599,7 +686,6 @@ import {
   type HonorRecordBrief,
   type HonorRecordDetail,
   type HonorRecordIn,
-  type HonorRecipientIn,
   type HonorStatus,
 } from '@/api/honor'
 
@@ -609,6 +695,7 @@ const columns = [
   { title: '荣誉信息', dataIndex: 'title', key: 'title', width: 280 },
   { title: '类别', key: 'category', width: 170 },
   { title: '级别', dataIndex: 'level', key: 'level', width: 100 },
+  { title: '类型', key: 'honor_type', width: 90 },
   { title: '授奖单位', dataIndex: 'awarded_by', key: 'awarded_by', width: 180 },
   { title: '获奖人', key: 'recipients', width: 220 },
   { title: '公布日期', dataIndex: 'announced_at', key: 'announced_at', width: 120 },
@@ -655,6 +742,7 @@ const filters = reactive<{
   year?: number
   level?: HonorLevel
   status?: HonorStatus
+  honor_type?: 'PERSONAL' | 'COLLECTIVE'
 }>({})
 
 const rows = ref<HonorRecordBrief[]>([])
@@ -860,6 +948,11 @@ async function reload(resetPage = false) {
       year: filters.year,
       level: filters.level,
       status: filters.status,
+      is_collective: filters.honor_type === 'COLLECTIVE'
+        ? true
+        : filters.honor_type === 'PERSONAL'
+          ? false
+          : undefined,
       page: pagination.current,
       size: pagination.pageSize,
     })
@@ -880,6 +973,7 @@ function onResetFilters() {
   filters.year = undefined
   filters.level = undefined
   filters.status = undefined
+  filters.honor_type = undefined
   void reload(true).catch(() => undefined)
 }
 
@@ -887,6 +981,16 @@ function onTableChange(p: { current?: number; pageSize?: number }) {
   pagination.current = p.current ?? pagination.current
   pagination.pageSize = p.pageSize ?? pagination.pageSize
   void reload().catch(() => undefined)
+}
+
+interface HonorRecipientForm {
+  student_id: number | null
+  student_no_snapshot: string
+  display_name: string
+  major_snapshot: string
+  grade_snapshot: string
+  class_snapshot: string
+  role_in_collective: string
 }
 
 interface HonorFormState {
@@ -900,12 +1004,13 @@ interface HonorFormState {
   effective_to?: string
   is_collective: boolean
   summary: string
+  display_order: number
   story_md: string
   acceptance_speech: string
   cover_image_url: string
-  media: Record<string, unknown> | null
+  media_text: string
   consent_flag: boolean
-  recipients: HonorRecipientIn[]
+  recipients: HonorRecipientForm[]
 }
 
 interface CategoryFormState {
@@ -929,12 +1034,25 @@ function createEmptyForm(): HonorFormState {
     effective_to: undefined,
     is_collective: false,
     summary: '',
+    display_order: 0,
     story_md: '',
     acceptance_speech: '',
     cover_image_url: '',
-    media: null,
+    media_text: '',
     consent_flag: false,
-    recipients: [],
+    recipients: [createEmptyRecipient()],
+  }
+}
+
+function createEmptyRecipient(): HonorRecipientForm {
+  return {
+    student_id: null,
+    student_no_snapshot: '',
+    display_name: '',
+    major_snapshot: '',
+    grade_snapshot: '',
+    class_snapshot: '',
+    role_in_collective: '',
   }
 }
 
@@ -950,19 +1068,20 @@ function buildFormFromDetail(detail: HonorRecordDetail): HonorFormState {
     effective_to: detail.effective_to || undefined,
     is_collective: detail.is_collective,
     summary: detail.summary || '',
+    display_order: detail.display_order || 0,
     story_md: detail.story_md || '',
     acceptance_speech: detail.acceptance_speech || '',
     cover_image_url: detail.cover_image_url || '',
-    media: detail.media || null,
+    media_text: detail.media ? JSON.stringify(detail.media, null, 2) : '',
     consent_flag: detail.consent_flag,
-    recipients: detail.recipients.map((recipient) => ({
+    recipients: (detail.recipients.length ? detail.recipients : [createEmptyRecipient()]).map((recipient) => ({
       student_id: recipient.student_id ?? null,
-      student_no_snapshot: recipient.student_no_snapshot ?? null,
+      student_no_snapshot: recipient.student_no_snapshot ?? '',
       display_name: recipient.display_name,
-      major_snapshot: recipient.major_snapshot ?? null,
-      grade_snapshot: recipient.grade_snapshot ?? null,
-      class_snapshot: recipient.class_snapshot ?? null,
-      role_in_collective: recipient.role_in_collective ?? null,
+      major_snapshot: recipient.major_snapshot ?? '',
+      grade_snapshot: recipient.grade_snapshot ?? '',
+      class_snapshot: recipient.class_snapshot ?? '',
+      role_in_collective: recipient.role_in_collective ?? '',
     })),
   }
 }
@@ -978,7 +1097,37 @@ function assignForm(next: HonorFormState) {
   Object.assign(form, createEmptyForm(), next)
 }
 
-function buildPayload(): HonorRecordIn {
+function parseMediaText(): Record<string, unknown> | null | undefined {
+  const text = form.media_text.trim()
+  if (!text) return null
+  try {
+    const parsed = JSON.parse(text)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      message.warning('媒体 JSON 必须是对象')
+      return undefined
+    }
+    return parsed as Record<string, unknown>
+  } catch {
+    message.warning('媒体 JSON 格式不正确')
+    return undefined
+  }
+}
+
+function normalizedRecipients() {
+  return form.recipients
+    .map((recipient) => ({
+      student_id: recipient.student_id ?? null,
+      student_no_snapshot: recipient.student_no_snapshot?.trim() || null,
+      display_name: recipient.display_name.trim(),
+      major_snapshot: recipient.major_snapshot?.trim() || null,
+      grade_snapshot: recipient.grade_snapshot?.trim() || null,
+      class_snapshot: recipient.class_snapshot?.trim() || null,
+      role_in_collective: recipient.role_in_collective?.trim() || null,
+    }))
+    .filter((recipient) => recipient.display_name)
+}
+
+function buildPayload(media: Record<string, unknown> | null): HonorRecordIn {
   return {
     category_code: form.category_code,
     title: form.title.trim(),
@@ -990,13 +1139,23 @@ function buildPayload(): HonorRecordIn {
     effective_to: form.effective_to,
     is_collective: form.is_collective,
     summary: form.summary.trim() || undefined,
+    display_order: Number(form.display_order || 0),
     story_md: form.story_md.trim() || undefined,
     acceptance_speech: form.acceptance_speech.trim() || undefined,
     cover_image_url: form.cover_image_url.trim() || undefined,
-    media: form.media,
+    media,
     consent_flag: form.consent_flag,
-    recipients: form.recipients,
+    recipients: normalizedRecipients(),
   }
+}
+
+function addRecipient() {
+  form.recipients.push(createEmptyRecipient())
+}
+
+function removeRecipient(index: number) {
+  if (form.recipients.length <= 1) return
+  form.recipients.splice(index, 1)
 }
 
 async function openEditor(record?: HonorRecordBrief | Record<string, unknown>) {
@@ -1035,10 +1194,16 @@ async function onSubmit() {
     message.warning('请补全标题、荣誉类别、授奖单位和公布日期')
     return
   }
+  if (!normalizedRecipients().length) {
+    message.warning('请至少填写一位获奖人或一个获奖集体')
+    return
+  }
+  const media = parseMediaText()
+  if (media === undefined) return
 
   submitting.value = true
   try {
-    const payload = buildPayload()
+    const payload = buildPayload(media)
     if (editingId.value) {
       const resp = await adminUpdateRecord(editingId.value, payload)
       currentDetail.value = resp.data
@@ -1246,6 +1411,19 @@ onMounted(() => {
 
 .drawer-actions {
   margin-top: 24px;
+}
+
+.recipient-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.recipient-row-editor {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.2fr) repeat(5, minmax(90px, 1fr)) auto;
+  gap: 8px;
+  align-items: center;
 }
 
 .section-title {

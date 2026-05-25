@@ -34,6 +34,7 @@ export interface HonorRecordBrief {
   announced_at: string
   status: HonorStatus
   is_collective: boolean
+  display_order: number
   cover_image_url?: string | null
   summary?: string | null
   effective_to?: string | null
@@ -88,6 +89,7 @@ export interface HonorRecordIn {
   effective_from?: string | null
   effective_to?: string | null
   is_collective?: boolean
+  display_order?: number
   summary?: string | null
   story_md?: string | null
   acceptance_speech?: string | null
@@ -142,6 +144,7 @@ export function adminListRecords(params: {
   level?: HonorLevel
   status?: HonorStatus
   year?: number
+  is_collective?: boolean
   q?: string
   page?: number
   size?: number

@@ -34,6 +34,10 @@ from app.workflow.schemas import (
     NodeCompleteIn,
     NodeMarkStatusIn,
     OfflineHandleIn,
+    ProofTemplateIn,
+    ProofTemplateOut,
+    ProofTemplatePreviewIn,
+    ProofTemplatePreviewOut,
     QuizDrawOut,
     QuizQuestionAdminOut,
     QuizQuestionIn,
@@ -272,7 +276,7 @@ async def admin_list_templates(
     _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
     kind: str | None = Query(default=None),
 ) -> ApiResponse[list[WorkflowTemplateOut]]:
-    return ok(await service.list_templates(db, kind))
+    return ok(await service.list_templates(db, kind, active_only=False))
 
 
 @admin_router.post(
@@ -520,6 +524,72 @@ async def admin_upsert_request_type(
         db, payload, user.user_id, ",".join(user.roles) or None
     )
     return ok(RequestTypeOut.model_validate(row))
+
+
+# -------- 电子证明模板维护 --------
+@admin_router.get(
+    "/proof-templates", response_model=ApiResponse[list[ProofTemplateOut]]
+)
+async def admin_list_proof_templates(
+    db: DBDep,
+    _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+    request_type_code: str | None = Query(default=None),
+    active_only: bool = Query(default=False),
+) -> ApiResponse[list[ProofTemplateOut]]:
+    return ok(
+        await service.list_proof_templates(
+            db,
+            request_type_code=request_type_code,
+            active_only=active_only,
+        )
+    )
+
+
+@admin_router.post(
+    "/proof-templates", response_model=ApiResponse[ProofTemplateOut]
+)
+async def admin_upsert_proof_template(
+    payload: ProofTemplateIn,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+) -> ApiResponse[ProofTemplateOut]:
+    return ok(
+        await service.upsert_proof_template(
+            db,
+            payload,
+            user.user_id,
+            ",".join(user.roles) or None,
+        )
+    )
+
+
+@admin_router.post(
+    "/proof-templates/preview", response_model=ApiResponse[ProofTemplatePreviewOut]
+)
+async def admin_preview_proof_template(
+    payload: ProofTemplatePreviewIn,
+    db: DBDep,
+    _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+) -> ApiResponse[ProofTemplatePreviewOut]:
+    return ok(await service.preview_proof_template(db, payload))
+
+
+@admin_router.delete(
+    "/proof-templates/{template_code}", response_model=ApiResponse[ProofTemplateOut]
+)
+async def admin_deactivate_proof_template(
+    template_code: str,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_AdminRole)],
+) -> ApiResponse[ProofTemplateOut]:
+    return ok(
+        await service.deactivate_proof_template(
+            db,
+            template_code,
+            user.user_id,
+            ",".join(user.roles) or None,
+        )
+    )
 
 
 # -------- 审批工作台（FR-007 / FR-008）--------

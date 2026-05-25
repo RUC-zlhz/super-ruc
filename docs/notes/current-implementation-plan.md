@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐均已完成
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -437,6 +437,101 @@
 - 后端静态验证：`uv run --extra dev ruff check ...` 通过；`uv run --extra dev python -m py_compile ...` 通过。
 - 前端构建：`pnpm -C web build` 通过；`pnpm -C miniapp build:mp-weixin` 通过。
 - 阻塞验证：`uv run --extra dev pytest tests/integration/test_auth_flow.py -q --basetemp=.tmp/pytest-tmp-s34-auth` 因 `localhost:54322/sip_db_test` 连接拒绝在 fixture setup 阶段失败，未进入业务断言。
+
+### S35 电子证明正式模板引擎
+
+- 细化文件：`docs/notes/refinements/2026-05-23-s35-formal-proof-template-engine.md`
+- 当前状态：`[x]` 已完成
+- [x] `S35.1` 新增 `proof_templates` 数据表，支持按申请类型绑定模板、版本、启停和默认模板。
+- [x] `S35.2` 将证明 PDF 生成从内联 HTML 改为模板渲染，保留原 `/api/v1/workflow/proof-preview/{request_id}` 入口。
+- [x] `S35.3` 提供后台模板管理 API：列表、创建/更新、停用、渲染预览。
+- [x] `S35.4` 默认种子提供 `CERTIFICATE_IN_SCHOOL` 在读证明正式模板，保障现有证明申请开箱可用。
+- [x] `S35.5` 已补回归测试覆盖模板渲染、未知占位符拒绝、停用模板后预览失败和管理 API；纯模板引擎单元测试与隔离 Kingbase 申请流集成测试均已通过。
+
+当前结论：
+
+- 电子证明现有实现仅是硬编码 HTML -> PDF 预览；本轮将其升级为受控占位符、版本化、可启停、可后台维护的正式模板引擎。
+
+证据：
+
+- 新增迁移：`backend/alembic/versions/0018_proof_template_engine.py`
+- 后端实现：`backend/app/workflow/pdf_generator.py`、`backend/app/workflow/models.py`、`backend/app/workflow/repository.py`、`backend/app/workflow/service.py`、`backend/app/workflow/router.py`、`backend/app/workflow/schemas.py`
+- 默认种子：`backend/scripts/seed/proof_templates.py`
+- 回归样例：`backend/tests/integration/test_request_flow.py`
+- 静态验证：`uv run --extra dev ruff check ...` 通过；`uv run --extra dev python -m py_compile ...` 通过；模板渲染 smoke 通过；`uv run --extra dev pytest unit_tests/test_proof_template_engine.py -q --basetemp=.tmp/pytest-tmp-s35-proof-unit-final` 通过，结果 `4 passed`；`unit_tests` 已加入 `backend/pyproject.toml` 的 `testpaths`。
+- 数据库验证：隔离 Kingbase `127.0.0.1:54323` 下 `uv run --extra dev alembic upgrade head` 成功执行到 `0018_proof_template_engine`，`uv run --extra dev alembic current` 返回 `0018_proof_template_engine (head)`；`uv run --extra dev python scripts/seed_initial.py --only request_types --only proof_templates` 通过，插入 `proof_templates=1`；`uv run --extra dev pytest tests/integration/test_request_flow.py -q --basetemp=.tmp/pytest-tmp-s35-proof-template-kingbase` 通过，结果 `18 passed`。
+
+### S36 生产 EDR Agent 安装
+
+- 细化文件：`docs/notes/refinements/2026-05-24-s36-edr-agent-production-install.md`
+- 当前状态：`[x]` 已完成
+- [x] `S36.1` 解析 `EDR安全软件安装方法及回退方案-服务器业务组(2025).docx`，确认 Linux 服务器业务组安装命令、控制中心地址和回退命令。
+- [x] `S36.2` 对 `user@10.10.0.13` 做只读环境检查，确认 `sudo`、`curl`、系统架构、现有安装状态和控制中心端口连通性。
+- [x] `S36.3` 下载并留档 Titan Agent 安装脚本，按文档参数以 root 权限执行安装。
+- [x] `S36.4` 完成安装后复核，确认 EDR 进程、目录、crontab、安装日志、控制中心上报和 `super-ruc` 生产服务健康状态。
+
+当前结论：
+
+- `10.10.0.13` 已完成 Titan EDR Agent 安装；`/titan/agent/titanagent` 正在运行，root crontab 已写入更新与监控任务。
+- `super-ruc` 生产容器保持 healthy，`http://127.0.0.1/healthz` 返回 `{"code":0,"message":"ok","data":{"status":"ok"}}`。
+- 如需回退，来源文档给出的 Linux 本机卸载命令为 `sudo bash /titan/agent/install_agent.sh disclean`，仅在确认影响业务或用户明确要求时执行。
+
+证据：
+
+- 来源文档：`D:\Documents\xwechat_files\wxid_d3gc7wjxuoja22_a84b\msg\file\2026-05\EDR安全软件安装方法及回退方案-服务器业务组(2025).docx`
+- 远端留档脚本：`/home/user/edr-install-logs/titan_agent_install.sh`
+- 远端安装日志：`/home/user/edr-install-logs/install-20260524-215338.log`
+- Agent 日志：`/var/log/titanagent/install.log`
+- 业务验证：`docker ps` 中 `web / backend / db / redis / minio` 均为 healthy；`curl http://127.0.0.1/healthz` 返回 ok。
+
+### S37 党团官方流程默认模板修正
+
+- 细化文件：`docs/notes/refinements/2026-05-25-s37-official-party-youth-workflow-templates.md`
+- 当前状态：`[x]` 已完成
+- [x] `S37.1` 新增 `PARTY_DEVELOPMENT_OFFICIAL_V2`，按仓库内 `发展党员工作程序` 的 4 阶段 29 步建立党员发展默认模板。
+- [x] `S37.2` 新增 `YOUTH_LEAGUE_DEVELOPMENT_OFFICIAL_V2`，按仓库内入团资料的 5 阶段 15 步建立发展团员默认模板。
+- [x] `S37.3` 将 `PARTY_DEVELOPMENT_V1` 与 `YOUTH_LEAGUE_V1` 改为 inactive 历史兼容模板，保留旧模板和旧实例可读性。
+- [x] `S37.4` 新增 `YOUTH_LEAGUE_MEMBERSHIP_MANAGEMENT_V1`，把“推优入党 / 毕业团员转出”从入团发展主流程拆到团籍管理模板。
+- [x] `S37.5` 管理端模板查询可查看 inactive 历史模板，学生/公开查询与新发起入口仍只使用 active 模板。
+
+当前结论：
+
+- 默认新发起党团流程已切到官方 V2 模板口径；入团发展主模板不再混入推优入党和毕业团员转出。
+- 旧 V1 模板未删除，历史流程实例仍可通过模板关系读取。
+
+证据：
+
+- 默认种子：`backend/scripts/seed/workflow_templates.py`
+- 后端查询调整：`backend/app/workflow/{repository,service,router}.py`
+- 回归样例：`backend/tests/integration/test_workflow_party_flow.py`、`backend/unit_tests/test_workflow_template_specs.py`
+- 静态验证：`uv run --extra dev ruff check ...` 通过；`uv run --extra dev python -m py_compile ...` 通过。
+- 单元验证：`uv run --extra dev pytest unit_tests/test_workflow_template_specs.py -q --basetemp=.tmp/pytest-tmp-workflow-template-specs` 通过，结果 `2 passed`。
+- 阻塞验证：`uv run --extra dev pytest tests/integration/test_workflow_party_flow.py -q --basetemp=.tmp/pytest-tmp-workflow-official-v2` 因 `localhost:54322/sip_db_test` 连接拒绝在 fixture setup 阶段失败，当前结果为 `13 errors`，未进入业务断言。
+
+### S38 学生画像与荣誉展示 P1 补齐
+
+- 细化文件：`docs/notes/refinements/2026-05-25-s38-profile-honor-p1-web-closure.md`
+- 当前状态：`[x]` 已完成
+- [x] `S38.1` 对照 P1 口径核查学生画像基础信息、成长信息、导入导出、多维检索、本人档案与字段分级展示能力。
+- [x] `S38.2` 荣誉后端补齐 `display_order` 字段、公共/管理列表个人/集体筛选、统一排序与获奖人/集体成员服务端校验。
+- [x] `S38.3` Web 荣誉管理补齐个人/集体筛选、类型列、展示顺序、封面图、媒体 JSON 与获奖人/集体成员编辑器。
+- [x] `S38.4` Miniapp 荣誉公示页补齐个人/集体筛选与列表/详情标识。
+- [x] `S38.5` 补定向回归样例并完成当前可运行的静态、类型和构建验证。
+
+当前结论：
+
+- 外部微信补丁已拆分吸收为当前仓库的 `S38`，没有覆盖已有 `S35/S36/S37` 计划内容。
+- 荣誉展示 P1 的新增录入、筛选、展示顺序和榜样宣传维护入口已形成前后端契约闭环；学生画像 P1 以当前既有实现核查登记为主。
+
+证据：
+
+- 后端实现：`backend/app/honor/{models,schemas,repository,router,service}.py`
+- 迁移：`backend/alembic/versions/0019_honor_display_order_and_collective_filter.py`
+- 回归样例：`backend/tests/integration/test_honor_flow.py`
+- 前端实现：`web/src/api/honor.ts`、`web/src/views/honor/HonorList.vue`、`miniapp/src/api/honor.ts`、`miniapp/src/pages/honor/index.vue`
+- 静态验证：`uv run --project backend --extra dev ruff check ...` 通过；`uv run --project backend --extra dev python -m py_compile ...` 通过。
+- 前端验证：`corepack.cmd pnpm -C web exec vue-tsc --noEmit -p tsconfig.json` 通过；`.\web\node_modules\.bin\vue-tsc.CMD --noEmit -p miniapp\tsconfig.json` 通过；`corepack.cmd pnpm -C web build` 通过；`corepack.cmd pnpm -C miniapp build:mp-weixin` 通过。
+- 阻塞验证：`uv run --project backend --extra dev pytest backend/tests/integration/test_honor_flow.py -q --basetemp=.tmp/pytest-tmp-s37-honor` 因 `localhost:54322/sip_db_test` 连接拒绝在 fixture setup 阶段失败，当前结果为 `4 errors`，未进入业务断言。
 
 ### S6 前端体验增量优化
 
@@ -983,6 +1078,10 @@
 | 2026-05-20 | 工作流发起服务端范围校验修复 | `docs/notes/refinements/2026-05-20-workflow-start-scope-guard.md` | `S32.1, S32.2, S32.3, S32.4` | `[x]` | 已将发起学生流程的范围校验下沉到后端服务层，补范围外/空 scope 拒绝审计与回归样例；ruff 与 py_compile 通过，集成测试受本机测试库连接拒绝阻塞 |
 | 2026-05-20 | 党团流程范围权限二次收口 | `docs/notes/refinements/2026-05-20-workflow-scope-closure.md` | `S33.1, S33.2, S33.3, S33.4, S33.5` | `[x]` | 已将流程详情、节点操作、流程列表与提醒列表统一接入后端学生 scope 校验；ruff 与 py_compile 通过，集成测试受本机测试库连接拒绝阻塞 |
 | 2026-05-20 | S34 最终缺口闭合方向 | `docs/notes/refinements/2026-05-20-s34-final-gap-closure-direction.md` | `S34.1, S34.2, S34.3, S34.4, S34.5, S34.6` | `[!]` | 可直接落地项已完成并通过静态/构建验证，且 `f35cf98` 已部署到 `10.10.0.13` 并推送 `origin/main`；真实微信订阅联调和真实学院数据仍等待外部输入 |
+| 2026-05-23 | 电子证明正式模板引擎 | `docs/notes/refinements/2026-05-23-s35-formal-proof-template-engine.md` | `S35.1, S35.2, S35.3, S35.4, S35.5` | `[x]` | 已新增模板表、正式 HTML 模板渲染、后台模板管理 API、默认在读证明模板和回归样例；ruff、py_compile、渲染 smoke、纯单元测试 `4 passed` 与隔离 Kingbase 申请流集成测试 `18 passed` 通过 |
+| 2026-05-24 | 生产 EDR Agent 安装 | `docs/notes/refinements/2026-05-24-s36-edr-agent-production-install.md` | `S36.1, S36.2, S36.3, S36.4` | `[x]` | 已按服务器业务组文档在 `10.10.0.13` 安装 Titan EDR Agent，安装日志显示 success，Agent 进程运行，生产容器与 `/healthz` 保持 healthy |
+| 2026-05-25 | 党团官方流程默认模板修正 | `docs/notes/refinements/2026-05-25-s37-official-party-youth-workflow-templates.md` | `S37.1, S37.2, S37.3, S37.4, S37.5` | `[x]` | 已新增党员发展官方 29 步、发展团员官方 15 步和团籍管理模板，旧 V1 模板转为 inactive 历史兼容；ruff、py_compile 与单元测试 `2 passed` 通过，集成测试受本机测试库拒连阻塞 |
+| 2026-05-25 | 学生画像与荣誉展示 P1 补齐 | `docs/notes/refinements/2026-05-25-s38-profile-honor-p1-web-closure.md` | `S38.1, S38.2, S38.3, S38.4, S38.5` | `[x]` | 已补荣誉 `display_order`、个人/集体筛选、获奖人/集体成员校验、Web 管理入口和 Miniapp 筛选标识；后端静态校验、双端类型检查与构建通过，荣誉集成测试受本机测试库拒连阻塞 |
 
 ## 会话更新要求
 
@@ -1073,3 +1172,7 @@
 - `2026-05-19`：新增并完成 `S28` 内网生产部署与持续交付底座；已落地 `deploy/intranet-prod/` 的 Compose、Nginx、Web Dockerfile、生产 `.env` 模板、部署/迁移/备份/恢复/回滚/smoke 脚本和小程序内网出包入口，并完成本地验证；通过本机 SSH 反向 SOCKS 代理完成服务器 `git / Docker / Compose` 初始化和 Docker 镜像拉取验证；服务器生产 `.env` 就绪后完成五服务上线、Alembic 迁移、幂等基础种子、smoke、本机内网访问与数据库备份脚本验证。
 - `2026-05-19`：新增并完成 `S29` 生产默认数据导入与管理入口补强；为后端生产容器只读挂载 `docs` 默认数据源，新增 `seed-default-data.sh`，在服务器完成默认学生与 `2024-default` 培养方案导入，并补 Web 单个后台账号创建和学生学籍信息编辑入口；`pnpm -C web build`、Compose config、shell 语法检查、服务器 Web 重建与 smoke 通过。
 - `2026-05-19`：新增并完成 `S30` 学生主档与微信绑定管理补强；后台已支持新增学生、修改学生主档、查看和解绑学生微信登录绑定，Web 学生管理页已新增对应入口，并通过本地静态/构建/定向集成测试和服务器生产重建 smoke。
+- `2026-05-23`：完成 `S35` 电子证明正式模板引擎；后端已新增 `proof_templates` 模板表、受控占位符渲染、后台模板列表/保存/预览/停用 API、默认在读证明模板种子和申请流回归样例。`ruff`、`py_compile`、模板渲染 smoke、纯单元测试 `4 passed`、隔离 Kingbase 迁移/种子与申请流集成测试 `18 passed` 均通过。
+- `2026-05-24`：完成 `S36` 生产 EDR Agent 安装；按 `EDR安全软件安装方法及回退方案-服务器业务组(2025).docx` 的 Linux 服务器业务组参数在 `10.10.0.13` 安装 Titan Agent，安装日志显示 `Agent installation success.`，`/titan/agent/titanagent` 进程运行，root crontab 已写入更新与监控任务；安装后 `super-ruc` 生产容器保持 healthy，`http://127.0.0.1/healthz` 返回 ok。
+- `2026-05-25`：完成 `S37` 党团官方流程默认模板修正；默认种子新增 `PARTY_DEVELOPMENT_OFFICIAL_V2` 官方 29 步党员发展模板、`YOUTH_LEAGUE_DEVELOPMENT_OFFICIAL_V2` 官方 15 步发展团员模板和 `YOUTH_LEAGUE_MEMBERSHIP_MANAGEMENT_V1` 团籍管理模板，旧 `PARTY_DEVELOPMENT_V1 / YOUTH_LEAGUE_V1` 转为 inactive 历史兼容；`ruff`、`py_compile` 与 `unit_tests/test_workflow_template_specs.py` 通过，工作流集成测试仍受本机 `localhost:54322/sip_db_test` 拒连阻塞。
+- `2026-05-25`：完成 `S38` 学生画像与荣誉展示 P1 补齐；荣誉后端新增 `display_order` 迁移、个人/集体筛选、统一排序和 recipients 服务端校验，Web 管理端补齐展示顺序、封面图、媒体 JSON 与获奖人/集体成员编辑器，Miniapp 补齐个人/集体筛选与标识；后端 `ruff` / `py_compile`、Web / Miniapp 类型检查与构建均通过，荣誉集成测试因本机 `localhost:54322/sip_db_test` 拒连未进入业务断言。

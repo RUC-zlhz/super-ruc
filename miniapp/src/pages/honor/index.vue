@@ -52,6 +52,18 @@
           </view>
         </view>
       </view>
+
+      <view class="type-filter-row">
+        <view
+          v-for="opt in TYPE_OPTIONS"
+          :key="opt.label"
+          class="type-chip"
+          :class="{ active: filters.is_collective === opt.value }"
+          @tap="onTypeChange(opt.value)"
+        >
+          {{ opt.label }}
+        </view>
+      </view>
     </view>
 
     <view v-if="filters.include_archived" class="history-hint">
@@ -80,6 +92,9 @@
               {{ levelLabel(honor.level) }}
             </text>
             <text class="card-category">{{ categoryLabel(honor) }}</text>
+            <text class="card-type" :class="{ collective: honor.is_collective }">
+              {{ honor.is_collective ? '集体' : '个人' }}
+            </text>
           </view>
 
           <view class="card-meta-row">
@@ -123,6 +138,7 @@
 
             <view class="detail-badges">
               <text class="detail-pill">{{ categoryLabel(selected) }}</text>
+              <text class="detail-pill">{{ selected.is_collective ? '集体荣誉' : '个人荣誉' }}</text>
             </view>
 
             <view class="detail-facts">
@@ -211,6 +227,11 @@ const LEVEL_OPTIONS = [
   { label: '校级', value: 'SCHOOL' },
 ]
 const LEVEL_OPTION_LABELS = LEVEL_OPTIONS.map((item) => item.label)
+const TYPE_OPTIONS: Array<{ label: string; value: boolean | null }> = [
+  { label: '全部类型', value: null },
+  { label: '个人', value: false },
+  { label: '集体', value: true },
+]
 
 type HistoryLike = {
   status?: string
@@ -226,11 +247,13 @@ const filters = reactive<{
   category_code: string
   level: string
   year: number | null
+  is_collective: boolean | null
   include_archived: boolean
 }>({
   category_code: '',
   level: '',
   year: null,
+  is_collective: null,
   include_archived: false,
 })
 
@@ -339,6 +362,7 @@ async function reload(reset = true) {
       category_code: filters.category_code || undefined,
       level: filters.level || undefined,
       year: filters.year || undefined,
+      is_collective: filters.is_collective ?? undefined,
       include_archived: filters.include_archived,
       page: page.value,
       size,
@@ -367,6 +391,11 @@ function onLevelChange(event: { detail: { value: string | number } }) {
   const index = Number(event.detail.value)
   levelIdx.value = index
   filters.level = LEVEL_OPTIONS[index]?.value || ''
+  void reload(true).catch(() => undefined)
+}
+
+function onTypeChange(value: boolean | null) {
+  filters.is_collective = value
   void reload(true).catch(() => undefined)
 }
 
@@ -627,6 +656,33 @@ onMounted(() => {
   justify-content: space-between;
   gap: 20rpx;
   margin-top: 20rpx;
+}
+
+.type-filter-row {
+  display: flex;
+  gap: 14rpx;
+  margin-top: 18rpx;
+}
+
+.type-chip {
+  flex: 1;
+  min-height: 60rpx;
+  border-radius: 20rpx;
+  border: 2rpx solid rgba(221, 225, 229, 0.78);
+  background: #fff;
+  color: #6b4f52;
+  font-size: 25rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10rpx 22rpx rgba(37, 36, 37, 0.05);
+}
+
+.type-chip.active {
+  border-color: #b6122b;
+  background: #fff0f2;
+  color: #a90e22;
 }
 
 .control-pill,
@@ -907,7 +963,8 @@ onMounted(() => {
 }
 
 .card-tag,
-.card-category {
+.card-category,
+.card-type {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -926,6 +983,16 @@ onMounted(() => {
 .card-category {
   background: #faf4f0;
   color: #8f6057;
+}
+
+.card-type {
+  background: #f4f7ff;
+  color: #4967a8;
+}
+
+.card-type.collective {
+  background: #fff4eb;
+  color: #a95f21;
 }
 
 .card-meta-row {

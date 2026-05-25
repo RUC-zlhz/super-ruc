@@ -27,6 +27,9 @@ class _NodeSpec:
     trigger_rule: str = "PREV_DONE"
     due_rule_days: int | None = None
     reminder_lead_days: int | None = None
+    reminder_enabled: bool = True
+    repeat_interval_days: int | None = None
+    max_reminders: int | None = 1
     is_terminal: bool = False
 
 
@@ -38,14 +41,18 @@ class _TemplateSpec:
     description: str
     version_label: str
     nodes: tuple[_NodeSpec, ...]
+    is_active: bool = True
+    sync_nodes_on_update: bool = True
 
 
-_PARTY_DEVELOPMENT = _TemplateSpec(
+_PARTY_DEVELOPMENT_LEGACY = _TemplateSpec(
     code="PARTY_DEVELOPMENT_V1",
-    name="党员发展完整流程",
+    name="党员发展关键节点简版（历史兼容）",
     kind="PARTY",
-    description="从递交入党申请书至预备党员转正的完整流程，覆盖积极分子-发展对象-预备党员三阶段。",
+    description="历史兼容模板：以关键节点概括党员发展流程，新发起流程请使用官方 29 步模板。",
     version_label="v1",
+    is_active=False,
+    sync_nodes_on_update=False,
     nodes=(
         _NodeSpec("APPLY_SUBMIT", "递交入党申请书", 10,
                  stage_group="APPLICANT",
@@ -74,12 +81,82 @@ _PARTY_DEVELOPMENT = _TemplateSpec(
     ),
 )
 
-_YOUTH_LEAGUE = _TemplateSpec(
+_PARTY_DEVELOPMENT_OFFICIAL = _TemplateSpec(
+    code="PARTY_DEVELOPMENT_OFFICIAL_V2",
+    name="发展党员工作程序（官方29步）",
+    kind="PARTY",
+    description="依据仓库内《发展党员工作程序》结构化资料建立的 4 阶段 29 步官方对齐模板。",
+    version_label="official-v2",
+    nodes=(
+        _NodeSpec("PARTY_01_EDUCATION_GUIDANCE", "教育引导", 10,
+                 stage_group="ACTIVIST_CONFIRMATION", trigger_rule="MANUAL"),
+        _NodeSpec("PARTY_02_RECEIVE_APPLICATION_TALK", "接收入党申请书并派人谈话", 20,
+                 stage_group="ACTIVIST_CONFIRMATION"),
+        _NodeSpec("PARTY_03_CONFIRM_ACTIVIST_FILE", "确定入党积极分子并报党委备案", 30,
+                 stage_group="ACTIVIST_CONFIRMATION"),
+        _NodeSpec("PARTY_04_ASSIGN_MENTOR_EDUCATION", "指定培养联系人并进行培养教育", 40,
+                 stage_group="ACTIVIST_CONFIRMATION"),
+        _NodeSpec("PARTY_05_INSPECTION", "考察", 50,
+                 stage_group="ACTIVIST_CONFIRMATION"),
+        _NodeSpec("PARTY_06_BRANCH_COMMITTEE_DISCUSSION", "支部委员会听取意见后讨论", 60,
+                 stage_group="DEVELOPMENT_TARGET"),
+        _NodeSpec("PARTY_07_FILE_CONFIRM_TARGET", "报党委备案后确定发展对象", 70,
+                 stage_group="DEVELOPMENT_TARGET"),
+        _NodeSpec("PARTY_08_CONFIRM_INTRODUCER", "确定入党介绍人", 80,
+                 stage_group="DEVELOPMENT_TARGET"),
+        _NodeSpec("PARTY_09_POLITICAL_REVIEW", "政治审查", 90,
+                 stage_group="DEVELOPMENT_TARGET"),
+        _NodeSpec("PARTY_10_SHORT_TRAINING", "短期集中培训", 100,
+                 stage_group="DEVELOPMENT_TARGET"),
+        _NodeSpec("PARTY_11_BRANCH_COMMITTEE_PREVIEW", "支部委员会听取意见后讨论", 110,
+                 stage_group="PROBATION_ACCEPTANCE"),
+        _NodeSpec("PARTY_12_PRE_REVIEW", "报党委预审", 120,
+                 stage_group="PROBATION_ACCEPTANCE"),
+        _NodeSpec("PARTY_13_PUBLIC_NOTICE", "公示", 130,
+                 stage_group="PROBATION_ACCEPTANCE"),
+        _NodeSpec("PARTY_14_BRANCH_MEETING_ACCEPT_PROBATION", "召开支部大会讨论接收预备党员", 140,
+                 stage_group="PROBATION_ACCEPTANCE"),
+        _NodeSpec("PARTY_15_SUBMIT_MATERIALS_ORG_DEPT", "将有关材料报党委组织部", 150,
+                 stage_group="PROBATION_ACCEPTANCE"),
+        _NodeSpec("PARTY_16_ORG_DEPT_TALK", "党委组织部派人进行谈话", 160,
+                 stage_group="PROBATION_ACCEPTANCE"),
+        _NodeSpec("PARTY_17_PARTY_COMMITTEE_APPROVAL", "党委审批", 170,
+                 stage_group="PROBATION_ACCEPTANCE"),
+        _NodeSpec("PARTY_18_NOTIFY_BRANCH_APPROVAL", "党委审批结果通知党支部", 180,
+                 stage_group="PROBATION_ACCEPTANCE"),
+        _NodeSpec("PARTY_19_HIGHER_ORG_FILE", "报上级党委组织部备案", 190,
+                 stage_group="PROBATION_ACCEPTANCE"),
+        _NodeSpec("PARTY_20_ASSIGN_BRANCH_GROUP", "编入党支部和党小组", 200,
+                 stage_group="PROBATION_EDUCATION_FULL_MEMBER"),
+        _NodeSpec("PARTY_21_OATH", "组织入党宣誓", 210,
+                 stage_group="PROBATION_EDUCATION_FULL_MEMBER"),
+        _NodeSpec("PARTY_22_CONTINUED_EDUCATION", "继续教育考察", 220,
+                 stage_group="PROBATION_EDUCATION_FULL_MEMBER"),
+        _NodeSpec("PARTY_23_SUBMIT_FULL_MEMBER_APPLICATION", "递交转正申请书", 230,
+                 stage_group="PROBATION_EDUCATION_FULL_MEMBER"),
+        _NodeSpec("PARTY_24_FULL_MEMBER_PUBLIC_NOTICE", "公示", 240,
+                 stage_group="PROBATION_EDUCATION_FULL_MEMBER"),
+        _NodeSpec("PARTY_25_BRANCH_MEETING_FULL_MEMBER", "召开支部大会讨论预备党员转正", 250,
+                 stage_group="PROBATION_EDUCATION_FULL_MEMBER"),
+        _NodeSpec("PARTY_26_SUBMIT_FULL_MEMBER_MATERIALS", "将有关材料报党委组织部", 260,
+                 stage_group="PROBATION_EDUCATION_FULL_MEMBER"),
+        _NodeSpec("PARTY_27_FULL_MEMBER_APPROVAL", "党委审批", 270,
+                 stage_group="PROBATION_EDUCATION_FULL_MEMBER"),
+        _NodeSpec("PARTY_28_NOTIFY_FULL_MEMBER_APPROVAL", "党委审批结果通知党支部", 280,
+                 stage_group="PROBATION_EDUCATION_FULL_MEMBER"),
+        _NodeSpec("PARTY_29_ARCHIVE", "存档", 290,
+                 stage_group="PROBATION_EDUCATION_FULL_MEMBER", is_terminal=True),
+    ),
+)
+
+_YOUTH_LEAGUE_LEGACY = _TemplateSpec(
     code="YOUTH_LEAGUE_V1",
-    name="团员发展与团籍管理",
+    name="团员发展与团籍管理简版（历史兼容）",
     kind="YOUTH_LEAGUE",
-    description="团员入团申请-批准-注册-推优全流程。",
+    description="历史兼容模板：混合了入团发展、推优入党与毕业转出，新发起入团发展请使用官方 15 步模板。",
     version_label="v1",
+    is_active=False,
+    sync_nodes_on_update=False,
     nodes=(
         _NodeSpec("LEAGUE_APPLY", "递交入团申请", 10,
                  stage_group="APPLICANT", trigger_rule="MANUAL"),
@@ -98,7 +175,68 @@ _YOUTH_LEAGUE = _TemplateSpec(
     ),
 )
 
-_TEMPLATES: tuple[_TemplateSpec, ...] = (_PARTY_DEVELOPMENT, _YOUTH_LEAGUE)
+_YOUTH_LEAGUE_DEVELOPMENT_OFFICIAL = _TemplateSpec(
+    code="YOUTH_LEAGUE_DEVELOPMENT_OFFICIAL_V2",
+    name="发展团员工作流程（官方15步）",
+    kind="YOUTH_LEAGUE",
+    description="依据仓库内《五个阶段15个步骤》发展团员资料建立的 5 阶段 15 步官方对齐模板。",
+    version_label="official-v2",
+    nodes=(
+        _NodeSpec("YOUTH_01_SUBMIT_APPLICATION", "提交入团申请书", 10,
+                 stage_group="APPLY", trigger_rule="MANUAL"),
+        _NodeSpec("YOUTH_02_TALK", "派人谈话", 20,
+                 stage_group="APPLY", due_rule_days=30, reminder_lead_days=7),
+        _NodeSpec("YOUTH_03_APPROVE_ACTIVIST", "确定和批准入团积极分子", 30,
+                 stage_group="ACTIVIST_CONFIRMATION"),
+        _NodeSpec("YOUTH_04_ASSIGN_MENTOR", "指定培养联系人", 40,
+                 stage_group="ACTIVIST_CONFIRMATION"),
+        _NodeSpec("YOUTH_05_EDUCATION_INSPECTION", "入团积极分子的教育、培养和考察", 50,
+                 stage_group="ACTIVIST_EDUCATION", due_rule_days=90, reminder_lead_days=14),
+        _NodeSpec("YOUTH_06_RECOMMEND_TARGET", "推荐发展对象", 60,
+                 stage_group="DEVELOPMENT_TARGET"),
+        _NodeSpec("YOUTH_07_PRE_REVIEW_TARGET", "预审发展对象", 70,
+                 stage_group="DEVELOPMENT_TARGET"),
+        _NodeSpec("YOUTH_08_PUBLIC_NOTICE_TARGET", "公示发展对象", 80,
+                 stage_group="DEVELOPMENT_TARGET", due_rule_days=5, reminder_lead_days=1),
+        _NodeSpec("YOUTH_09_CONFIRM_INTRODUCER", "确定入团介绍人", 90,
+                 stage_group="DEVELOPMENT_TARGET"),
+        _NodeSpec("YOUTH_10_FILL_APPLICATION_FORM", "填写入团志愿书", 100,
+                 stage_group="NEW_MEMBER_ACCEPTANCE"),
+        _NodeSpec("YOUTH_11_BRANCH_MEETING_DISCUSSION", "支部大会讨论", 110,
+                 stage_group="NEW_MEMBER_ACCEPTANCE"),
+        _NodeSpec("YOUTH_12_APPROVAL_AND_FILE", "基层团（工）委审批、县级以上团委备案", 120,
+                 stage_group="NEW_MEMBER_ACCEPTANCE", due_rule_days=30, reminder_lead_days=7),
+        _NodeSpec("YOUTH_13_RESULT_FEEDBACK", "审批结果反馈", 130,
+                 stage_group="NEW_MEMBER_ACCEPTANCE"),
+        _NodeSpec("YOUTH_14_JOINING_CEREMONY", "入团仪式", 140,
+                 stage_group="NEW_MEMBER_ACCEPTANCE"),
+        _NodeSpec("YOUTH_15_ARCHIVE", "档案管理", 150,
+                 stage_group="NEW_MEMBER_ACCEPTANCE", due_rule_days=30,
+                 reminder_lead_days=7, is_terminal=True),
+    ),
+)
+
+_YOUTH_LEAGUE_MEMBERSHIP_MANAGEMENT = _TemplateSpec(
+    code="YOUTH_LEAGUE_MEMBERSHIP_MANAGEMENT_V1",
+    name="团籍管理与推优流程",
+    kind="YOUTH_LEAGUE",
+    description="承载入团发展主流程之外的团籍管理事项，包括推优入党与毕业团员转出。",
+    version_label="v1",
+    nodes=(
+        _NodeSpec("LEAGUE_RECOMMEND_PARTY", "推优入党", 10,
+                 stage_group="MEMBERSHIP_MANAGEMENT", trigger_rule="MANUAL"),
+        _NodeSpec("LEAGUE_GRADUATE_TRANSFER", "毕业团员转出", 20,
+                 stage_group="MEMBERSHIP_MANAGEMENT", is_terminal=True),
+    ),
+)
+
+_TEMPLATES: tuple[_TemplateSpec, ...] = (
+    _PARTY_DEVELOPMENT_OFFICIAL,
+    _YOUTH_LEAGUE_DEVELOPMENT_OFFICIAL,
+    _YOUTH_LEAGUE_MEMBERSHIP_MANAGEMENT,
+    _PARTY_DEVELOPMENT_LEGACY,
+    _YOUTH_LEAGUE_LEGACY,
+)
 
 
 async def _upsert_template(db: AsyncSession, spec: _TemplateSpec) -> tuple[str, WorkflowTemplate]:
@@ -112,7 +250,7 @@ async def _upsert_template(db: AsyncSession, spec: _TemplateSpec) -> tuple[str, 
         tpl = WorkflowTemplate(
             code=spec.code, name=spec.name, kind=spec.kind,
             description=spec.description, version_label=spec.version_label,
-            is_active=True,
+            is_active=spec.is_active,
         )
         db.add(tpl)
         await db.flush()
@@ -124,6 +262,7 @@ async def _upsert_template(db: AsyncSession, spec: _TemplateSpec) -> tuple[str, 
         ("kind", spec.kind),
         ("description", spec.description),
         ("version_label", spec.version_label),
+        ("is_active", spec.is_active),
     ):
         if getattr(existing, field) != new_value:
             setattr(existing, field, new_value)
@@ -158,6 +297,9 @@ async def _sync_nodes(
                 trigger_rule=spec.trigger_rule,
                 due_rule_days=spec.due_rule_days,
                 reminder_lead_days=spec.reminder_lead_days,
+                reminder_enabled=spec.reminder_enabled,
+                repeat_interval_days=spec.repeat_interval_days,
+                max_reminders=spec.max_reminders,
                 is_terminal=spec.is_terminal,
                 is_active=True,
             ))
@@ -170,6 +312,9 @@ async def _sync_nodes(
             ("trigger_rule", spec.trigger_rule),
             ("due_rule_days", spec.due_rule_days),
             ("reminder_lead_days", spec.reminder_lead_days),
+            ("reminder_enabled", spec.reminder_enabled),
+            ("repeat_interval_days", spec.repeat_interval_days),
+            ("max_reminders", spec.max_reminders),
             ("is_terminal", spec.is_terminal),
         ):
             if getattr(row, field) != new_value:
@@ -187,7 +332,8 @@ async def seed(db: AsyncSession) -> SeedResult:
             updated += 1
         else:
             skipped += 1
-        await _sync_nodes(db, tpl, spec.nodes)
+        if spec.sync_nodes_on_update or action == "insert":
+            await _sync_nodes(db, tpl, spec.nodes)
     return SeedResult(
         domain=DOMAIN, inserted=inserted, updated=updated, skipped=skipped
     )

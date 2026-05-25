@@ -23,7 +23,7 @@ from app.auth.models import Student, User, UserRole
 from app.core import storage
 from app.core.security import create_token
 from app.workflow import pdf_generator
-from app.workflow.models import RequestType
+from app.workflow.models import ProofTemplate, RequestType
 
 
 async def _login_as_student(
@@ -582,6 +582,221 @@ async def test_proof_preview_returns_pdf_stream(
     )
     assert preview_log is not None
     assert preview_log.result_code == "SUCCESS"
+
+
+async def test_proof_preview_uses_active_template_engine(
+    client: AsyncClient,
+    db: AsyncSession,
+    counselor_headers: dict[str, str],
+    monkeypatch,
+) -> None:
+    admin_headers = await _headers_for_role(
+        db,
+        role_code="SUPER_ADMIN",
+        work_no="REQPROOFTPL01",
+    )
+    upsert = await client.post(
+        "/api/v1/admin/proof-templates",
+        headers=admin_headers,
+        json={
+            "code": "CERTIFICATE_IN_SCHOOL_TEST",
+            "name": "测试在读证明模板",
+            "request_type_code": "CERTIFICATE_IN_SCHOOL",
+            "version_label": "test-v1",
+            "html_template": (
+                "<html><body>"
+                "ENGINE {{student.full_name}} {{student.student_no}} "
+                "{{form.purpose}} {{request.request_no}}"
+                "</body></html>"
+            ),
+            "is_active": True,
+            "is_default": True,
+        },
+    )
+    assert upsert.status_code == 200, upsert.text
+
+    token = await _login_as_student(
+        client, db, student_no="R520201", wx_code="wx_r520201"
+    )
+    stu_headers = {"Authorization": f"Bearer {token}"}
+    create = await client.post(
+        "/api/v1/requests",
+        headers=stu_headers,
+        json={
+            "type_code": "CERTIFICATE_IN_SCHOOL",
+            "title": "模板引擎证明",
+            "form_data": {"purpose": "<交换申请>"},
+        },
+    )
+    assert create.status_code == 200, create.text
+    request_id = create.json()["data"]["id"]
+    await client.post(f"/api/v1/requests/{request_id}/submit", headers=stu_headers)
+    approve = await client.post(
+        f"/api/v1/admin/requests/{request_id}/approve",
+        headers=counselor_headers,
+        json={"comment": "模板引擎通过"},
+    )
+    assert approve.status_code == 200, approve.text
+
+    captured: dict[str, str] = {}
+
+    def _capture_pdf(html: str) -> bytes:
+        captured["html"] = html
+        return b"%PDF-1.4 template"
+
+    monkeypatch.setattr(pdf_generator, "_html_to_pdf_bytes", _capture_pdf)
+    resp = await client.get(
+        f"/api/v1/workflow/proof-preview/{request_id}",
+        headers=stu_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.content.startswith(b"%PDF-1.4")
+    assert "ENGINE req-R520201 R520201" in captured["html"]
+    assert "&lt;交换申请&gt;" in captured["html"]
+    assert "<交换申请>" not in captured["html"]
+
+
+async def test_admin_proof_template_rejects_unknown_placeholder(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    admin_headers = await _headers_for_role(
+        db,
+        role_code="SUPER_ADMIN",
+        work_no="REQPROOFTPL02",
+    )
+    resp = await client.post(
+        "/api/v1/admin/proof-templates",
+        headers=admin_headers,
+        json={
+            "code": "CERTIFICATE_BAD_PLACEHOLDER",
+            "name": "错误模板",
+            "request_type_code": "CERTIFICATE_IN_SCHOOL",
+            "version_label": "bad-v1",
+            "html_template": "<html>{{student.id_card_enc}}</html>",
+        },
+    )
+    assert resp.status_code == 400, resp.text
+    assert "未授权占位符" in resp.text
+
+
+async def test_proof_preview_requires_active_template(
+    client: AsyncClient,
+    db: AsyncSession,
+    counselor_headers: dict[str, str],
+    monkeypatch,
+) -> None:
+    db.add(
+        RequestType(
+            code="CERTIFICATE_NO_TEMPLATE",
+            name="无模板证明",
+            category="CERTIFICATE",
+            description="用于模板缺失回归",
+            form_schema={
+                "type": "object",
+                "required": ["purpose"],
+                "properties": {"purpose": {"type": "string", "title": "用途"}},
+            },
+            attachment_required=False,
+            allow_withdraw=True,
+            withdraw_hours_limit=72,
+            approver_roles="COUNSELOR",
+            is_active=True,
+        )
+    )
+    await db.commit()
+
+    token = await _login_as_student(
+        client, db, student_no="R520301", wx_code="wx_r520301"
+    )
+    stu_headers = {"Authorization": f"Bearer {token}"}
+    create = await client.post(
+        "/api/v1/requests",
+        headers=stu_headers,
+        json={
+            "type_code": "CERTIFICATE_NO_TEMPLATE",
+            "title": "无模板证明",
+            "form_data": {"purpose": "测试"},
+        },
+    )
+    assert create.status_code == 200, create.text
+    request_id = create.json()["data"]["id"]
+    await client.post(f"/api/v1/requests/{request_id}/submit", headers=stu_headers)
+    approve = await client.post(
+        f"/api/v1/admin/requests/{request_id}/approve",
+        headers=counselor_headers,
+        json={"comment": "通过"},
+    )
+    assert approve.status_code == 200, approve.text
+
+    monkeypatch.setattr(pdf_generator, "_html_to_pdf_bytes", lambda _html: b"unexpected")
+    resp = await client.get(
+        f"/api/v1/workflow/proof-preview/{request_id}",
+        headers=stu_headers,
+    )
+    assert resp.status_code == 400, resp.text
+    assert "未配置有效电子证明模板" in resp.text
+
+
+async def test_admin_can_list_preview_and_deactivate_proof_template(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    admin_headers = await _headers_for_role(
+        db,
+        role_code="SUPER_ADMIN",
+        work_no="REQPROOFTPL03",
+    )
+    payload = {
+        "code": "CERTIFICATE_PREVIEW_TEST",
+        "name": "预览测试模板",
+        "request_type_code": "CERTIFICATE_IN_SCHOOL",
+        "version_label": "preview-v1",
+        "html_template": "<html>{{student.full_name}} {{form.purpose}}</html>",
+        "field_schema": {"note": "test"},
+        "is_active": True,
+        "is_default": False,
+    }
+    upsert = await client.post(
+        "/api/v1/admin/proof-templates",
+        headers=admin_headers,
+        json=payload,
+    )
+    assert upsert.status_code == 200, upsert.text
+
+    listing = await client.get(
+        "/api/v1/admin/proof-templates?request_type_code=CERTIFICATE_IN_SCHOOL",
+        headers=admin_headers,
+    )
+    assert listing.status_code == 200, listing.text
+    assert any(
+        item["code"] == "CERTIFICATE_PREVIEW_TEST"
+        for item in listing.json()["data"]
+    )
+
+    preview = await client.post(
+        "/api/v1/admin/proof-templates/preview",
+        headers=admin_headers,
+        json={"html_template": payload["html_template"]},
+    )
+    assert preview.status_code == 200, preview.text
+    assert "张三" in preview.json()["data"]["html"]
+    assert "form.purpose" in preview.json()["data"]["placeholders"]
+
+    deactivated = await client.delete(
+        "/api/v1/admin/proof-templates/CERTIFICATE_PREVIEW_TEST",
+        headers=admin_headers,
+    )
+    assert deactivated.status_code == 200, deactivated.text
+    assert deactivated.json()["data"]["is_active"] is False
+    row = (
+        await db.execute(
+            select(ProofTemplate).where(
+                ProofTemplate.code == "CERTIFICATE_PREVIEW_TEST"
+            )
+        )
+    ).scalar_one()
+    assert row.is_active is False
 
 
 async def test_proof_preview_rejects_other_student(

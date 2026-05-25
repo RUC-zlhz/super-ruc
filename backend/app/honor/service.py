@@ -70,6 +70,7 @@ def build_public_brief(
         announced_at=record.announced_at,
         status=record.status,
         is_collective=record.is_collective,
+        display_order=record.display_order,
         cover_image_url=record.cover_image_url,
         summary=record.summary,
         effective_to=record.effective_to,
@@ -95,6 +96,7 @@ def build_public_detail(
         effective_from=record.effective_from,
         effective_to=record.effective_to,
         is_collective=record.is_collective,
+        display_order=record.display_order,
         summary=record.summary,
         story_md=record.story_md,
         acceptance_speech=record.acceptance_speech,
@@ -126,6 +128,7 @@ def build_admin_brief(
         announced_at=record.announced_at,
         status=record.status,
         is_collective=record.is_collective,
+        display_order=record.display_order,
         cover_image_url=record.cover_image_url,
         summary=record.summary,
         effective_to=record.effective_to,
@@ -157,6 +160,7 @@ def build_admin_detail(
         effective_from=record.effective_from,
         effective_to=record.effective_to,
         is_collective=record.is_collective,
+        display_order=record.display_order,
         summary=record.summary,
         story_md=record.story_md,
         acceptance_speech=record.acceptance_speech,
@@ -223,6 +227,28 @@ async def build_admin_detail_for_record(
     )
 
 
+def _normalize_recipients(recipients: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for item in recipients:
+        display_name = str(item.get("display_name") or "").strip()
+        if not display_name:
+            continue
+        normalized.append(
+            {
+                "student_id": item.get("student_id"),
+                "student_no_snapshot": (item.get("student_no_snapshot") or "").strip() or None,
+                "display_name": display_name,
+                "major_snapshot": (item.get("major_snapshot") or "").strip() or None,
+                "grade_snapshot": (item.get("grade_snapshot") or "").strip() or None,
+                "class_snapshot": (item.get("class_snapshot") or "").strip() or None,
+                "role_in_collective": (item.get("role_in_collective") or "").strip() or None,
+            }
+        )
+    if not normalized:
+        raise BizError("请至少填写一位获奖人或一个获奖集体", code=40172)
+    return normalized
+
+
 async def create_record(
     db: AsyncSession,
     payload: dict[str, Any],
@@ -233,7 +259,7 @@ async def create_record(
     level = payload.get("level")
     if level not in _ALLOWED_LEVELS:
         raise BizError(f"不支持的荣誉级别：{level}（仅限校级及以上）", code=40170)
-    recipients = payload.pop("recipients", []) or []
+    recipients = _normalize_recipients(payload.pop("recipients", []) or [])
     payload.setdefault("status", HONOR_STATUS_ACTIVE)
     payload["created_by"] = operator_id
     payload["updated_by"] = operator_id
@@ -270,6 +296,8 @@ async def update_record(
     level = payload.get("level")
     if level and level not in _ALLOWED_LEVELS:
         raise BizError(f"不支持的荣誉级别：{level}", code=40170)
+    if recipients is not None:
+        recipients = _normalize_recipients(recipients)
     for k, v in payload.items():
         setattr(row, k, v)
     row.updated_by = operator_id
