@@ -662,6 +662,7 @@
 - [x] `S6.20` Miniapp 小程序主图标资产制作
 - [x] `S6.21` Web / Miniapp 按钮图标语义补齐 Round 7
 - [x] `S6.22` Miniapp 图标与空态收口 Round 8
+- [x] `S6.23` Miniapp 事务单字徽章语义修复
 
 出口条件：
 
@@ -680,6 +681,7 @@
 - `miniapp` 理论自测、知识详情、通知/荣誉动作和画像弹层继续补齐设计稿中的白卡、头图、动作反馈与上传区细节
 - `miniapp` 知识、荣誉、画像页不再依赖未安装的 `uni-popup` 组件，弹层交互由页面内原生遮罩与底部面板承载
 - `miniapp` 具备可上传到微信公众平台的小程序主图标 PNG 资产，并保留可复现生成脚本
+- `miniapp` 首页服务入口和事务申请页单字徽章语义一致，不再将通用事务错误显示为住宿相关字形
 - `web` 管理端在逐页浏览器截图对照后继续收紧多面板结构，尤其补齐通知、党团流程、导入导出中心的右侧工作面板
 - `data/` 政策/流程 PDF 可转换为 JSON / Markdown，并显式暴露需 OCR 的页面
 - `web build`、`miniapp mp-weixin build` 继续可验证
@@ -709,6 +711,8 @@
 - `S6.21`：已新增并完成 `docs/notes/refinements/2026-04-28-s6-button-icon-semantics-round7.md`。本轮对 Web 16 个核心视图中约 50 处 `<a-button>` 补充了 `@ant-design/icons-vue` 组件，大幅提升管理后台查询、操作和导出的直观语义；对 Miniapp 使用纯文本和 Emoji 图标强化了学生端的提交、重选、开始自测和退出操作。
 - `S6.22`：已新增并完成 `docs/notes/refinements/2026-05-11-s6-miniapp-icon-empty-state-round8.md`。本轮保留恢复 Git 历史后识别出的有效 Miniapp UI 优化：新增复用 `EmptyState`，统一高频页加载/空态/未找到状态，保留实际使用的 `mini-chevron` 基础箭头，收口首页服务单字语义徽章与按钮小图标，并删除未接入的全局样式占位和页面级旧空态样式；同时修正 `.gitignore`，避免正式 `output/` 交付件被静默忽略。
 - `2026-05-11` Miniapp 图标与空态收口验证：执行 `git diff --check` 通过；执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；执行 `pnpm -C miniapp build:mp-weixin` 通过，输出 `miniapp/dist/build/mp-weixin`。
+- `S6.23`：已新增并完成 `docs/notes/refinements/2026-05-25-s6-miniapp-request-badge-semantics.md`。本轮确认小程序学生端截图中的“图标”是 Vue 文本单字徽章而非独立 SVG；新增 `miniapp/src/utils/request-badge.ts`，将首页“事务办理”入口从 `宿` 改为 `事`，并统一申请创建、列表、详情页的请假/证明/盖章/报名/材料/通用事务徽章映射。
+- `2026-05-25` Miniapp 事务单字徽章修复验证：执行 `git diff --check -- miniapp/src/utils/request-badge.ts miniapp/src/pages/index/index.vue miniapp/src/pages/request/create.vue miniapp/src/pages/request/index.vue miniapp/src/pages/request/detail.vue` 通过；执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；执行 `pnpm -C miniapp build:mp-weixin` 通过；执行 `rg -n "宿|DORM" miniapp/src miniapp/dist/build/mp-weixin -g "*.vue" -g "*.ts" -g "*.js" -g "*.wxml" -g "*.json"` 无命中。
 - 验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p web\tsconfig.json` 与 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 均通过；执行 `uv run --extra dev python -m py_compile app\knowledge\router.py app\knowledge\service.py tests\integration\test_knowledge_flow.py` 通过；本轮 `pytest tests\integration\test_knowledge_flow.py -q` 因本地测试数据库拒连未进入断言阶段。
 - `2026-04-27` 补充验证：执行 `UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache uv run --project backend --no-sync --with pypdf --with pdfplumber --with rapidocr-onnxruntime --with pillow python -m py_compile scripts\knowledge\extract_pdf_documents.py` 通过；执行 `UV_CACHE_DIR=D:\Codes\super-ruc\.uv-cache uv run --project backend --no-sync --with pypdf --with pdfplumber --with rapidocr-onnxruntime --with pillow python scripts\knowledge\extract_pdf_documents.py data --output-dir output\pdf\extracted --ocr` 通过，生成 4 份 JSON、4 份 Markdown 与 `manifest.json`；团员发展流程 PDF OCR 后正文字符数 `8925`、OCR 字符数 `3366`、chunk 数 `8`。
 - `2026-04-27` Miniapp JPG 视觉对齐验证：执行 `& '.\web\node_modules\.bin\vue-tsc.CMD' --noEmit -p miniapp\tsconfig.json` 通过；沙箱内 `pnpm -C miniapp build:mp-weixin` 因 esbuild `spawn EPERM` 失败，提权环境下重跑通过并输出 `dist\build\mp-weixin`；复核 `miniapp/dist/build/mp-weixin/app.json`、`project.config.json` 及页面级 JSON 存在。
@@ -744,6 +748,7 @@
 - `S6.20` 已完成小程序主图标资产制作：`miniapp/src/static/app-icon.png` 可用于微信公众平台后台上传，`scripts/miniapp/generate_app_icon.ps1` 可稳定再生主图标与尺寸变体。
 - `S6.21` 已完成 Web 与 Miniapp 双端按钮图标语义补齐，解决了纯文字操作按钮的识别效率问题。
 - `S6.22` 已完成 Miniapp 图标与空态收口：学生端高频页加载/空态/未找到状态改用 `EmptyState`，页面箭头和按钮小图标切到可控样式，首页服务入口语义更清晰，且 `.gitignore` 不再遮蔽正式 `output/` 交付件。
+- `S6.23` 已完成 Miniapp 事务单字徽章语义修复：首页“事务办理”显示为 `事`，申请发起/列表/详情页统一复用事务徽章 helper，且小程序源码与 `mp-weixin` 产物已无 `宿 / DORM` 图标映射残留。
 - `S6.6` 已证明 3 份文字型校级 PDF 可以直接结构化抽取，团员发展流程 PDF 的图片化页面可通过 `--ocr` 自动补齐；OCR 结果仍需人工校对后才能作为权威知识库条目。
 - 后续若继续推进，优先做知识库管理端真实数据走查、PDF OCR / 知识库草稿导入映射、短信 provider 适配或申请流程小程序真机验收。
 
@@ -1152,6 +1157,7 @@
 | 2026-05-09 | 临时 IP 直连部署联调 | `docs/notes/refinements/2026-05-09-temporary-ip-deployment.md` | `S11.1, S11.2, S11.3, S11.4, S11.5` | `[x]` | 已完成临时服务器部署、数据库迁移与种子、Web 与小程序重构建、HTTP/API smoke 验证 |
 | 2026-05-09 | 微信小程序登录鉴权与未登录请求治理 | `docs/notes/refinements/2026-05-09-wechat-auth-login-hardening.md` | `S11.6` | `[x]` | 已按微信官方登录流程加固后端与小程序请求层，并同步重建远端后端；续跑复核通过类型检查、后端静态校验、临时 IP 小程序出包、真实模式无效 code smoke、日志脱敏检查、访客登录/绑定续修、退出确认和输入框宽度修复 |
 | 2026-05-11 | Miniapp 图标与空态收口 Round 8 | `docs/notes/refinements/2026-05-11-s6-miniapp-icon-empty-state-round8.md` | `S6.22` | `[x]` | 已保留有效 Miniapp UI 优化、补 `EmptyState` 复用、清理未使用全局与页面级旧空态样式，并通过 `miniapp vue-tsc` 与 `mp-weixin` 出包 |
+| 2026-05-25 | Miniapp 事务单字徽章语义修复 | `docs/notes/refinements/2026-05-25-s6-miniapp-request-badge-semantics.md` | `S6.23` | `[x]` | 已修正首页“事务办理”单字徽章，并统一申请创建/列表/详情页事务类型徽章；小程序类型检查、`mp-weixin` 出包和 `宿 / DORM` 残留扫描均通过 |
 | 2026-05-11 | 教师管理端默认管理员与初始密码提醒 | `docs/notes/refinements/2026-05-11-s11-admin-default-password-change.md` | `S11.7` | `[x]` | 已新增 `admin/admin123` 默认超管种子、登录后改密提醒与个人信息页改密弹窗；通过后端静态校验与 Web 构建，集成测试受本机 DB 拒连阻塞 |
 | 2026-05-11 | S12 需求缺口闭环与默认数据导入 | `docs/notes/refinements/2026-05-11-s12-requirements-gap-closure.md` | `S12.1, S12.2, S12.3, S12.4, S12.5, S12.6, S12.7, S12.8, S12.9, S12.DOC` | `[x]` | 已完成默认导入、PDF 核验、模板下载、进度中心、通知抓取、短信治理、Web/Miniapp 接入与 SRS v1.7 出件；后端 S12 回归、Web 构建、小程序出包和文档 QC 均通过 |
 | 2026-05-12 | S13 需求文档与实现一致性修复 | `docs/notes/refinements/2026-05-12-s13-requirements-doc-implementation-alignment.md` | `S13.1, S13.2, S13.3, S13.4, S13.5` | `[x]` | 已完成 S12 状态漂移、FR 验收项语义、需求边界和官方来源结构化标识修复，并通过后端静态/定向集成、双端构建与文档 grep 验证 |
@@ -1252,6 +1258,7 @@
 - `2026-04-28`：新增并完成 `S6.19` Web / Miniapp 前端体验增量优化 Round 6 (交互增强)；对 Web 增加页面转场、卡片悬浮与载入动画，对 Miniapp 补充全局触摸反馈并覆盖首页、申请、流程、通知等高频入口，进一步提升双端操作平滑度。
 - `2026-04-28`：新增并完成 `S6.20` Miniapp 小程序主图标资产制作；生成 `app-icon.png`、`app-icon-512.png`、`app-icon-144.png`，补可复现生成脚本和 README 说明，并确认 `mp-weixin` 构建产物已带出图标资源。
 - `2026-05-11`：新增并完成 `S6.22` Miniapp 图标与空态收口 Round 8；恢复 Git 历史后保留有效学生端 UI 优化，补 `EmptyState` 复用、可控箭头/按钮小图标、首页服务单字语义徽章，清理未使用全局样式和页面级旧空态样式，并修正 `.gitignore` 对正式 `output/` 交付件的遮蔽风险。
+- `2026-05-25`：新增并完成 `S6.23` Miniapp 事务单字徽章语义修复；确认小程序学生端相关“图标”实际为 Vue 文本单字徽章而非 SVG，修正首页“事务办理”为 `事`，并通过统一 helper 收口申请创建、列表、详情页的事务类型徽章；`miniapp vue-tsc`、`pnpm -C miniapp build:mp-weixin` 与 `宿 / DORM` 残留扫描通过。
 - `2026-05-11`：新增并完成 `S11.7` 教师管理端默认管理员与初始密码提醒；默认种子创建 `admin/admin123` 超管账号，登录响应暴露 `must_change_password`，Web 登录后提醒并在个人信息页提供改密弹窗。
 - `2026-05-11`：新增 `S12` 需求缺口闭环与默认数据导入条目及细化文件，开始推进默认导入、成绩单 PDF 核验、统一进度、受控抓取、短信治理、官方链接优先与 SRS v1.7 出件；本轮已补齐 S12 上游 SRS 增量文本与 v1.7 脚本骨架。
 - `2026-05-11`：完成 `S12` 闭环；修复学业推荐排序使默认信息安全课程 `BISYMS0012` 进入缺口建议，完成后端 S12 定向集成测试、Web 构建、小程序 `mp-weixin` 出包，并生成含 S12 增量说明的 SRS v1.7 三组 DOCX/PDF。

@@ -343,6 +343,7 @@ import { computed, onMounted, ref } from "vue";
 import InlineStateNotice from "@/components/InlineStateNotice.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import DynamicForm from "@/components/DynamicForm.vue";
+import { getRequestTypeBadge } from "@/utils/request-badge";
 import {
   createRequest,
   getRequestCategoryLabel,
@@ -509,12 +510,7 @@ function categoryLabel(category: string) {
 }
 
 function typeIcon(code: string, category: string) {
-  if (category === "CERTIFICATE" || code.includes("CERT")) return "证";
-  if (code.includes("GRADE") || code.includes("SCORE")) return "绩";
-  if (code.includes("SCHOLAR") || code.includes("HONOR")) return "奖";
-  if (code.includes("DORM")) return "宿";
-  if (code.includes("LEAVE")) return "假";
-  return "事";
+  return getRequestTypeBadge(code, category);
 }
 
 function statusLabel(status: string) {

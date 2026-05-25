@@ -303,7 +303,7 @@ const entries: Array<{
     url: "/pages/request/create?category=LEAVE&type_code=LEAVE_PERSONAL",
   },
   {
-    mark: "宿",
+    mark: "事",
     tone: "slate",
     label: "事务办理",
     desc: "进入事务申请列表查看可办理事项。",

@@ -213,6 +213,7 @@ import {
 import { useAuthStore } from "@/store/auth";
 import { getErrorMessage } from "@/utils/error";
 import { openMiniappPage } from "@/utils/navigation";
+import { getRequestTypeBadge } from "@/utils/request-badge";
 
 const STATUS_TABS = [
   { label: "全部", value: "" },
@@ -264,12 +265,7 @@ function statusLabel(status: string) {
 }
 
 function requestIcon(typeCode?: string | null) {
-  const code = typeCode || "";
-  if (code.includes("CERT")) return "证";
-  if (code.includes("LEAVE")) return "假";
-  if (code.includes("HONOR") || code.includes("SCHOLAR")) return "奖";
-  if (code.includes("DORM")) return "宿";
-  return "事";
+  return getRequestTypeBadge(typeCode);
 }
 
 function requestToneClass(status: string) {
