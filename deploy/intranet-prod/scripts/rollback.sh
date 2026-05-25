@@ -23,7 +23,7 @@ fi
 cd "$APP_DIR"
 
 if [ "${SKIP_BACKUP:-0}" != "1" ]; then
-  "$SCRIPT_DIR/backup-db.sh" >/dev/null
+  bash "$SCRIPT_DIR/backup-db.sh" >/dev/null
 fi
 
 configure_deploy_git_ssh
@@ -32,6 +32,6 @@ git checkout --detach "$TARGET"
 
 compose build
 compose up -d --remove-orphans db redis minio backend web
-"$SCRIPT_DIR/smoke.sh"
+bash "$SCRIPT_DIR/smoke.sh"
 
 echo "Rollback completed to $(current_commit)"

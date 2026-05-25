@@ -60,3 +60,5 @@ GitHub 登记要求：
 - self-hosted runner 已注册为 systemd 服务：`actions.runner.RUC-zlhz-super-ruc.super-ruc-prod-user-VMware-Virtual-Platform.service`，状态为 `active (running)`。
 - 首轮 workflow 被 runner 接收，但失败在 `actions/checkout@v4` 的 HTTPS 拉取阶段：`unable to access 'https://github.com/RUC-zlhz/super-ruc/': Failed to connect to github.com port 443`。
 - 处理方案：workflow 不再使用 `actions/checkout`，直接调用服务器生产 checkout 中的 `/opt/super-ruc/app/deploy/intranet-prod/scripts/deploy-from-github.sh`，由该脚本使用 SSH deploy key 拉取目标提交。
+- 第二轮 workflow 已绕过 HTTPS checkout，但失败在部署脚本直接执行同目录 `.sh` 文件：服务器 checkout 中脚本没有可执行位，返回 `exit code 126`。
+- 处理方案：`deploy-from-github.sh` 与 `rollback.sh` 内部统一使用 `bash "$SCRIPT_DIR/<script>.sh"` 调用同目录脚本，并补 Git 可执行位，避免不同 checkout 文件模式导致部署失败。

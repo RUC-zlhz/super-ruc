@@ -74,10 +74,10 @@ fi
 
 echo "Deploying $(current_commit)"
 
-"$SCRIPT_DIR/preflight-network.sh"
+bash "$SCRIPT_DIR/preflight-network.sh"
 
 if [ "$DEPLOY_SKIP_BACKUP" != "1" ]; then
-  backup_file=$("$SCRIPT_DIR/backup-db.sh")
+  backup_file=$(bash "$SCRIPT_DIR/backup-db.sh")
   echo "Database backup: $backup_file"
 else
   echo "Skipping database backup because DEPLOY_SKIP_BACKUP=1"
@@ -87,10 +87,10 @@ cd "$APP_DIR"
 compose build
 compose up -d --remove-orphans db redis minio
 compose up -d --remove-orphans backend
-"$SCRIPT_DIR/migrate-and-seed.sh"
+bash "$SCRIPT_DIR/migrate-and-seed.sh"
 compose up -d --remove-orphans web
-"$SCRIPT_DIR/smoke.sh"
-"$SCRIPT_DIR/preflight-network.sh"
+bash "$SCRIPT_DIR/smoke.sh"
+bash "$SCRIPT_DIR/preflight-network.sh"
 
 current_commit >"$CURRENT_COMMIT_FILE"
 echo "Deploy completed at $(cat "$CURRENT_COMMIT_FILE")"

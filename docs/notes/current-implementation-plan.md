@@ -638,6 +638,7 @@
 
 - Deploy Key 与 self-hosted runner 已生效；runner 服务已接收 GitHub job。
 - 首轮 job 失败点不是生产构建或 smoke，而是 `actions/checkout@v4` 使用 HTTPS 拉仓库超时；workflow 已改为不 checkout，直接调用服务器生产 checkout 中的 SSH deploy key 部署入口。
+- 第二轮 job 已进入服务器部署入口，但因脚本文件无可执行位返回 `126`；已改为显式 `bash` 调用同目录脚本，并补 Git 可执行位。
 
 ### S6 前端体验增量优化
 
