@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐均已完成
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一均已完成
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -532,6 +532,31 @@
 - 静态验证：`uv run --project backend --extra dev ruff check ...` 通过；`uv run --project backend --extra dev python -m py_compile ...` 通过。
 - 前端验证：`corepack.cmd pnpm -C web exec vue-tsc --noEmit -p tsconfig.json` 通过；`.\web\node_modules\.bin\vue-tsc.CMD --noEmit -p miniapp\tsconfig.json` 通过；`corepack.cmd pnpm -C web build` 通过；`corepack.cmd pnpm -C miniapp build:mp-weixin` 通过。
 - 阻塞验证：`uv run --project backend --extra dev pytest backend/tests/integration/test_honor_flow.py -q --basetemp=.tmp/pytest-tmp-s37-honor` 因 `localhost:54322/sip_db_test` 连接拒绝在 fixture setup 阶段失败，当前结果为 `4 errors`，未进入业务断言。
+
+### S39 官方风格 PDF 导出版式统一
+
+- 细化文件：`docs/notes/refinements/2026-05-25-s39-official-pdf-branding.md`
+- 当前状态：`[x]` 已完成
+- [x] `S39.1` 盘点当前系统生成型 PDF 导出入口：证明 PDF 与学生画像快照 PDF。
+- [x] `S39.2` 引入中国人民大学官网校徽/校名 SVG 与中国人民大学信息学院官网 logo，作为后端 PDF 生成静态资产。
+- [x] `S39.3` 新增统一 PDF 品牌版式 helper，提供人大红页眉、双 logo、A4 页边距、标题区、正文样式、页脚与水印。
+- [x] `S39.4` 将电子证明 PDF 模板切换为统一品牌版式，默认在读证明模板改为正文片段，不再携带旧 `PREVIEW` 临时水印。
+- [x] `S39.5` 将学生画像快照 PDF 切换为统一品牌版式，并移除纯文本 PDF fallback；WeasyPrint 不可用时改走带双 logo、页眉与水印的 ReportLab 设计版兜底。
+- [x] `S39.6` 完成静态校验、单元测试、PDF 生成 smoke 与计划回写。
+- `2026-05-25` 补充视觉收口：ReportLab 兜底已改为结构化绘制，页面按标题区、元信息表、指标卡、记录表、提示框与签名区分层布局；人大校徽已切换为红色资产，并修复页脚说明与页码的遮挡。
+
+当前结论：
+
+- 本轮不新增业务 PDF 类型；现有系统生成 PDF 统一收口为证明 PDF 和画像快照 PDF 两个后端出口。
+- 成绩单 PDF 属于学生上传与教师核验输入，不是系统导出文件，本轮不改变其解析边界。
+
+证据：
+
+- 后端实现：`backend/app/core/pdf_branding.py`、`backend/app/workflow/pdf_generator.py`、`backend/app/profile/service.py`
+- 品牌资产：`backend/app/pdf_assets/ruc-logo.svg`、`backend/app/pdf_assets/ruc-logo.png`、`backend/app/pdf_assets/info-logo.png`
+- 默认模板：`backend/scripts/seed/proof_templates.py`
+- 依赖：`backend/pyproject.toml` 与 `backend/uv.lock` 新增 `reportlab>=4.2`
+- 验证：`ruff check`、`py_compile`、`unit_tests/test_proof_template_engine.py` 均通过；证明 PDF smoke 生成 `%PDF` 字节流 `133064` bytes，画像快照 PDF smoke 生成 `%PDF` 字节流 `159179` bytes。
 
 ### S6 前端体验增量优化
 
@@ -1082,6 +1107,7 @@
 | 2026-05-24 | 生产 EDR Agent 安装 | `docs/notes/refinements/2026-05-24-s36-edr-agent-production-install.md` | `S36.1, S36.2, S36.3, S36.4` | `[x]` | 已按服务器业务组文档在 `10.10.0.13` 安装 Titan EDR Agent，安装日志显示 success，Agent 进程运行，生产容器与 `/healthz` 保持 healthy |
 | 2026-05-25 | 党团官方流程默认模板修正 | `docs/notes/refinements/2026-05-25-s37-official-party-youth-workflow-templates.md` | `S37.1, S37.2, S37.3, S37.4, S37.5` | `[x]` | 已新增党员发展官方 29 步、发展团员官方 15 步和团籍管理模板，旧 V1 模板转为 inactive 历史兼容；ruff、py_compile 与单元测试 `2 passed` 通过，集成测试受本机测试库拒连阻塞 |
 | 2026-05-25 | 学生画像与荣誉展示 P1 补齐 | `docs/notes/refinements/2026-05-25-s38-profile-honor-p1-web-closure.md` | `S38.1, S38.2, S38.3, S38.4, S38.5` | `[x]` | 已补荣誉 `display_order`、个人/集体筛选、获奖人/集体成员校验、Web 管理入口和 Miniapp 筛选标识；后端静态校验、双端类型检查与构建通过，荣誉集成测试受本机测试库拒连阻塞 |
+| 2026-05-25 | 官方风格 PDF 导出版式统一 | `docs/notes/refinements/2026-05-25-s39-official-pdf-branding.md` | `S39.1, S39.2, S39.3, S39.4, S39.5, S39.6` | `[x]` | 已引入人大/信息学院官网视觉资产，统一证明 PDF 与画像快照 PDF 版式，并补 ReportLab 设计版兜底；ruff、py_compile、单测和双 PDF smoke 通过 |
 
 ## 会话更新要求
 

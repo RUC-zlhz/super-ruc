@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 import html
-import io
-import logging
 import re
 from datetime import UTC, date, datetime
 from typing import Any
@@ -11,12 +9,10 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import Student
+from app.core import pdf_branding
 from app.core.exceptions import BizError, NotFoundError
 from app.workflow import repository as repo
 from app.workflow.models import REQUEST_STATUS_APPROVED, ProofTemplate, Request
-
-logger = logging.getLogger(__name__)
-
 
 _CERTIFICATE_CATEGORY = "CERTIFICATE"
 _PLACEHOLDER_RE = re.compile(r"{{\s*([a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z0-9_]+)*)\s*}}")
@@ -156,22 +152,15 @@ def render_proof_html(
     student: Student | None,
 ) -> str:
     context = build_render_context(req, student)
-    return render_template_html(template.html_template, context)
-
-
-def _html_to_pdf_bytes(html_text: str) -> bytes:
-    try:
-        from weasyprint import HTML  # type: ignore
-    except Exception as e:  # noqa: BLE001
-        logger.warning("weasyprint unavailable: %s", e)
-        raise BizError(
-            "PDF 生成依赖未就绪（weasyprint + GTK 运行时），请联系运维",
-            code=50003,
-            http_status=500,
-        ) from e
-    buf = io.BytesIO()
-    HTML(string=html_text).write_pdf(buf)
-    return buf.getvalue()
+    body_html = render_template_html(template.html_template, context)
+    return pdf_branding.official_document_html(
+        title=template.name or "电子证明",
+        subtitle="电子证明 · 审批通过后生成",
+        body_html=body_html,
+        document_code=req.request_no,
+        generated_at=datetime.now(UTC),
+        watermark="信息学院",
+    )
 
 
 async def _get_approved_certificate_request(
@@ -223,6 +212,6 @@ async def generate_proof_pdf(
         student = await db.get(Student, req.applicant_student_id)
 
     html_text = render_proof_html(template, req, student)
-    pdf_bytes = _html_to_pdf_bytes(html_text)
+    pdf_bytes = pdf_branding.html_to_pdf_bytes(html_text)
     filename = f"proof-{req.request_no}.pdf"
     return pdf_bytes, filename

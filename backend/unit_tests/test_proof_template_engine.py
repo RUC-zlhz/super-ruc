@@ -114,6 +114,10 @@ def test_render_proof_html_uses_request_type_and_approval_context() -> None:
 
     html = render_proof_html(template, _certificate_request(), _student())
 
+    assert "中国人民大学信息学院" in html
+    assert "RENMIN UNIVERSITY OF CHINA" in html
+    assert "data:image/svg+xml;base64," in html
+    assert "data:image/png;base64," in html
     assert "<h1>在读证明</h1>" in html
     assert "2024000001 CERT-260524-UNIT" in html
     assert "2026-05-20 2026-05-23" in html
