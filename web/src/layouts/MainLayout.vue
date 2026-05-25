@@ -81,7 +81,7 @@
           <ReloadOutlined />
         </button>
 
-        <button class="icon-btn light bell" title="通知">
+        <button class="icon-btn light bell" title="通知" @click="go('/notice/list')">
           <BellOutlined />
           <span class="notif-dot">12</span>
         </button>
