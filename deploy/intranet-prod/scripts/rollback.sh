@@ -26,6 +26,7 @@ if [ "${SKIP_BACKUP:-0}" != "1" ]; then
   "$SCRIPT_DIR/backup-db.sh" >/dev/null
 fi
 
+configure_deploy_git_ssh
 git fetch origin --prune
 git checkout --detach "$TARGET"
 

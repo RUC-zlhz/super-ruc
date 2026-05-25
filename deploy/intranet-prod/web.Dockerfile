@@ -5,26 +5,28 @@ ARG HTTPS_PROXY=
 ARG NO_PROXY=
 
 FROM ${NODE_IMAGE} AS builder
+ARG HTTP_PROXY=
+ARG HTTPS_PROXY=
+ARG NO_PROXY=
 
 WORKDIR /app
 
 RUN corepack enable
 
-ENV HTTP_PROXY=${HTTP_PROXY} \
-    HTTPS_PROXY=${HTTPS_PROXY} \
-    http_proxy=${HTTP_PROXY} \
-    https_proxy=${HTTPS_PROXY} \
-    npm_config_proxy=${HTTP_PROXY} \
-    npm_config_https_proxy=${HTTPS_PROXY} \
-    NPM_CONFIG_PROXY=${HTTP_PROXY} \
-    NPM_CONFIG_HTTPS_PROXY=${HTTPS_PROXY} \
-    NO_PROXY=${NO_PROXY} \
-    no_proxy=${NO_PROXY}
-
 COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY web/package.json web/package.json
 
-RUN corepack prepare pnpm@9.1.0 --activate \
+RUN HTTP_PROXY="${HTTP_PROXY}" \
+    HTTPS_PROXY="${HTTPS_PROXY}" \
+    http_proxy="${HTTP_PROXY}" \
+    https_proxy="${HTTPS_PROXY}" \
+    npm_config_proxy="${HTTP_PROXY}" \
+    npm_config_https_proxy="${HTTPS_PROXY}" \
+    NPM_CONFIG_PROXY="${HTTP_PROXY}" \
+    NPM_CONFIG_HTTPS_PROXY="${HTTPS_PROXY}" \
+    NO_PROXY="${NO_PROXY}" \
+    no_proxy="${NO_PROXY}" \
+    corepack prepare pnpm@9.1.0 --activate \
     && pnpm install --filter ./web --frozen-lockfile
 
 COPY web web

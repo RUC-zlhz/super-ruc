@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=common.sh
+. "$SCRIPT_DIR/common.sh"
+
+DEPLOY_REF=${1:-${DEPLOY_REF:-main}}
+DEPLOY_GIT_REMOTE=${DEPLOY_GIT_REMOTE:-git@github.com:RUC-zlhz/super-ruc.git}
+DEPLOY_EXPECTED_SHA=${DEPLOY_EXPECTED_SHA:-}
+DEPLOY_FORCE_SYNC=${DEPLOY_FORCE_SYNC:-0}
+DEPLOY_SKIP_BACKUP=${DEPLOY_SKIP_BACKUP:-0}
+
+fail() {
+  echo "Deploy failed: $*" >&2
+  exit 1
+}
+
+require_app_dir
+require_env_file
+
+if [ ! -r "$DEPLOY_KEY_FILE" ]; then
+  fail "missing readable deploy key: $DEPLOY_KEY_FILE"
+fi
+
+mkdir -p "$APP_DIR/.deploy"
+PREVIOUS_COMMIT_FILE="$APP_DIR/.deploy/previous_commit"
+CURRENT_COMMIT_FILE="$APP_DIR/.deploy/current_commit"
+
+configure_deploy_git_ssh
+
+git -C "$APP_DIR" remote set-url origin "$DEPLOY_GIT_REMOTE"
+
+if ! git -C "$APP_DIR" ls-remote --exit-code origin >/dev/null; then
+  fail "cannot access GitHub with deploy key; add the public key as a read-only repository deploy key first"
+fi
+
+if ! git -C "$APP_DIR" diff --quiet || ! git -C "$APP_DIR" diff --cached --quiet; then
+  if [ "$DEPLOY_FORCE_SYNC" != "1" ]; then
+    git -C "$APP_DIR" status --short >&2
+    fail "server checkout has tracked local changes; set DEPLOY_FORCE_SYNC=1 only after confirming they can be replaced by GitHub"
+  fi
+  echo "DEPLOY_FORCE_SYNC=1: tracked server changes will be replaced by GitHub state."
+fi
+
+previous_commit=$(current_commit)
+printf '%s\n' "$previous_commit" >"$PREVIOUS_COMMIT_FILE"
+
+git -C "$APP_DIR" fetch origin --prune
+
+if git -C "$APP_DIR" rev-parse --verify --quiet "origin/$DEPLOY_REF" >/dev/null; then
+  target_ref="origin/$DEPLOY_REF"
+  checkout_branch="$DEPLOY_REF"
+else
+  target_ref="$DEPLOY_REF"
+  checkout_branch=""
+fi
+
+target_sha=$(git -C "$APP_DIR" rev-parse "$target_ref^{commit}") || fail "cannot resolve deploy ref: $DEPLOY_REF"
+
+if [ -n "$DEPLOY_EXPECTED_SHA" ] && [ "$target_sha" != "$DEPLOY_EXPECTED_SHA" ]; then
+  fail "resolved $DEPLOY_REF to $target_sha, expected $DEPLOY_EXPECTED_SHA"
+fi
+
+if [ "$DEPLOY_FORCE_SYNC" = "1" ]; then
+  git -C "$APP_DIR" reset --hard "$target_sha"
+fi
+
+if [ -n "$checkout_branch" ]; then
+  git -C "$APP_DIR" checkout -B "$checkout_branch" "$target_sha"
+else
+  git -C "$APP_DIR" checkout --detach "$target_sha"
+fi
+
+echo "Deploying $(current_commit)"
+
+"$SCRIPT_DIR/preflight-network.sh"
+
+if [ "$DEPLOY_SKIP_BACKUP" != "1" ]; then
+  backup_file=$("$SCRIPT_DIR/backup-db.sh")
+  echo "Database backup: $backup_file"
+else
+  echo "Skipping database backup because DEPLOY_SKIP_BACKUP=1"
+fi
+
+cd "$APP_DIR"
+compose build
+compose up -d --remove-orphans db redis minio
+compose up -d --remove-orphans backend
+"$SCRIPT_DIR/migrate-and-seed.sh"
+compose up -d --remove-orphans web
+"$SCRIPT_DIR/smoke.sh"
+"$SCRIPT_DIR/preflight-network.sh"
+
+current_commit >"$CURRENT_COMMIT_FILE"
+echo "Deploy completed at $(cat "$CURRENT_COMMIT_FILE")"

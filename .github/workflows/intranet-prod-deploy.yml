@@ -1,0 +1,74 @@
+name: Intranet Production Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      deploy_ref:
+        description: Branch, tag, or commit to deploy
+        required: false
+        default: main
+      skip_backup:
+        description: Skip database backup before deploy
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: intranet-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to 10.10.0.13
+    runs-on:
+      - self-hosted
+      - super-ruc-prod
+    timeout-minutes: 60
+    environment: intranet-prod
+
+    steps:
+      - name: Checkout deployment scripts
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Verify runner host
+        shell: bash
+        run: |
+          set -euo pipefail
+          hostname
+          test -d /opt/super-ruc/app
+          test -f /opt/super-ruc/app/deploy/intranet-prod/.env
+          test -r /opt/super-ruc/.ssh/super-ruc-prod-deploy-ed25519
+          docker compose version
+
+      - name: Deploy
+        shell: bash
+        env:
+          APP_DIR: /opt/super-ruc/app
+          BACKUP_DIR: /opt/super-ruc/backups
+          ENV_FILE: /opt/super-ruc/app/deploy/intranet-prod/.env
+          COMPOSE_FILE: /opt/super-ruc/app/deploy/intranet-prod/docker-compose.yml
+          COMPOSE_PROJECT_NAME: super-ruc-intranet-prod
+          DEPLOY_GIT_REMOTE: git@github.com:RUC-zlhz/super-ruc.git
+          DEPLOY_KEY_FILE: /opt/super-ruc/.ssh/super-ruc-prod-deploy-ed25519
+          INPUT_DEPLOY_REF: ${{ github.event.inputs.deploy_ref || '' }}
+          INPUT_SKIP_BACKUP: ${{ github.event.inputs.skip_backup || 'false' }}
+        run: |
+          set -euo pipefail
+          deploy_ref="${INPUT_DEPLOY_REF:-${GITHUB_REF_NAME:-main}}"
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            export DEPLOY_EXPECTED_SHA="$GITHUB_SHA"
+          fi
+          if [ "$INPUT_SKIP_BACKUP" = "true" ]; then
+            export DEPLOY_SKIP_BACKUP=1
+          else
+            export DEPLOY_SKIP_BACKUP=0
+          fi
+          bash deploy/intranet-prod/scripts/deploy-from-github.sh "$deploy_ref"

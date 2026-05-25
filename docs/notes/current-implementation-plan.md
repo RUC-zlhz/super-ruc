@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复均已完成
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理均已完成；`S44` GitHub Actions 自动部署底座已实现，等待 GitHub Deploy Key 登记与 self-hosted runner 注册后完成首轮工作流验证
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -588,6 +588,56 @@
 - 本轮只关闭 S40 审查中的 P1 项；P2 与争议项继续保留在后续修复池。
 - 本轮不做生产部署，部署与生产 smoke 后续单独执行。
 
+### S42 生产运行时代理隔离修复
+
+- 细化文件：`docs/notes/refinements/2026-05-25-s42-runtime-proxy-isolation.md`
+- 当前状态：`[x]` 已完成
+- [x] `S42.1` 将后端 Dockerfile 的构建期代理限定在 `apt / pip` 命令范围内。
+- [x] `S42.2` 将 Web Dockerfile 的构建期代理限定在 `corepack / pnpm` 命令范围内。
+- [x] `S42.3` 更新生产部署说明，明确构建代理不得进入运行时容器。
+- [x] `S42.4` 完成本地 Dockerfile/Compose 静态验证。
+- [x] `S42.5` 同步到 `10.10.0.13` 并通过 Compose 运行时清空代理变量后重建 backend 容器。
+- [x] `S42.6` 复测 `wx-login` 不再因容器内代理连接拒绝返回 `50201`。
+
+当前结论：
+
+- 生产 502 根因已定位为后端容器运行时继承 `HTTP_PROXY / HTTPS_PROXY=http://127.0.0.1:18081`，导致真实微信 `jscode2session` 调用在容器内误连本机代理端口并失败。
+- 已在 Dockerfile 层收口构建期代理，并在 Compose 层增加运行时兜底清空；服务器 backend 容器重建后保持 healthy，容器代理变量为空值，`wx-login` 无效 code 探测返回微信凭证错误 `401` 而非 `50201`。
+
+### S43 生产网络与构建出网治理
+
+- 细化文件：`docs/notes/refinements/2026-05-25-s43-production-network-cleanup.md`
+- 当前状态：`[x]` 已完成
+- [x] `S43.1` 盘点生产主机网络、DNS、Docker daemon 代理、Compose 代理配置、监听端口和容器出口。
+- [x] `S43.2` 将内网生产构建默认切到直连公网与国内镜像源，`BUILD_HTTP_PROXY / BUILD_HTTPS_PROXY` 默认留空。
+- [x] `S43.3` 固化 backend 构建阶段 Debian TUNA 镜像、IPv4 优先、短超时与重试。
+- [x] `S43.4` 将微信 `code2session` HTTP client 固定为 `trust_env=False`，禁止误读环境代理。
+- [x] `S43.5` 停止服务器侧失效的 `127.0.0.1:18081` 构建代理进程，并确认 `18080 / 18081` 不再监听。
+- [x] `S43.6` 在服务器直连模式下重建 backend / web 镜像，重启生产容器并验证健康状态。
+- [x] `S43.7` 复测容器外网出口、项目 smoke、外部 `10.10.0.13` 访问与 `wx-login` 真实微信错误路径。
+
+当前结论：
+
+- `10.10.0.13` 当前可直接访问微信、TUNA PyPI 与 TUNA Debian 镜像源；生产不再依赖反向 SSH 或 `127.0.0.1:18081` 构建代理。
+- backend / web 已用直连网络正式重建并重启，五个生产服务 healthy；`bash deploy/intranet-prod/scripts/smoke.sh` 通过，`POST /api/v1/auth/wx-login` 无效 code 返回微信凭证错误 `401`，后端日志仅记录 `errcode=40029`。
+
+### S44 GitHub Actions 自动部署底座
+
+- 细化文件：`docs/notes/refinements/2026-05-25-s44-github-actions-auto-deploy.md`
+- 当前状态：`[!]` 外部 GitHub 登记待完成
+- [x] `S44.1` 选择 self-hosted runner + read-only deploy key 方案，避免 GitHub-hosted runner 访问内网 IP。
+- [x] `S44.2` 在服务器生成生产 deploy key，私钥留在 `/opt/super-ruc/.ssh/`，公钥待登记到 GitHub Deploy keys。
+- [x] `S44.3` 新增自动部署入口脚本，统一执行 GitHub 拉取、网络预检、数据库备份、镜像构建、迁移种子、服务启动和 smoke。
+- [x] `S44.4` 新增 self-hosted runner 安装脚本与 GitHub Actions workflow。
+- [x] `S44.5` 将生产网络治理检查固化到 CI/CD 部署前后，防止回退到 `18080 / 18081` 代理依赖。
+- [!] `S44.6` 将服务器 deploy key 公钥登记到 GitHub 仓库 Deploy keys。
+- [!] `S44.7` 使用 GitHub 一次性 token 注册 `super-ruc-prod` self-hosted runner 并完成首轮 workflow 部署验证。
+
+当前结论：
+
+- 自动部署代码底座已落地；因当前环境没有 GitHub 管理凭据，Deploy Key 登记与 runner 注册 token 仍需要在 GitHub 仓库设置页完成。
+- 在 `S44.6 / S44.7` 完成前，服务器仍可继续使用当前手动部署流程；完成后，push 到 `main` 将自动触发生产部署。
+
 ### S6 前端体验增量优化
 
 - [x] `S6.1` Web 共享导航与默认落点收口
@@ -1140,6 +1190,9 @@
 | 2026-05-25 | 官方风格 PDF 导出版式统一 | `docs/notes/refinements/2026-05-25-s39-official-pdf-branding.md` | `S39.1, S39.2, S39.3, S39.4, S39.5, S39.6` | `[x]` | 已引入人大/信息学院官网视觉资产，统一证明 PDF 与画像快照 PDF 版式，并补 ReportLab 设计版兜底；ruff、py_compile、单测和双 PDF smoke 通过 |
 | 2026-05-25 | bug-report 生产事实审查 | `docs/notes/refinements/2026-05-25-bug-report-production-review.md` | `S40.1, S40.2, S40.3, S40.4` | `[x]` | 已对照 `bug-report.md`、当前代码和 `10.10.0.13` 实际部署逐项定性；确认 P1 修复池为上传大小前置限制、学分消耗模型、日期兼容解析和分页参数约束 |
 | 2026-05-25 | bug-report P1 代码修复 | `docs/notes/refinements/2026-05-25-s41-bug-report-p1-fixes.md` | `S41.1, S41.2, S41.3, S41.4, S41.5, S41.6` | `[x]` | 已关闭上传大小前置限制、学分消耗模型、日期兼容解析和分页参数约束四类 P1 项，并补定向回归测试；本地 ruff、py_compile 与新增单测通过，远程 `10.10.0.13` 隔离 worktree + 生产镜像 + `sip_db_test_s41` 手写业务断言通过 |
+| 2026-05-25 | S42 生产运行时代理隔离修复 | `docs/notes/refinements/2026-05-25-s42-runtime-proxy-isolation.md` | `S42.1, S42.2, S42.3, S42.4, S42.5, S42.6` | `[x]` | 已定位小程序 `wx-login` 502 为后端运行时误继承构建代理导致微信 `jscode2session` 出口失败；Dockerfile 已限定构建期代理，Compose 已运行时清空代理变量，生产 backend 重建后 `wx-login` 探测从 `50201` 恢复为微信凭证错误 `401` |
+| 2026-05-25 | S43 生产网络与构建出网治理 | `docs/notes/refinements/2026-05-25-s43-production-network-cleanup.md` | `S43.1, S43.2, S43.3, S43.4, S43.5, S43.6, S43.7` | `[x]` | 已确认服务器可直连微信、TUNA PyPI 与 TUNA Debian，停止失效 `18081` 构建代理，backend / web 在无代理直连模式下重建并重启；生产 smoke、外部 `10.10.0.13` 健康检查和 `wx-login` 微信错误路径均通过 |
+| 2026-05-25 | S44 GitHub Actions 自动部署底座 | `docs/notes/refinements/2026-05-25-s44-github-actions-auto-deploy.md` | `S44.1, S44.2, S44.3, S44.4, S44.5, S44.6, S44.7` | `[!]` | 已实现 self-hosted runner + read-only deploy key 自动部署脚本、workflow 和网络预检；等待 GitHub Deploy Key 登记与 runner token 注册后进行首轮 workflow 验证 |
 
 ## 会话更新要求
 
@@ -1237,3 +1290,6 @@
 - `2026-05-25`：将 `S35/S37/S38` 合并提交 `20b2c5f` 推送到 GitHub `origin/main` 并部署到内网生产 `10.10.0.13`。部署前备份 `/opt/super-ruc/backups/super-ruc-20260525-144925-5072fca.dump`；服务器通过本机 Git bundle 更新到 `20b2c5f` 后执行 `deploy.sh local`、`migrate-and-seed.sh`、`smoke.sh` 均通过；Alembic 已迁移到 `0019_honor_display_order`，幂等种子插入 `proof_templates=1`、新增/更新 `workflow_templates`，五个生产服务均为 healthy。
 - `2026-05-25`：完成 `S40` bug-report 生产事实审查；实际生产提交为 `a558c61`，`smoke.sh` 与 `/healthz` 通过，`WECHAT_MOCK_ENABLED=False`、`AI_QA_ENABLED=False`。18 项报告中，配置启动、DB 连接、路由死循环、Mock 生产风险等被生产事实否定；上传先读内存、学分等价重复消耗、日期解析兼容性和分页参数约束进入 P1 修复池。
 - `2026-05-25`：完成 `S41` bug-report P1 代码修复；新增统一上传读取 helper 并替换五个直接 `file.read()` 上传入口，学业缺口等价课程改为一次性学分消耗模型，导入日期解析支持斜杠/中文/ISO datetime，`/admin/report/academic-gap` 补分页参数边界，并新增对应单元与集成回归测试。本地 `ruff`、`py_compile` 与新增单测 `4 passed` 通过；因本机 `localhost:54322/sip_db_test` 拒连，另在 `10.10.0.13:/opt/super-ruc/test-runs/s41-p1` 使用生产后端镜像和隔离测试库 `sip_db_test_s41` 完成远程 py_compile 与手写业务断言，输出 `S41 remote manual assertions passed`。
+- `2026-05-25`：完成 `S42` 生产运行时代理隔离修复；确认 `wx-login` 502 根因为旧后端镜像运行时继承 `HTTP_PROXY / HTTPS_PROXY=http://127.0.0.1:18081`，导致真实微信 `jscode2session` 在容器内误连本机代理。已修正 Dockerfile 构建期代理边界，并在 Compose 中运行时清空 backend 代理变量；服务器强制重建 backend 容器后 healthy，`POST /api/v1/auth/wx-login` 无效 code 探测返回微信 `errcode=40029` 对应 `401`，不再返回 `50201`。
+- `2026-05-25`：完成 `S43` 生产网络与构建出网治理；确认 `10.10.0.13` 具备直连公网出口，停止失效 `127.0.0.1:18081` 构建代理，backend Dockerfile 固化 TUNA Debian 镜像、IPv4 优先和短超时重试，微信 `code2session` 固定 `trust_env=False`。服务器无代理重建 backend / web 并重启后五服务 healthy，容器外网探测微信/TUNA PyPI/TUNA Debian 均返回 `200`，`bash deploy/intranet-prod/scripts/smoke.sh` 与外部 `http://10.10.0.13/healthz` 通过，`wx-login` 无效 code 返回 `401` 且日志仅记录微信 `errcode=40029`。
+- `2026-05-25`：新增 `S44` GitHub Actions 自动部署底座；采用服务器 self-hosted runner 规避 GitHub-hosted runner 无法访问内网 IP 的问题，服务器使用 read-only deploy key 拉取 GitHub。已新增部署前后网络预检、从 GitHub 部署入口、runner 安装脚本和 `main` push 自动部署 workflow；当前阻塞在 GitHub Deploy Key 公钥登记与 runner 一次性 token 注册，完成后可触发首轮 workflow 验证。

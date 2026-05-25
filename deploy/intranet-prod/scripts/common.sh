@@ -16,6 +16,13 @@ BACKUP_DIR=${BACKUP_DIR:-/opt/super-ruc/backups}
 ENV_FILE=${ENV_FILE:-$APP_DIR/deploy/intranet-prod/.env}
 COMPOSE_FILE=${COMPOSE_FILE:-$APP_DIR/deploy/intranet-prod/docker-compose.yml}
 COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-super-ruc-intranet-prod}
+DEPLOY_KEY_FILE=${DEPLOY_KEY_FILE:-/opt/super-ruc/.ssh/super-ruc-prod-deploy-ed25519}
+
+configure_deploy_git_ssh() {
+  if [ -z "${GIT_SSH_COMMAND:-}" ] && [ -r "$DEPLOY_KEY_FILE" ]; then
+    export GIT_SSH_COMMAND="ssh -i $DEPLOY_KEY_FILE -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+  fi
+}
 
 compose() {
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" "$@"

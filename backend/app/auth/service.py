@@ -101,7 +101,7 @@ async def wx_code2session(code: str, *, student_no: str | None = None) -> dict:
         "grant_type": "authorization_code",
     }
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, trust_env=False) as client:
             resp = await client.get(WX_CODE2SESSION_URL, params=params)
     except httpx.RequestError as exc:
         logger.warning("wechat code2session request failed: %s", exc)
