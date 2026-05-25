@@ -48,6 +48,7 @@
 - `corepack.cmd pnpm -C web build` 通过。
 - `corepack.cmd pnpm -C miniapp build:mp-weixin` 通过。
 - `uv run --project backend --extra dev pytest backend/tests/integration/test_honor_flow.py -q --basetemp=.tmp/pytest-tmp-s37-honor` 因 `localhost:54322/sip_db_test` 连接拒绝在 fixture setup 阶段失败，当前结果为 `4 errors`，未进入业务断言。
+- 生产部署：`20b2c5f` 已推送 `origin/main` 并部署到 `10.10.0.13`；部署前备份 `/opt/super-ruc/backups/super-ruc-20260525-144925-5072fca.dump`，服务器执行 `deploy.sh local`、`migrate-and-seed.sh`、`smoke.sh` 通过。生产 Alembic 已执行 `0018_proof_template_engine -> 0019_honor_display_order`，`proof_templates` 默认种子插入 `1` 条，`workflow_templates` 种子新增 `3` 条并更新旧 V1 模板 `2` 条，五个 Compose 服务均为 healthy。
 
 ## 残余说明
 
