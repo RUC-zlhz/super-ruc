@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理均已完成；`S44` GitHub Actions 自动部署底座已实现，等待 GitHub Deploy Key 登记与 self-hosted runner 注册后完成首轮工作流验证
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理均已完成；`S44` GitHub Actions 自动部署底座已注册 runner，首轮 workflow 发现 HTTPS checkout 失败并已改为 SSH deploy key 部署入口
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -624,19 +624,20 @@
 ### S44 GitHub Actions 自动部署底座
 
 - 细化文件：`docs/notes/refinements/2026-05-25-s44-github-actions-auto-deploy.md`
-- 当前状态：`[!]` 外部 GitHub 登记待完成
+- 当前状态：`[-]` 首轮 workflow 修正中
 - [x] `S44.1` 选择 self-hosted runner + read-only deploy key 方案，避免 GitHub-hosted runner 访问内网 IP。
 - [x] `S44.2` 在服务器生成生产 deploy key，私钥留在 `/opt/super-ruc/.ssh/`，公钥待登记到 GitHub Deploy keys。
 - [x] `S44.3` 新增自动部署入口脚本，统一执行 GitHub 拉取、网络预检、数据库备份、镜像构建、迁移种子、服务启动和 smoke。
 - [x] `S44.4` 新增 self-hosted runner 安装脚本与 GitHub Actions workflow。
 - [x] `S44.5` 将生产网络治理检查固化到 CI/CD 部署前后，防止回退到 `18080 / 18081` 代理依赖。
-- [!] `S44.6` 将服务器 deploy key 公钥登记到 GitHub 仓库 Deploy keys。
-- [!] `S44.7` 使用 GitHub 一次性 token 注册 `super-ruc-prod` self-hosted runner 并完成首轮 workflow 部署验证。
+- [x] `S44.6` 将服务器 deploy key 公钥登记到 GitHub 仓库 Deploy keys。
+- [x] `S44.7` 使用 GitHub 一次性 token 注册 `super-ruc-prod` self-hosted runner。
+- [-] `S44.8` 首轮 workflow 部署验证：修正 `actions/checkout` HTTPS 失败，改为直接调用服务器 SSH deploy key 部署入口。
 
 当前结论：
 
-- 自动部署代码底座已落地；因当前环境没有 GitHub 管理凭据，Deploy Key 登记与 runner 注册 token 仍需要在 GitHub 仓库设置页完成。
-- 在 `S44.6 / S44.7` 完成前，服务器仍可继续使用当前手动部署流程；完成后，push 到 `main` 将自动触发生产部署。
+- Deploy Key 与 self-hosted runner 已生效；runner 服务已接收 GitHub job。
+- 首轮 job 失败点不是生产构建或 smoke，而是 `actions/checkout@v4` 使用 HTTPS 拉仓库超时；workflow 已改为不 checkout，直接调用服务器生产 checkout 中的 SSH deploy key 部署入口。
 
 ### S6 前端体验增量优化
 

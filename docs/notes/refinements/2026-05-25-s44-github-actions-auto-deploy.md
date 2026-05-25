@@ -21,8 +21,9 @@
 - [x] `S44.5` 新增 `deploy/intranet-prod/scripts/install-github-runner.sh`。
 - [x] `S44.6` 新增 `.github/workflows/intranet-prod-deploy.yml`。
 - [x] `S44.7` 更新 `deploy/intranet-prod/README.md` 的 deploy key、runner 和自动部署说明。
-- [!] `S44.8` 将 deploy key 公钥登记到 GitHub 仓库 Deploy keys。
-- [!] `S44.9` 使用 GitHub 一次性 runner token 注册 self-hosted runner 并实跑首轮 workflow。
+- [x] `S44.8` 将 deploy key 公钥登记到 GitHub 仓库 Deploy keys。
+- [x] `S44.9` 使用 GitHub 一次性 runner token 注册 self-hosted runner。
+- [-] `S44.10` 实跑首轮 workflow 并修正 HTTPS checkout 失败问题。
 
 ## 当前服务器 Deploy Key 公钥
 
@@ -52,3 +53,10 @@ GitHub 登记要求：
 - push 到 `main` 后，workflow 在 self-hosted runner 上运行。
 - workflow 完成数据库备份、构建、迁移、种子、服务启动、smoke 和网络复检。
 - 部署后 `10.10.0.13` 五服务 healthy，`18080 / 18081` 无监听，`wx-login` 无效 code 继续返回微信凭证错误 `401` 而非 `50201`。
+
+## 2026-05-26 首轮运行记录
+
+- Deploy key 已生效：服务器通过 `GIT_SSH_COMMAND="ssh -i /opt/super-ruc/.ssh/super-ruc-prod-deploy-ed25519 ..."` 执行 `git ls-remote git@github.com:RUC-zlhz/super-ruc.git HEAD` 成功。
+- self-hosted runner 已注册为 systemd 服务：`actions.runner.RUC-zlhz-super-ruc.super-ruc-prod-user-VMware-Virtual-Platform.service`，状态为 `active (running)`。
+- 首轮 workflow 被 runner 接收，但失败在 `actions/checkout@v4` 的 HTTPS 拉取阶段：`unable to access 'https://github.com/RUC-zlhz/super-ruc/': Failed to connect to github.com port 443`。
+- 处理方案：workflow 不再使用 `actions/checkout`，直接调用服务器生产 checkout 中的 `/opt/super-ruc/app/deploy/intranet-prod/scripts/deploy-from-github.sh`，由该脚本使用 SSH deploy key 拉取目标提交。

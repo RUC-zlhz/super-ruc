@@ -191,7 +191,7 @@ RUNNER_TOKEN=<github-runner-token> \
 `.github/workflows/intranet-prod-deploy.yml` 会在 `main` 分支 push 后触发，并在服务器 runner 上执行：
 
 ```bash
-bash deploy/intranet-prod/scripts/deploy-from-github.sh main
+bash /opt/super-ruc/app/deploy/intranet-prod/scripts/deploy-from-github.sh main
 ```
 
 该脚本会按顺序执行：

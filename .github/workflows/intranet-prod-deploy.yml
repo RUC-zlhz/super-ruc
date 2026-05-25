@@ -33,11 +33,6 @@ jobs:
     environment: intranet-prod
 
     steps:
-      - name: Checkout deployment scripts
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
       - name: Verify runner host
         shell: bash
         run: |
@@ -71,4 +66,4 @@ jobs:
           else
             export DEPLOY_SKIP_BACKUP=0
           fi
-          bash deploy/intranet-prod/scripts/deploy-from-github.sh "$deploy_ref"
+          bash /opt/super-ruc/app/deploy/intranet-prod/scripts/deploy-from-github.sh "$deploy_ref"
