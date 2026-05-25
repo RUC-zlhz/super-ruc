@@ -1,6 +1,6 @@
 # S44 GitHub Actions 自动部署底座
 
-- 状态：`[!]` 外部 GitHub 登记待完成
+- 状态：`[x]` 已完成
 - 主计划引用：`docs/notes/current-implementation-plan.md`
 - 触发问题：用户希望本地、GitHub、服务器三端同步，并实现提交到 GitHub 后自动部署，避免反复手动部署。
 - 日期：`2026-05-25`
@@ -23,7 +23,8 @@
 - [x] `S44.7` 更新 `deploy/intranet-prod/README.md` 的 deploy key、runner 和自动部署说明。
 - [x] `S44.8` 将 deploy key 公钥登记到 GitHub 仓库 Deploy keys。
 - [x] `S44.9` 使用 GitHub 一次性 runner token 注册 self-hosted runner。
-- [-] `S44.10` 实跑首轮 workflow 并修正 HTTPS checkout 失败问题。
+- [x] `S44.10` 实跑首轮 workflow 并修正 HTTPS checkout 失败问题。
+- [x] `S44.11` 实跑第三轮 workflow 自动部署并完成生产 smoke 与网络预检。
 
 ## 当前服务器 Deploy Key 公钥
 
@@ -62,3 +63,5 @@ GitHub 登记要求：
 - 处理方案：workflow 不再使用 `actions/checkout`，直接调用服务器生产 checkout 中的 `/opt/super-ruc/app/deploy/intranet-prod/scripts/deploy-from-github.sh`，由该脚本使用 SSH deploy key 拉取目标提交。
 - 第二轮 workflow 已绕过 HTTPS checkout，但失败在部署脚本直接执行同目录 `.sh` 文件：服务器 checkout 中脚本没有可执行位，返回 `exit code 126`。
 - 处理方案：`deploy-from-github.sh` 与 `rollback.sh` 内部统一使用 `bash "$SCRIPT_DIR/<script>.sh"` 调用同目录脚本，并补 Git 可执行位，避免不同 checkout 文件模式导致部署失败。
+- 第三轮 workflow 对应提交 `1ed58f0` 已自动部署成功：runner 日志显示 `Job Deploy to 10.10.0.13 completed with result: Succeeded`。
+- 部署后验证：服务器 `/opt/super-ruc/app` 已在 `1ed58f0`，backend / web / db / redis / minio 均 healthy，`bash deploy/intranet-prod/scripts/smoke.sh` 通过，`bash deploy/intranet-prod/scripts/preflight-network.sh` 通过，外部 `http://10.10.0.13/healthz` 返回 ok。
