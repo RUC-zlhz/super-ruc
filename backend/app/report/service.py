@@ -439,38 +439,50 @@ async def compute_academic_gap(
             (e.target_course_code, float(e.ratio or 1.0))
         )
 
-    # 展开一条成绩到它可以覆盖的 course_code 集合（原始 + 所有等价目标）
-    # 同时记录该课程的"有效学分"
-    earned: dict[str, float] = {}
-    passed_course_codes: set[str] = set()
+    credit_buckets: list[dict[str, Any]] = []
     total_passed_credits = 0.0
     for r in records:
-        passed_course_codes.add(r.course_code)
-        total_passed_credits += float(r.credits or 0)
-        earned[r.course_code] = earned.get(r.course_code, 0) + float(r.credits or 0)
+        credits = float(r.credits or 0)
+        total_passed_credits += credits
+        coverage = {r.course_code: credits}
         for target, ratio in equiv_map.get(r.course_code, []):
-            earned[target] = earned.get(target, 0) + float(r.credits or 0) * ratio
+            coverage[target] = max(coverage.get(target, 0.0), credits * ratio)
+        credit_buckets.append(
+            {
+                "course_code": r.course_code,
+                "remaining": credits,
+                "coverage": coverage,
+            }
+        )
 
     module_gaps: list[AcademicModuleGap] = []
     total_earned = 0.0
-    whitelist_earned_total = 0.0
     flexible_credit_balance = total_passed_credits
     for m in modules:
-        allowed_codes: set[str] = set()
+        allowed_codes: list[str] = []
+        seen_allowed_codes: set[str] = set()
         for c in _iter_module_courses(m.courses):
             code = c.get("code")
-            if code:
-                allowed_codes.add(str(code))
+            if code and str(code) not in seen_allowed_codes:
+                allowed_codes.append(str(code))
+                seen_allowed_codes.add(str(code))
         module_earned = 0.0
         passed: list[str] = []
         if allowed_codes:
             for code in allowed_codes:
-                if code in earned:
-                    module_earned += earned[code]
-                    whitelist_earned_total += earned[code]
-                    if code in passed_course_codes:
-                        passed.append(code)
-            flexible_credit_balance = max(total_passed_credits - whitelist_earned_total, 0.0)
+                for bucket in credit_buckets:
+                    available = min(
+                        float(bucket["remaining"]),
+                        float(bucket["coverage"].get(code, 0.0)),
+                    )
+                    if available <= 0:
+                        continue
+                    bucket["remaining"] = max(float(bucket["remaining"]) - available, 0.0)
+                    module_earned += available
+                    real_code = str(bucket["course_code"])
+                    if real_code not in passed:
+                        passed.append(real_code)
+            flexible_credit_balance = sum(float(bucket["remaining"]) for bucket in credit_buckets)
         else:
             required = float(m.credits_required or 0)
             module_earned = min(required, flexible_credit_balance)

@@ -40,6 +40,7 @@ from app.audit.service import build_audit_detail, log_action
 from app.core.dependencies import CurrentUserDep, DBDep, require_role
 from app.core.exceptions import BizError, ConflictError, NotFoundError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
+from app.core.uploads import read_upload_file_limited
 from app.exchange import default_imports, service
 from app.exchange import repository as repo
 from app.exchange.models import (
@@ -78,8 +79,6 @@ _VALID_IMPORT_TYPES = {
     "course-offering": IMPORT_TYPE_COURSE_OFFERING,
     "honor": IMPORT_TYPE_HONOR,
 }
-
-_MAX_UPLOAD_BYTES = 30 * 1024 * 1024
 
 router = APIRouter(prefix="/admin", tags=["exchange"])
 
@@ -153,9 +152,11 @@ async def upload_import(
     import_type = _VALID_IMPORT_TYPES.get(type_slug.lower())
     if import_type is None:
         raise BizError(f"不支持的导入类型：{type_slug}", code=40050)
-    content = await file.read()
-    if len(content) > _MAX_UPLOAD_BYTES:
-        raise BizError("文件超过 30MB 上限", code=40051)
+    content = await read_upload_file_limited(
+        file,
+        too_large_message="文件超过 30MB 上限",
+        too_large_code=40051,
+    )
     if not content:
         raise BizError("空文件", code=40052)
 

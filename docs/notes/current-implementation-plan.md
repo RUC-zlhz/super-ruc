@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一均已完成
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复均已完成
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -558,6 +558,36 @@
 - 依赖：`backend/pyproject.toml` 与 `backend/uv.lock` 新增 `reportlab>=4.2`
 - 验证：`ruff check`、`py_compile`、`unit_tests/test_proof_template_engine.py` 均通过；证明 PDF smoke 生成 `%PDF` 字节流 `133064` bytes，画像快照 PDF smoke 生成 `%PDF` 字节流 `159179` bytes。
 
+### S40 bug-report 生产事实审查
+
+- 细化文件：`docs/notes/refinements/2026-05-25-bug-report-production-review.md`
+- 当前状态：`[x]` 已完成审查，修复实施待后续确认
+- [x] `S40.1` 读取 `bug-report.md` 并按当前代码路径逐条核对。
+- [x] `S40.2` 对 `10.10.0.13:/opt/super-ruc/app` 做只读生产基线检查，确认实际提交、容器状态、运行配置和健康检查。
+- [x] `S40.3` 对报告中的 18 项给出“否定 / 确认风险 / 待业务确认 / 证据不足”结论。
+- [x] `S40.4` 形成后续修复优先级：P1 为上传大小前置限制、学分消耗模型、日期兼容解析、分页参数约束。
+
+当前结论：
+
+- `bug-report.md` 不是全部成立的故障清单；生产当前运行在 `a558c61`，backend/web 和依赖服务 healthy，配置守卫与 Mock/AI 开关相关条目在生产上已被事实否定。
+- 真实需要进入后续修复池的高优先级项是：上传入口先读入内存、学业缺口等价课程重复消耗、导入日期兼容性不足、学业缺口分页参数缺少 `Query` 约束。
+
+### S41 bug-report P1 代码修复
+
+- 细化文件：`docs/notes/refinements/2026-05-25-s41-bug-report-p1-fixes.md`
+- 当前状态：`[x]` 已完成
+- [x] `S41.1` 新增统一上传读取 helper，按 chunk 读取 `UploadFile`，超过上限立即返回 `413`。
+- [x] `S41.2` 替换事务附件、成绩单 PDF、导入中心、知识模板、后台账号导入的直接 `await file.read()`。
+- [x] `S41.3` 修复学业缺口等价课程学分消耗模型，同一条已修成绩只可被一个模块消耗一次。
+- [x] `S41.4` 扩展导入日期解析，支持常见斜杠、中文和 ISO datetime 日期。
+- [x] `S41.5` 为 `/admin/report/academic-gap` 补分页参数边界。
+- [x] `S41.6` 补充上传 helper、日期解析、等价课程消耗和分页参数回归测试。
+
+当前结论：
+
+- 本轮只关闭 S40 审查中的 P1 项；P2 与争议项继续保留在后续修复池。
+- 本轮不做生产部署，部署与生产 smoke 后续单独执行。
+
 ### S6 前端体验增量优化
 
 - [x] `S6.1` Web 共享导航与默认落点收口
@@ -1108,6 +1138,8 @@
 | 2026-05-25 | 党团官方流程默认模板修正 | `docs/notes/refinements/2026-05-25-s37-official-party-youth-workflow-templates.md` | `S37.1, S37.2, S37.3, S37.4, S37.5` | `[x]` | 已新增党员发展官方 29 步、发展团员官方 15 步和团籍管理模板，旧 V1 模板转为 inactive 历史兼容；ruff、py_compile 与单元测试 `2 passed` 通过，集成测试受本机测试库拒连阻塞 |
 | 2026-05-25 | 学生画像与荣誉展示 P1 补齐 | `docs/notes/refinements/2026-05-25-s38-profile-honor-p1-web-closure.md` | `S38.1, S38.2, S38.3, S38.4, S38.5` | `[x]` | 已补荣誉 `display_order`、个人/集体筛选、获奖人/集体成员校验、Web 管理入口和 Miniapp 筛选标识；后端静态校验、双端类型检查与构建通过，荣誉集成测试受本机测试库拒连阻塞 |
 | 2026-05-25 | 官方风格 PDF 导出版式统一 | `docs/notes/refinements/2026-05-25-s39-official-pdf-branding.md` | `S39.1, S39.2, S39.3, S39.4, S39.5, S39.6` | `[x]` | 已引入人大/信息学院官网视觉资产，统一证明 PDF 与画像快照 PDF 版式，并补 ReportLab 设计版兜底；ruff、py_compile、单测和双 PDF smoke 通过 |
+| 2026-05-25 | bug-report 生产事实审查 | `docs/notes/refinements/2026-05-25-bug-report-production-review.md` | `S40.1, S40.2, S40.3, S40.4` | `[x]` | 已对照 `bug-report.md`、当前代码和 `10.10.0.13` 实际部署逐项定性；确认 P1 修复池为上传大小前置限制、学分消耗模型、日期兼容解析和分页参数约束 |
+| 2026-05-25 | bug-report P1 代码修复 | `docs/notes/refinements/2026-05-25-s41-bug-report-p1-fixes.md` | `S41.1, S41.2, S41.3, S41.4, S41.5, S41.6` | `[x]` | 已关闭上传大小前置限制、学分消耗模型、日期兼容解析和分页参数约束四类 P1 项，并补定向回归测试；本地 ruff、py_compile 与新增单测通过，远程 `10.10.0.13` 隔离 worktree + 生产镜像 + `sip_db_test_s41` 手写业务断言通过 |
 
 ## 会话更新要求
 
@@ -1203,3 +1235,5 @@
 - `2026-05-25`：完成 `S37` 党团官方流程默认模板修正；默认种子新增 `PARTY_DEVELOPMENT_OFFICIAL_V2` 官方 29 步党员发展模板、`YOUTH_LEAGUE_DEVELOPMENT_OFFICIAL_V2` 官方 15 步发展团员模板和 `YOUTH_LEAGUE_MEMBERSHIP_MANAGEMENT_V1` 团籍管理模板，旧 `PARTY_DEVELOPMENT_V1 / YOUTH_LEAGUE_V1` 转为 inactive 历史兼容；`ruff`、`py_compile` 与 `unit_tests/test_workflow_template_specs.py` 通过，工作流集成测试仍受本机 `localhost:54322/sip_db_test` 拒连阻塞。
 - `2026-05-25`：完成 `S38` 学生画像与荣誉展示 P1 补齐；荣誉后端新增 `display_order` 迁移、个人/集体筛选、统一排序和 recipients 服务端校验，Web 管理端补齐展示顺序、封面图、媒体 JSON 与获奖人/集体成员编辑器，Miniapp 补齐个人/集体筛选与标识；后端 `ruff` / `py_compile`、Web / Miniapp 类型检查与构建均通过，荣誉集成测试因本机 `localhost:54322/sip_db_test` 拒连未进入业务断言。
 - `2026-05-25`：将 `S35/S37/S38` 合并提交 `20b2c5f` 推送到 GitHub `origin/main` 并部署到内网生产 `10.10.0.13`。部署前备份 `/opt/super-ruc/backups/super-ruc-20260525-144925-5072fca.dump`；服务器通过本机 Git bundle 更新到 `20b2c5f` 后执行 `deploy.sh local`、`migrate-and-seed.sh`、`smoke.sh` 均通过；Alembic 已迁移到 `0019_honor_display_order`，幂等种子插入 `proof_templates=1`、新增/更新 `workflow_templates`，五个生产服务均为 healthy。
+- `2026-05-25`：完成 `S40` bug-report 生产事实审查；实际生产提交为 `a558c61`，`smoke.sh` 与 `/healthz` 通过，`WECHAT_MOCK_ENABLED=False`、`AI_QA_ENABLED=False`。18 项报告中，配置启动、DB 连接、路由死循环、Mock 生产风险等被生产事实否定；上传先读内存、学分等价重复消耗、日期解析兼容性和分页参数约束进入 P1 修复池。
+- `2026-05-25`：完成 `S41` bug-report P1 代码修复；新增统一上传读取 helper 并替换五个直接 `file.read()` 上传入口，学业缺口等价课程改为一次性学分消耗模型，导入日期解析支持斜杠/中文/ISO datetime，`/admin/report/academic-gap` 补分页参数边界，并新增对应单元与集成回归测试。本地 `ruff`、`py_compile` 与新增单测 `4 passed` 通过；因本机 `localhost:54322/sip_db_test` 拒连，另在 `10.10.0.13:/opt/super-ruc/test-runs/s41-p1` 使用生产后端镜像和隔离测试库 `sip_db_test_s41` 完成远程 py_compile 与手写业务断言，输出 `S41 remote manual assertions passed`。

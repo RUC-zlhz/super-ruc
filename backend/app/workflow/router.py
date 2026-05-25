@@ -24,6 +24,7 @@ from app.core.dependencies import (
 )
 from app.core.exceptions import BizError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
+from app.core.uploads import read_upload_file_limited
 from app.profile import service as profile_service
 from app.profile.schemas import StudentBasic
 from app.workflow import pdf_generator, quiz_service, service
@@ -185,7 +186,7 @@ async def upload_attachment(
     user: ActiveStudentDep,
     file: Annotated[UploadFile, File()],
 ) -> ApiResponse[AttachmentOut]:
-    content = await file.read()
+    content = await read_upload_file_limited(file)
     row = await service.upload_request_attachment(
         db,
         request_id=request_id,

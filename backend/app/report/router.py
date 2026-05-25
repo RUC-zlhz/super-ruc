@@ -12,11 +12,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 
 from app.core.dependencies import ActiveStudentDep, CurrentUserDep, DBDep, require_role
 from app.core.exceptions import BizError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
+from app.core.uploads import read_upload_file_limited
 from app.report import service
 from app.report.schemas import (
     AcademicGapAggregateItem,
@@ -64,7 +65,7 @@ async def upload_my_transcript_pdf(
 ) -> ApiResponse[TranscriptPdfUploadResult]:
     if user.student_id is None:
         raise BizError("仅学生可上传本人成绩单 PDF", code=40305, http_status=403)
-    content = await file.read()
+    content = await read_upload_file_limited(file)
     result = await service.upload_transcript_pdf_for_review(
         db,
         student_id=user.student_id,
@@ -100,8 +101,8 @@ async def admin_academic_gap_list(
     grade_code: str | None = None,
     major_code: str | None = None,
     risk_level: str | None = None,
-    page: int = 1,
-    page_size: int = 20,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
 ) -> ApiResponse[Paginated[AcademicGapAggregateItem]]:
     items, total = await service.list_academic_gap_overview(
         db,

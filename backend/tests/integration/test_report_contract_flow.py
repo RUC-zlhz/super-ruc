@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.models import Student, User
 from app.exchange.models import (
     IMPORT_TYPE_TRANSCRIPT_PDF_REVIEW,
+    CourseEquivalence,
     CourseOffering,
     CurriculumModule,
     CurriculumPlan,
@@ -411,3 +412,103 @@ async def test_admin_academic_gap_aggregate_query_uses_items_meta_and_filters(
     detail_data = detail.json()["data"]
     assert detail_data["student_no"] == "A200001"
     assert "disclaimer" in detail_data
+
+
+async def test_academic_gap_equivalent_course_consumes_credit_once(
+    db: AsyncSession,
+) -> None:
+    student = Student(
+        student_no="A200004",
+        full_name="equiv-gap",
+        grade_code="2022",
+        major_code="CS",
+        class_code="CS2201",
+    )
+    db.add(student)
+    await db.flush()
+
+    plan = CurriculumPlan(
+        grade_code="2022",
+        major_code="CS",
+        plan_name="2022 等价课程测试方案",
+        version_label="2022-equiv",
+        total_credits_required=6,
+        is_active=True,
+    )
+    db.add(plan)
+    await db.flush()
+    db.add_all(
+        [
+            CurriculumModule(
+                plan_id=plan.id,
+                module_code="MODULE_B",
+                module_name="模块 B",
+                module_type="REQUIRED",
+                credits_required=3,
+                courses=[{"code": "CS-B", "name": "等价目标 B", "credits": 3}],
+                sort_order=1,
+            ),
+            CurriculumModule(
+                plan_id=plan.id,
+                module_code="MODULE_C",
+                module_name="模块 C",
+                module_type="REQUIRED",
+                credits_required=3,
+                courses=[{"code": "CS-C", "name": "等价目标 C", "credits": 3}],
+                sort_order=2,
+            ),
+            CourseEquivalence(
+                grade_code="2022",
+                major_code="CS",
+                source_course_code="CS-A",
+                source_course_name="源课程 A",
+                target_course_code="CS-B",
+                target_course_name="等价目标 B",
+                ratio=1,
+                is_active=True,
+            ),
+            CourseEquivalence(
+                grade_code="2022",
+                major_code="CS",
+                source_course_code="CS-A",
+                source_course_name="源课程 A",
+                target_course_code="CS-C",
+                target_course_name="等价目标 C",
+                ratio=1,
+                is_active=True,
+            ),
+            StudentCourseRecord(
+                student_id=student.id,
+                term_code="2025-FALL",
+                course_code="CS-A",
+                course_name="源课程 A",
+                credits=3,
+                course_type="REQUIRED",
+                pass_flag=True,
+            ),
+        ]
+    )
+    await db.commit()
+
+    result = await report_service.compute_academic_gap(db, student.id)
+
+    assert result.total_credits_required == 6
+    assert result.total_credits_earned == 3
+    assert result.credits_gap == 3
+    modules = {item.module_code: item for item in result.modules}
+    assert modules["MODULE_B"].credits_earned == 3
+    assert modules["MODULE_C"].credits_earned == 0
+    assert modules["MODULE_B"].passed_courses == ["CS-A"]
+
+
+async def test_admin_academic_gap_rejects_invalid_pagination(
+    admin_client: AsyncClient,
+) -> None:
+    for params in (
+        {"page": 0, "page_size": 20},
+        {"page": 1, "page_size": 0},
+        {"page": 1, "page_size": 101},
+    ):
+        response = await admin_client.get("/api/v1/admin/report/academic-gap", params=params)
+        assert response.status_code == 422, response.text
+        assert response.json()["code"] == 42200

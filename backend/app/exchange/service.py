@@ -13,6 +13,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import re
 import uuid
 from datetime import UTC, date, datetime
 from typing import Any
@@ -525,12 +526,26 @@ def _parse_courses(v: Any) -> list[dict[str, Any]] | None:
 def _parse_date(v: Any) -> date | None:
     if v is None or v == "":
         return None
-    if isinstance(v, date):
-        return v
     if isinstance(v, datetime):
         return v.date()
+    if isinstance(v, date):
+        return v
+    value = str(v).strip()
+    if not value:
+        return None
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y年%m月%d日"):
+        try:
+            return datetime.strptime(value, fmt).date()
+        except ValueError:
+            pass
+    if re.fullmatch(r"\d{4}年\d{1,2}月\d{1,2}日", value):
+        normalized = re.sub(r"年|月", "-", value).removesuffix("日")
+        try:
+            return datetime.strptime(normalized, "%Y-%m-%d").date()
+        except ValueError:
+            return None
     try:
-        return datetime.strptime(str(v), "%Y-%m-%d").date()
+        return datetime.fromisoformat(value).date()
     except ValueError:
         return None
 

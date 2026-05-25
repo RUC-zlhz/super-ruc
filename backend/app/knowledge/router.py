@@ -23,6 +23,7 @@ from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES
 from app.core.dependencies import CurrentUserDep, DBDep, require_role
 from app.core.exceptions import BizError, NotFoundError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
+from app.core.uploads import read_upload_file_limited
 from app.knowledge import repository as repo
 from app.knowledge import service
 from app.knowledge.schemas import (
@@ -382,7 +383,7 @@ async def admin_upload_template(
     applicable_scenario: Annotated[str | None, Form()] = None,
     version_label: Annotated[str | None, Form()] = None,
 ) -> ApiResponse[TemplateOut]:
-    content = await file.read()
+    content = await read_upload_file_limited(file)
     row = await service.upload_template(
         db,
         filename=file.filename or "template.bin",
