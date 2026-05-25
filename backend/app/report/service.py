@@ -8,6 +8,7 @@ FR-014 原则：
 FR-016：
 - 按状态/类型聚合 requests / notices / workflows。不暴露个人敏感字段。
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -82,10 +83,7 @@ _TERM_CODE_PATTERN = re.compile(r"(\d{4})-(SPRING|SUMMER|FALL|WINTER)")
 
 
 def _generate_transcript_pdf_batch_no() -> str:
-    return (
-        f"IM-TPDF-{datetime.now(UTC).strftime('%y%m%d%H%M%S')}-"
-        f"{uuid.uuid4().hex[:6].upper()}"
-    )
+    return f"IM-TPDF-{datetime.now(UTC).strftime('%y%m%d%H%M%S')}-" f"{uuid.uuid4().hex[:6].upper()}"
 
 
 def _safe_filename(filename: str | None) -> str:
@@ -131,9 +129,7 @@ async def upload_transcript_pdf_for_review(
     content_type: str | None,
 ) -> TranscriptPdfUploadResult:
     """学生上传成绩单 PDF 的最小闭环：存文件、建核验批次、不写正式成绩。"""
-    student = (
-        await db.execute(select(Student).where(Student.id == student_id))
-    ).scalar_one_or_none()
+    student = (await db.execute(select(Student).where(Student.id == student_id))).scalar_one_or_none()
     if student is None:
         raise NotFoundError("学生不存在")
     if not content:
@@ -272,9 +268,7 @@ async def upload_transcript_pdf_for_review(
         object_key=batch.object_key,
         parsed_text_chars=len(analysis.extracted_text),
         parsed_courses_count=len(candidate_rows),
-        parsed_courses=[
-            TranscriptPdfCandidateCourse(**candidate) for candidate in candidate_rows
-        ],
+        parsed_courses=[TranscriptPdfCandidateCourse(**candidate) for candidate in candidate_rows],
         review_required=True,
         formal_records_written=0,
         data_warnings=warnings,
@@ -368,12 +362,8 @@ async def commit_transcript_pdf_review(
     )
 
 
-async def compute_academic_gap(
-    db: AsyncSession, student_id: int
-) -> AcademicGapResult:
-    student = (await db.execute(
-        select(Student).where(Student.id == student_id)
-    )).scalar_one_or_none()
+async def compute_academic_gap(db: AsyncSession, student_id: int) -> AcademicGapResult:
+    student = (await db.execute(select(Student).where(Student.id == student_id))).scalar_one_or_none()
     if student is None:
         raise NotFoundError("学生不存在")
 
@@ -408,36 +398,56 @@ async def compute_academic_gap(
         result.conclusion_text = _build_academic_gap_conclusion(result)
         return result
 
-    modules = (await db.execute(
-        select(CurriculumModule)
-        .where(CurriculumModule.plan_id == plan.id)
-        .order_by(CurriculumModule.sort_order.asc())
-    )).scalars().all()
-
-    records = (await db.execute(
-        select(StudentCourseRecord).where(
-            StudentCourseRecord.student_id == student_id,
-            StudentCourseRecord.pass_flag.is_(True),
+    modules = (
+        (
+            await db.execute(
+                select(CurriculumModule)
+                .where(CurriculumModule.plan_id == plan.id)
+                .order_by(CurriculumModule.sort_order.asc())
+            )
         )
-    )).scalars().all()
+        .scalars()
+        .all()
+    )
+
+    records = (
+        (
+            await db.execute(
+                select(StudentCourseRecord).where(
+                    StudentCourseRecord.student_id == student_id,
+                    StudentCourseRecord.pass_flag.is_(True),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
 
     if not records:
         data_warnings.append("暂无已通过的课程记录；所有模块标记为缺口以供人工核验。")
 
-    equivs = (await db.execute(
-        select(CourseEquivalence).where(
-            CourseEquivalence.is_active.is_(True),
-            ((CourseEquivalence.grade_code == student.grade_code)
-             | (CourseEquivalence.grade_code.is_(None))),
-            ((CourseEquivalence.major_code == student.major_code)
-             | (CourseEquivalence.major_code.is_(None))),
+    equivs = (
+        (
+            await db.execute(
+                select(CourseEquivalence).where(
+                    CourseEquivalence.is_active.is_(True),
+                    (
+                        (CourseEquivalence.grade_code == student.grade_code)
+                        | (CourseEquivalence.grade_code.is_(None))
+                    ),
+                    (
+                        (CourseEquivalence.major_code == student.major_code)
+                        | (CourseEquivalence.major_code.is_(None))
+                    ),
+                )
+            )
         )
-    )).scalars().all()
+        .scalars()
+        .all()
+    )
     equiv_map: dict[str, list[tuple[str, float]]] = {}
     for e in equivs:
-        equiv_map.setdefault(e.source_course_code, []).append(
-            (e.target_course_code, float(e.ratio or 1.0))
-        )
+        equiv_map.setdefault(e.source_course_code, []).append((e.target_course_code, float(e.ratio or 1.0)))
 
     credit_buckets: list[dict[str, Any]] = []
     total_passed_credits = 0.0
@@ -469,12 +479,17 @@ async def compute_academic_gap(
         module_earned = 0.0
         passed: list[str] = []
         if allowed_codes:
+            required = float(m.credits_required or 0)
             for code in allowed_codes:
                 for bucket in credit_buckets:
+                    if module_earned >= required:
+                        break
                     available = min(
                         float(bucket["remaining"]),
                         float(bucket["coverage"].get(code, 0.0)),
                     )
+                    # 修复 Logic Bug: 避免贪婪消耗超出模块所需学分，导致溢出学分被困住无法给后续模块（如自由选修）使用
+                    available = min(available, required - module_earned)
                     if available <= 0:
                         continue
                     bucket["remaining"] = max(float(bucket["remaining"]) - available, 0.0)
@@ -487,30 +502,42 @@ async def compute_academic_gap(
             required = float(m.credits_required or 0)
             module_earned = min(required, flexible_credit_balance)
             flexible_credit_balance = max(flexible_credit_balance - module_earned, 0.0)
-            data_warnings.append(
-                f"模块 {m.module_code} 未配置课程白名单，已按未归属已修学分粗略抵扣。"
-            )
+
+            # 修复 Logic Bug: 必须同步从 credit_buckets 中扣除，否则下一个带白名单的模块会重新 sum 导致学分双重计算
+            deduct_left = module_earned
+            for bucket in credit_buckets:
+                if deduct_left <= 0:
+                    break
+                b_rem = float(bucket["remaining"])
+                if b_rem > 0:
+                    deducted = min(b_rem, deduct_left)
+                    bucket["remaining"] = max(b_rem - deducted, 0.0)
+                    deduct_left -= deducted
+
+            data_warnings.append(f"模块 {m.module_code} 未配置课程白名单，已按未归属已修学分粗略抵扣。")
 
         module_earned = round(module_earned, 2)
         required = float(m.credits_required or 0)
         gap = max(required - module_earned, 0.0)
         total_earned += module_earned
-        module_gaps.append(AcademicModuleGap(
-            module_code=m.module_code,
-            module_name=m.module_name,
-            module_type=m.module_type,
-            credits_required=required,
-            credits_earned=module_earned,
-            credits_gap=round(gap, 2),
-            passed_courses=passed,
-            note=m.note,
-        ))
+        module_gaps.append(
+            AcademicModuleGap(
+                module_code=m.module_code,
+                module_name=m.module_name,
+                module_type=m.module_type,
+                credits_required=required,
+                credits_earned=module_earned,
+                credits_gap=round(gap, 2),
+                passed_courses=passed,
+                note=m.note,
+            )
+        )
 
     # 建议课程：缺口模块中的未修课程均返回；缺少开课/容量/课表/先修/偏好数据时显式提示。
     ranked_suggestions: list[tuple[int, float, int, int, str, dict[str, Any]]] = []
-    offered = (await db.execute(
-        select(CourseOffering).where(CourseOffering.is_active.is_(True))
-    )).scalars().all()
+    offered = (
+        (await db.execute(select(CourseOffering).where(CourseOffering.is_active.is_(True)))).scalars().all()
+    )
     offer_map = {o.course_code: o for o in offered}
     if not offered:
         data_warnings.append("当前未配置有效开课数据，课程推荐仅按培养方案白名单列出候选。")
@@ -725,9 +752,13 @@ def _term_code_date_range(term_code: str | None) -> tuple[datetime, datetime] | 
         "WINTER": ((1, 1), (2, 1)),
     }
     (start_month, start_day), (end_month, end_day) = ranges[season]
-    end_year = year + 1 if season == "FALL" else year
+
+    # 修复 Logic Bug: 春/夏/冬学期均属于跨年后的日历年
+    start_year = year if season == "FALL" else year + 1
+    end_year = year + 1 if season == "FALL" else year + 1
+
     return (
-        datetime(year, start_month, start_day, tzinfo=UTC),
+        datetime(start_year, start_month, start_day, tzinfo=UTC),
         datetime(end_year, end_month, end_day, tzinfo=UTC),
     )
 
@@ -736,14 +767,11 @@ async def build_overview(db: AsyncSession, *, term_code: str | None = None) -> O
     normalized_term_code = _normalize_term_code(term_code)
     term_range = _term_code_date_range(normalized_term_code)
     # --- requests 按类型 × 状态聚合 ---
-    stmt = (
-        select(
-            Request.type_code,
-            Request.status,
-            func.count().label("cnt"),
-        )
-        .group_by(Request.type_code, Request.status)
-    )
+    stmt = select(
+        Request.type_code,
+        Request.status,
+        func.count().label("cnt"),
+    ).group_by(Request.type_code, Request.status)
     if term_range:
         stmt = stmt.where(Request.created_at >= term_range[0], Request.created_at < term_range[1])
     grouped = (await db.execute(stmt)).all()
@@ -753,10 +781,13 @@ async def build_overview(db: AsyncSession, *, term_code: str | None = None) -> O
 
     summary_map: dict[str, RequestSummary] = {}
     for type_code, status, cnt in grouped:
-        s = summary_map.setdefault(type_code, RequestSummary(
-            type_code=type_code,
-            type_name=(type_map.get(type_code).name if type_code in type_map else type_code),
-        ))
+        s = summary_map.setdefault(
+            type_code,
+            RequestSummary(
+                type_code=type_code,
+                type_name=(type_map.get(type_code).name if type_code in type_map else type_code),
+            ),
+        )
         if status == REQUEST_STATUS_DRAFT:
             s.draft += cnt
         elif status == REQUEST_STATUS_SUBMITTED:
@@ -813,15 +844,18 @@ async def build_overview(db: AsyncSession, *, term_code: str | None = None) -> O
         published_notices=published_notices,
         total_batches=total_batches,
         total_deliveries=total_deliveries,
-        sent=sent, failed=failed, skipped=skipped, read=read,
+        sent=sent,
+        failed=failed,
+        skipped=skipped,
+        read=read,
     )
 
     # --- workflows ---
     templates = (await db.execute(select(WorkflowTemplate))).scalars().all()
     workflows: list[WorkflowSummary] = []
     for t in templates:
-        workflow_count_stmt = select(func.count()).select_from(StudentWorkflow).where(
-            StudentWorkflow.template_id == t.id
+        workflow_count_stmt = (
+            select(func.count()).select_from(StudentWorkflow).where(StudentWorkflow.template_id == t.id)
         )
         if term_range:
             workflow_count_stmt = workflow_count_stmt.where(
@@ -842,24 +876,24 @@ async def build_overview(db: AsyncSession, *, term_code: str | None = None) -> O
             )
         node_rows = (await db.execute(node_stmt)).all()
         node_map = dict(node_rows)
-        workflows.append(WorkflowSummary(
-            template_code=t.code,
-            template_name=t.name,
-            kind=t.kind,
-            total_students=total_students,
-            nodes_pending=node_map.get(WORKFLOW_NODE_PENDING, 0),
-            nodes_overdue=node_map.get(WORKFLOW_NODE_OVERDUE, 0),
-            nodes_done=node_map.get(WORKFLOW_NODE_DONE, 0),
-        ))
+        workflows.append(
+            WorkflowSummary(
+                template_code=t.code,
+                template_name=t.name,
+                kind=t.kind,
+                total_students=total_students,
+                nodes_pending=node_map.get(WORKFLOW_NODE_PENDING, 0),
+                nodes_overdue=node_map.get(WORKFLOW_NODE_OVERDUE, 0),
+                nodes_done=node_map.get(WORKFLOW_NODE_DONE, 0),
+            )
+        )
 
     # --- 顶部指标 ---
-    total_students = (await db.execute(
-        select(func.count()).select_from(Student).where(Student.deleted_at.is_(None))
-    )).scalar_one()
+    total_students = (
+        await db.execute(select(func.count()).select_from(Student).where(Student.deleted_at.is_(None)))
+    ).scalar_one()
     total_requests_all = sum(s.total for s in requests_summary)
-    pending_approvals = sum(
-        s.submitted + s.in_review for s in requests_summary
-    )
+    pending_approvals = sum(s.submitted + s.in_review for s in requests_summary)
     metrics = [
         KVMetric(key="students", label="在籍学生", value=total_students),
         KVMetric(key="requests", label="申请总量", value=total_requests_all),
