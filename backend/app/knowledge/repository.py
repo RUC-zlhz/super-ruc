@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import date
 
-from sqlalchemy import and_, case, func, or_, select
+from sqlalchemy import and_, case, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.knowledge.models import (
@@ -139,6 +139,12 @@ async def search_published_entries(
         stmt = stmt.where(KnowledgeEntry.category_code == category_code)
     if q:
         like = f"%{q}%"
+        tag_like_exists = exists(
+            select(1).where(
+                KnowledgeEntryTag.entry_id == KnowledgeEntry.id,
+                KnowledgeEntryTag.tag.ilike(like),
+            )
+        )
         stmt = stmt.where(
             or_(
                 KnowledgeEntry.title.ilike(like),
@@ -147,12 +153,19 @@ async def search_published_entries(
                 KnowledgeEntry.required_materials.ilike(like),
                 KnowledgeEntry.process_steps.ilike(like),
                 KnowledgeEntry.body_md.ilike(like),
+                tag_like_exists,
+                KnowledgeSource.source_name.ilike(like),
+                KnowledgeSource.issuing_org.ilike(like),
             )
         )
     if tag:
-        stmt = stmt.join(KnowledgeEntryTag, KnowledgeEntryTag.entry_id == KnowledgeEntry.id).where(
-            KnowledgeEntryTag.tag == tag
+        tag_exists = exists(
+            select(1).where(
+                KnowledgeEntryTag.entry_id == KnowledgeEntry.id,
+                KnowledgeEntryTag.tag == tag,
+            )
         )
+        stmt = stmt.where(tag_exists)
 
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar_one()

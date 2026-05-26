@@ -6,6 +6,7 @@ const REFRESH_TOKEN_KEY = 'sip.refresh_token'
 const LOGIN_PAGE_URL = '/pages/profile/index'
 
 let loginRedirectPending = false
+let devApiNormalized = false
 
 export interface ApiEnvelope<T> {
   code: number
@@ -39,7 +40,28 @@ function normalizeApiBaseUrl(baseUrl: string): string {
   return baseUrl.trim().replace(/\/+$/, '')
 }
 
+function getForcedDevApiBaseUrl(): string | null {
+  const env = (import.meta as unknown as { env?: Record<string, string | boolean | undefined> }).env
+  if (!env?.DEV || getEnvApiBaseUrl()) return null
+
+  if (!devApiNormalized) {
+    devApiNormalized = true
+    const runtimeValue = uni.getStorageSync(API_BASE_URL_STORAGE_KEY)
+    const runtimeBaseUrl = typeof runtimeValue === 'string' ? normalizeApiBaseUrl(runtimeValue) : ''
+    const target = normalizeApiBaseUrl(DEFAULT_API_BASE_URL)
+    if (runtimeBaseUrl && runtimeBaseUrl !== target) {
+      uni.removeStorageSync(API_BASE_URL_STORAGE_KEY)
+      uni.removeStorageSync(TOKEN_KEY)
+      uni.removeStorageSync(REFRESH_TOKEN_KEY)
+    }
+  }
+
+  return normalizeApiBaseUrl(DEFAULT_API_BASE_URL)
+}
+
 export function getApiBaseUrl(): string {
+  const forcedDevBaseUrl = getForcedDevApiBaseUrl()
+  if (forcedDevBaseUrl) return forcedDevBaseUrl
   const runtimeValue = uni.getStorageSync(API_BASE_URL_STORAGE_KEY)
   const runtimeBaseUrl = typeof runtimeValue === 'string' ? runtimeValue.trim() : ''
   return normalizeApiBaseUrl(runtimeBaseUrl || getEnvApiBaseUrl() || DEFAULT_API_BASE_URL)

@@ -206,6 +206,7 @@ class AiMatchCandidate(BaseModel):
     entry_id: int
     slug: str
     title: str
+    summary: str | None = None
     score: float
     reason: str | None = None
     source_name: str | None = None

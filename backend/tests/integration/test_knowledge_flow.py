@@ -247,7 +247,7 @@ async def test_official_source_requires_url_and_writes_audit(
 
 
 async def test_ai_match_fallback_to_keyword(admin_client: AsyncClient) -> None:
-    """AI_QA_ENABLED=false 时走关键词匹配，engine 字段 == 'keyword'。"""
+    """AI_QA_ENABLED=false 时走检索式关键词匹配。"""
     # 先发布一条条目
     src = await admin_client.post(
         "/api/v1/admin/knowledge/sources",
@@ -277,3 +277,64 @@ async def test_ai_match_fallback_to_keyword(admin_client: AsyncClient) -> None:
     data = match_resp.json()["data"]
     assert data["engine"] == "retrieval"
     assert "免责" in data["disclaimer"] or "人工" in data["disclaimer"]
+
+
+async def test_search_can_hit_tag_keyword(admin_client: AsyncClient) -> None:
+    """学生侧自由搜索不仅搜正文，也能命中知识标签。"""
+    src = await admin_client.post(
+        "/api/v1/admin/knowledge/sources",
+        json={"source_name": "tag-hit-src"},
+    )
+    entry_resp = await admin_client.post(
+        "/api/v1/admin/knowledge/entries",
+        json={
+            "slug": "academic-change-service",
+            "title": "学业异动办理咨询",
+            "summary": "查看学业办理口径。",
+            "category_code": "ACADEMIC",
+            "source_id": src.json()["data"]["id"],
+            "tags": ["转专业", "专业分流"],
+            "body_md": "来源文件：《测试条目》\n\n标准答复：1. 转专业需以学校和学院正式通知为准。",
+        },
+    )
+    entry_id = entry_resp.json()["data"]["id"]
+    publish_resp = await admin_client.post(f"/api/v1/admin/knowledge/entries/{entry_id}/publish", json={})
+    assert publish_resp.status_code == 200, publish_resp.text
+
+    search_resp = await admin_client.get("/api/v1/knowledge/search?q=转专业")
+    assert search_resp.status_code == 200, search_resp.text
+    body = search_resp.json()["data"]
+    assert body["meta"]["total"] == 1
+    assert body["items"][0]["slug"] == "academic-change-service"
+
+
+async def test_ai_match_returns_summary_and_keyword_reason(admin_client: AsyncClient) -> None:
+    src = await admin_client.post(
+        "/api/v1/admin/knowledge/sources",
+        json={"source_name": "ai-preview-src"},
+    )
+    entry_resp = await admin_client.post(
+        "/api/v1/admin/knowledge/entries",
+        json={
+            "slug": "leave-cancel-guide",
+            "title": "教学活动销假办理",
+            "summary": "涉及离京离校的请假，返校后需回到原请假表单办理销假登记。",
+            "category_code": "LEAVE",
+            "source_id": src.json()["data"]["id"],
+            "tags": ["销假", "离京离校", "返校"],
+            "body_md": "来源文件：《测试条目》\n\n标准答复：1. 涉及离京离校的请假，返校后需回到原请假表单办理销假登记。",
+        },
+    )
+    entry_id = entry_resp.json()["data"]["id"]
+    publish_resp = await admin_client.post(f"/api/v1/admin/knowledge/entries/{entry_id}/publish", json={})
+    assert publish_resp.status_code == 200, publish_resp.text
+
+    match_resp = await admin_client.post(
+        "/api/v1/knowledge/ai-match",
+        json={"query": "离京离校回来后怎么销假", "top_k": 3},
+    )
+    assert match_resp.status_code == 200, match_resp.text
+    candidate = match_resp.json()["data"]["candidates"][0]
+    assert candidate["slug"] == "leave-cancel-guide"
+    assert candidate["summary"].startswith("涉及离京离校的请假")
+    assert "销假" in (candidate["reason"] or "")
