@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
 from app.core.config import settings
@@ -22,28 +23,97 @@ _SYSTEM_PROMPT = (
 )
 
 
+def _normalize_query(query: str) -> str:
+    return re.sub(r"\s+", " ", query.lower().strip())
+
+
+def _query_tokens(query: str) -> list[str]:
+    normalized = _normalize_query(query)
+    if not normalized:
+        return []
+
+    parts = [
+        token
+        for token in re.split(r"[\s,，。.!！？?、:：;；/（）()【】\[\]“”\"'·-]+", normalized)
+        if token
+    ]
+    tokens: list[str] = []
+    seen: set[str] = set()
+    for token in [normalized, *parts]:
+        if len(token) < 2 or token in seen:
+            continue
+        seen.add(token)
+        tokens.append(token)
+    return tokens
+
+
+def _candidate_fields(entry: KnowledgeEntry) -> list[tuple[str, float, bool]]:
+    tag_fields = [(tag.tag or "", 2.2, True) for tag in (entry.tags or [])]
+    source_name = entry.source.source_name if entry.source else ""
+    return [
+        (entry.title or "", 3.0, True),
+        (entry.summary or "", 1.8, False),
+        (entry.applicable_condition or "", 1.2, False),
+        (entry.required_materials or "", 1.2, False),
+        (entry.process_steps or "", 1.2, False),
+        (entry.body_md or "", 0.8, False),
+        (source_name or "", 1.0, True),
+        *tag_fields,
+    ]
+
+
+def _match_text_score(token: str, text: str, *, allow_reverse: bool = False) -> float:
+    normalized_text = text.lower().strip()
+    if not normalized_text:
+        return 0.0
+    if token in normalized_text:
+        return 1.0
+    if allow_reverse and len(normalized_text) <= 32 and normalized_text in token:
+        return 0.75
+    return 0.0
+
+
 def _score_keyword(entry: KnowledgeEntry, query: str) -> float:
     """简易关键词评分：字符串子串命中权重。用于降级与初筛。"""
-    q = query.lower().strip()
-    if not q:
-        return 0.0
-    tokens = [t for t in q.replace("?", " ").replace("？", " ").split() if t]
+    tokens = _query_tokens(query)
     if not tokens:
-        tokens = [q]
+        return 0.0
     score = 0.0
-    fields = [
-        (entry.title or "", 3.0),
-        (entry.summary or "", 1.5),
-        (entry.applicable_condition or "", 1.0),
-        (entry.required_materials or "", 1.0),
-        (entry.process_steps or "", 1.0),
-        (entry.body_md or "", 0.5),
-    ]
     for tk in tokens:
-        for text, weight in fields:
-            if tk in text.lower():
-                score += weight
+        for text, weight, allow_reverse in _candidate_fields(entry):
+            score += weight * _match_text_score(tk, text, allow_reverse=allow_reverse)
     return score
+
+
+def explain_keyword_match(entry: KnowledgeEntry, query: str) -> str:
+    query_text = _normalize_query(query)
+    matched: list[str] = []
+    seen: set[str] = set()
+
+    for tag in (entry.tags or []):
+        value = (tag.tag or "").strip()
+        normalized = value.lower()
+        if not value:
+            continue
+        if normalized in query_text or query_text in normalized:
+            if value not in seen:
+                matched.append(value)
+                seen.add(value)
+
+    if matched:
+        return f"命中关键词：{'、'.join(matched[:3])}"
+
+    for tk in _query_tokens(query):
+        for text, _, allow_reverse in _candidate_fields(entry):
+            if _match_text_score(tk, text, allow_reverse=allow_reverse) > 0:
+                if tk not in seen:
+                    matched.append(tk)
+                    seen.add(tk)
+                break
+
+    if matched:
+        return f"命中关键词：{'、'.join(matched[:3])}"
+    return "检索命中"
 
 
 def _source_official_rank(entry: KnowledgeEntry) -> int:

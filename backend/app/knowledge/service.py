@@ -101,6 +101,20 @@ def entry_to_detail(entry: KnowledgeEntry) -> EntryDetail:
     )
 
 
+def _entry_answer_preview(entry: KnowledgeEntry) -> str | None:
+    for value in (
+        entry.summary,
+        entry.applicable_condition,
+        entry.required_materials,
+        entry.process_steps,
+        entry.body_md,
+    ):
+        if value and value.strip():
+            snippet = " ".join(value.strip().split())
+            return snippet[:180]
+    return None
+
+
 def _snapshot(entry: KnowledgeEntry) -> dict[str, Any]:
     return {
         "title": entry.title,
@@ -169,11 +183,14 @@ async def ai_match(db: AsyncSession, query: str, top_k: int) -> AiMatchResponse:
     # 兼容旧接口名；当前产品口径只做检索式匹配，不调用生成式模型。
     prefetched, _ = await repo.search_published_entries(db, q=query, page=1, size=20)
     if not prefetched:
+        # 自然语言问法不一定能被 SQL 级整句 LIKE 命中；未命中时回退到已发布条目集合做关键词重排。
+        prefetched, _ = await repo.search_published_entries(db, q=None, page=1, size=200)
+    if not prefetched:
         return AiMatchResponse(
             engine="retrieval",
             candidates=[],
             manual_consult_required=True,
-            manual_consult_hint="未检索到相关条目，建议转人工咨询",
+            manual_consult_hint="知识库中暂无已发布条目，建议先由老师发布知识后再检索",
         )
 
     candidates: list[AiMatchCandidate] = []
@@ -186,8 +203,9 @@ async def ai_match(db: AsyncSession, query: str, top_k: int) -> AiMatchResponse:
                 entry_id=e.id,
                 slug=e.slug,
                 title=e.title,
+                summary=_entry_answer_preview(e),
                 score=round(norm, 3),
-                reason="检索命中",
+                reason=ai_matcher.explain_keyword_match(e, query),
                 source_name=e.source.source_name if e.source else None,
                 source_url=e.source.source_url if e.source else None,
                 source_is_official=_entry_source_is_official(e),
