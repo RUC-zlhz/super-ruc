@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测均已完成
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入/敏感字段加密审计均已完成
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -691,6 +691,36 @@
 - 验证通过：S47 定向 `1 passed`，后端全量 DB 集成 `124 passed, 3 warnings in 215.90s`，后端 ruff / compileall、Web 构建、Miniapp 类型检查与 `mp-weixin` 构建均通过。
 - 本轮未新增有效崩溃类 bug 或 Logic bug；真实微信 code 登录仍属于外部微信环境项。
 
+### S48 Miniapp 微信开发者工具告警排查与首页 key 修复
+
+- 细化文件：`docs/notes/refinements/2026-05-26-s48-miniapp-devtools-warning-audit.md`
+- 当前状态：`[x]` 已完成
+- [x] `S48.1` 核查 `request-badge` 源码、引用点与 `mp-weixin` 构建产物，明确缺模块报错来自未重新生成或不完整的本地构建产物。
+- [x] `S48.2` 将事务徽章 helper 合并进已有 `api/workflow` 模块并删除独立 `utils/request-badge.ts`，让请求页不再生成 `../../utils/request-badge.js` require。
+- [x] `S48.3` 修复首页入口列表重复 `wx:key`，将 `item.url` key 改为稳定业务 key。
+- [x] `S48.4` 回跑 Miniapp 类型检查、清理后 `mp-weixin` 构建和生成产物检查。
+
+当前结论：
+
+- 最新源码已不再依赖独立 `request-badge` 模块；重新构建后的 `miniapp/dist/build/mp-weixin` 中无 `request-badge` 引用，微信开发者工具若仍报该模块名，说明仍在运行旧缓存或旧项目。
+- 首页重复 key 已修复；`vue-tsc`、清理后 `pnpm -C miniapp build:mp-weixin`、源码 `item.url/item.path` key 残留扫描和生成产物相对 `require()` 缺失扫描均通过。
+
+### S49 官方知识种子、本学期开课推荐、题库导入与敏感字段加密审计
+
+- 细化文件：`docs/notes/refinements/2026-05-26-s49-official-seed-term-quiz-sensitive-closure.md`
+- 当前状态：`[x]` 已完成
+- [x] `S49.1` 新增官方知识正文默认 seed，覆盖休学、复学、奖助、档案转递、校历、信息学院公告/咨询、出国出境、发展党员、知识自测和宿舍调整咨询入口。
+- [x] `S49.2` 学业缺口推荐增加有效推荐学期口径，只使用 `CourseOffering.is_active=True AND term_code=有效学期` 的真实开课数据。
+- [x] `S49.3` 理论自测题库新增 `.xlsx/.csv` 模板下载、导入预览、错误行展示、提交 upsert 和来源追溯字段。
+- [x] `S49.4` 学生身份证号/手机号新增统一加密 helper，后台新增/编辑、学生主档导入和审计 detail 均完成明文脱敏与回归保护。
+
+当前结论：
+
+- 默认知识库不再只有分类 seed，开箱可搜索到官方来源知识条目；对缺少稳定官方细则的事项只提供官方入口和人工咨询提示，避免伪造流程。
+- 学业推荐返回 `recommendation_term_code` 并在无本学期开课数据时给出 warning 和空建议，不再用培养方案候选课程冒充当前开课。
+- 理论自测导入能力已闭环到后端 API、Web 题库页和测试，默认不编造共产党员网无法公开稳定提取的题面与答案。
+- 敏感字段写入、导入预览/存储与审计日志已增加加密/脱敏保护；验证通过后端 ruff、compileall、S49 定向集成 `40 passed`、后端全量 `143 passed`、Web 构建和 Miniapp `mp-weixin` 构建。
+
 ### S6 前端体验增量优化
 
 - [x] `S6.1` Web 共享导航与默认落点收口
@@ -1255,6 +1285,8 @@
 | 2026-05-26 | 全栈测试与 bug 分级审查 | `docs/notes/refinements/2026-05-26-s45-full-stack-test-bug-audit.md` | `S45.1, S45.2, S45.3, S45.4, S45.5, S45.6` | `[x]` | 已完成本轮可测试范围审查与 DB 集成补跑；后端静态/编译/单元、Web 构建与浏览器 smoke、Miniapp 类型/构建/产物扫描、生产只读 smoke 通过；Docker 启动后全量后端集成测试 `109 passed, 10 failed`；累计发现 `1` 个崩溃类 bug 与 `16` 个 Logic bug，基础分 `143` |
 | 2026-05-26 | S45 缺陷修复闭环 | `docs/notes/refinements/2026-05-26-s46-s45-bug-fix-closure.md` | `S46.1, S46.2, S46.3, S46.4` | `[x]` | 已修复 S45 可代码闭环缺陷和测试断言漂移；后端全量 DB 集成 `123 passed`，后端 ruff/compileall/unit、Web 构建、Miniapp 类型检查与 `mp-weixin` 构建、本地 Web 403 smoke 均通过 |
 | 2026-05-26 | S47 多角色联通完成度审计与补测 | `docs/notes/refinements/2026-05-26-s47-cross-role-linkage-completion-audit.md` | `S47.1, S47.2, S47.3, S47.4` | `[x]` | 已补 DB 驱动跨角色联通 smoke，覆盖通知、申请审批、党团流程、画像、学业看板、荣誉公示；S47 定向 `1 passed`，后端全量 DB 集成 `124 passed`，双端构建通过 |
+| 2026-05-26 | S48 Miniapp 微信开发者工具告警排查与首页 key 修复 | `docs/notes/refinements/2026-05-26-s48-miniapp-devtools-warning-audit.md` | `S48.1, S48.2, S48.3, S48.4` | `[x]` | 已移除独立 `request-badge` 模块依赖，最新 `mp-weixin` 产物无 `request-badge` 引用且无缺失相对 require；首页重复 `wx:key` 已修复，Miniapp 类型检查和构建通过 |
+| 2026-05-26 | S49 官方知识种子、本学期开课推荐、题库导入与敏感字段加密审计 | `docs/notes/refinements/2026-05-26-s49-official-seed-term-quiz-sensitive-closure.md` | `S49.1, S49.2, S49.3, S49.4` | `[x]` | 已补官方知识正文 seed、学业推荐有效学期过滤、理论自测题库导入和学生敏感字段加密/审计脱敏；后端 ruff/compileall、S49 定向集成 `40 passed`、后端全量 `143 passed`、Web 构建和 Miniapp `mp-weixin` 构建通过 |
 
 ## 会话更新要求
 
@@ -1359,3 +1391,5 @@
 - `2026-05-26`：完成 `S45` 全栈测试与 bug 分级审查；后端 ruff / compileall / 单元测试、Web 构建与浏览器 smoke、Miniapp 类型检查 / `mp-weixin` 构建 / 产物风险扫描、生产只读 smoke 均通过。随后按用户要求启动 Docker Desktop，`sip-kingbase` 健康后补跑全量后端 DB 集成测试，结果 `109 passed, 10 failed, 3 warnings in 357.78s`；10 个失败中 `3` 个按新增 Logic bug 计分、`7` 个为测试断言漂移。最终累计登记 `1` 个崩溃类 bug、`16` 个 Logic bug，基础分合计 `143`。
 - `2026-05-26`：完成 `S46` S45 缺陷修复闭环；修复后端身份/权限/SSRF/审计/契约/刷新问题、Web 角色与错误态、Miniapp 登录/筛选/错误态/媒体入口，并补齐回归测试。验证通过后端全量 DB 集成 `123 passed, 3 warnings in 231.05s`、后端 ruff / compileall / unit、Web 构建、Miniapp 类型检查与 `mp-weixin` 构建、本地 Web 403 smoke；本轮复核再次通过后端全量 DB 集成 `123 passed, 3 warnings in 205.89s`、后端静态/单元、双端构建和 403 浏览器 smoke。
 - `2026-05-26`：完成 `S47` 多角色联通完成度审计与补测；新增 `backend/tests/integration/test_s47_cross_role_linkage_smoke.py`，用真实测试数据库串起学生、辅导员、班主任、党团教师和超管身份，覆盖通知发布/收件已读、学生申请/老师审批、党团流程发起/学生进度、画像访问边界、学业看板 scope、荣誉发布/学生端读取。验证通过 S47 定向 `1 passed in 66.77s`、后端全量 DB 集成 `124 passed, 3 warnings in 215.90s`、后端 ruff / compileall、Web 构建、Miniapp 类型检查与 `mp-weixin` 构建；本轮未新增有效崩溃类 bug 或 Logic bug。
+- `2026-05-26`：完成 `S48` Miniapp 微信开发者工具告警排查与首页 key 修复；为规避开发者工具旧模块索引继续报 `request-badge.js`，已将事务徽章 helper 合并进 `api/workflow` 并删除独立 util，使最新构建产物不再包含 `request-badge` 引用；首页入口列表改用稳定业务 key，消除 `/pages/request/index` 与 `/pages/knowledge/index` 重复 `wx:key` 来源。验证通过 Miniapp 类型检查、清理后 `pnpm -C miniapp build:mp-weixin`、源码 key 残留扫描、`request-badge` 产物残留扫描和生成产物相对 `require()` 缺失扫描。
+- `2026-05-26`：完成 `S49` 官方知识种子、本学期开课推荐、题库导入与敏感字段加密审计；默认 seed 新增官方知识正文和来源链接，学业推荐按 `recommendation_term_code` 过滤本学期真实开课，理论自测题库支持 `.xlsx/.csv` 预览提交导入，学生身份证号/手机号写入路径统一加密并对导入行/审计 detail 脱敏。验证通过后端 `ruff`、`compileall`、S49 定向集成 `40 passed, 3 warnings in 178.21s`、后端全量 `143 passed, 3 warnings in 516.49s`、`pnpm -C web build` 和 `pnpm -C miniapp build:mp-weixin`。

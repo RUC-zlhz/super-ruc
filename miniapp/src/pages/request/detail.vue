@@ -253,9 +253,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import EmptyState from "@/components/EmptyState.vue";
-import { getRequestCategoryBadge } from "@/utils/request-badge";
 import {
   getRequestActionLabel,
+  getRequestCategoryBadge,
   getRequestDetail,
   getRequestStatusLabel,
   isEditableRequestStatus,

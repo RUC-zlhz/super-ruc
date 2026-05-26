@@ -20,6 +20,7 @@ from app.auth.models import Student
 from app.auth.scopes import StudentScopeSet, split_scope_code, student_in_scope
 from app.core import pdf_branding
 from app.core.exceptions import BizError, NotFoundError, PermissionError
+from app.core.sensitive_fields import encrypted_student_sensitive_fields
 from app.profile import repository as repo
 from app.profile.models import (
     PROFILE_APPROVAL_APPROVED,
@@ -78,6 +79,7 @@ _STUDENT_ACADEMIC_FIELDS = {
     "expected_graduation_year",
 }
 _STUDENT_CREATE_FIELDS = set(_STUDENT_ACADEMIC_FIELDS)
+_STUDENT_SENSITIVE_INPUT_FIELDS = {"id_card", "phone"}
 
 
 @dataclass(slots=True)
@@ -969,6 +971,7 @@ async def update_student_academic_info(
             normalized_payload[field_name] = _coerce_student_academic_value(
                 field_name, payload.get(field_name)
             )
+    sensitive_payload = encrypted_student_sensitive_fields(payload)
 
     if "student_no" in normalized_payload and normalized_payload["student_no"] != student.student_no:
         existing = await auth_repo.get_student_by_no(db, normalized_payload["student_no"])
@@ -994,7 +997,11 @@ async def update_student_academic_info(
 
     for field_name, value in normalized_payload.items():
         setattr(student, field_name, value)
+    for field_name, value in sensitive_payload.items():
+        setattr(student, field_name, value)
     student.updated_at = datetime.now(UTC)
+    changed_plain_fields = sorted(k for k in payload if k in _STUDENT_ACADEMIC_FIELDS)
+    changed_sensitive_fields = sorted(k for k in payload if k in _STUDENT_SENSITIVE_INPUT_FIELDS)
     await log_action(
         db,
         event_type="PROFILE",
@@ -1003,7 +1010,11 @@ async def update_student_academic_info(
         entity_id=student.id,
         actor_user_id=operator_id,
         actor_role=operator_role,
-        detail={"student_id": student.id, "fields": sorted(k for k in payload if k in _STUDENT_ACADEMIC_FIELDS)},
+        detail={
+            "student_id": student.id,
+            "fields": changed_plain_fields + changed_sensitive_fields,
+            "masked_fields": changed_sensitive_fields,
+        },
     )
     await db.commit()
     await db.refresh(student)
@@ -1021,6 +1032,8 @@ async def create_student_admin(
     for field_name in _STUDENT_CREATE_FIELDS:
         if field_name in payload:
             data[field_name] = _coerce_student_academic_value(field_name, payload.get(field_name))
+    sensitive_payload = encrypted_student_sensitive_fields(payload)
+    data.update(sensitive_payload)
 
     if "student_no" not in data:
         raise BizError("学号不能为空", code=40186)
@@ -1064,6 +1077,7 @@ async def create_student_admin(
             "grade_code": student.grade_code,
             "major_code": student.major_code,
             "class_code": student.class_code,
+            "masked_fields": sorted(k for k in payload if k in _STUDENT_SENSITIVE_INPUT_FIELDS),
         },
     )
     await db.commit()

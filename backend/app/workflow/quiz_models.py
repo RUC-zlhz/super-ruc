@@ -54,6 +54,12 @@ class QuizQuestion(Base):
     correct_key: Mapped[str] = mapped_column(String(64), nullable=False)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
     difficulty: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    source_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    source_official: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
+    import_batch_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="true"
     )

@@ -15,7 +15,7 @@ import hashlib
 import logging
 import re
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import func, or_, select
@@ -137,6 +137,7 @@ def _apply_report_student_scope(stmt, scope: StudentScopeSet | None):
 # ============================================================
 _TRANSCRIPT_PDF_MAX_BYTES = 10 * 1024 * 1024
 _TERM_CODE_PATTERN = re.compile(r"(\d{4})-(SPRING|SUMMER|FALL|WINTER)")
+_BEIJING_TZ = timezone(timedelta(hours=8), name="Asia/Shanghai")
 
 
 def _generate_transcript_pdf_batch_no() -> str:
@@ -163,6 +164,31 @@ def _normalize_term_code(term_code: str | None) -> str | None:
             data={"term_code": term_code},
         )
     return normalized
+
+
+def _derive_current_recommendation_term_code(now: datetime | None = None) -> str:
+    current = (now or datetime.now(UTC)).astimezone(_BEIJING_TZ)
+    year = current.year
+    month = current.month
+    if month == 1:
+        return f"{year - 1}-WINTER"
+    if 2 <= month < 7:
+        return f"{year - 1}-SPRING"
+    if 7 <= month < 9:
+        return f"{year - 1}-SUMMER"
+    return f"{year}-FALL"
+
+
+def _effective_recommendation_term_code(term_code: str | None) -> str:
+    explicit = _normalize_term_code(term_code)
+    if explicit:
+        return explicit
+    configured = (settings.ACADEMIC_CURRENT_TERM_CODE or "").strip()
+    if configured:
+        normalized = _normalize_term_code(configured)
+        assert normalized is not None
+        return normalized
+    return _derive_current_recommendation_term_code()
 
 
 def _iter_module_courses(raw: Any) -> list[dict[str, Any]]:
@@ -419,12 +445,18 @@ async def commit_transcript_pdf_review(
     )
 
 
-async def compute_academic_gap(db: AsyncSession, student_id: int) -> AcademicGapResult:
+async def compute_academic_gap(
+    db: AsyncSession,
+    student_id: int,
+    *,
+    term_code: str | None = None,
+) -> AcademicGapResult:
     student = (await db.execute(select(Student).where(Student.id == student_id))).scalar_one_or_none()
     if student is None:
         raise NotFoundError("学生不存在")
 
     data_warnings: list[str] = []
+    recommendation_term_code = _effective_recommendation_term_code(term_code)
 
     plan = None
     if student.grade_code and student.major_code:
@@ -447,6 +479,7 @@ async def compute_academic_gap(db: AsyncSession, student_id: int) -> AcademicGap
             student_name=student.full_name,
             grade_code=student.grade_code,
             major_code=student.major_code,
+            recommendation_term_code=recommendation_term_code,
             data_warnings=data_warnings,
             generated_at=datetime.now(UTC),
         )
@@ -590,14 +623,25 @@ async def compute_academic_gap(db: AsyncSession, student_id: int) -> AcademicGap
             )
         )
 
-    # 建议课程：缺口模块中的未修课程均返回；缺少开课/容量/课表/先修/偏好数据时显式提示。
+    # 建议课程：只基于当前推荐学期的真实开课数据，不再用培养方案 opening_term 伪装实际开课。
     ranked_suggestions: list[tuple[int, float, int, int, str, dict[str, Any]]] = []
     offered = (
-        (await db.execute(select(CourseOffering).where(CourseOffering.is_active.is_(True)))).scalars().all()
+        (
+            await db.execute(
+                select(CourseOffering).where(
+                    CourseOffering.is_active.is_(True),
+                    CourseOffering.term_code == recommendation_term_code,
+                )
+            )
+        )
+        .scalars()
+        .all()
     )
     offer_map = {o.course_code: o for o in offered}
     if not offered:
-        data_warnings.append("当前未配置有效开课数据，课程推荐仅按培养方案白名单列出候选。")
+        data_warnings.append(
+            f"当前未配置 {recommendation_term_code} 本学期开课数据，课程建议暂为空。"
+        )
     module_map = {module.module_code: module for module in modules}
     module_gap_map = {gap.module_code: gap.credits_gap for gap in module_gaps}
     module_priority_map = {
@@ -618,30 +662,19 @@ async def compute_academic_gap(db: AsyncSession, student_id: int) -> AcademicGap
             if not code or code in gap.passed_courses:
                 continue
             offering = offer_map.get(code)
+            if offering is None:
+                continue
             course_warnings: list[str] = []
-            rank_score = 0
-            if offering is not None:
-                rank_score += 50
-                term_value = offering.term_code
-                course_name = offering.course_name
-                credits = float(offering.credits or course.get("credits") or 0)
-                course_type = offering.course_type or module.module_type
-                capacity = offering.capacity
-                capacity_status = "已配置" if capacity is not None else "数据未配置"
-                if capacity is not None:
-                    rank_score += 10
-                schedule_status = "已配置" if term_value else "数据未配置"
-            else:
-                term_value = course.get("opening_term")
-                course_name = str(course.get("name") or code)
-                credits = float(course.get("credits") or 0)
-                course_type = module.module_type
-                capacity = None
-                capacity_status = "数据未配置"
-                schedule_status = "实际开课数据未配置"
-                course_warnings.append("实际开课数据未配置")
-            if not term_value:
-                course_warnings.append("开课学期数据未配置")
+            rank_score = 50
+            term_value = offering.term_code
+            course_name = offering.course_name
+            credits = float(offering.credits or course.get("credits") or 0)
+            course_type = offering.course_type or module.module_type
+            capacity = offering.capacity
+            capacity_status = "已配置" if capacity is not None else "数据未配置"
+            if capacity is not None:
+                rank_score += 10
+            schedule_status = f"{recommendation_term_code} 本学期开课"
             if capacity is None:
                 course_warnings.append("容量数据未配置")
             course_warnings.extend(["先修要求数据未配置", "时间冲突数据未配置", "学生偏好数据未配置"])
@@ -687,6 +720,7 @@ async def compute_academic_gap(db: AsyncSession, student_id: int) -> AcademicGap
         total_credits_earned=round(total_earned, 2),
         modules=module_gaps,
         suggested_courses=suggested[:30],
+        recommendation_term_code=recommendation_term_code,
         data_warnings=data_warnings,
         generated_at=datetime.now(UTC),
     )
@@ -739,6 +773,7 @@ async def list_academic_gap_overview(
     grade_code: str | None,
     major_code: str | None,
     risk_level: str | None,
+    term_code: str | None,
     page: int,
     page_size: int,
     viewer_user_id: int | None = None,
@@ -798,7 +833,7 @@ async def list_academic_gap_overview(
 
         items: list[AcademicGapAggregateItem] = []
         for student in paged_students:
-            result = await compute_academic_gap(db, student.id)
+            result = await compute_academic_gap(db, student.id, term_code=term_code)
             current_risk = _derive_risk_level(result)
             gap = _compute_gap_value(result)
             item = AcademicGapAggregateItem(
@@ -844,7 +879,7 @@ async def list_academic_gap_overview(
         offset += chunk_size
 
         for student in chunk_students:
-            result = await compute_academic_gap(db, student.id)
+            result = await compute_academic_gap(db, student.id, term_code=term_code)
             current_risk = _derive_risk_level(result)
 
             if current_risk != desired_risk:

@@ -46,11 +46,13 @@ router = APIRouter(tags=["report"])
     response_model=ApiResponse[AcademicGapResult],
 )
 async def my_academic_gap(
-    db: DBDep, user: CurrentUserDep
+    db: DBDep,
+    user: CurrentUserDep,
+    term_code: str | None = None,
 ) -> ApiResponse[AcademicGapResult]:
     if user.student_id is None:
         raise BizError("仅学生可查看本人学业缺口", code=40305, http_status=403)
-    result = await service.compute_academic_gap(db, user.student_id)
+    result = await service.compute_academic_gap(db, user.student_id, term_code=term_code)
     return ok(result)
 
 
@@ -101,6 +103,7 @@ async def admin_academic_gap_list(
     grade_code: str | None = None,
     major_code: str | None = None,
     risk_level: str | None = None,
+    term_code: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ) -> ApiResponse[Paginated[AcademicGapAggregateItem]]:
@@ -110,6 +113,7 @@ async def admin_academic_gap_list(
         grade_code=grade_code,
         major_code=major_code,
         risk_level=risk_level,
+        term_code=term_code,
         page=page,
         page_size=page_size,
         viewer_user_id=user.user_id,
@@ -131,6 +135,7 @@ async def admin_academic_gap(
     student_id: int,
     db: DBDep,
     user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
+    term_code: str | None = None,
 ) -> ApiResponse[AcademicGapResult]:
     await service.ensure_academic_gap_student_visible(
         db,
@@ -138,7 +143,7 @@ async def admin_academic_gap(
         viewer_user_id=user.user_id,
         viewer_roles=user.roles,
     )
-    return ok(await service.compute_academic_gap(db, student_id))
+    return ok(await service.compute_academic_gap(db, student_id, term_code=term_code))
 
 
 @router.post(

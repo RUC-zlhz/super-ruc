@@ -57,6 +57,61 @@
           </a-form-item>
         </a-form>
 
+        <div class="import-panel">
+          <div class="import-copy">
+            <strong>批量导入</strong>
+            <span>支持 xlsx/csv 模板预览后提交，重复的 topic + stem 会更新已有题目。</span>
+          </div>
+          <a-space wrap>
+            <a-button @click="downloadTemplate('xlsx')">
+              <template #icon><DownloadOutlined /></template>
+              XLSX 模板
+            </a-button>
+            <a-button @click="downloadTemplate('csv')">
+              <template #icon><DownloadOutlined /></template>
+              CSV 模板
+            </a-button>
+            <a-upload
+              accept=".xlsx,.csv"
+              :before-upload="beforeImportUpload"
+              :show-upload-list="false"
+            >
+              <a-button :loading="importing">
+                <template #icon><UploadOutlined /></template>
+                上传预览
+              </a-button>
+            </a-upload>
+            <a-button
+              type="primary"
+              :disabled="!importPreview || importPreview.batch.fatal_rows > 0"
+              :loading="committingImport"
+              @click="commitImport"
+            >
+              <template #icon><CloudUploadOutlined /></template>
+              提交导入
+            </a-button>
+          </a-space>
+        </div>
+
+        <a-alert
+          v-if="importPreview"
+          class="import-alert"
+          :type="importPreview.batch.fatal_rows > 0 ? 'error' : (importPreview.batch.warn_rows > 0 ? 'warning' : 'success')"
+          show-icon
+          message="导入预览结果"
+          :description="`批次 ${importPreview.batch.batch_no}：有效 ${importPreview.batch.ok_rows} 行，警告 ${importPreview.batch.warn_rows} 行，致命 ${importPreview.batch.fatal_rows} 行。`"
+        />
+
+        <a-table
+          v-if="importRows.length"
+          class="import-row-table"
+          :columns="importCols"
+          :data-source="importRows"
+          :pagination="{ pageSize: 5 }"
+          row-key="id"
+          size="small"
+        />
+
         <a-table
           :columns="cols"
           :data-source="rows"
@@ -78,6 +133,17 @@
               <a-tag :color="record.is_active ? 'green' : 'default'">
                 {{ record.is_active ? '启用' : '停用' }}
               </a-tag>
+            </template>
+            <template v-else-if="column.key === 'source'">
+              <div v-if="record.source_name || record.source_url" class="source-cell">
+                <a-tag v-if="record.source_official" color="green">官方</a-tag>
+                <a v-if="record.source_url" :href="record.source_url" target="_blank" rel="noreferrer">
+                  <LinkOutlined />
+                  {{ record.source_name || '来源链接' }}
+                </a>
+                <span v-else>{{ record.source_name }}</span>
+              </div>
+              <span v-else class="source-empty">-</span>
             </template>
             <template v-else-if="column.key === 'actions'">
               <a-space size="small">
@@ -209,6 +275,18 @@
             <a-textarea v-model:value="form.explanation" :rows="3" />
           </a-form-item>
 
+          <a-form-item label="来源名称">
+            <a-input v-model:value="form.source_name" placeholder="如 共产党员网知识自测" />
+          </a-form-item>
+
+          <a-form-item label="来源链接">
+            <a-input v-model:value="form.source_url" placeholder="https://..." />
+          </a-form-item>
+
+          <a-form-item>
+            <a-checkbox v-model:checked="form.source_official">官方来源</a-checkbox>
+          </a-form-item>
+
           <div class="editor-actions">
             <a-button type="primary" :loading="saving" @click="onSubmit">
               <template #icon><SaveOutlined /></template>
@@ -231,10 +309,11 @@ import { message } from 'ant-design-vue'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
+  CloudUploadOutlined,
   PlusCircleOutlined,
   ReadOutlined,
   TagsOutlined,
-  LeftOutlined,
+  DownloadOutlined,
   SearchOutlined,
   PlusOutlined,
   EditOutlined,
@@ -242,14 +321,21 @@ import {
   ClearOutlined,
   DeleteOutlined,
   SaveOutlined,
-  CloseOutlined
+  CloseOutlined,
+  UploadOutlined,
+  LinkOutlined
 } from '@ant-design/icons-vue'
 import {
+  commitQuizQuestionImport,
   listQuizQuestions,
   createQuizQuestion,
   updateQuizQuestion,
   deleteQuizQuestion,
+  downloadQuizQuestionImportTemplate,
+  previewQuizQuestionImport,
   type QuizDifficulty,
+  type QuizImportPreview,
+  type QuizImportRow,
   type QuizOption,
   type QuizQuestion,
   type QuizType,
@@ -262,7 +348,15 @@ const cols = [
   { title: '正确答案', dataIndex: 'correct_key', key: 'correct_key', width: 140 },
   { title: '难度', dataIndex: 'difficulty', key: 'difficulty', width: 80 },
   { title: '状态', key: 'is_active', width: 80 },
+  { title: '来源', key: 'source', width: 220 },
   { title: '操作', key: 'actions', width: 160 },
+]
+
+const importCols = [
+  { title: '行号', dataIndex: 'row_no', key: 'row_no', width: 70 },
+  { title: '级别', dataIndex: 'severity', key: 'severity', width: 90 },
+  { title: '字段', dataIndex: 'field_name', key: 'field_name', width: 120 },
+  { title: '信息', dataIndex: 'message', key: 'message', ellipsis: true },
 ]
 
 const filters = reactive<{
@@ -273,6 +367,10 @@ const filters = reactive<{
 }>({})
 const rows = ref<QuizQuestion[]>([])
 const loading = ref(false)
+const importing = ref(false)
+const committingImport = ref(false)
+const importPreview = ref<QuizImportPreview | null>(null)
+const importRows = ref<QuizImportRow[]>([])
 const pagination = reactive({ current: 1, pageSize: 20, total: 0 })
 const metrics = computed(() => [
   {
@@ -376,6 +474,9 @@ interface FormState {
   correct_key: string
   explanation: string
   difficulty?: QuizDifficulty
+  source_name: string
+  source_url: string
+  source_official: boolean
 }
 
 const emptyForm = (): FormState => ({
@@ -389,6 +490,9 @@ const emptyForm = (): FormState => ({
   correct_key: 'A',
   explanation: '',
   difficulty: undefined,
+  source_name: '',
+  source_url: '',
+  source_official: false,
 })
 
 const editing = ref<QuizQuestion | null>(null)
@@ -413,6 +517,9 @@ function openEdit(record: QuizQuestion | Record<string, any>) {
     correct_key: current.correct_key,
     explanation: current.explanation || '',
     difficulty: current.difficulty ?? undefined,
+    source_name: current.source_name || '',
+    source_url: current.source_url || '',
+    source_official: Boolean(current.source_official),
   })
   if (form.qtype !== 'JUDGE' && !form.options_json) {
     form.options_json = [
@@ -454,6 +561,9 @@ async function onSubmit() {
     correct_key: form.correct_key.trim(),
     explanation: form.explanation || null,
     difficulty: form.difficulty || null,
+    source_name: form.source_name.trim() || null,
+    source_url: form.source_url.trim() || null,
+    source_official: form.source_official,
   }
   if (!payload.topic || !payload.stem || !payload.correct_key) {
     message.error('主题 / 题干 / 正确答案不能为空')
@@ -489,6 +599,53 @@ async function onReactivate(record: QuizQuestion | Record<string, any>) {
   reload()
 }
 
+function beforeImportUpload(file: File) {
+  void previewImport(file)
+  return false
+}
+
+async function previewImport(file: File) {
+  importing.value = true
+  try {
+    const resp = await previewQuizQuestionImport(file)
+    importPreview.value = resp.data
+    importRows.value = resp.data.rows
+    if (resp.data.batch.fatal_rows > 0) {
+      message.error('导入预览存在致命错误，请修正后重新上传')
+    } else if (resp.data.batch.warn_rows > 0) {
+      message.warning('导入预览存在警告，提交后会更新已有题目')
+    } else {
+      message.success('导入预览通过')
+    }
+  } finally {
+    importing.value = false
+  }
+}
+
+async function commitImport() {
+  if (!importPreview.value) return
+  committingImport.value = true
+  try {
+    const resp = await commitQuizQuestionImport(importPreview.value.batch.id)
+    message.success(`导入完成：新增 ${resp.data.created_count}，更新 ${resp.data.updated_count}`)
+    importPreview.value = null
+    importRows.value = []
+    await reload()
+  } finally {
+    committingImport.value = false
+  }
+}
+
+async function downloadTemplate(format: 'xlsx' | 'csv') {
+  const blob = await downloadQuizQuestionImportTemplate(format)
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `quiz-question-import-template.${format}`
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 onMounted(() => reload())
 </script>
 
@@ -506,6 +663,53 @@ onMounted(() => reload())
 
 .quiz-filter {
   margin-bottom: 14px;
+}
+
+.import-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  background: #fbfcfe;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+}
+
+.import-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.import-copy strong {
+  color: var(--text);
+}
+
+.import-copy span,
+.source-empty {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.import-alert,
+.import-row-table {
+  margin-bottom: 12px;
+}
+
+.source-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.source-cell a {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .quiz-editor {
@@ -603,6 +807,11 @@ onMounted(() => reload())
 
   .quiz-editor {
     position: static;
+  }
+
+  .import-panel {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

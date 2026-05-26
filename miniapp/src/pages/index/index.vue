@@ -65,7 +65,7 @@
       <view class="priority-grid">
         <view
           v-for="item in shortcutEntries"
-          :key="item.url"
+          :key="item.key"
           class="priority-card"
           hover-class="hover-scale"
           @tap="goTo(item.url)"
@@ -91,7 +91,7 @@
       <view class="entry-grid">
         <view
           v-for="item in entries"
-          :key="item.url"
+          :key="item.key"
           class="entry-card"
           hover-class="hover-scale"
           @tap="goTo(item.url)"
@@ -268,6 +268,7 @@ const SECTION_LABELS: Record<HomeSectionKey, string> = {
 };
 
 const entries: Array<{
+  key: string;
   mark: string;
   tone: "primary" | "blue" | "gold" | "green" | "orange" | "slate";
   label: string;
@@ -275,6 +276,7 @@ const entries: Array<{
   url: string;
 }> = [
   {
+    key: "my-requests",
     mark: "申",
     tone: "primary",
     label: "我的申请",
@@ -282,6 +284,7 @@ const entries: Array<{
     url: "/pages/request/index",
   },
   {
+    key: "certificate-request",
     mark: "绩",
     tone: "blue",
     label: "成绩证明",
@@ -289,6 +292,7 @@ const entries: Array<{
     url: "/pages/request/create?category=CERTIFICATE&type_code=CERTIFICATE_IN_SCHOOL",
   },
   {
+    key: "honor-public",
     mark: "奖",
     tone: "gold",
     label: "荣誉公示",
@@ -296,6 +300,7 @@ const entries: Array<{
     url: "/pages/honor/index",
   },
   {
+    key: "leave-request",
     mark: "假",
     tone: "green",
     label: "请假审批",
@@ -303,6 +308,7 @@ const entries: Array<{
     url: "/pages/request/create?category=LEAVE&type_code=LEAVE_PERSONAL",
   },
   {
+    key: "service-request-list",
     mark: "事",
     tone: "slate",
     label: "事务办理",
@@ -310,6 +316,7 @@ const entries: Array<{
     url: "/pages/request/index",
   },
   {
+    key: "policy-query",
     mark: "费",
     tone: "orange",
     label: "政策查询",
@@ -317,6 +324,7 @@ const entries: Array<{
     url: "/pages/knowledge/index",
   },
   {
+    key: "course-service",
     mark: "课",
     tone: "blue",
     label: "课程事务",
@@ -324,6 +332,7 @@ const entries: Array<{
     url: "/pages/knowledge/index",
   },
   {
+    key: "help-center",
     mark: "问",
     tone: "primary",
     label: "帮助中心",
@@ -334,6 +343,7 @@ const entries: Array<{
 
 const shortcutEntries = [
   {
+    key: "academic-analysis",
     mark: "学",
     tone: "blue",
     label: "学业分析",
@@ -341,6 +351,7 @@ const shortcutEntries = [
     url: "/pages/academic/index",
   },
   {
+    key: "template-library",
     mark: "模",
     tone: "gold",
     label: "常用模板",
@@ -348,6 +359,7 @@ const shortcutEntries = [
     url: "/pages/knowledge/index",
   },
   {
+    key: "progress-center",
     mark: "进",
     tone: "green",
     label: "进度中心",

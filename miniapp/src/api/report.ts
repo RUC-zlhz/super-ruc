@@ -43,6 +43,7 @@ export interface AcademicGapResult {
   conclusion_text?: string | null
   modules: AcademicModuleGap[]
   suggested_courses: SuggestedCourse[]
+  recommendation_term_code?: string | null
   disclaimer: string
   data_warnings: string[]
   generated_at: string

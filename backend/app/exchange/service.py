@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import log_action
 from app.core.exceptions import BizError, NotFoundError
+from app.core.sensitive_fields import protect_student_import_record
 from app.exchange import repository as repo
 from app.exchange.models import (
     BATCH_STATUS_FAILED,
@@ -142,11 +143,16 @@ async def validate_excel_batch(
                 continue
             record = _row_to_dict(header, raw)
             sev, result, field, msg = validator(record)
+            stored_record = (
+                protect_student_import_record(record)
+                if import_type == IMPORT_TYPE_STUDENT
+                else record
+            )
             await repo.add_batch_row(
                 db, batch_id=batch.id, row_no=idx,
                 severity=sev, result=result,
                 field_name=field, message=msg,
-                raw_data=record,
+                raw_data=stored_record,
             )
             if sev == ROW_SEVERITY_FATAL:
                 fatal += 1
@@ -253,6 +259,8 @@ async def _apply_student(db: AsyncSession, batch: ImportBatch) -> None:
             "political_status": d.get("political_status"),
             "enrollment_year": _parse_int(d.get("enrollment_year")),
             "expected_graduation_year": _parse_int(d.get("expected_graduation_year")),
+            "id_card_enc": d.get("id_card_enc"),
+            "phone_enc": d.get("phone_enc"),
             "email": d.get("email"),
             "status": d.get("status") or "IN_SCHOOL",
         }

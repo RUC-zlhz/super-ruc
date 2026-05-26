@@ -36,6 +36,7 @@ class AcademicGapResult(BaseModel):
     conclusion_text: str = "当前数据不足，需补充培养方案或成绩记录后再判断学分缺口。"
     modules: list[AcademicModuleGap] = []
     suggested_courses: list[dict] = []
+    recommendation_term_code: str | None = None
     disclaimer: str = (
         "本结果仅为辅助提示，不构成毕业资格、课程替代或教务最终结论；"
         "请以学院/学校正式审核结果为准。"

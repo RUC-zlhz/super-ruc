@@ -221,7 +221,9 @@
       <view class="section">
         <view class="section-head">
           <text class="section-title">课程类型建议</text>
-          <text class="plan-name">共 {{ result.suggested_courses?.length || 0 }} 条</text>
+          <text class="plan-name">
+            {{ result.recommendation_term_code || '当前学期' }} · 共 {{ result.suggested_courses?.length || 0 }} 条
+          </text>
         </view>
         <view
           v-for="course in result.suggested_courses || []"

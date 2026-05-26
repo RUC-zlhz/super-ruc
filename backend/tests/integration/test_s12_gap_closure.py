@@ -15,6 +15,7 @@ from app.exchange.models import (
     BATCH_STATUS_COMMITTED,
     BATCH_STATUS_VALIDATED,
     IMPORT_TYPE_TRANSCRIPT_PDF_REVIEW,
+    CourseOffering,
     CurriculumModule,
     CurriculumPlan,
     StudentCourseRecord,
@@ -233,12 +234,34 @@ async def test_default_imports_students_curriculum_and_gap_suggestions(
     await db.commit()
     await db.refresh(gap_student)
 
-    gap = await admin_client.get(f"/api/v1/admin/report/academic-gap/{gap_student.id}")
+    gap = await admin_client.get(
+        f"/api/v1/admin/report/academic-gap/{gap_student.id}?term_code=2025-SPRING"
+    )
     assert gap.status_code == 200, gap.text
     gap_data = gap.json()["data"]
+    assert gap_data["recommendation_term_code"] == "2025-SPRING"
+    assert gap_data["suggested_courses"] == []
+    assert any("2025-SPRING" in warning and "开课数据" in warning for warning in gap_data["data_warnings"])
+
+    db.add(
+        CourseOffering(
+            term_code="2025-SPRING",
+            course_code="BISYMS0012",
+            course_name="信息安全专业核心课",
+            credits=3,
+            course_type="REQUIRED",
+            is_active=True,
+        )
+    )
+    await db.commit()
+
+    gap_with_offering = await admin_client.get(
+        f"/api/v1/admin/report/academic-gap/{gap_student.id}?term_code=2025-SPRING"
+    )
+    assert gap_with_offering.status_code == 200, gap_with_offering.text
+    gap_data = gap_with_offering.json()["data"]
     suggested_codes = {item["course_code"] for item in gap_data["suggested_courses"]}
     assert "BISYMS0012" in suggested_codes
-    assert any("开课数据" in warning for warning in gap_data["data_warnings"])
     assert any(
         item["capacity_status"] == "数据未配置" and item["prerequisite_status"] == "数据未配置"
         for item in gap_data["suggested_courses"]

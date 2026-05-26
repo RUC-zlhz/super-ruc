@@ -22,6 +22,21 @@ async def test_list_categories_anonymous(client: AsyncClient) -> None:
     assert {"PARTY", "SCHOLARSHIP", "LEAVE"}.issubset(codes)
 
 
+async def test_default_official_knowledge_entries_seed_searchable(client: AsyncClient) -> None:
+    for keyword in ("休学", "党员", "档案", "奖助"):
+        resp = await client.get("/api/v1/knowledge/search", params={"q": keyword})
+        assert resp.status_code == 200, resp.text
+        payload = resp.json()["data"]
+        assert payload["meta"]["total"] >= 1
+        assert any(item["source_is_official"] for item in payload["items"])
+
+    dorm = await client.get("/api/v1/knowledge/search", params={"q": "宿舍调整"})
+    assert dorm.status_code == 200, dorm.text
+    dorm_items = dorm.json()["data"]["items"]
+    assert dorm_items
+    assert dorm_items[0]["ambiguity_flag"] is True
+
+
 async def test_admin_flow_create_publish_search(admin_client: AsyncClient) -> None:
     # 1. 创建来源
     src_resp = await admin_client.post(

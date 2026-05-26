@@ -638,6 +638,10 @@ export interface QuizQuestion {
   correct_key: string
   explanation?: string | null
   difficulty?: QuizDifficulty | null
+  source_name?: string | null
+  source_url?: string | null
+  source_official?: boolean
+  import_batch_id?: number | null
   is_active: boolean
   created_by?: number | null
   created_at: string
@@ -652,10 +656,50 @@ export interface QuizQuestionPayload {
   correct_key: string
   explanation?: string | null
   difficulty?: QuizDifficulty | null
+  source_name?: string | null
+  source_url?: string | null
+  source_official?: boolean
 }
 
 export interface QuizQuestionPatch extends Partial<QuizQuestionPayload> {
   is_active?: boolean
+}
+
+export interface QuizImportBatch {
+  id: number
+  batch_no: string
+  import_type: string
+  filename: string
+  total_rows: number
+  ok_rows: number
+  warn_rows: number
+  fatal_rows: number
+  status: string
+  summary?: Record<string, unknown> | null
+  started_at: string
+  finished_at?: string | null
+}
+
+export interface QuizImportRow {
+  id: number
+  row_no: number
+  severity: 'INFO' | 'WARN' | 'FATAL' | string
+  result: string
+  field_name?: string | null
+  message?: string | null
+  raw_data?: Record<string, unknown> | null
+}
+
+export interface QuizImportPreview {
+  batch: QuizImportBatch
+  rows: QuizImportRow[]
+}
+
+export interface QuizImportCommit {
+  batch: QuizImportBatch
+  created_count: number
+  updated_count: number
+  skipped_count: number
 }
 
 export function listQuizQuestions(params: {
@@ -679,4 +723,21 @@ export function updateQuizQuestion(id: number, payload: QuizQuestionPatch) {
 
 export function deleteQuizQuestion(id: number) {
   return del<ApiEnvelope<{ id: number; is_active: boolean }>>(`/admin/quiz/questions/${id}`)
+}
+
+export function previewQuizQuestionImport(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return post<ApiEnvelope<QuizImportPreview>>('/admin/quiz/questions/import-preview', form)
+}
+
+export function commitQuizQuestionImport(batchId: number) {
+  return post<ApiEnvelope<QuizImportCommit>>(`/admin/quiz/questions/import-commit/${batchId}`)
+}
+
+export function downloadQuizQuestionImportTemplate(format: 'xlsx' | 'csv' = 'xlsx') {
+  return get<Blob>('/admin/quiz/questions/import-template', {
+    params: { format },
+    responseType: 'blob',
+  })
 }

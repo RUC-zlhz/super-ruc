@@ -4,7 +4,9 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
+
+from app.core.sensitive_fields import sanitize_sensitive_data
 
 
 # ============================================================
@@ -40,6 +42,10 @@ class ImportBatchRowOut(BaseModel):
     field_name: str | None
     message: str | None
     raw_data: dict[str, Any] | None
+
+    @field_serializer("raw_data")
+    def serialize_raw_data(self, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        return sanitize_sensitive_data(value)
 
 
 class ImportBatchDetail(ImportBatchBrief):

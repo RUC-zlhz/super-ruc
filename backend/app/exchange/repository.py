@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.auth.models import Student
+from app.core.exceptions import BizError
 from app.core.sql import order_by_nulls_last_desc
 from app.exchange.models import (
     BATCH_STATUS_COMMITTED,
@@ -171,6 +172,8 @@ async def upsert_student(
     db: AsyncSession, payload: dict[str, Any]
 ) -> tuple[Student, bool]:
     """按 student_no upsert；返回 (对象, 是否新建)。"""
+    if "id_card" in payload or "phone" in payload:
+        raise BizError("学生敏感字段必须通过加密字段写入", code=40094)
     stmt = select(Student).where(Student.student_no == payload["student_no"])
     row = (await db.execute(stmt)).scalar_one_or_none()
     created = False

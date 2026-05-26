@@ -208,12 +208,12 @@ import EmptyState from "@/components/EmptyState.vue";
 import {
   getMyRequests,
   getRequestStatusLabel,
+  getRequestTypeBadge,
   type RequestBrief,
 } from "@/api/workflow";
 import { useAuthStore } from "@/store/auth";
 import { getErrorMessage } from "@/utils/error";
 import { openMiniappPage } from "@/utils/navigation";
-import { getRequestTypeBadge } from "@/utils/request-badge";
 
 const STATUS_TABS = [
   { label: "全部", value: "" },

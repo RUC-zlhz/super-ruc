@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.models import AuditLog, AuditLogHistory
 from app.core.config import settings
+from app.core.sensitive_fields import sanitize_sensitive_data
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +148,7 @@ def normalize_audit_detail(detail: Mapping[str, Any] | None) -> dict[str, Any] |
     if detail is None:
         return None
 
-    raw = dict(detail)
+    raw = dict(sanitize_sensitive_data(detail))
     normalized = build_audit_detail(
         scope=raw.pop("scope", None),
         target=raw.pop("target", None),

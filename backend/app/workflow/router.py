@@ -25,6 +25,7 @@ from app.core.dependencies import (
 from app.core.exceptions import BizError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
 from app.core.uploads import read_upload_file_limited
+from app.exchange import repository as exchange_repo
 from app.profile import service as profile_service
 from app.profile.schemas import StudentBasic
 from app.workflow import pdf_generator, quiz_service, service
@@ -40,6 +41,9 @@ from app.workflow.schemas import (
     ProofTemplatePreviewIn,
     ProofTemplatePreviewOut,
     QuizDrawOut,
+    QuizImportCommitOut,
+    QuizImportPreviewOut,
+    QuizImportRowOut,
     QuizQuestionAdminOut,
     QuizQuestionIn,
     QuizQuestionStudentOut,
@@ -788,6 +792,9 @@ async def admin_create_quiz_question(
         correct_key=payload.correct_key,
         explanation=payload.explanation,
         difficulty=payload.difficulty,
+        source_name=payload.source_name,
+        source_url=payload.source_url,
+        source_official=payload.source_official,
         operator_id=user.user_id,
         operator_role=",".join(user.roles) or None,
     )
@@ -816,11 +823,84 @@ async def admin_update_quiz_question(
         correct_key=payload.correct_key,
         explanation=payload.explanation,
         difficulty=payload.difficulty,
+        source_name=payload.source_name,
+        source_url=payload.source_url,
+        source_official=payload.source_official,
         is_active=payload.is_active,
         operator_id=user.user_id,
         operator_role=",".join(user.roles) or None,
     )
     return ok(QuizQuestionAdminOut.model_validate(row))
+
+
+@admin_router.post(
+    "/quiz/questions/import-preview",
+    response_model=ApiResponse[QuizImportPreviewOut],
+)
+async def admin_preview_quiz_question_import(
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+    file: Annotated[UploadFile, File()],
+) -> ApiResponse[QuizImportPreviewOut]:
+    content = await read_upload_file_limited(
+        file,
+        max_bytes=quiz_service.QUIZ_IMPORT_MAX_BYTES,
+        too_large_message="题库导入文件超过 10MB 上限",
+        too_large_code=41311,
+    )
+    batch = await quiz_service.preview_question_import(
+        db,
+        filename=file.filename or "quiz-questions.xlsx",
+        file_bytes=content,
+        mime_type=file.content_type,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    rows = await exchange_repo.list_batch_rows(db, batch.id, limit=500)
+    return ok(
+        QuizImportPreviewOut(
+            batch=batch,
+            rows=[QuizImportRowOut.model_validate(row) for row in rows],
+        )
+    )
+
+
+@admin_router.post(
+    "/quiz/questions/import-commit/{batch_id}",
+    response_model=ApiResponse[QuizImportCommitOut],
+)
+async def admin_commit_quiz_question_import(
+    batch_id: int,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+) -> ApiResponse[QuizImportCommitOut]:
+    batch, summary = await quiz_service.commit_question_import(
+        db,
+        batch_id,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    return ok(
+        QuizImportCommitOut(
+            batch=batch,
+            created_count=summary["created"],
+            updated_count=summary["updated"],
+            skipped_count=summary["skipped"],
+        )
+    )
+
+
+@admin_router.get("/quiz/questions/import-template")
+async def admin_download_quiz_question_import_template(
+    _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+    fmt: str = Query(default="xlsx", alias="format", pattern="^(xlsx|csv)$"),
+) -> StreamingResponse:
+    data, filename, media_type = quiz_service.build_import_template(fmt)
+    return StreamingResponse(
+        iter([data]),
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @admin_router.delete(

@@ -4,7 +4,9 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
+
+from app.core.sensitive_fields import sanitize_sensitive_data
 
 
 # ============================================================
@@ -405,6 +407,9 @@ class QuizQuestionIn(BaseModel):
     correct_key: str = Field(min_length=1, max_length=64)
     explanation: str | None = None
     difficulty: str | None = Field(default=None, description="EASY/MEDIUM/HARD")
+    source_name: str | None = Field(default=None, max_length=256)
+    source_url: str | None = Field(default=None, max_length=1024)
+    source_official: bool = False
 
 
 class QuizQuestionUpdate(BaseModel):
@@ -415,6 +420,9 @@ class QuizQuestionUpdate(BaseModel):
     correct_key: str | None = None
     explanation: str | None = None
     difficulty: str | None = None
+    source_name: str | None = None
+    source_url: str | None = None
+    source_official: bool | None = None
     is_active: bool | None = None
 
 
@@ -431,6 +439,10 @@ class QuizQuestionAdminOut(BaseModel):
     correct_key: str
     explanation: str | None
     difficulty: str | None
+    source_name: str | None = None
+    source_url: str | None = None
+    source_official: bool = False
+    import_batch_id: int | None = None
     is_active: bool
     created_by: int | None
     created_at: datetime
@@ -448,6 +460,9 @@ class QuizQuestionStudentOut(BaseModel):
     stem: str
     options_json: list[dict[str, Any]] | None
     difficulty: str | None
+    source_name: str | None = None
+    source_url: str | None = None
+    source_official: bool = False
 
 
 class QuizDrawOut(BaseModel):
@@ -491,3 +506,48 @@ class QuizRecordOut(BaseModel):
     is_correct: bool
     score: int
     submitted_at: datetime
+
+
+class QuizImportBatchOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    batch_no: str
+    import_type: str
+    filename: str
+    total_rows: int
+    ok_rows: int
+    warn_rows: int
+    fatal_rows: int
+    status: str
+    summary: dict[str, Any] | None = None
+    started_at: datetime
+    finished_at: datetime | None = None
+
+
+class QuizImportRowOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    row_no: int
+    severity: str
+    result: str
+    field_name: str | None = None
+    message: str | None = None
+    raw_data: dict[str, Any] | None = None
+
+    @field_serializer("raw_data")
+    def serialize_raw_data(self, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        return sanitize_sensitive_data(value)
+
+
+class QuizImportPreviewOut(BaseModel):
+    batch: QuizImportBatchOut
+    rows: list[QuizImportRowOut]
+
+
+class QuizImportCommitOut(BaseModel):
+    batch: QuizImportBatchOut
+    created_count: int = 0
+    updated_count: int = 0
+    skipped_count: int = 0

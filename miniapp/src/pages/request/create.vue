@@ -343,12 +343,12 @@ import { computed, onMounted, ref } from "vue";
 import InlineStateNotice from "@/components/InlineStateNotice.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import DynamicForm from "@/components/DynamicForm.vue";
-import { getRequestTypeBadge } from "@/utils/request-badge";
 import {
   createRequest,
   getRequestCategoryLabel,
   getRequestDetail,
   getRequestStatusLabel,
+  getRequestTypeBadge,
   isEditableRequestStatus,
   listRequestTypes,
   submitRequest,

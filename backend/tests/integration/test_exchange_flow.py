@@ -10,11 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.models import AuditLog
 from app.auth.models import Student, User, UserRole
-from app.core.security import create_token
+from app.core.security import create_token, decrypt_field
 from app.exchange import repository as exchange_repo
 from app.exchange.models import (
     BATCH_STATUS_VALIDATED,
     IMPORT_TYPE_TRANSCRIPT_PDF_REVIEW,
+    ImportBatchRow,
     StudentCourseRecord,
 )
 from app.exchange.service import ERROR_REPORT_COLUMN
@@ -24,7 +25,7 @@ from app.honor.models import HonorRecord
 def _build_student_xlsx(rows: list[dict]) -> bytes:
     """按 _apply_student 期望的列头拼装一个最小 Excel。"""
     headers = [
-        "student_no", "full_name", "gender", "birth_date",
+        "student_no", "full_name", "id_card", "phone", "gender", "birth_date",
         "grade_code", "major_code", "class_code",
         "political_status", "enrollment_year", "expected_graduation_year",
         "email", "status",
@@ -105,6 +106,8 @@ async def test_student_import_happy_path_validate_and_commit(
         {
             "student_no": "IMP2001",
             "full_name": "导入学生甲",
+            "id_card": "110101200001011234",
+            "phone": "13800138000",
             "gender": "男",
             "grade_code": "2024",
             "major_code": "CS",
@@ -136,6 +139,22 @@ async def test_student_import_happy_path_validate_and_commit(
     assert batch["status"] == "VALIDATED"
     assert batch["total_rows"] == 2
     assert batch["fatal_rows"] == 0
+    preview_row = upload.json()["data"]["rows"][0]["raw_data"]
+    assert preview_row.get("id_card") is None
+    assert preview_row.get("phone") is None
+    assert preview_row.get("id_card_enc") == "***encrypted***"
+    assert preview_row.get("phone_enc") == "***encrypted***"
+
+    stored_row = (
+        await db.execute(
+            select(ImportBatchRow).where(ImportBatchRow.batch_id == batch["id"])
+        )
+    ).scalars().first()
+    assert stored_row is not None
+    assert stored_row.raw_data["id_card_enc"] != "110101200001011234"
+    assert stored_row.raw_data["phone_enc"] != "13800138000"
+    assert "id_card" not in stored_row.raw_data
+    assert "phone" not in stored_row.raw_data
 
     commit = await admin_client.post(
         f"/api/v1/admin/exchange/imports/{batch['id']}/commit",
@@ -150,6 +169,10 @@ async def test_student_import_happy_path_validate_and_commit(
     ).scalar_one_or_none()
     assert stu is not None
     assert stu.full_name == "导入学生甲"
+    assert stu.id_card_enc != "110101200001011234"
+    assert stu.phone_enc != "13800138000"
+    assert decrypt_field(stu.id_card_enc) == "110101200001011234"
+    assert decrypt_field(stu.phone_enc) == "13800138000"
 
 
 async def test_student_import_with_bad_row_fails_batch(

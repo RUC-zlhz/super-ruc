@@ -113,6 +113,8 @@ export interface ProfileSummary {
 export interface StudentAcademicInfoPatch {
   student_no?: string | null
   full_name?: string | null
+  id_card?: string | null
+  phone?: string | null
   gender?: string | null
   grade_code?: string | null
   major_code?: string | null
@@ -125,6 +127,8 @@ export interface StudentAcademicInfoPatch {
 export interface StudentCreateInput {
   student_no: string
   full_name: string
+  id_card?: string | null
+  phone?: string | null
   gender?: string | null
   grade_code?: string | null
   major_code?: string | null

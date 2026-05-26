@@ -197,6 +197,14 @@
                     <a-select-option value="LOW">低关注</a-select-option>
                   </a-select>
                 </a-form-item>
+                <a-form-item label="推荐学期">
+                  <a-input
+                    v-model:value="academicGapFilters.term_code"
+                    allow-clear
+                    placeholder="默认当前"
+                    style="width: 130px"
+                  />
+                </a-form-item>
                 <a-form-item>
                   <a-space>
                     <a-button type="primary" html-type="submit" :loading="loadingAcademicGap">
@@ -327,6 +335,9 @@
             <a-descriptions-item label="风险级别">
               {{ academicGapDetail.risk_level || '-' }}
             </a-descriptions-item>
+            <a-descriptions-item label="推荐学期">
+              {{ academicGapDetail.recommendation_term_code || '-' }}
+            </a-descriptions-item>
             <a-descriptions-item label="缺口结论" :span="2">
               {{ academicGapDetail.conclusion_text || '-' }}
             </a-descriptions-item>
@@ -412,6 +423,7 @@ const academicGapFilters = reactive<{
   grade_code?: string
   major_code?: string
   risk_level?: 'HIGH' | 'MEDIUM' | 'LOW'
+  term_code?: string
 }>({})
 
 const academicGapRows = ref<AcademicGapAggregateItem[]>([])
@@ -425,7 +437,7 @@ const academicGapDrawerOpen = ref(false)
 const academicGapDetailLoading = ref(false)
 const academicGapDetail = ref<AcademicGapResult | null>(null)
 const currentDrawerStudentId = ref<number | null>(null)
-const academicGapDetailCache = new Map<number, AcademicGapResult>()
+const academicGapDetailCache = new Map<string, AcademicGapResult>()
 
 const academicGapColumns = [
   { title: '学生', key: 'student', width: 180 },
@@ -504,6 +516,7 @@ async function loadAcademicGapList() {
       grade_code: academicGapFilters.grade_code,
       major_code: academicGapFilters.major_code,
       risk_level: academicGapFilters.risk_level,
+      term_code: academicGapFilters.term_code,
       page: academicGapPagination.current,
       page_size: academicGapPagination.pageSize,
     })
@@ -528,7 +541,9 @@ function resetAcademicGapFilters() {
   academicGapFilters.grade_code = undefined
   academicGapFilters.major_code = undefined
   academicGapFilters.risk_level = undefined
+  academicGapFilters.term_code = undefined
   academicGapPagination.current = 1
+  academicGapDetailCache.clear()
   loadAcademicGapList()
 }
 
@@ -583,14 +598,15 @@ async function openAcademicGapDetail(studentId: number) {
   currentDrawerStudentId.value = studentId
   academicGapDrawerOpen.value = true
   academicGapDetailLoading.value = true
+  const cacheKey = `${studentId}:${academicGapFilters.term_code || ''}`
   try {
-    if (academicGapDetailCache.has(studentId)) {
-      academicGapDetail.value = academicGapDetailCache.get(studentId) ?? null
+    if (academicGapDetailCache.has(cacheKey)) {
+      academicGapDetail.value = academicGapDetailCache.get(cacheKey) ?? null
       return
     }
-    const resp = await fetchAcademicGap(studentId)
+    const resp = await fetchAcademicGap(studentId, { term_code: academicGapFilters.term_code })
     academicGapDetail.value = resp.data
-    academicGapDetailCache.set(studentId, resp.data)
+    academicGapDetailCache.set(cacheKey, resp.data)
   } catch {
     academicGapDetail.value = null
   } finally {
