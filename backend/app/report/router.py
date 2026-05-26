@@ -86,10 +86,15 @@ async def upload_my_transcript_pdf(
 )
 async def admin_overview(
     db: DBDep,
-    _user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
+    user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
     term_code: str | None = None,
 ) -> ApiResponse[OverviewResult]:
-    return ok(await service.build_overview(db, term_code=term_code))
+    return ok(await service.build_overview(
+        db, 
+        term_code=term_code,
+        viewer_user_id=user.user_id,
+        viewer_roles=user.roles,
+    ))
 
 
 @router.get(

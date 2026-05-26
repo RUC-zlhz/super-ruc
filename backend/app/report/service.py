@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import build_audit_detail, log_action
 from app.auth import repository as auth_repo
-from app.auth.models import Student
+from app.auth.models import Student, User
 from app.auth.role_codes import normalize_role_code, normalize_role_codes
 from app.auth.scopes import StudentScopeSet, split_student_scope_codes, student_in_scope
 from app.core.config import settings
@@ -965,15 +965,50 @@ def _term_code_date_range(term_code: str | None) -> tuple[datetime, datetime] | 
     )
 
 
-async def build_overview(db: AsyncSession, *, term_code: str | None = None) -> OverviewResult:
+async def build_overview(
+    db: AsyncSession,
+    *,
+    term_code: str | None = None,
+    viewer_user_id: int | None = None,
+    viewer_roles: list[str] | None = None,
+) -> OverviewResult:
     normalized_term_code = _normalize_term_code(term_code)
     term_range = _term_code_date_range(normalized_term_code)
+
+    scope = None
+    if viewer_user_id is not None and viewer_roles is not None:
+        scope = await _report_scope_for_viewer(
+            db, viewer_user_id=viewer_user_id, viewer_roles=viewer_roles
+        )
+        if scope is not None and scope.is_empty():
+            return OverviewResult(
+                term_code=normalized_term_code,
+                metrics=[],
+                requests=[],
+                notices=NoticeSummary(
+                    total_notices=0,
+                    published_notices=0,
+                    total_batches=0,
+                    total_deliveries=0,
+                    sent=0,
+                    failed=0,
+                    skipped=0,
+                    read=0,
+                ),
+                workflows=[],
+                generated_at=datetime.now(UTC),
+            )
+
     # --- requests 按类型 × 状态聚合 ---
     stmt = select(
         Request.type_code,
         Request.status,
         func.count().label("cnt"),
-    ).group_by(Request.type_code, Request.status)
+    )
+    if scope is not None:
+        stmt = stmt.join(User, Request.applicant_user_id == User.id).join(Student, User.student_id == Student.id)
+        stmt = _apply_report_student_scope(stmt, scope)
+    stmt = stmt.group_by(Request.type_code, Request.status)
     if term_range:
         stmt = stmt.where(Request.created_at >= term_range[0], Request.created_at < term_range[1])
     grouped = (await db.execute(stmt)).all()
@@ -1006,10 +1041,26 @@ async def build_overview(db: AsyncSession, *, term_code: str | None = None) -> O
     requests_summary = list(summary_map.values())
 
     # --- notices ---
-    notice_count_stmt = select(func.count()).select_from(Notice)
-    published_notice_stmt = notice_count_stmt.where(Notice.status == "PUBLISHED")
-    batch_count_stmt = select(func.count()).select_from(NoticeDeliveryBatch)
-    delivery_stmt = select(NoticeDelivery.status, func.count()).group_by(NoticeDelivery.status)
+    notice_count_stmt = select(func.count(func.distinct(Notice.id))).select_from(Notice)
+    published_notice_stmt = select(func.count(func.distinct(Notice.id))).select_from(Notice).where(Notice.status == "PUBLISHED")
+    batch_count_stmt = select(func.count(func.distinct(NoticeDeliveryBatch.id))).select_from(NoticeDeliveryBatch)
+    delivery_stmt = select(NoticeDelivery.status, func.count(func.distinct(NoticeDelivery.id))).select_from(NoticeDelivery)
+
+    if scope is not None:
+        notice_count_stmt = notice_count_stmt.join(NoticeDelivery, NoticeDelivery.notice_id == Notice.id).join(Student, NoticeDelivery.student_id == Student.id)
+        notice_count_stmt = _apply_report_student_scope(notice_count_stmt, scope)
+
+        published_notice_stmt = published_notice_stmt.join(NoticeDelivery, NoticeDelivery.notice_id == Notice.id).join(Student, NoticeDelivery.student_id == Student.id)
+        published_notice_stmt = _apply_report_student_scope(published_notice_stmt, scope)
+
+        batch_count_stmt = batch_count_stmt.join(NoticeDelivery, NoticeDelivery.batch_id == NoticeDeliveryBatch.id).join(Student, NoticeDelivery.student_id == Student.id)
+        batch_count_stmt = _apply_report_student_scope(batch_count_stmt, scope)
+
+        delivery_stmt = delivery_stmt.join(Student, NoticeDelivery.student_id == Student.id)
+        delivery_stmt = _apply_report_student_scope(delivery_stmt, scope)
+
+    delivery_stmt = delivery_stmt.group_by(NoticeDelivery.status)
+
     if term_range:
         notice_count_stmt = notice_count_stmt.where(
             Notice.created_at >= term_range[0], Notice.created_at < term_range[1]
@@ -1059,18 +1110,25 @@ async def build_overview(db: AsyncSession, *, term_code: str | None = None) -> O
         workflow_count_stmt = (
             select(func.count()).select_from(StudentWorkflow).where(StudentWorkflow.template_id == t.id)
         )
+        if scope is not None:
+            workflow_count_stmt = workflow_count_stmt.join(Student, StudentWorkflow.student_id == Student.id)
+            workflow_count_stmt = _apply_report_student_scope(workflow_count_stmt, scope)
         if term_range:
             workflow_count_stmt = workflow_count_stmt.where(
                 StudentWorkflow.started_at >= term_range[0],
                 StudentWorkflow.started_at < term_range[1],
             )
-        total_students = (await db.execute(workflow_count_stmt)).scalar_one()
+        total_students_workflow = (await db.execute(workflow_count_stmt)).scalar_one()
+        
         node_stmt = (
             select(StudentWorkflowNode.status, func.count())
             .join(StudentWorkflow, StudentWorkflow.id == StudentWorkflowNode.workflow_id)
             .where(StudentWorkflow.template_id == t.id)
-            .group_by(StudentWorkflowNode.status)
         )
+        if scope is not None:
+            node_stmt = node_stmt.join(Student, StudentWorkflow.student_id == Student.id)
+            node_stmt = _apply_report_student_scope(node_stmt, scope)
+        node_stmt = node_stmt.group_by(StudentWorkflowNode.status)
         if term_range:
             node_stmt = node_stmt.where(
                 StudentWorkflowNode.created_at >= term_range[0],
@@ -1083,7 +1141,7 @@ async def build_overview(db: AsyncSession, *, term_code: str | None = None) -> O
                 template_code=t.code,
                 template_name=t.name,
                 kind=t.kind,
-                total_students=total_students,
+                total_students=total_students_workflow,
                 nodes_pending=node_map.get(WORKFLOW_NODE_PENDING, 0),
                 nodes_overdue=node_map.get(WORKFLOW_NODE_OVERDUE, 0),
                 nodes_done=node_map.get(WORKFLOW_NODE_DONE, 0),
@@ -1091,13 +1149,15 @@ async def build_overview(db: AsyncSession, *, term_code: str | None = None) -> O
         )
 
     # --- 顶部指标 ---
-    total_students = (
-        await db.execute(select(func.count()).select_from(Student).where(Student.deleted_at.is_(None)))
-    ).scalar_one()
+    student_count_stmt = select(func.count()).select_from(Student).where(Student.deleted_at.is_(None))
+    if scope is not None:
+        student_count_stmt = _apply_report_student_scope(student_count_stmt, scope)
+    total_students_metric = (await db.execute(student_count_stmt)).scalar_one()
+    
     total_requests_all = sum(s.total for s in requests_summary)
     pending_approvals = sum(s.submitted + s.in_review for s in requests_summary)
     metrics = [
-        KVMetric(key="students", label="在籍学生", value=total_students),
+        KVMetric(key="students", label="在籍学生", value=total_students_metric),
         KVMetric(key="requests", label="申请总量", value=total_requests_all),
         KVMetric(key="pending_approvals", label="待审批", value=pending_approvals),
         KVMetric(key="notices", label="通知条数", value=total_notices),

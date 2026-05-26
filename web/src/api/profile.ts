@@ -278,7 +278,8 @@ async function optionalAdminGet<T>(url: string, params?: Record<string, unknown>
   if (resp.status === 401) {
     setAccessToken(null)
     if (location.pathname !== '/login') {
-      location.replace('/login')
+      const currentPath = location.pathname + location.search + location.hash
+      location.replace(`/login?redirect=${encodeURIComponent(currentPath)}`)
     }
     throw new Error('登录已失效')
   }
@@ -333,7 +334,8 @@ export async function downloadStudentProfileSnapshot(studentId: number, format: 
   if (resp.status === 401) {
     setAccessToken(null)
     if (location.pathname !== '/login') {
-      location.replace('/login')
+      const currentPath = location.pathname + location.search + location.hash
+      location.replace(`/login?redirect=${encodeURIComponent(currentPath)}`)
     }
     throw new Error('登录已失效')
   }

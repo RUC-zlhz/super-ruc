@@ -207,6 +207,14 @@ async function requestOptionalEnvelope<T>(
     headers,
     body: method === 'GET' ? undefined : JSON.stringify(options?.body ?? {}),
   })
+  if (response.status === 401) {
+    localStorage.removeItem('sip.access_token')
+    if (location.pathname !== '/login') {
+      const currentPath = location.pathname + location.search + location.hash
+      location.replace(`/login?redirect=${encodeURIComponent(currentPath)}`)
+    }
+    throw new Error('登录已失效')
+  }
   if (response.status === 404 || response.status === 405) {
     return { supported: false }
   }

@@ -271,11 +271,42 @@ async def _get_public_http_url(client: httpx.AsyncClient, url: str) -> httpx.Res
 
 
 # ---------- Target preview ----------
+async def _notice_scope_for_viewer(db: AsyncSession, viewer_user_id: int, viewer_roles: list[str]):
+    from app.auth import repository as auth_repo
+    from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES, normalize_role_code, normalize_role_codes
+    from app.auth.scopes import StudentScopeSet, split_student_scope_codes
+    
+    roles = set(normalize_role_codes(viewer_roles))
+    if roles & {"SUPER_ADMIN", "COLLEGE_LEADER"}:
+        return None
+    scoped_roles = roles & {"COUNSELOR", "HEAD_TEACHER", "YOUTH_LEAGUE_TEACHER", "PARTY_BUILD_TEACHER", *ROLE_CODE_COLLABORATOR_ROLES}
+    if not scoped_roles:
+        return StudentScopeSet()
+
+    rows = await auth_repo.list_user_roles(db, viewer_user_id)
+    scope_codes = [
+        row.scope_code
+        for row in rows
+        if normalize_role_code(row.role_code) in scoped_roles and row.scope_code
+    ]
+    return split_student_scope_codes(scope_codes)
+
 async def preview_target(
-    db: AsyncSession, rule: TargetRule | None
+    db: AsyncSession, 
+    rule: TargetRule | None,
+    *,
+    viewer_user_id: int | None = None,
+    viewer_roles: list[str] | None = None,
 ) -> TargetPreviewResult:
     rule_dict = rule.model_dump() if rule else None
-    students = await repo.resolve_target_students(db, rule_dict)
+    
+    scope = None
+    if viewer_user_id is not None and viewer_roles is not None:
+        scope = await _notice_scope_for_viewer(db, viewer_user_id, viewer_roles)
+        if scope is not None and scope.is_empty():
+            return TargetPreviewResult(target_count=0, sample_student_nos=[])
+
+    students = await repo.resolve_target_students(db, rule_dict, scope=scope)
     return TargetPreviewResult(
         target_count=len(students),
         sample_student_nos=[s.student_no for s in students[:10]],
@@ -996,6 +1027,7 @@ async def dispatch_notice(
     note: str | None,
     operator_id: int,
     operator_role: str | None,
+    operator_roles: list[str] | None = None,
 ) -> NoticeDeliveryBatch:
     notice = await repo.get_notice(db, notice_id)
     if notice is None:
@@ -1007,7 +1039,13 @@ async def dispatch_notice(
     if not channels:
         raise BizError("未指定发送渠道", code=40033)
 
-    students = await repo.resolve_target_students(db, notice.target_rule)
+    scope = None
+    if operator_roles is not None:
+        scope = await _notice_scope_for_viewer(db, operator_id, operator_roles)
+        if scope is not None and scope.is_empty():
+            raise BizError("未配置通知发送范围", code=40320)
+
+    students = await repo.resolve_target_students(db, notice.target_rule, scope=scope)
     batch = await repo.create_batch(
         db,
         notice_id=notice.id,

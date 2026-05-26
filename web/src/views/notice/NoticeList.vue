@@ -176,6 +176,9 @@
             <template v-if="selectedNotice.status === 'DRAFT'">
               <p class="side-muted">草稿通知尚未产生发送批次。</p>
             </template>
+            <template v-else-if="selectedNoticeBatchesError">
+              <a-alert type="error" message="加载批次失败，请重试" show-icon />
+            </template>
             <template v-else-if="latestSelectedBatch">
               <div class="delivery-summary-grid">
                 <div>
@@ -200,7 +203,12 @@
 
           <section class="side-section">
             <h3>触达范围</h3>
-            <p>{{ selectedNoticeDetail?.target_summary || '全体在读学生' }}</p>
+            <template v-if="selectedNoticeError">
+              <a-alert type="error" message="加载详情失败，请重试" show-icon />
+            </template>
+            <template v-else>
+              <p>{{ selectedNoticeDetail?.target_summary || '全体在读学生' }}</p>
+            </template>
           </section>
 
           <div class="side-actions">
@@ -760,7 +768,7 @@
                   重试
                 </a-button>
                 <a-button
-                  v-if="record.channel === 'SMS'"
+                  v-if="isDev && record.channel === 'SMS'"
                   type="link"
                   size="small"
                   @click="openReceiptModal(record as NoticeDelivery)"
@@ -1061,6 +1069,8 @@ import {
   type NoticeTargetPreviewResult,
   type NoticeTargetRule,
 } from '@/api/notice'
+
+const isDev = import.meta.env.DEV
 
 interface NoticeTargetRuleForm {
   grade_codes: string[]
@@ -1383,6 +1393,8 @@ const selectedNoticeDetail = ref<NoticeOut | null>(null)
 const selectedNoticeBatchesLoading = ref(false)
 const selectedNoticeBatches = ref<NoticeBatch[]>([])
 const batchCache = new Map<number, NoticeBatch[]>()
+const selectedNoticeError = ref(false)
+const selectedNoticeBatchesError = ref(false)
 const latestSelectedBatch = computed(() => selectedNoticeBatches.value[0] ?? null)
 const selectedNoticeChannelsLabel = computed(() => {
   if (!selectedNoticeDetail.value) return '-'
@@ -1455,10 +1467,13 @@ function clearSelectedNotice() {
   selectedNoticeBatches.value = []
   selectedNoticeLoading.value = false
   selectedNoticeBatchesLoading.value = false
+  selectedNoticeError.value = false
+  selectedNoticeBatchesError.value = false
 }
 
 async function loadSelectedNoticeDetail(id: number, force = false) {
   selectedNoticeLoading.value = true
+  selectedNoticeError.value = false
   try {
     const detail = await loadNoticeDetail(id, force)
     if (selectedNoticeId.value === id) {
@@ -1467,6 +1482,7 @@ async function loadSelectedNoticeDetail(id: number, force = false) {
   } catch {
     if (selectedNoticeId.value === id) {
       selectedNoticeDetail.value = null
+      selectedNoticeError.value = true
     }
   } finally {
     if (selectedNoticeId.value === id) {
@@ -1476,6 +1492,7 @@ async function loadSelectedNoticeDetail(id: number, force = false) {
 }
 
 async function loadSelectedNoticeBatches(id: number, status: NoticeStatus, force = false) {
+  selectedNoticeBatchesError.value = false
   if (status === 'DRAFT') {
     selectedNoticeBatchesLoading.value = false
     selectedNoticeBatches.value = []
@@ -1497,6 +1514,7 @@ async function loadSelectedNoticeBatches(id: number, status: NoticeStatus, force
   } catch {
     if (selectedNoticeId.value === id) {
       selectedNoticeBatches.value = []
+      selectedNoticeBatchesError.value = true
     }
   } finally {
     if (selectedNoticeId.value === id) {

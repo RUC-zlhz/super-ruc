@@ -1,425 +1,68 @@
-# 信息学院学生综合服务与党团管理平台 - 测试工程师Bug报告
+# 信息学院学生综合服务与党团管理平台 - 当前 HEAD 测试工程师 Bug 报告
 
-**测试日期**: 2026年5月25日  
-**测试工程师**: Sisyphus  
-**测试范围**: 前端、后端、小程序、数据库  
+- 测试日期：2026-05-26
+- 测试对象：当前 HEAD `0374c2e`（`main`）
+- 测试工程师：Codex
+- 测试范围：后端、Web 管理端、Miniapp 学生端、生产只读 smoke
 
----
+## 评分口径
 
-## 一、崩溃类Bug（共6个，总分90分）
+- 崩溃类 bug：程序无法启动、运行中崩溃、异常退出、无响应、服务中断、页面白屏等；基础分 `15`。
+- Logic bug：程序可以运行，但输出结果、功能行为、业务逻辑、边界输入或异常输入处理与预期不一致；基础分 `8`。
 
-### Bug #1: 后端启动依赖配置校验失败导致服务无法启动
-**严重程度**: 崩溃类（15分）  
-**文件路径**: `backend/app/core/config.py`  
-**问题描述**:  
-在 `config.py` 的 `_enforce_prod_invariants` 方法中，如果生产环境配置不完整或使用默认值，会导致 `ValueError` 异常，使整个后端服务无法启动。特别是：
-- `JWT_SECRET_KEY` 为空或使用默认值
-- `FIELD_ENCRYPTION_KEY` 为空或使用默认值  
-- `WECHAT_MOCK_ENABLED=True` 在生产环境
-- `AI_QA_ENABLED=True` 时（代码中强制要求为False）
+## 本轮验证结果
 
-**复现步骤**:  
-1. 在生产环境 `.env` 文件中不配置 `JWT_SECRET_KEY`
-2. 启动后端服务 `uv run uvicorn app.main:app --reload --port 8080`
-3. 服务启动失败，抛出配置校验错误
+- 后端静态检查：`uv run --extra dev ruff check app tests unit_tests scripts` 通过。
+- 后端编译检查：`uv run --extra dev python -m compileall -q app tests unit_tests scripts` 通过。
+- 后端全量测试：`uv run --extra dev pytest -q -o cache_dir=../.tmp/pytest-cache-s50-full --basetemp=../.tmp/pytest-tmp-s50-full` 通过，`143 passed, 3 warnings in 275.89s`。
+- Web 管理端构建：`pnpm -C web build` 通过。
+- Miniapp 类型检查：`.\web\node_modules\.bin\vue-tsc.CMD --noEmit -p miniapp\tsconfig.json` 通过。
+- Miniapp 微信小程序构建：`pnpm -C miniapp build:mp-weixin` 通过。
+- Miniapp 风险残留扫描：`request-badge / uni-popup / wx_test_appid / utils/async / DORM / 宿 / resolveComponent` 均无命中。
+- 生产只读 smoke：`http://10.10.0.13/healthz` 与 `/api/v1/knowledge/search?page=1&page_size=5` 返回 `200`；需登录接口 `/api/v1/honors`、`/api/v1/workflow/public/templates` 返回 `401`，符合认证边界。
 
-**影响**: 生产环境无法启动，开发环境如果配置不当也会失败
+## 缺陷汇总
 
----
+- 崩溃类 bug：`0` 个，基础分 `0`。
+- Logic bug：`14` 个，基础分 `112`。
+- 本轮基础分合计：`112`。
 
-### Bug #2: 数据库连接失败导致服务崩溃
-**严重程度**: 崩溃类（15分）  
-**文件路径**: `backend/app/core/database.py`  
-**问题描述**:  
-在 `database.py` 中，如果 `DATABASE_URL` 配置错误或数据库服务不可用，`create_async_engine` 会在应用启动时抛出异常，导致整个服务崩溃。虽然有 `pool_pre_ping=True` 配置，但如果初始连接就失败，没有优雅的降级机制。
+## 崩溃类 Bug
 
-**复现步骤**:  
-1. 配置错误的 `DATABASE_URL`（如错误的端口、用户名、密码）
-2. 启动后端服务
-3. 服务启动失败，抛出数据库连接异常
+本轮未发现当前 HEAD 可稳定复现的新增崩溃类 bug。旧版 `bug-report.md` 中的“配置启动失败、数据库不可用、路由死循环、文件上传内存”等条目已在 `S40/S41/S46/S49` 中被生产事实否定或代码修复，不再重复计分。
 
-**影响**: 数据库不可用时服务完全无法启动
+## Logic Bug
 
----
+| ID | 分值 | 模块 | 触发条件 | 预期 | 实际与证据 |
+|---|---:|---|---|---|---|
+| S50-L01 | 8 | 后端认证 | 已登录用户调用 `/api/v1/auth/change-password` 后继续使用修改前的 access token 或 refresh token | 改密后旧 token 应立即失效 | `change_password` 仅更新 `password_hash` 和 `must_change_password`，未递增 `token_version`（`backend/app/auth/service.py:373-385`）；而 access/refresh 校验依赖 token version（`backend/app/core/dependencies.py:67-72`、`backend/app/auth/service.py:482-486`）。结果是旧 access token 仍可访问 `/auth/me`，旧 refresh token 仍可刷新 |
+| S50-L02 | 8 | 后端运营看板 | 带 `scope_code` 的辅导员、班主任、党团教师访问 `/api/v1/admin/report/overview` | overview 聚合应只统计其 scope 内学生相关数据 | 路由允许 scoped 角色进入（`backend/app/report/router.py:31-39`），但 `admin_overview` 直接调用无 viewer/scope 参数的 `build_overview`（`backend/app/report/router.py:87-92`、`backend/app/report/service.py:968-979`），请求、通知、流程聚合会按全局统计 |
+| S50-L03 | 8 | 后端党团流程发起 | 具备有效 workflow scope 的协同角色，例如 `PARTY_BRANCH_SECRETARY + CLASS:CS2401`，调用 `/api/v1/admin/workflow/students/search` | 该角色既然可发起 scoped workflow，就应能搜索 scope 内学生 | workflow 发起角色包含协同角色（`backend/app/workflow/router.py:80-88`、`backend/app/workflow/service.py:96-102`），但学生搜索转调 profile 搜索（`backend/app/workflow/router.py:324-351`），profile scope 只认辅导员、班主任、党团教师等角色（`backend/app/profile/service.py:55-60`、`:379-382`、`:527`），导致“能发起，不能搜人” |
+| S50-L04 | 8 | 后端通知圈人/投递 | 带 scope 的通知编辑角色，例如 `COUNSELOR + CLASS:CS2401`，预览或投递 scope 外班级 | 目标预览和分发都应收口到操作者 scope 内 | 通知编辑角色包含 scoped 教师/协同角色（`backend/app/notice/router.py:48-57`），但预览与分发没有传入 actor scope（`backend/app/notice/router.py:212-226`），目标解析只按 `target_rule` 查询学生（`backend/app/notice/repository.py:151-185`），分发直接使用该结果（`backend/app/notice/service.py:1010`） |
+| S50-L05 | 8 | Web 路由默认落点 | 浏览器已有 `sip.access_token`，硬刷新或直接访问 `/` | 应先恢复用户信息，再进入该角色默认首页 | 根路由 redirect 在 `fetchMe()` 前读取 `auth.roleCodes`（`web/src/router/index.ts:42-45`），而恢复会话时 `user=null`、`roleCodes=[]`（`web/src/store/auth.ts:15-20`），因此先落到默认 `/profile`，与 dashboard-capable 角色预期不一致 |
+| S50-L06 | 8 | Web 登录态保持 | 刷新受保护页面时 `/auth/me` 临时 500 或网络错误 | 应保留本地 session，并给出重试或错误态 | 路由守卫对 `fetchMe()` 的所有异常都执行 `auth.logout()`（`web/src/router/index.ts:181-187`），`logout()` 会清空 access/refresh token（`web/src/store/auth.ts:48-63`），瞬时服务错误会误退出用户 |
+| S50-L07 | 8 | Web 401 重定向 | token 失效后，在 `/approval/123` 或 `/profile/student/1` 触发普通 API 请求或画像快照下载 | 应跳到 `/login?redirect=<current fullPath>`，登录后可回到原页面 | Axios 401 拦截器直接 `location.replace('/login')`（`web/src/utils/request.ts:52-60`），画像 raw fetch 下载也直接跳裸 `/login`（`web/src/api/profile.ts:272-283`、`:327-338`），丢失原始目标路径 |
+| S50-L08 | 8 | Web 党团提醒工作台 | token 过期后打开或刷新 `/workflow/party-stage` 的提醒记录/运行记录区域 | 应进入统一登录失效处理 | 提醒 API 使用 raw `fetch` 并自行解析（`web/src/api/workflow.ts:190-217`），没有 401 分支；页面的提醒加载链路没有统一重定向处理（`web/src/views/workflow/PartyStageList.vue:1275`、`:1358-1362`），会停留在 stale/empty 状态 |
+| S50-L09 | 8 | Web 通知短信回执 | 在生产管理端打开 SMS 投递行并点击“模拟回执” | 生产 UI 应只显示真实投递状态，或 mock 写入入口必须 dev/test gated | Web 生产页面展示“模拟回执”按钮（`web/src/views/notice/NoticeList.vue:762-769`）和“模拟短信回执”弹窗（`:987-995`），提交会调用 `/admin/notices/deliveries/{id}/receipt/mock`（`:2056-2064`、`web/src/api/notice.ts:251-256`） |
+| S50-L10 | 8 | Web 通知详情侧栏 | 选择通知时详情接口或批次接口返回 403/500/网络错误 | 应显示明确加载错误，不应把错误解释成真实业务空态 | `loadSelectedNoticeDetail` 失败后清空 detail（`web/src/views/notice/NoticeList.vue:1460-1470`），`loadSelectedNoticeBatches` 失败后清空 batches（`:1478-1500`）；侧栏随后显示“全体在读学生”“当前通知暂无发送批次”等正常空态文案（`:161-202`），误导操作员 |
+| S50-L11 | 8 | Miniapp 首页未读通知统计 | 学生有超过 5 条未读站内通知时进入首页 | 首页“未读通知”应反映真实未读总数，或明确标注“最近 5 条” | 首页只请求 `getMyNotices({ page: 1, size: 5 })`（`miniapp/src/pages/index/index.vue:795-801`），再用这 5 条计算未读数（`:409-410`）和焦点卡片（`:563-571`），第 6 条及之后未读通知被漏计 |
+| S50-L12 | 8 | Miniapp 首页待跟进申请统计 | 学生申请总数超过 20，且 `SUBMITTED / IN_REVIEW / REJECTED` 记录落在第 2 页以后 | 首页“待跟进申请”和焦点卡片应覆盖全部待关注申请 | 首页只请求 `getMyRequests({ page: 1, size: 20 })`（`miniapp/src/pages/index/index.vue:803-806`），再本地计算待跟进数（`:412-417`）和最新待关注申请（`:574-585`），第 21 条及之后会被漏掉 |
+| S50-L13 | 8 | Miniapp 事务申请列表 | 单状态 tab，例如“已通过”“草稿”“已驳回”，记录数超过 20 | 应支持分页/加载更多，或明确仅展示最近 20 条 | 单状态 tab 固定请求 `page=1,size=20`（`miniapp/src/pages/request/index.vue:325-342`），页面没有加载更多入口，却显示“共 {{ requests.length }} 项”（`:80-87`）并直接渲染当前数组（`:133-188`） |
+| S50-L14 | 8 | Miniapp 我的画像历史记录 | 纠错申诉超过 10 条，或成长补录/完整查看申请超过 20 条 | 历史区应支持查看完整记录，或提供分页/剩余数量提示 | `loadAll()` 只拉第一页：纠错 `size=10`、补录 `size=20`、完整查看 `size=20`（`miniapp/src/pages/profile/index.vue:863-889`）；模板直接渲染数组，无分页或加载更多（`:287-350`） |
 
-### Bug #3: 小程序页面栈溢出风险
-**严重程度**: 崩溃类（8分）  
-**文件路径**: `miniapp/src/pages/workflow/index.vue`  
-**问题描述**:  
-在小程序的 `workflow/index.vue` 中，`onDetail` 和 `goQuiz` 函数使用 `openMiniappPage` 进行页面跳转。如果用户快速连续点击，可能导致页面栈溢出（微信小程序限制页面栈最大10层），造成小程序白屏或崩溃。
+## 不计分但需关注
 
-**复现步骤**:  
-1. 快速连续点击"查看完整时间轴与节点要求"按钮
-2. 快速连续点击"理论自测"卡片
-3. 页面栈累积超过10层，小程序出现异常
+- `report/overview` 中 notices/workflows 聚合与 requests 同属一个 scope 缺失根因，本轮只按 `S50-L02` 计一次，避免同根因重复计分。
+- 通知管理列表、批次、投递明细也缺少 actor scope 模型迹象；本轮只对已能造成越权投递的 `preview/dispatch` 计分。
+- Miniapp “学籍信息”“纠错申诉附件”等入口存在未闭合迹象，但当前需要先确认后端契约和交付范围，暂不作为本轮有效 bug。
+- Web 个人信息页“绑定手机 -> 更换”、登录设备“管理”、403“联系管理员”等可见死按钮偏向未完成功能或 UX 缺口，暂不计分。
 
-**影响**: 用户体验差，极端情况下小程序崩溃
+## 修复优先级建议
 
----
+- P0：`S50-L01` 改密后旧 token 未失效；`S50-L04` scoped 通知编辑者可越权投递；`S50-L02` scoped 运营看板全局聚合。
+- P1：`S50-L03` 协同角色搜人权限不一致；`S50-L07/S50-L08` Web 401 处理不一致；`S50-L09` 生产暴露模拟回执。
+- P2：`S50-L05/S50-L06/S50-L10` Web 登录态与错误态；`S50-L11 ~ S50-L14` Miniapp 首页/列表分页截断。
 
-### Bug #4: 前端路由守卫死循环风险
-**严重程度**: 崩溃类（8分）  
-**文件路径**: `web/src/router/index.ts`  
-**问题描述**:  
-在路由守卫 `router.beforeEach` 中，如果 `auth.fetchMe()` 失败，会调用 `auth.logout()` 并重定向到登录页。但如果登录页本身也触发了 `fetchMe()`（例如在 `/error/403` 页面），可能导致无限重定向循环，浏览器标签页卡死。
+## 旧报告处理结论
 
-**复现步骤**:  
-1. 登录后，手动清除 localStorage 中的 token
-2. 访问需要权限的页面
-3. 路由守卫尝试刷新用户信息失败
-4. 可能出现无限重定向（取决于 store 实现）
-
-**影响**: 浏览器标签页卡死，需要手动关闭
-
----
-
-### Bug #5: 文件上传未处理大文件导致内存溢出
-**严重程度**: 崩溃类（8分）  
-**文件路径**: `backend/app/workflow/service.py`  
-**问题描述**:  
-在 `upload_request_attachment` 函数中，文件内容被完全读入内存 (`len(content)`)。如果用户上传超大文件（虽然有30MB限制，但恶意用户可能绕过），可能导致服务器内存溢出，影响整个服务的稳定性。
-
-**复现步骤**:  
-1. 构造一个接近或超过30MB的文件
-2. 通过小程序或前端上传
-3. 服务器内存占用飙升
-
-**影响**: 服务器资源耗尽，影响其他用户
-
----
-
-### Bug #6: 微信登录Mock模式安全隐患
-**严重程度**: 崩溃类（8分）  
-**文件路径**: `backend/app/core/config.py`  
-**问题描述**:  
-配置中 `WECHAT_MOCK_ENABLED=True` 和 `WECHAT_GUEST_LOGIN_ENABLED=False`，但在生产环境校验中，如果 `WECHAT_MOCK_ENABLED=True` 会阻止启动。然而在开发/测试环境，Mock模式可能被滥用，导致安全漏洞。
-
-**复现步骤**:  
-1. 使用开发环境配置
-2. 通过Mock登录获取任意用户身份
-3. 访问敏感数据
-
-**影响**: 开发环境安全风险，可能被恶意利用
-
----
-
-## 二、Logic Bug（共12个，总分96分）
-
-### Bug #7: 学分计算逻辑错误 - 等价课程重复计算
-**严重程度**: Logic Bug（8分）  
-**文件路径**: `backend/app/report/service.py`  
-**问题描述**:  
-在 `compute_academic_gap` 函数中，课程等价计算逻辑存在问题。当一门课程有多个等价目标时，`earned` 字典会累加所有等价课程的学分，导致学分被重复计算。
-
-**代码片段**:
-```python
-for target, ratio in equiv_map.get(r.course_code, []):
-    earned[target] = earned.get(target, 0) + float(r.credits or 0) * ratio
-```
-
-**复现步骤**:  
-1. 课程A可以等价替代课程B和课程C
-2. 学生通过了课程A（3学分）
-3. 系统计算时，课程B和课程C都会获得3学分
-4. 实际应该只计算一次
-
-**影响**: 学分缺口计算不准确，可能导致错误的学业预警
-
----
-
-### Bug #8: 排序逻辑不一致
-**严重程度**: Logic Bug（8分）  
-**文件路径**: `backend/app/report/service.py`  
-**问题描述**:  
-在 `list_academic_gap_overview` 函数中，排序逻辑使用了多个字段，但排序优先级可能不符合业务需求。当前排序：风险等级 → 学分缺口（降序）→ 学号 → 学生ID。但实际业务可能需要按学分缺口绝对值排序，而不是风险等级优先。
-
-**复现步骤**:  
-1. 准备测试数据：学生A（HIGH风险，缺口2学分）、学生B（MEDIUM风险，缺口10学分）
-2. 调用学业缺口概览接口
-3. 学生A排在学生B前面，但学生B的缺口更大
-
-**影响**: 管理员无法按缺口严重程度排序查看学生
-
----
-
-### Bug #9: 边界输入处理不当 - 空字符串处理
-**严重程度**: Logic Bug（8分）  
-**文件路径**: `backend/app/exchange/service.py`  
-**问题描述**:  
-在 `_parse_courses` 函数中，对空字符串的处理不一致。函数接受 `""` 作为输入并返回 `None`，但在某些调用点可能期望返回空列表 `[]`，导致后续逻辑错误。
-
-**代码片段**:
-```python
-def _parse_courses(v: Any) -> list[dict[str, Any]] | None:
-    if v in (None, ""):
-        return None  # 这里返回None，但调用方可能期望[]
-```
-
-**复现步骤**:  
-1. Excel导入时，课程字段为空字符串
-2. 解析返回None
-3. 后续代码尝试遍历None值，可能抛出异常
-
-**影响**: 导入功能可能失败或数据不完整
-
----
-
-### Bug #10: 日期解析错误 - 时区问题
-**严重程度**: Logic Bug（8分）  
-**文件路径**: `backend/app/exchange/service.py`  
-**问题描述**:  
-在 `_parse_date` 函数中，日期解析使用 `datetime.strptime` 但没有处理时区信息。如果输入包含时区（如 `2024-01-01T00:00:00+08:00`），解析会失败或产生错误结果。
-
-**代码片段**:
-```python
-def _parse_date(v: Any) -> date | None:
-    # ...
-    try:
-        return datetime.strptime(str(v), "%Y-%m-%d").date()
-    except ValueError:
-        return None  # 带时区的日期会到这里
-```
-
-**复现步骤**:  
-1. Excel中日期格式为 `2024-01-01T00:00:00+08:00`
-2. 解析失败，返回None
-3. 数据导入失败
-
-**影响**: 数据导入功能对日期格式支持不完善
-
----
-
-### Bug #11: 查询结果错误 - 软删除未正确过滤
-**严重程度**: Logic Bug（8分）  
-**文件路径**: `backend/app/report/service.py`  
-**问题描述**:  
-在 `list_academic_gap_overview` 函数中，虽然查询时过滤了 `Student.deleted_at.is_(None)`，但在计算学业缺口时，`compute_academic_gap` 函数没有再次验证学生是否被软删除，可能导致已删除学生的数据仍然被计算。
-
-**复现步骤**:  
-1. 删除一个学生（设置deleted_at）
-2. 调用学业缺口概览接口
-3. 已删除学生可能仍然出现在结果中（取决于缓存或并发）
-
-**影响**: 数据不一致，显示已删除学生的学业信息
-
----
-
-### Bug #12: 匹配逻辑错误 - 角色权限判断
-**严重程度**: Logic Bug（8分）  
-**文件路径**: `backend/app/workflow/service.py`  
-**问题描述**:  
-在 `_approver_has_role` 函数中，角色匹配逻辑使用了字符串包含判断，但没有考虑角色层级。例如，`COUNSELOR` 角色应该不能审批需要 `COLLEGE_LEADER` 角色的申请，但当前逻辑可能允许。
-
-**代码片段**:
-```python
-def _approver_has_role(rt, roles: list[str]) -> bool:
-    if not rt or not rt.approver_roles:
-        return True  # 没有配置时默认允许
-    allowed = set(normalize_role_codes(rt.approver_roles.split(",")))
-    return bool(set(normalize_role_codes(roles)) & allowed)
-```
-
-**复现步骤**:  
-1. 配置申请类型需要 `COLLEGE_LEADER` 审批
-2. 使用 `COUNSELOR` 角色尝试审批
-3. 如果角色代码不完全匹配，可能被拒绝（取决于normalize逻辑）
-
-**影响**: 权限控制可能不严格
-
----
-
-### Bug #13: 异常输入处理不合理 - Excel导入日期格式
-**严重程度**: Logic Bug（8分）  
-**文件路径**: `backend/app/exchange/service.py`  
-**问题描述**:  
-在Excel导入时，日期字段只支持 `%Y-%m-%d` 格式，不支持其他常见格式如 `%Y/%m/%d`、`%Y年%m月%d日` 等。用户使用不同格式的日期会导致导入失败。
-
-**复现步骤**:  
-1. 准备Excel文件，日期列为 `2024/01/01` 格式
-2. 尝试导入
-3. 日期解析失败，记录为错误
-
-**影响**: 用户体验差，需要手动转换日期格式
-
----
-
-### Bug #14: 计算结果错误 - 模块学分抵扣逻辑
-**严重程度**: Logic Bug（8分）  
-**文件路径**: `backend/app/report/service.py`  
-**问题描述**:  
-在学业缺口计算中，对于没有课程白名单的模块，使用"未归属已修学分"进行抵扣。但这个抵扣逻辑可能不准确，因为 `flexible_credit_balance` 的计算方式可能导致学分被重复使用。
-
-**代码片段**:
-```python
-else:
-    required = float(m.credits_required or 0)
-    module_earned = min(required, flexible_credit_balance)
-    flexible_credit_balance = max(flexible_credit_balance - module_earned, 0.0)
-```
-
-**复现步骤**:  
-1. 学生有10学分未归属课程
-2. 模块A需要5学分（无白名单）
-3. 模块B需要5学分（无白名单）
-4. 系统可能错误地将10学分同时分配给两个模块
-
-**影响**: 学分缺口计算错误
-
----
-
-### Bug #15: 排序结果错误 - 荣誉记录排序
-**严重程度**: Logic Bug（8分）  
-**文件路径**: `backend/app/exchange/service.py`  
-**问题描述**:  
-在荣誉导入时，分组逻辑使用了多个字段作为key，但排序时没有考虑时间顺序。如果同一荣誉有多条记录，可能无法正确识别最新的记录。
-
-**复现步骤**:  
-1. 导入同一荣誉的多条记录（不同时间）
-2. 系统可能无法正确识别哪条是最新的
-3. 数据可能被覆盖或重复
-
-**影响**: 荣誉数据不准确
-
----
-
-### Bug #16: 边界输入处理错误 - 分页参数
-**严重程度**: Logic Bug（8分）  
-**文件路径**: `backend/app/report/service.py`  
-**问题描述**:  
-在 `list_academic_gap_overview` 函数中，分页参数 `page` 和 `page_size` 没有进行边界检查。如果传入负数或零，可能导致计算错误。
-
-**代码片段**:
-```python
-start = max(page - 1, 0) * page_size
-end = start + page_size
-return flattened[start:end], total
-```
-
-**复现步骤**:  
-1. 调用接口时传入 `page=0` 或 `page=-1`
-2. 计算结果可能不符合预期
-3. 返回空结果或全部结果
-
-**影响**: API行为不一致
-
----
-
-### Bug #17: 异常输入处理不合理 - 文件名校验
-**严重程度**: Logic Bug（8分）  
-**文件路径**: `backend/app/report/service.py`  
-**问题描述**:  
-在 `_safe_filename` 函数中，文件名校验只替换了 `\` 和 `/`，但没有处理其他特殊字符（如 `..`、`*`、`?` 等），可能存在路径遍历风险。
-
-**代码片段**:
-```python
-def _safe_filename(filename: str | None) -> str:
-    value = (filename or "transcript.pdf").strip() or "transcript.pdf"
-    value = value.replace("\\", "_").replace("/", "_")
-    # 没有处理 .. 等特殊字符
-```
-
-**复现步骤**:  
-1. 上传文件名为 `../../../etc/passwd.pdf`
-2. 系统只替换 `/` 为 `_`
-3. 文件名变为 `.._.._.._etc_passwd.pdf`，但可能仍存在风险
-
-**影响**: 安全风险，虽然MinIO存储可能缓解，但仍需注意
-
----
-
-### Bug #18: 匹配逻辑错误 - 课程类型判断
-**严重程度**: Logic Bug（8分）  
-**文件路径**: `backend/app/report/service.py`  
-**问题描述**:  
-在课程推荐逻辑中，课程类型判断使用了硬编码的映射，但没有处理未知类型。如果课程类型不在映射中，会返回默认优先级9，可能导致重要课程被排在后面。
-
-**代码片段**:
-```python
-module_priority_map = {
-    "REQUIRED": 0,
-    "PRACTICE": 1,
-    "GENERAL": 2,
-    "ELECTIVE": 3,
-}
-# ...
-module_priority = module_priority_map.get(module.module_type, 9)  # 未知类型优先级很低
-```
-
-**复现步骤**:  
-1. 培养方案中有自定义模块类型（如 `SPECIAL`）
-2. 系统将其优先级设为9
-3. 该模块的课程推荐排在最后
-
-**影响**: 课程推荐不准确
-
----
-
-## 三、其他问题（非Bug，但需要关注）
-
-### 1. 安全性问题
-- **JWT密钥硬编码**: 开发环境使用默认密钥，如果忘记修改会导致安全漏洞
-- **CORS配置宽松**: 开发环境 `allow_origins=["*"]`，生产环境需要收紧
-- **敏感字段加密**: 身份证号、手机号使用Fernet加密，但密钥管理需要加强
-
-### 2. 性能问题
-- **N+1查询**: 在 `list_admin_workflows` 中，对每个workflow单独查询学生信息
-- **全表扫描**: 学业缺口计算时查询所有学生，数据量大时性能差
-- **内存占用**: Excel导入时将整个文件读入内存
-
-### 3. 代码质量问题
-- **异常处理不一致**: 部分代码使用 `except Exception`，部分使用具体异常类型
-- **日志记录不足**: 关键业务操作缺少审计日志
-- **类型注解缺失**: 部分函数缺少类型注解，影响IDE支持
-
----
-
-## 四、测试建议
-
-### 1. 单元测试
-- 为关键业务逻辑编写单元测试，特别是状态机、学分计算等
-- 测试边界条件和异常输入
-- 测试并发场景
-
-### 2. 集成测试
-- 测试前后端API接口
-- 测试数据库事务和回滚
-- 测试文件上传下载流程
-
-### 3. 性能测试
-- 测试大量数据导入导出
-- 测试并发用户访问
-- 测试内存和CPU使用情况
-
-### 4. 安全测试
-- 测试权限控制
-- 测试SQL注入和XSS攻击
-- 测试文件上传安全
-
----
-
-## 五、总结
-
-本次测试发现 **6个崩溃类Bug** 和 **12个Logic Bug**，总计 **18个问题**，总分 **186分**。
-
-**崩溃类Bug** 主要集中在：
-1. 配置校验失败导致服务无法启动
-2. 数据库连接问题
-3. 小程序页面栈溢出
-4. 前端路由守卫死循环
-5. 文件上传内存问题
-6. 安全配置隐患
-
-**Logic Bug** 主要集中在：
-1. 学分计算逻辑错误
-2. 排序和匹配逻辑不一致
-3. 边界输入处理不当
-4. 日期和格式解析问题
-5. 权限判断逻辑
-6. 分页和查询逻辑
-
-**建议优先修复**: Bug #1, #2, #7, #8（影响核心功能和数据准确性）
-
----
-
-**测试工程师**: Sisyphus  
-**测试完成时间**: 2026年5月25日
+2026-05-25 旧版报告中的 `6` 个崩溃类和 `12` 个 Logic 条目不再作为当前 HEAD 的有效计分依据：其中配置守卫、数据库依赖、Mock 生产风险等已由 `S40` 生产事实审查否定；上传读取、等价学分、日期解析、分页参数等已由 `S41` 修复；`S45/S46/S49` 后当前全量测试已恢复到 `143 passed`。本文件是当前 HEAD 的最新测试报告。

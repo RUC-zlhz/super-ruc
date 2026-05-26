@@ -406,15 +406,11 @@ const greeting = computed(() => {
   if (hour < 19) return "下午好";
   return "晚上好";
 });
-const unreadNoticeCount = computed(
-  () => recentNotices.value.filter((item) => !item.read_at).length,
-);
-const pendingRequestCount = computed(
-  () =>
-    requests.value.filter((item) =>
-      ["SUBMITTED", "IN_REVIEW", "REJECTED"].includes(item.status),
-    ).length,
-);
+const unreadNoticeTotal = ref(0);
+const pendingRequestTotal = ref(0);
+
+const unreadNoticeCount = computed(() => unreadNoticeTotal.value);
+const pendingRequestCount = computed(() => pendingRequestTotal.value);
 const activeWorkflowCount = computed(
   () =>
     workflows.value.filter((item) =>
@@ -797,11 +793,15 @@ async function refreshSection(key: HomeSectionKey) {
   try {
     if (key === "notices") {
       const response = await getMyNotices({ page: 1, size: 5 });
+      const unreadResp = await getMyNotices({ unread_only: true, page: 1, size: 1 });
+      unreadNoticeTotal.value = unreadResp.data.meta.total;
       markSectionSuccess("notices", response.data.items || []);
       return;
     }
     if (key === "requests") {
       const response = await getMyRequests({ page: 1, size: 20 });
+      const pendingResp = await getMyRequests({ status: "SUBMITTED,IN_REVIEW,REJECTED", page: 1, size: 1 });
+      pendingRequestTotal.value = pendingResp.data.meta.total;
       markSectionSuccess("requests", response.data.items || []);
       return;
     }

@@ -578,6 +578,14 @@ const loginSubmitting = ref(false)
 const appealSubmitting = ref(false)
 const growthSubmitting = ref(false)
 const fullViewSubmitting = ref('')
+
+const correctionsPage = ref(1)
+const correctionsHasMore = ref(true)
+const submissionsPage = ref(1)
+const submissionsHasMore = ref(true)
+const fullViewPage = ref(1)
+const fullViewHasMore = ref(true)
+
 const studentNoForBinding = ref('')
 const fullNameForBinding = ref('')
 const idCardTailForBinding = ref('')
@@ -865,6 +873,14 @@ async function loadAll() {
     clearProfileData()
     return
   }
+  
+  correctionsPage.value = 1
+  submissionsPage.value = 1
+  fullViewPage.value = 1
+  correctionsHasMore.value = true
+  submissionsHasMore.value = true
+  fullViewHasMore.value = true
+  
   const [profileResp, correctionsResp, submissionsResp, fullViewResp] = await settleAll([
     getMyProfile(),
     getMyCorrections({ page: 1, size: 10 }),
@@ -877,16 +893,19 @@ async function loadAll() {
   }
   if (correctionsResp.status === 'fulfilled') {
     corrections.value = correctionsResp.value.data.items || []
+    if (corrections.value.length < 10) correctionsHasMore.value = false
   }
   if (submissionsResp.status === 'fulfilled') {
     factSubmissionsSupported.value = submissionsResp.value !== null
     factSubmissions.value = submissionsResp.value?.data.items || []
+    if (factSubmissions.value.length < 20) submissionsHasMore.value = false
   } else {
     factSubmissionsSupported.value = false
     factSubmissions.value = []
   }
   if (fullViewResp.status === 'fulfilled') {
     fullViewRequests.value = fullViewResp.value.data.items || []
+    if (fullViewRequests.value.length < 20) fullViewHasMore.value = false
   }
 }
 
@@ -1074,6 +1093,45 @@ function onLogout() {
   })
 }
 
+async function loadMore() {
+  if (isGuest.value) return
+  if (!correctionsHasMore.value && !submissionsHasMore.value && !fullViewHasMore.value) return
+  
+  const tasks = []
+  if (correctionsHasMore.value) {
+    tasks.push(getMyCorrections({ page: correctionsPage.value + 1, size: 10 }).then(res => {
+      const newItems = res.data.items || []
+      corrections.value = [...corrections.value, ...newItems]
+      correctionsPage.value++
+      if (newItems.length < 10) correctionsHasMore.value = false
+    }).catch(() => { correctionsHasMore.value = false }))
+  }
+  
+  if (submissionsHasMore.value && factSubmissionsSupported.value) {
+    tasks.push(getMyFactSubmissions({ page: submissionsPage.value + 1, size: 20 }).then(res => {
+      const newItems = res?.data?.items || []
+      factSubmissions.value = [...factSubmissions.value, ...newItems]
+      submissionsPage.value++
+      if (newItems.length < 20) submissionsHasMore.value = false
+    }).catch(() => { submissionsHasMore.value = false }))
+  }
+  
+  if (fullViewHasMore.value) {
+    tasks.push(getMyFullViewRequests({ page: fullViewPage.value + 1, size: 20 }).then(res => {
+      const newItems = res.data.items || []
+      fullViewRequests.value = [...fullViewRequests.value, ...newItems]
+      fullViewPage.value++
+      if (newItems.length < 20) fullViewHasMore.value = false
+    }).catch(() => { fullViewHasMore.value = false }))
+  }
+  
+  if (tasks.length > 0) {
+    uni.showNavigationBarLoading()
+    await Promise.all(tasks)
+    uni.hideNavigationBarLoading()
+  }
+}
+
 onMounted(async () => {
   if (!auth.isLoggedIn) {
     try {
@@ -1083,6 +1141,24 @@ onMounted(async () => {
     }
   }
   if (auth.isLoggedIn) await loadAll()
+})
+
+import { onShow, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
+
+onShow(() => {
+  if (auth.isLoggedIn) void loadAll().catch(() => undefined)
+})
+
+onPullDownRefresh(async () => {
+  try {
+    if (auth.isLoggedIn) await loadAll()
+  } finally {
+    uni.stopPullDownRefresh()
+  }
+})
+
+onReachBottom(() => {
+  if (auth.isLoggedIn) loadMore()
 })
 </script>
 

@@ -5,6 +5,7 @@ import {
 } from "vue-router";
 import { useAuthStore } from "@/store/auth";
 import { getDefaultRouteForRoles } from "@/config/navigation";
+import { getAccessToken } from "@/utils/request";
 import {
   APPROVER_ROLES,
   AUDIT_VIEWER_ROLES,
@@ -39,10 +40,6 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/",
     component: MainLayout,
-    redirect: () => {
-      const auth = useAuthStore();
-      return getDefaultRouteForRoles(auth.roleCodes);
-    },
     children: [
       {
         path: "dashboard",
@@ -181,11 +178,19 @@ router.beforeEach(async (to) => {
   if (!auth.user) {
     try {
       await auth.fetchMe();
-    } catch {
-      auth.logout();
-      return { path: "/login", query: { redirect: to.fullPath } };
+    } catch (e) {
+      if (!getAccessToken()) {
+        auth.logout();
+        return { path: "/login", query: { redirect: to.fullPath } };
+      }
+      throw e;
     }
   }
+
+  if (to.path === "/") {
+    return { path: getDefaultRouteForRoles(auth.roleCodes) };
+  }
+
   const requiredRoles = (to.meta.roles as string[] | undefined) ?? undefined;
   if (!hasAnyRole(auth.roleCodes, requiredRoles)) {
     return { path: "/error/403" };

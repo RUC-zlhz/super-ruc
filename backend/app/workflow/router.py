@@ -349,6 +349,7 @@ async def admin_search_workflow_students(
         size=size,
         viewer_user_id=user.user_id,
         viewer_role=",".join(user.roles) or None,
+        include_workflow_roles=True,
     )
     return ok(
         Paginated[StudentBasic](

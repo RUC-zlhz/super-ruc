@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -149,7 +150,7 @@ async def list_ingest_runs(
 
 # ---------- Target resolution ----------
 async def resolve_target_students(
-    db: AsyncSession, rule: dict | None
+    db: AsyncSession, rule: dict | None, scope: Any | None = None
 ) -> list[Student]:
     """根据 target_rule JSON 解析目标学生列表。"""
     normalized_rule = rule or {}
@@ -181,6 +182,14 @@ async def resolve_target_students(
             .join(UserRole, UserRole.user_id == User.id)
             .where(UserRole.role_code.in_(lookup_role_codes))
         )
+        
+    if scope is not None:
+        from app.report.service import _apply_report_student_scope
+        scoped_stmt = _apply_report_student_scope(stmt, scope)
+        if scoped_stmt is None:
+            return []
+        stmt = scoped_stmt
+
     stmt = stmt.order_by(Student.id)
     return list((await db.execute(stmt)).scalars().all())
 

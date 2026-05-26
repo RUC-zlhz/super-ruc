@@ -363,11 +363,18 @@ def _build_fact_submission_view(fact: ProfileFact) -> ProfileFactSubmissionOut:
 
 
 async def _load_profile_scope(
-    db: AsyncSession, viewer_user_id: int
+    db: AsyncSession, viewer_user_id: int, include_workflow_roles: bool = False
 ) -> dict[str, Any]:
     roles = await auth_repo.list_user_roles(db, viewer_user_id)
     role_codes = {row.role_code for row in roles}
-    if role_codes & _GLOBAL_PROFILE_ROLES:
+    
+    from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES
+    global_roles = _GLOBAL_PROFILE_ROLES
+    scoped_roles = set(_SCOPED_PROFILE_ROLES)
+    if include_workflow_roles:
+        scoped_roles.update(ROLE_CODE_COLLABORATOR_ROLES)
+
+    if role_codes & global_roles:
         return {
             "is_global": True,
             "class_codes": set(),
@@ -378,7 +385,7 @@ async def _load_profile_scope(
 
     parsed_scope = StudentScopeSet()
     for row in roles:
-        if row.role_code not in _SCOPED_PROFILE_ROLES:
+        if row.role_code not in scoped_roles:
             continue
         parsed = split_scope_code(row.scope_code)
         if parsed is None:
@@ -441,8 +448,9 @@ async def _ensure_profile_scope_available(
     db: AsyncSession,
     *,
     viewer_user_id: int,
+    include_workflow_roles: bool = False,
 ) -> dict[str, Any]:
-    scope = await _load_profile_scope(db, viewer_user_id)
+    scope = await _load_profile_scope(db, viewer_user_id, include_workflow_roles)
     if _scope_is_empty(scope):
         raise PermissionError("未配置画像查看范围", code=40320)
     return scope
@@ -523,8 +531,9 @@ async def search_students_admin(
     size: int,
     viewer_user_id: int,
     viewer_role: str | None,
+    include_workflow_roles: bool = False,
 ) -> tuple[list[StudentBasic], int]:
-    scope = await _ensure_profile_scope_available(db, viewer_user_id=viewer_user_id)
+    scope = await _ensure_profile_scope_available(db, viewer_user_id=viewer_user_id, include_workflow_roles=include_workflow_roles)
     rows, total = await repo.search_students(
         db,
         q=q,

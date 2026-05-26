@@ -1,4 +1,4 @@
-﻿"""Authentication service logic for WeChat login, account binding, and JWT issuance."""
+"""Authentication service logic for WeChat login, account binding, and JWT issuance."""
 from __future__ import annotations
 
 import logging
@@ -372,6 +372,7 @@ async def change_password(
 
     user.password_hash = hash_password(new_password)
     user.must_change_password = False
+    user.token_version += 1
     await log_action(
         db,
         event_type="AUTH",
