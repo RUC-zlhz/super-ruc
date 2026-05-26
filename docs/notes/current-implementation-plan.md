@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入/敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正与 `S55` 默认示例模板开箱即有均已完成
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入/敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有与 `S56` 成绩单课程匹配推荐和教师审核辅助均已完成
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -852,6 +852,29 @@
 - 细化方案：`docs/notes/refinements/2026-05-26-s39-default-example-template-seed.md`
 - 实现文件：`backend/scripts/import_common_template_examples.py`、`backend/scripts/seed_default_data.py`
 - 验证：`py -m uv run python -m py_compile scripts/import_common_template_examples.py scripts/seed_default_data.py tests/integration/test_knowledge_template_flow.py`、`py -m uv run pytest tests/integration/test_knowledge_template_flow.py -q`（`1 passed`）、本地 `GET /api/v1/knowledge/templates` 与 `GET /api/v1/knowledge/templates/{id}/download` 返回 `200`
+
+### S56 成绩单课程匹配推荐与教师审核辅助
+
+- 细化文件：`docs/notes/refinements/2026-05-26-s56-transcript-course-matching-recommendation.md`
+- 当前状态：`[x]` 已完成首版课程推荐、教师审核页接线与定向验证
+- [x] `S56.1` 后端基于受控培养方案课程库，为成绩单 PDF 候选课程生成可解释的课程代码推荐列表。
+- [x] `S56.2` 匹配策略使用确定性规则收口：课程代码精确匹配、课程名称归一化精确匹配、别名/包含匹配、相似度排序与学分一致性加权，不引入生成式 RAG。
+- [x] `S56.3` Web 教师审核页支持展示推荐课程，并可一键套用推荐的课程代码与课程名称，同时保留人工覆盖输入。
+- [x] `S56.4` 补成绩单上传 contract 回归、后端静态校验、Web 类型检查与构建验证。
+
+当前结论：
+
+- 现在的成绩单审核链路已从“只能人工查课程代码”升级为“系统先基于信息学院培养方案做受控推荐，教师再点选或手填确认”。
+- 当前方案刻意不使用生成式 RAG，而是复用仓库内已落库的培养方案课程白名单，保证推荐结果可解释、可回归、可审计，不改变“教师提交后才落正式成绩”的治理边界。
+
+证据：
+
+- 细化方案：`docs/notes/refinements/2026-05-26-s56-transcript-course-matching-recommendation.md`
+- 后端实现：`backend/app/report/service.py`、`backend/app/report/schemas.py`、`backend/app/report/transcript_pdf.py`
+- Web 审核页：`web/src/views/exchange/ImportCenter.vue`、`web/src/api/exchange.ts`；成绩单 PDF 批次列表已改为“批次号内直出 打开核验 + 整行可点击展开”，避免教师在右侧被遮挡布局中找不到操作入口。
+- 定向回归：`backend/tests/integration/test_report_contract_flow.py` 已新增成绩单上传返回推荐课程断言；`backend/tests/test_transcript_pdf_analysis.py` 已新增“课程名 + 教师 + 课程属性 + 多列成绩”新版人大成绩单解析样例。
+- 验证：`py -m uv run --project backend --extra dev ruff check backend/app/report/service.py backend/app/report/schemas.py backend/tests/integration/test_report_contract_flow.py backend/app/report/transcript_pdf.py backend/tests/test_transcript_pdf_analysis.py`、`py -m uv run --project backend --extra dev python -m py_compile backend/app/report/service.py backend/app/report/schemas.py backend/tests/integration/test_report_contract_flow.py backend/app/report/transcript_pdf.py backend/tests/test_transcript_pdf_analysis.py`、`py -m uv run --project backend --extra dev pytest backend/tests/integration/test_report_contract_flow.py -q -k transcript_pdf --basetemp=.tmp/pytest-tmp-transcript-match`（`3 passed`）、`py -m uv run --project backend --extra dev pytest backend/tests/test_transcript_pdf_analysis.py -q --basetemp=.tmp/pytest-tmp-transcript-unit`（`3 passed`）、`.\web\node_modules\.bin\vue-tsc.CMD --noEmit -p web\tsconfig.json`、`corepack.cmd pnpm -C web build`；真实样本 `D:/大学/校务/毛概/1779807358619.pdf` 在本地重启后端后，通过真实上传接口返回 `parsed_courses_count=34`，首条候选 `游泳` 已带推荐课程 `BCPEQD0003 / 游泳`。
+
 ### S6 前端体验增量优化
 
 - [x] `S6.1` Web 共享导航与默认落点收口
@@ -1424,6 +1447,7 @@
 | 2026-05-26 | S53 默认示例知识开箱即有，同时保留教师删改权 | `docs/notes/refinements/2026-05-26-s37-default-example-knowledge-seed.md` | `S53.1, S53.2, S53.3, S53.4` | `[x]` | 已将示例知识接入 `seed_default_data.py`，空库默认会自动导入 11 条示例知识；知识库非空时整批跳过，避免覆盖老师后续删改；已完成空库/非空库双场景实测 |
 | 2026-05-26 | S54 小程序开发态本地接口自动回正 | `docs/notes/refinements/2026-05-26-s38-miniapp-dev-local-api-auto-reset.md` | `S54.1, S54.2, S54.3, S54.4` | `[x]` | 已在开发态强制回本地接口并自动清理旧 storage/token，无需再手动打开微信开发者工具控制台输入修正命令；miniapp vue-tsc 通过 |
 | 2026-05-26 | S55 默认示例模板开箱即有，同时保留管理端删改权 | `docs/notes/refinements/2026-05-26-s39-default-example-template-seed.md` | `S55.1, S55.2, S55.3, S55.4` | `[x]` | 已将 `常用模板/` 的 4 份标准模板接入默认数据链路，空模板库默认会自动导入模板资产、来源和关联知识条目；模板库非空时整批跳过，避免覆盖老师后续删改；模板下载回归 `1 passed`，本地学生端模板列表与下载接口 HTTP 复测通过 |
+| 2026-05-26 | S56 成绩单课程匹配推荐与教师审核辅助 | `docs/notes/refinements/2026-05-26-s56-transcript-course-matching-recommendation.md` | `S56.1, S56.2, S56.3, S56.4` | `[x]` | 已为成绩单 PDF 候选课程补受控课程库推荐、教师审核页一键套用和定向 contract 回归，并兼容真实样本 `1779807358619.pdf` 的新版人大成绩单排版；后端 ruff/py_compile、两组 pytest `3 passed + 3 passed`、Web 类型检查与构建通过 |
 
 ## 会话更新要求
 
@@ -1552,3 +1576,6 @@
 - `2026-05-26`：完成 `S48` Miniapp 微信开发者工具告警排查与首页 key 修复；为规避开发者工具旧模块索引继续报 `request-badge.js`，已将事务徽章 helper 合并进 `api/workflow` 并删除独立 util，使最新构建产物不再包含 `request-badge` 引用；首页入口列表改用稳定业务 key，消除 `/pages/request/index` 与 `/pages/knowledge/index` 重复 `wx:key` 来源。验证通过 Miniapp 类型检查、清理后 `pnpm -C miniapp build:mp-weixin`、源码 key 残留扫描、`request-badge` 产物残留扫描和生成产物相对 `require()` 缺失扫描。
 - `2026-05-26`：完成 `S49` 官方知识种子、本学期开课推荐、题库导入与敏感字段加密审计；默认 seed 新增官方知识正文和来源链接，学业推荐按 `recommendation_term_code` 过滤本学期真实开课，理论自测题库支持 `.xlsx/.csv` 预览提交导入，学生身份证号/手机号写入路径统一加密并对导入行/审计 detail 脱敏。验证通过后端 `ruff`、`compileall`、S49 定向集成 `40 passed, 3 warnings in 178.21s`、后端全量 `143 passed, 3 warnings in 516.49s`、`pnpm -C web build` 和 `pnpm -C miniapp build:mp-weixin`。
 - `2026-05-26`：完成 `S50` 当前 HEAD 测试工程师 bug 审查；新增细化文件 `docs/notes/refinements/2026-05-26-s50-current-head-bug-audit.md`，并将 `bug-report.md` 替换为当前 `0374c2e` 的有效计分报告。验证通过后端 `ruff`、`compileall`、全量 pytest `143 passed, 3 warnings in 275.89s`、`pnpm -C web build`、Miniapp 类型检查与 `mp-weixin` 构建、生产只读 smoke 和小程序产物风险残留扫描。本轮未发现新增崩溃类 bug，确认 `14` 个 Logic bug，基础分合计 `112`。
+- `2026-05-26`：新增并完成 `S56` 成绩单课程匹配推荐与教师审核辅助；后端已基于受控培养方案课程库为成绩单 PDF 候选课程生成推荐列表，匹配策略收口为课程代码/课程名精确匹配、别名/包含匹配、相似度排序与学分一致性加权；Web 教师审核页已支持一键套用推荐课程代码与课程名称，同时保留人工覆盖输入。验证通过后端 `ruff`、`py_compile`、成绩单定向集成 `3 passed`、Web 类型检查与构建。
+- `2026-05-26`：补完 `S56` 真实样本兼容修复；`D:/大学/校务/毛概/1779807358619.pdf` 属于新版人大成绩单排版，原上传链路会落成 `0 条候选`。当前已在 `backend/app/report/transcript_pdf.py` 增补“课程名 + 教师 + 课程属性 + 成绩/绩点”排版解析、学期汇总回填与课程名尾部噪声剔除，并新增 `backend/tests/test_transcript_pdf_analysis.py` 覆盖；重启本地后端后，该真实样本通过真实 `POST /api/v1/report/transcript-pdf` 上传已返回 `parsed_courses_count=34`，候选课程含推荐代码，闭环与计划证据现已一致。
+- `2026-05-26`：补完 `S56` 教师端可用性收口；用户实测时发现成绩单 PDF 批次表最右侧操作列在当前后台布局下不易发现，已将 `ImportCenter.vue` 调整为“批次号内直出 打开核验 + 整行可点击展开”，并补充页内提示文案，避免误以为推荐课程列缺失或需要横向拖动批次表。

@@ -14,12 +14,16 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+import unicodedata
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, timezone
+from difflib import SequenceMatcher
 from typing import Any
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.audit.service import build_audit_detail, log_action
 from app.auth import repository as auth_repo
@@ -138,6 +142,24 @@ def _apply_report_student_scope(stmt, scope: StudentScopeSet | None):
 _TRANSCRIPT_PDF_MAX_BYTES = 10 * 1024 * 1024
 _TERM_CODE_PATTERN = re.compile(r"(\d{4})-(SPRING|SUMMER|FALL|WINTER)")
 _BEIJING_TZ = timezone(timedelta(hours=8), name="Asia/Shanghai")
+_TRANSCRIPT_RECOMMENDATION_LIMIT = 5
+_TRANSCRIPT_MATCH_DEFAULT_VERSION = "2024-default"
+_TRANSCRIPT_MATCH_MIN_SCORE = 0.72
+_TRANSCRIPT_MATCH_EXCLUDED_MAJOR_CODES = {"源文件全量课程池"}
+_TRANSCRIPT_NAME_NOISE_RE = re.compile(r"[\s\-_—·•,，.。:：;；、/\\|]+")
+_TRANSCRIPT_BRACKET_RE = re.compile(r"[\\(（【\\[].*?[\\)）】\\]]")
+
+
+@dataclass(slots=True)
+class _TranscriptCourseCatalogEntry:
+    course_code: str
+    course_name: str
+    credits: float | None
+    grade_codes: set[str]
+    major_codes: set[str]
+    module_names: set[str]
+    plan_names: set[str]
+    aliases: set[str]
 
 
 def _generate_transcript_pdf_batch_no() -> str:
@@ -201,6 +223,228 @@ def _iter_module_courses(raw: Any) -> list[dict[str, Any]]:
     return []
 
 
+def _normalize_transcript_course_code(value: str | None) -> str:
+    return unicodedata.normalize("NFKC", (value or "")).strip().upper()
+
+
+def _normalize_transcript_course_name(value: str | None) -> str:
+    text = unicodedata.normalize("NFKC", (value or "")).strip().upper()
+    text = _TRANSCRIPT_NAME_NOISE_RE.sub("", text)
+    return text
+
+
+def _build_transcript_course_aliases(value: str | None) -> set[str]:
+    original = unicodedata.normalize("NFKC", (value or "")).strip().upper()
+    if not original:
+        return set()
+    alias_inputs = {
+        original,
+        _TRANSCRIPT_BRACKET_RE.sub("", original),
+    }
+    return {
+        normalized
+        for item in alias_inputs
+        if (normalized := _normalize_transcript_course_name(item))
+    }
+
+
+def _transcript_name_bigram_set(value: str) -> set[str]:
+    if len(value) < 2:
+        return {value} if value else set()
+    return {value[index : index + 2] for index in range(len(value) - 1)}
+
+
+def _transcript_name_similarity(left: str, right: str) -> float:
+    if not left or not right:
+        return 0.0
+    ratio = SequenceMatcher(None, left, right).ratio()
+    if left in right or right in left:
+        ratio = max(ratio, 0.93)
+    left_bigrams = _transcript_name_bigram_set(left)
+    right_bigrams = _transcript_name_bigram_set(right)
+    union = left_bigrams | right_bigrams
+    jaccard = (len(left_bigrams & right_bigrams) / len(union)) if union else 0.0
+    return max(ratio, ratio * 0.65 + jaccard * 0.35)
+
+
+async def _load_transcript_course_catalog(
+    db: AsyncSession,
+    *,
+    student: Student,
+) -> dict[str, _TranscriptCourseCatalogEntry]:
+    catalog: dict[str, _TranscriptCourseCatalogEntry] = {}
+    plans: list[CurriculumPlan] = []
+    seen_plan_ids: set[int] = set()
+
+    if student.grade_code and student.major_code:
+        student_plan_stmt = (
+            select(CurriculumPlan)
+            .where(
+                CurriculumPlan.is_active.is_(True),
+                CurriculumPlan.grade_code == student.grade_code,
+                CurriculumPlan.major_code == student.major_code,
+            )
+            .options(selectinload(CurriculumPlan.modules))
+            .order_by(*order_by_nulls_last_desc(CurriculumPlan.effective_from))
+            .limit(1)
+        )
+        student_plan = (await db.execute(student_plan_stmt)).scalar_one_or_none()
+        if student_plan is not None:
+            plans.append(student_plan)
+            seen_plan_ids.add(student_plan.id)
+
+    default_plans_stmt = (
+        select(CurriculumPlan)
+        .where(
+            CurriculumPlan.is_active.is_(True),
+            CurriculumPlan.version_label == _TRANSCRIPT_MATCH_DEFAULT_VERSION,
+            CurriculumPlan.major_code.notin_(sorted(_TRANSCRIPT_MATCH_EXCLUDED_MAJOR_CODES)),
+        )
+        .options(selectinload(CurriculumPlan.modules))
+        .order_by(CurriculumPlan.grade_code.asc(), CurriculumPlan.major_code.asc())
+    )
+    default_plans = (await db.execute(default_plans_stmt)).scalars().all()
+    for plan in default_plans:
+        if plan.id in seen_plan_ids:
+            continue
+        plans.append(plan)
+        seen_plan_ids.add(plan.id)
+
+    for plan in plans:
+        grade_code = (plan.grade_code or "").strip()
+        major_code = (plan.major_code or "").strip()
+        plan_name = (plan.plan_name or "").strip()
+        for module in plan.modules:
+            module_name = (module.module_name or "").strip()
+            for course in _iter_module_courses(module.courses):
+                code = _normalize_transcript_course_code(str(course.get("code") or ""))
+                name = str(course.get("name") or "").strip()
+                if not code or not name:
+                    continue
+                entry = catalog.get(code)
+                if entry is None:
+                    credits_raw = course.get("credits")
+                    credits = None if credits_raw in (None, "") else float(credits_raw)
+                    entry = _TranscriptCourseCatalogEntry(
+                        course_code=code,
+                        course_name=name,
+                        credits=credits,
+                        grade_codes=set(),
+                        major_codes=set(),
+                        module_names=set(),
+                        plan_names=set(),
+                        aliases=set(),
+                    )
+                    catalog[code] = entry
+                if grade_code:
+                    entry.grade_codes.add(grade_code)
+                if major_code:
+                    entry.major_codes.add(major_code)
+                if module_name:
+                    entry.module_names.add(module_name)
+                if plan_name:
+                    entry.plan_names.add(plan_name)
+                entry.aliases.update(_build_transcript_course_aliases(name))
+    return catalog
+
+
+def _score_transcript_course_match(
+    candidate: dict[str, Any],
+    entry: _TranscriptCourseCatalogEntry,
+    *,
+    student: Student,
+) -> tuple[float, str] | None:
+    candidate_code = _normalize_transcript_course_code(str(candidate.get("course_code") or ""))
+    candidate_name_aliases = _build_transcript_course_aliases(str(candidate.get("course_name") or ""))
+
+    if candidate_code and candidate_code == entry.course_code:
+        score = 1.0
+        reasons = ["课程编码精确匹配"]
+    else:
+        best_score = 0.0
+        best_reason: str | None = None
+        if not candidate_name_aliases:
+            return None
+        for candidate_alias in candidate_name_aliases:
+            for course_alias in entry.aliases:
+                if candidate_alias == course_alias:
+                    best_score = 0.98
+                    best_reason = "课程名称精确匹配"
+                    break
+                if candidate_alias in course_alias or course_alias in candidate_alias:
+                    if best_score < 0.93:
+                        best_score = 0.93
+                        best_reason = "课程名称包含匹配"
+                similarity = _transcript_name_similarity(candidate_alias, course_alias)
+                if similarity > best_score:
+                    best_score = similarity
+                    best_reason = "课程名称相似匹配"
+            if best_score >= 0.98:
+                break
+        if best_score < _TRANSCRIPT_MATCH_MIN_SCORE:
+            return None
+        score = best_score
+        reasons = [best_reason or "课程名称相似匹配"]
+
+    credits_raw = candidate.get("credits")
+    candidate_credits = None if credits_raw in (None, "") else float(credits_raw)
+    if candidate_credits is not None and entry.credits is not None:
+        diff = abs(candidate_credits - entry.credits)
+        if diff < 0.01:
+            score += 0.03
+            reasons.append("学分一致")
+        elif diff > 0.51:
+            score -= 0.08
+
+    student_major_code = (student.major_code or "").strip()
+    if student_major_code and student_major_code in entry.major_codes:
+        score += 0.03
+        reasons.append("命中学生专业方案")
+    student_grade_code = (student.grade_code or "").strip()
+    if student_grade_code and student_grade_code in entry.grade_codes:
+        score += 0.02
+
+    return min(score, 1.0), " + ".join(reasons)
+
+
+def _attach_transcript_course_recommendations(
+    candidate_rows: list[dict[str, Any]],
+    *,
+    catalog: dict[str, _TranscriptCourseCatalogEntry],
+    student: Student,
+) -> list[dict[str, Any]]:
+    enriched_rows: list[dict[str, Any]] = []
+    for candidate in candidate_rows:
+        enriched = dict(candidate)
+        ranked: list[tuple[float, str, dict[str, Any]]] = []
+        for code, entry in catalog.items():
+            matched = _score_transcript_course_match(enriched, entry, student=student)
+            if matched is None:
+                continue
+            score, reason = matched
+            ranked.append(
+                (
+                    score,
+                    code,
+                    {
+                        "course_code": entry.course_code,
+                        "course_name": entry.course_name,
+                        "credits": entry.credits,
+                        "match_score": round(score, 4),
+                        "match_reason": reason,
+                        "major_codes": sorted(entry.major_codes),
+                        "module_names": sorted(entry.module_names),
+                    },
+                )
+            )
+        ranked.sort(key=lambda item: (-item[0], item[1]))
+        enriched["course_recommendations"] = [
+            payload for _, _, payload in ranked[:_TRANSCRIPT_RECOMMENDATION_LIMIT]
+        ]
+        enriched_rows.append(enriched)
+    return enriched_rows
+
+
 async def upload_transcript_pdf_for_review(
     db: AsyncSession,
     *,
@@ -249,7 +493,15 @@ async def upload_transcript_pdf_for_review(
         student_name=student.full_name,
     )
     candidate_rows = [candidate_to_dict(candidate) for candidate in analysis.candidate_courses]
-    warnings = analysis.data_warnings
+    catalog = await _load_transcript_course_catalog(db, student=student)
+    candidate_rows = _attach_transcript_course_recommendations(
+        candidate_rows,
+        catalog=catalog,
+        student=student,
+    )
+    warnings = list(analysis.data_warnings)
+    if not catalog:
+        warnings.append("当前未加载可用于课程匹配的培养方案课程库，教师需手工填写课程代码。")
 
     batch = await exchange_repo.create_batch(
         db,

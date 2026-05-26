@@ -58,6 +58,31 @@ export interface ImportPreviewResult {
   rows: ImportBatchRowOut[]
 }
 
+export interface TranscriptPdfCourseRecommendation {
+  course_code: string
+  course_name: string
+  credits?: number | null
+  match_score: number
+  match_reason: string
+  major_codes: string[]
+  module_names: string[]
+}
+
+export interface TranscriptPdfParsedCandidate {
+  line_no?: number | null
+  raw_text?: string
+  course_code?: string | null
+  course_name?: string | null
+  credits?: number | null
+  term_code?: string | null
+  score?: number | null
+  grade_letter?: string | null
+  pass_flag?: boolean | null
+  confidence?: string
+  note?: string | null
+  course_recommendations?: TranscriptPdfCourseRecommendation[]
+}
+
 export interface TranscriptPdfReviewRecord {
   line_no?: number | null
   course_code: string

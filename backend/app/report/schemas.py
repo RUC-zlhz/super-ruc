@@ -60,6 +60,16 @@ class AcademicGapAggregateItem(BaseModel):
     generated_at: datetime
 
 
+class TranscriptPdfCourseRecommendation(BaseModel):
+    course_code: str
+    course_name: str
+    credits: float | None = None
+    match_score: float
+    match_reason: str
+    major_codes: list[str] = []
+    module_names: list[str] = []
+
+
 class TranscriptPdfCandidateCourse(BaseModel):
     line_no: int
     raw_text: str
@@ -71,6 +81,7 @@ class TranscriptPdfCandidateCourse(BaseModel):
     grade_letter: str | None = None
     pass_flag: bool | None = None
     confidence: str = "LOW"
+    course_recommendations: list[TranscriptPdfCourseRecommendation] = []
 
 
 class TranscriptPdfUploadResult(BaseModel):
