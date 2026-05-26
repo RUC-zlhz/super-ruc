@@ -16,6 +16,25 @@ fail() {
   exit 1
 }
 
+git_remote_with_retry() {
+  local attempt
+  local max_attempts=${DEPLOY_GIT_ATTEMPTS:-6}
+  local retry_delay=${DEPLOY_GIT_RETRY_DELAY_SECONDS:-8}
+  local status=0
+
+  for ((attempt = 1; attempt <= max_attempts; attempt += 1)); do
+    if git -C "$APP_DIR" "$@"; then
+      return 0
+    fi
+    status=$?
+    if [ "$attempt" -ge "$max_attempts" ]; then
+      return "$status"
+    fi
+    echo "Git $* failed, retrying in ${retry_delay}s (${attempt}/${max_attempts})" >&2
+    sleep "$retry_delay"
+  done
+}
+
 require_app_dir
 require_env_file
 
@@ -31,7 +50,7 @@ configure_deploy_git_ssh
 
 git -C "$APP_DIR" remote set-url origin "$DEPLOY_GIT_REMOTE"
 
-if ! git -C "$APP_DIR" ls-remote --exit-code origin >/dev/null; then
+if ! git_remote_with_retry ls-remote --exit-code origin >/dev/null; then
   fail "cannot access GitHub with deploy key; add the public key as a read-only repository deploy key first"
 fi
 
@@ -46,7 +65,7 @@ fi
 previous_commit=$(current_commit)
 printf '%s\n' "$previous_commit" >"$PREVIOUS_COMMIT_FILE"
 
-git -C "$APP_DIR" fetch origin --prune
+git_remote_with_retry fetch origin --prune
 
 if git -C "$APP_DIR" rev-parse --verify --quiet "origin/$DEPLOY_REF" >/dev/null; then
   target_ref="origin/$DEPLOY_REF"

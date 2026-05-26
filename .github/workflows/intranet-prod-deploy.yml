@@ -53,6 +53,8 @@ jobs:
           COMPOSE_PROJECT_NAME: super-ruc-intranet-prod
           DEPLOY_GIT_REMOTE: ssh://git@ssh.github.com:443/RUC-zlhz/super-ruc.git
           DEPLOY_KEY_FILE: /opt/super-ruc/.ssh/super-ruc-prod-deploy-ed25519
+          DEPLOY_GIT_ATTEMPTS: 8
+          DEPLOY_GIT_RETRY_DELAY_SECONDS: 8
           INPUT_DEPLOY_REF: ${{ github.event.inputs.deploy_ref || '' }}
           INPUT_SKIP_BACKUP: ${{ github.event.inputs.skip_backup || 'false' }}
         run: |

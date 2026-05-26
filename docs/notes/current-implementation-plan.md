@@ -973,7 +973,7 @@
 - [x] `S61.1` 定位第二次文档-only 自动部署卡在生产机 `git ls-remote origin` 的 GitHub SSH 22 连接。
 - [x] `S61.2` 验证生产机使用 `ssh://git@ssh.github.com:443/RUC-zlhz/super-ruc.git` 可正常 `git ls-remote HEAD`。
 - [x] `S61.3` 将 `Intranet Production Deploy` workflow 的 `DEPLOY_GIT_REMOTE` 切到 GitHub SSH 443。
-- [x] `S61.4` 为 `GIT_SSH_COMMAND` 增加 `BatchMode`、`ConnectTimeout` 与 `ServerAlive*` 参数，避免 deploy key 链路长时间挂起。
+- [x] `S61.4` 为 `GIT_SSH_COMMAND` 增加 `BatchMode`、`ConnectTimeout` 与 `ServerAlive*` 参数，并对 `git ls-remote` / `git fetch` 增加重试，避免 deploy key 链路长时间挂起或单次抖动即失败。
 - [x] `S61.5` 推送后确认生产 `.deploy/current_commit` 到最新提交，runner job completed，服务仍 healthy。
 
 当前结论：
@@ -1557,7 +1557,7 @@
 | 2026-05-26 | S58 小程序党团流程当前节点状态展示修正 | `docs/notes/refinements/2026-05-26-s58-miniapp-workflow-current-node-status.md` | `S58.1, S58.2, S58.3, S58.4` | `[x]` | 已确认张念昊入党流程实际为 `ACTIVE` 且当前节点“教育引导”已触发；修正小程序流程详情页，将当前或已触发的 `PENDING` 节点显示为“进行中”，未触发后续节点仍显示“待开始”；Miniapp 类型检查与 `mp-weixin` 构建通过 |
 | 2026-05-26 | S59 党团流程学生提交材料与老师确认推进闭环 | `docs/notes/refinements/2026-05-26-s59-workflow-student-material-submit.md` | `S59.1, S59.2, S59.3, S59.4, S59.5` | `[x]` | 已新增学生提交材料接口、`MATERIAL_SUBMITTED` 状态和 `student_material_required` 节点判定；小程序只对确需学生材料的节点展示提交入口，组织侧节点提示等待老师或支部处理；Web 老师端可查看材料或识别无需学生提交节点，并确认完成推进下一节点；后端与双端验证通过 |
 | 2026-05-27 | S60 证明 PDF 信息学院品牌与中文字体修复 | `docs/notes/refinements/2026-05-27-s60-proof-pdf-cjk-branding-fix.md` | `S60.1, S60.2, S60.3, S60.4, S60.5, S60.6` | `[x]` | 已确认生产证明模板正文是信息学院，定位生产中文渲染异常根因为 backend 容器缺 CJK 字体并回退 Helvetica；Docker 镜像补 `fonts-noto-cjk`，ReportLab fallback 改为 `STSong-Light`，并用单元测试和本地 PDF 渲染锁定中文可读与信息学院品牌 |
-| 2026-05-27 | S61 生产部署 GitHub SSH 443 与超时治理 | `docs/notes/refinements/2026-05-27-s61-intranet-deploy-ssh443-timeout.md` | `S61.1, S61.2, S61.3, S61.4, S61.5` | `[x]` | 已定位生产 runner 到 GitHub SSH 22 超时导致 deploy job 卡住；workflow 改用 `ssh.github.com:443`，deploy key SSH 命令补超时和批处理参数，避免自动部署长时间挂起 |
+| 2026-05-27 | S61 生产部署 GitHub SSH 443 与超时治理 | `docs/notes/refinements/2026-05-27-s61-intranet-deploy-ssh443-timeout.md` | `S61.1, S61.2, S61.3, S61.4, S61.5` | `[x]` | 已定位生产 runner 到 GitHub SSH 22 超时导致 deploy job 卡住；workflow 改用 `ssh.github.com:443`，deploy key SSH 命令补超时和批处理参数，`ls-remote/fetch` 增加重试，避免自动部署长时间挂起或单次抖动即失败 |
 
 ## 会话更新要求
 
