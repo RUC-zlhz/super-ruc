@@ -20,4 +20,5 @@
 ## 验证
 
 - 生产机手动验证 SSH 443 remote：`git ls-remote --exit-code ssh://git@ssh.github.com:443/RUC-zlhz/super-ruc.git HEAD` 成功返回 `496f6fb`。
+- Bootstrap 验证：生产 checkout 在外层重试第 3 次成功部署到 `73fb7e6aec26732ec7b2f6de391a24d83e3b0a3b`，此时 retry 版脚本已落到生产服务器。
 - 推送后需确认生产 `.deploy/current_commit` 到最新提交，runner job completed，backend/web/db/redis/minio 保持 healthy。
