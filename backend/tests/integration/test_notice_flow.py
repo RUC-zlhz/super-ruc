@@ -531,6 +531,46 @@ async def test_archived_notice_cannot_be_edited(
     assert patch.json()["code"] == 40030
 
 
+async def test_notice_source_rejects_local_private_and_resolved_private_urls(
+    admin_client: AsyncClient,
+    monkeypatch,
+) -> None:
+    for idx, source_url in enumerate(
+        [
+            "http://127.0.0.1/news",
+            "http://localhost/news",
+            "http://192.168.1.10/news",
+            "http://10.0.0.5/news",
+        ],
+        start=1,
+    ):
+        resp = await admin_client.post(
+            "/api/v1/admin/notices/sources",
+            json={
+                "name": f"非公开来源 {idx}",
+                "source_type": "URL",
+                "source_url": source_url,
+            },
+        )
+        assert resp.status_code == 400, resp.text
+
+    from app.notice import service as notice_service
+
+    def _resolve_to_private(*_args, **_kwargs):
+        return [notice_service.ip_address("10.0.0.8")]
+
+    monkeypatch.setattr(notice_service, "_resolve_host_addresses", _resolve_to_private)
+    resp = await admin_client.post(
+        "/api/v1/admin/notices/sources",
+        json={
+            "name": "解析到内网的来源",
+            "source_type": "URL",
+            "source_url": "http://intranet.example.edu/news",
+        },
+    )
+    assert resp.status_code == 400, resp.text
+
+
 async def test_notice_endpoints_reject_anonymous_and_student(
     client: AsyncClient, db: AsyncSession,
 ) -> None:
@@ -610,7 +650,7 @@ async def test_wechat_subscribe_config_and_authorization_record(
     ).scalars().all()
     by_template = {row.template_id: row for row in rows}
     assert by_template["tmpl-reminder"].status == "accept"
-    assert by_template["tmpl-reminder"].openid == "mock_wx_n21001"
+    assert by_template["tmpl-reminder"].openid == "mock_student_N21001"
     assert by_template["tmpl-request"].status == "reject"
 
 
@@ -682,7 +722,7 @@ async def test_wechat_subscribe_send_records_success_and_failure(
         )
     ).scalar_one()
     assert attempt.provider_message_id == "wx-msg-1"
-    assert sent_payloads[0]["touser"] == "mock_wx_n21002"
+    assert sent_payloads[0]["touser"] == "mock_student_N21002"
     assert set(sent_payloads[0]["data"]) == {
         "thing11",
         "thing2",

@@ -91,6 +91,7 @@ class Settings(BaseSettings):
     SMS_SIGN: str = ""
 
     UPLOAD_MAX_SIZE_MB: int = 30
+    ACADEMIC_CURRENT_TERM_CODE: str = ""
 
     @property
     def UPLOAD_MAX_SIZE_BYTES(self) -> int:

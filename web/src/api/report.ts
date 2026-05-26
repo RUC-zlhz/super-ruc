@@ -27,6 +27,7 @@ export interface AcademicGapResult {
   conclusion_text?: string
   modules: AcademicModuleGap[]
   suggested_courses: Record<string, unknown>[]
+  recommendation_term_code?: string | null
   disclaimer: string
   data_warnings: string[]
   generated_at: string
@@ -52,6 +53,7 @@ export interface AcademicGapAggregateParams {
   grade_code?: string
   major_code?: string
   risk_level?: 'HIGH' | 'MEDIUM' | 'LOW'
+  term_code?: string
   page?: number
   page_size?: number
 }
@@ -431,6 +433,6 @@ export function fetchAcademicGapList(params: AcademicGapAggregateParams) {
   })
 }
 
-export function fetchAcademicGap(studentId: number) {
-  return get<ApiEnvelope<AcademicGapResult>>(`/admin/report/academic-gap/${studentId}`)
+export function fetchAcademicGap(studentId: number, params?: { term_code?: string }) {
+  return get<ApiEnvelope<AcademicGapResult>>(`/admin/report/academic-gap/${studentId}`, { params })
 }

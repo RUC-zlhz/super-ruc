@@ -25,6 +25,7 @@ from app.notice.service import (
     create_system_in_app_notice_for_student,
     send_wechat_subscribe_for_delivery,
 )
+from app.workflow import pdf_generator
 from app.workflow import repository as repo
 from app.workflow.models import (
     REMINDER_RUN_STATUS_COMPLETED,
@@ -48,6 +49,7 @@ from app.workflow.models import (
     WORKFLOW_NODE_MANUAL,
     WORKFLOW_NODE_OVERDUE,
     WORKFLOW_NODE_PENDING,
+    ProofTemplate,
     Request,
     RequestAttachment,
     StudentWorkflow,
@@ -60,6 +62,10 @@ from app.workflow.models import (
 from app.workflow.schemas import (
     ApprovalRecordOut,
     AttachmentOut,
+    ProofTemplateIn,
+    ProofTemplateOut,
+    ProofTemplatePreviewIn,
+    ProofTemplatePreviewOut,
     ReminderAdminOut,
     ReminderRunOut,
     RequestBrief,
@@ -183,9 +189,9 @@ async def upsert_template_with_nodes(
 
 
 async def list_templates(
-    db: AsyncSession, kind: str | None
+    db: AsyncSession, kind: str | None, *, active_only: bool = True
 ) -> list[WorkflowTemplateOut]:
-    rows = await repo.list_templates(db, kind=kind)
+    rows = await repo.list_templates(db, kind=kind, active_only=active_only)
     return [template_to_out(r) for r in rows]
 
 
@@ -350,11 +356,10 @@ async def _ensure_workflow_start_allowed(
         actor_role=operator_role,
         message="无权为该学生发起流程",
         code=40306,
-        detail={
-            "student_id": student.id,
-            "template_code": template_code,
-            "reason": reason,
-        },
+        detail=build_audit_detail(
+            target={"student_id": student.id, "template_code": template_code},
+            reason=reason,
+        ),
     )
 
 
@@ -1821,7 +1826,164 @@ async def claim_in_review(
 
 
 # ======================================================================
-# B.3 申请类型维护
+# B.3 电子证明模板维护
+# ======================================================================
+def _proof_template_to_out(row: ProofTemplate) -> ProofTemplateOut:
+    return ProofTemplateOut.model_validate(row)
+
+
+async def list_proof_templates(
+    db: AsyncSession,
+    *,
+    request_type_code: str | None = None,
+    active_only: bool = False,
+) -> list[ProofTemplateOut]:
+    rows = await repo.list_proof_templates(
+        db,
+        request_type_code=request_type_code,
+        active_only=active_only,
+    )
+    return [_proof_template_to_out(row) for row in rows]
+
+
+async def upsert_proof_template(
+    db: AsyncSession,
+    payload: ProofTemplateIn,
+    operator_id: int,
+    operator_role: str | None,
+) -> ProofTemplateOut:
+    pdf_generator.validate_template_placeholders(payload.html_template)
+    request_type = await repo.get_request_type_by_code(db, payload.request_type_code)
+    if request_type is None:
+        raise NotFoundError(f"申请类型不存在：{payload.request_type_code}")
+    if (
+        request_type.category != "CERTIFICATE"
+        and not request_type.code.upper().startswith("CERT")
+    ):
+        raise BizError("电子证明模板只能绑定证明类申请类型", code=40042)
+
+    existing = await repo.get_proof_template_by_code(db, payload.code)
+    if existing is None:
+        row = await repo.create_proof_template(
+            db,
+            **payload.model_dump(),
+            created_by=operator_id,
+            updated_by=operator_id,
+        )
+        action = "CREATE"
+    else:
+        data = payload.model_dump(exclude={"code"})
+        for key, value in data.items():
+            setattr(existing, key, value)
+        existing.updated_by = operator_id
+        row = existing
+        action = "UPDATE"
+    await log_action(
+        db,
+        event_type="WORKFLOW",
+        entity_code="PROOF_TEMPLATE",
+        action=action,
+        entity_id=row.id,
+        actor_user_id=operator_id,
+        actor_role=operator_role,
+        detail=build_audit_detail(
+            target={
+                "code": row.code,
+                "request_type_code": row.request_type_code,
+                "version_label": row.version_label,
+            }
+        ),
+    )
+    await db.commit()
+    await db.refresh(row)
+    return _proof_template_to_out(row)
+
+
+async def deactivate_proof_template(
+    db: AsyncSession,
+    template_code: str,
+    operator_id: int,
+    operator_role: str | None,
+) -> ProofTemplateOut:
+    row = await repo.get_proof_template_by_code(db, template_code)
+    if row is None:
+        raise NotFoundError("证明模板不存在")
+    row.is_active = False
+    row.updated_by = operator_id
+    await log_action(
+        db,
+        event_type="WORKFLOW",
+        entity_code="PROOF_TEMPLATE",
+        action="DEACTIVATE",
+        entity_id=row.id,
+        actor_user_id=operator_id,
+        actor_role=operator_role,
+        detail=build_audit_detail(target={"code": row.code}),
+    )
+    await db.commit()
+    await db.refresh(row)
+    return _proof_template_to_out(row)
+
+
+async def preview_proof_template(
+    db: AsyncSession,
+    payload: ProofTemplatePreviewIn,
+) -> ProofTemplatePreviewOut:
+    placeholders = pdf_generator.validate_template_placeholders(payload.html_template)
+    if payload.request_id is not None:
+        req = await repo.get_request(db, payload.request_id)
+        if req is None:
+            raise NotFoundError("申请不存在")
+        student = (
+            await db.get(Student, req.applicant_student_id)
+            if req.applicant_student_id is not None
+            else None
+        )
+        context = pdf_generator.build_render_context(req, student)
+        html = pdf_generator.render_template_html(payload.html_template, context)
+        return ProofTemplatePreviewOut(html=html, placeholders=placeholders)
+
+    sample = payload.sample_data or {}
+    context = {
+        "today": datetime.now(UTC).strftime("%Y-%m-%d"),
+        "student": {
+            "full_name": sample.get("student_full_name", "张三"),
+            "student_no": sample.get("student_no", "2024000000"),
+            "grade_code": sample.get("grade_code", "2024"),
+            "major_code": sample.get("major_code", "CS"),
+            "class_code": sample.get("class_code", "CS2401"),
+            "political_status": sample.get("political_status", "共青团员"),
+            "enrollment_year": sample.get("enrollment_year", "2024"),
+            "expected_graduation_year": sample.get("expected_graduation_year", "2028"),
+        },
+        "request": {
+            "request_no": sample.get("request_no", "CERT-260523-DEMO01"),
+            "title": sample.get("title", "在读证明"),
+            "summary": sample.get("summary", "用于证明模板预览"),
+            "status": "APPROVED",
+            "revision": 1,
+            "submitted_date": sample.get("submitted_date", "2026-05-23"),
+            "decided_date": sample.get("decided_date", "2026-05-23"),
+            "decision_comment": sample.get("decision_comment", "同意开具"),
+        },
+        "type": {
+            "code": sample.get("type_code", "CERTIFICATE_IN_SCHOOL"),
+            "name": sample.get("type_name", "在读证明"),
+            "category": "CERTIFICATE",
+        },
+        "form": sample.get(
+            "form",
+            {"purpose": "出国交流申请", "deliver_to": "接收单位"},
+        ),
+    }
+    return ProofTemplatePreviewOut(
+        html=pdf_generator.render_template_html(payload.html_template, context),
+        placeholders=placeholders,
+    )
+
+
+# ======================================================================
+# B.4 申请类型维护
 # ======================================================================
 async def upsert_request_type(
     db: AsyncSession, payload, operator_id: int, operator_role: str | None

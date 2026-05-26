@@ -52,7 +52,20 @@ nohup python3 -u deploy/intranet-prod/scripts/http_proxy.py \
   >/tmp/super-ruc-build-proxy.log 2>&1 &
 ```
 
-默认 `.env.example` 已将 `BUILD_HTTP_PROXY / BUILD_HTTPS_PROXY` 指到 `http://127.0.0.1:18081`，Compose build 会使用 host network 访问该代理。
+默认 `.env.example` 保持 `BUILD_HTTP_PROXY / BUILD_HTTPS_PROXY` 为空，Compose build 直接走服务器公网出口和国内镜像源。只有服务器确实没有直接出网时，才临时将这两个变量指到 `http://127.0.0.1:18081`。
+该代理只允许在镜像构建阶段使用，`backend` 服务会在运行时显式清空 `HTTP_PROXY / HTTPS_PROXY` 等代理变量，避免真实微信登录等外部 API 在容器内误连 `127.0.0.1:18081`。
+
+当前 `10.10.0.13` 生产基线为直连公网与国内镜像源，不依赖反向 SSH 或 `http_proxy.py`。网络排查时优先确认以下状态：
+
+```bash
+cd /opt/super-ruc/app
+ss -ltnp | grep -E ':(18080|18081) ' || true
+systemctl show docker -p Environment
+docker compose -f deploy/intranet-prod/docker-compose.yml exec -T backend sh -lc 'env | grep -i proxy || true'
+docker compose -f deploy/intranet-prod/docker-compose.yml exec -T backend python -c "import urllib.request; print(urllib.request.urlopen('https://api.weixin.qq.com/sns/jscode2session?appid=bad&secret=bad&js_code=bad&grant_type=authorization_code', timeout=12).status)"
+```
+
+正常状态下 `18080 / 18081` 不应监听，Docker daemon 不应配置有效代理，backend 容器内代理变量应为空，微信探测应返回 HTTP `200` 并由业务层处理微信错误码。
 
 如果仓库尚未放到 `/opt/super-ruc/app`，在 `git` 可用后执行：
 
@@ -115,6 +128,98 @@ bash deploy/intranet-prod/scripts/deploy.sh <commit-sha>
 bash deploy/intranet-prod/scripts/migrate-and-seed.sh
 bash deploy/intranet-prod/scripts/smoke.sh
 ```
+
+## GitHub Actions 自动部署
+
+自动部署采用 GitHub self-hosted runner 模式：runner 安装在 `10.10.0.13`，因此 workflow 不需要从 GitHub 公网 runner 访问内网 IP。服务器使用只读 deploy key 拉取仓库，push 到 `main` 后由服务器本机执行构建、迁移、种子和 smoke。
+
+### 1. 配置只读 Deploy Key
+
+服务器私钥默认保存到：
+
+```bash
+/opt/super-ruc/.ssh/super-ruc-prod-deploy-ed25519
+```
+
+如果需要重新生成：
+
+```bash
+ssh user@10.10.0.13
+mkdir -p /opt/super-ruc/.ssh
+chmod 700 /opt/super-ruc/.ssh
+ssh-keygen -t ed25519 -N "" \
+  -C "super-ruc-prod-10.10.0.13-$(date +%Y%m%d)" \
+  -f /opt/super-ruc/.ssh/super-ruc-prod-deploy-ed25519
+cat /opt/super-ruc/.ssh/super-ruc-prod-deploy-ed25519.pub
+```
+
+把公钥添加到 GitHub 仓库：
+
+- Repository -> Settings -> Deploy keys -> Add deploy key
+- Title：`super-ruc-prod-10.10.0.13`
+- Key：粘贴 `.pub` 内容
+- 不勾选 `Allow write access`
+
+服务器验证：
+
+```bash
+cd /opt/super-ruc/app
+git remote set-url origin git@github.com:RUC-zlhz/super-ruc.git
+GIT_SSH_COMMAND="ssh -i /opt/super-ruc/.ssh/super-ruc-prod-deploy-ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+  git ls-remote --exit-code origin
+```
+
+### 2. 安装 self-hosted runner
+
+在 GitHub 生成一次性 runner token：
+
+- Repository -> Settings -> Actions -> Runners -> New self-hosted runner
+- 复制页面中的 token
+
+服务器执行：
+
+```bash
+cd /opt/super-ruc/app
+RUNNER_TOKEN=<github-runner-token> \
+  bash deploy/intranet-prod/scripts/install-github-runner.sh
+```
+
+脚本会自动下载最新 GitHub Actions runner，注册标签 `self-hosted, super-ruc-prod, intranet-prod`，并在具备免密 sudo 时安装为 systemd 服务。
+
+### 3. 自动部署流程
+
+`.github/workflows/intranet-prod-deploy.yml` 会在 `main` 分支 push 后触发，并在服务器 runner 上执行：
+
+```bash
+bash /opt/super-ruc/app/deploy/intranet-prod/scripts/deploy-from-github.sh main
+```
+
+该脚本会按顺序执行：
+
+1. 使用 deploy key 访问 GitHub 并解析目标提交。
+2. 运行 `preflight-network.sh`，确认不依赖 `18080 / 18081` 旧代理，Docker daemon 无有效代理，微信、TUNA PyPI、TUNA Debian 出口正常。
+3. 备份生产数据库。
+4. 构建 backend / web 镜像。
+5. 启动依赖服务与 backend。
+6. 执行 Alembic 迁移和幂等初始种子。
+7. 启动 web。
+8. 执行 `smoke.sh` 和部署后网络复检。
+
+也可以在 GitHub Actions 页面手动触发 `workflow_dispatch`，指定 `deploy_ref` 部署某个分支、tag 或 commit。正常生产部署不建议跳过数据库备份。
+
+### 4. 手动执行同一套入口
+
+在服务器上可手动执行：
+
+```bash
+cd /opt/super-ruc/app
+APP_DIR=/opt/super-ruc/app \
+DEPLOY_GIT_REMOTE=git@github.com:RUC-zlhz/super-ruc.git \
+DEPLOY_KEY_FILE=/opt/super-ruc/.ssh/super-ruc-prod-deploy-ed25519 \
+  bash deploy/intranet-prod/scripts/deploy-from-github.sh main
+```
+
+如果服务器 tracked 工作树有本地改动，脚本会拒绝部署。只有确认这些 tracked 改动都已经进入 GitHub 目标提交时，才允许临时设置 `DEPLOY_FORCE_SYNC=1` 做首次同步。
 
 ## 默认学生与培养方案导入
 

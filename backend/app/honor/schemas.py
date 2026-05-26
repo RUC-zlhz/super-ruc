@@ -60,6 +60,7 @@ class HonorRecordIn(BaseModel):
     effective_from: date | None = None
     effective_to: date | None = None
     is_collective: bool = False
+    display_order: int = Field(default=0, ge=0)
     summary: str | None = None
     story_md: str | None = None
     acceptance_speech: str | None = None
@@ -79,6 +80,7 @@ class PublicHonorRecordBrief(BaseModel):
     announced_at: date
     status: str
     is_collective: bool
+    display_order: int = 0
     cover_image_url: str | None = None
     summary: str | None = None
     effective_to: date | None = None
@@ -99,6 +101,7 @@ class PublicHonorRecordDetail(BaseModel):
     effective_from: date | None = None
     effective_to: date | None = None
     is_collective: bool
+    display_order: int = 0
     summary: str | None = None
     story_md: str | None = None
     acceptance_speech: str | None = None
@@ -122,6 +125,7 @@ class AdminHonorRecordBrief(BaseModel):
     announced_at: date
     status: str
     is_collective: bool
+    display_order: int = 0
     cover_image_url: str | None = None
     summary: str | None = None
     effective_to: date | None = None
@@ -145,6 +149,7 @@ class AdminHonorRecordDetail(BaseModel):
     effective_from: date | None = None
     effective_to: date | None = None
     is_collective: bool
+    display_order: int = 0
     summary: str | None = None
     story_md: str | None = None
     acceptance_speech: str | None = None

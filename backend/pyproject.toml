@@ -26,6 +26,7 @@ dependencies = [
     "cryptography>=42.0",
     "email-validator>=2.1",
     "pypdf>=6.11.0",
+    "reportlab>=4.2",
 ]
 
 [project.optional-dependencies]
@@ -67,6 +68,6 @@ target-version = ["py311"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
-testpaths = ["tests"]
+testpaths = ["tests", "unit_tests"]
 cache_dir = ".tmp/pytest-cache"
 addopts = "--basetemp=.tmp/pytest-tmp"

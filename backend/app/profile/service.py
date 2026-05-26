@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import html as html_escape
-import io
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from types import SimpleNamespace
@@ -19,7 +18,9 @@ from app.audit.service import build_audit_detail, log_action
 from app.auth import repository as auth_repo
 from app.auth.models import Student
 from app.auth.scopes import StudentScopeSet, split_scope_code, student_in_scope
+from app.core import pdf_branding
 from app.core.exceptions import BizError, NotFoundError, PermissionError
+from app.core.sensitive_fields import encrypted_student_sensitive_fields
 from app.profile import repository as repo
 from app.profile.models import (
     PROFILE_APPROVAL_APPROVED,
@@ -78,6 +79,7 @@ _STUDENT_ACADEMIC_FIELDS = {
     "expected_graduation_year",
 }
 _STUDENT_CREATE_FIELDS = set(_STUDENT_ACADEMIC_FIELDS)
+_STUDENT_SENSITIVE_INPUT_FIELDS = {"id_card", "phone"}
 
 
 @dataclass(slots=True)
@@ -361,11 +363,18 @@ def _build_fact_submission_view(fact: ProfileFact) -> ProfileFactSubmissionOut:
 
 
 async def _load_profile_scope(
-    db: AsyncSession, viewer_user_id: int
+    db: AsyncSession, viewer_user_id: int, include_workflow_roles: bool = False
 ) -> dict[str, Any]:
     roles = await auth_repo.list_user_roles(db, viewer_user_id)
     role_codes = {row.role_code for row in roles}
-    if role_codes & _GLOBAL_PROFILE_ROLES:
+    
+    from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES
+    global_roles = _GLOBAL_PROFILE_ROLES
+    scoped_roles = set(_SCOPED_PROFILE_ROLES)
+    if include_workflow_roles:
+        scoped_roles.update(ROLE_CODE_COLLABORATOR_ROLES)
+
+    if role_codes & global_roles:
         return {
             "is_global": True,
             "class_codes": set(),
@@ -376,7 +385,7 @@ async def _load_profile_scope(
 
     parsed_scope = StudentScopeSet()
     for row in roles:
-        if row.role_code not in _SCOPED_PROFILE_ROLES:
+        if row.role_code not in scoped_roles:
             continue
         parsed = split_scope_code(row.scope_code)
         if parsed is None:
@@ -439,8 +448,9 @@ async def _ensure_profile_scope_available(
     db: AsyncSession,
     *,
     viewer_user_id: int,
+    include_workflow_roles: bool = False,
 ) -> dict[str, Any]:
-    scope = await _load_profile_scope(db, viewer_user_id)
+    scope = await _load_profile_scope(db, viewer_user_id, include_workflow_roles)
     if _scope_is_empty(scope):
         raise PermissionError("未配置画像查看范围", code=40320)
     return scope
@@ -521,8 +531,9 @@ async def search_students_admin(
     size: int,
     viewer_user_id: int,
     viewer_role: str | None,
+    include_workflow_roles: bool = False,
 ) -> tuple[list[StudentBasic], int]:
-    scope = await _ensure_profile_scope_available(db, viewer_user_id=viewer_user_id)
+    scope = await _ensure_profile_scope_available(db, viewer_user_id=viewer_user_id, include_workflow_roles=include_workflow_roles)
     rows, total = await repo.search_students(
         db,
         q=q,
@@ -969,6 +980,7 @@ async def update_student_academic_info(
             normalized_payload[field_name] = _coerce_student_academic_value(
                 field_name, payload.get(field_name)
             )
+    sensitive_payload = encrypted_student_sensitive_fields(payload)
 
     if "student_no" in normalized_payload and normalized_payload["student_no"] != student.student_no:
         existing = await auth_repo.get_student_by_no(db, normalized_payload["student_no"])
@@ -994,7 +1006,11 @@ async def update_student_academic_info(
 
     for field_name, value in normalized_payload.items():
         setattr(student, field_name, value)
+    for field_name, value in sensitive_payload.items():
+        setattr(student, field_name, value)
     student.updated_at = datetime.now(UTC)
+    changed_plain_fields = sorted(k for k in payload if k in _STUDENT_ACADEMIC_FIELDS)
+    changed_sensitive_fields = sorted(k for k in payload if k in _STUDENT_SENSITIVE_INPUT_FIELDS)
     await log_action(
         db,
         event_type="PROFILE",
@@ -1003,7 +1019,11 @@ async def update_student_academic_info(
         entity_id=student.id,
         actor_user_id=operator_id,
         actor_role=operator_role,
-        detail={"student_id": student.id, "fields": sorted(k for k in payload if k in _STUDENT_ACADEMIC_FIELDS)},
+        detail={
+            "student_id": student.id,
+            "fields": changed_plain_fields + changed_sensitive_fields,
+            "masked_fields": changed_sensitive_fields,
+        },
     )
     await db.commit()
     await db.refresh(student)
@@ -1021,6 +1041,8 @@ async def create_student_admin(
     for field_name in _STUDENT_CREATE_FIELDS:
         if field_name in payload:
             data[field_name] = _coerce_student_academic_value(field_name, payload.get(field_name))
+    sensitive_payload = encrypted_student_sensitive_fields(payload)
+    data.update(sensitive_payload)
 
     if "student_no" not in data:
         raise BizError("学号不能为空", code=40186)
@@ -1064,6 +1086,7 @@ async def create_student_admin(
             "grade_code": student.grade_code,
             "major_code": student.major_code,
             "class_code": student.class_code,
+            "masked_fields": sorted(k for k in payload if k in _STUDENT_SENSITIVE_INPUT_FIELDS),
         },
     )
     await db.commit()
@@ -1483,40 +1506,26 @@ def _render_profile_snapshot_html(
     )
     if not fact_rows:
         fact_rows = '<tr><td colspan="5">暂无成长记录</td></tr>'
-    return f"""<!doctype html>
-<html lang="zh-CN">
-<head><meta charset="utf-8"/><title>画像快照</title>
-<style>
-@page {{ size: A4; margin: 1.5cm; }}
-body {{ font-family: "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; color: #222; }}
-h1 {{ text-align: center; font-size: 20pt; margin-bottom: 20pt; }}
-h2 {{ font-size: 13pt; margin: 16pt 0 8pt; }}
-.grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 8pt 16pt; font-size: 11pt; }}
-.metrics {{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 8pt; margin: 12pt 0; }}
-.metric {{ border: 1px solid #ddd; padding: 8pt; text-align: center; }}
-table {{ width: 100%; border-collapse: collapse; font-size: 10pt; }}
-th, td {{ border: 1px solid #ddd; padding: 6pt; text-align: left; vertical-align: top; }}
-th {{ background: #f7f7f7; }}
-</style></head>
-<body>
-<h1>学生画像快照</h1>
-<div class="grid">
-  <div><strong>学号：</strong>{e(student.student_no)}</div>
-  <div><strong>姓名：</strong>{e(student.full_name)}</div>
-  <div><strong>专业：</strong>{e(student.major_code or "-")}</div>
-  <div><strong>班级：</strong>{e(student.class_code or "-")}</div>
-  <div><strong>学籍状态：</strong>{e(student.enrollment_status)}</div>
-  <div><strong>状态说明：</strong>{e(student.enrollment_status_reason or "-")}</div>
+    body = f"""
+<h2>基础信息</h2>
+<div class="meta-grid">
+  <div class="meta-cell"><span class="label">学号</span>{e(student.student_no)}</div>
+  <div class="meta-cell"><span class="label">姓名</span>{e(student.full_name)}</div>
+  <div class="meta-cell"><span class="label">专业</span>{e(student.major_code or "-")}</div>
+  <div class="meta-cell"><span class="label">班级</span>{e(student.class_code or "-")}</div>
+  <div class="meta-cell"><span class="label">学籍状态</span>{e(student.enrollment_status)}</div>
+  <div class="meta-cell"><span class="label">状态说明</span>{e(student.enrollment_status_reason or "-")}</div>
 </div>
-<div class="metrics">
-  <div class="metric"><div>科研</div><strong>{summary.research_count}</strong></div>
-  <div class="metric"><div>竞赛</div><strong>{summary.competition_count}</strong></div>
-  <div class="metric"><div>实践</div><strong>{summary.practice_count}</strong></div>
-  <div class="metric"><div>志愿时长</div><strong>{summary.volunteer_hours}</strong></div>
-  <div class="metric"><div>学生骨干</div><strong>{summary.leadership_count}</strong></div>
+<h2>成长指标摘要</h2>
+<div class="metric-row">
+  <div class="metric-card"><span class="name">科研</span><span class="value">{summary.research_count}</span></div>
+  <div class="metric-card"><span class="name">竞赛</span><span class="value">{summary.competition_count}</span></div>
+  <div class="metric-card"><span class="name">实践</span><span class="value">{summary.practice_count}</span></div>
+  <div class="metric-card"><span class="name">志愿时长</span><span class="value">{summary.volunteer_hours}</span></div>
+  <div class="metric-card"><span class="name">学生骨干</span><span class="value">{summary.leadership_count}</span></div>
 </div>
 <h2>成长记录</h2>
-<table>
+<table class="snapshot-table">
   <thead>
     <tr>
       <th>类型</th>
@@ -1528,115 +1537,16 @@ th {{ background: #f7f7f7; }}
   </thead>
   <tbody>{fact_rows}</tbody>
 </table>
-</body></html>"""
-
-
-def _render_profile_snapshot_lines(
-    student: Student, summary: ProfileSummary
-) -> list[str]:
-    lines = [
-        "Student Profile Snapshot",
-        f"Student No: {student.student_no}",
-        f"Full Name: {student.full_name}",
-        f"Major: {student.major_code or '-'}",
-        f"Class: {student.class_code or '-'}",
-        f"Enrollment Status: {student.enrollment_status}",
-        f"Status Reason: {student.enrollment_status_reason or '-'}",
-        (
-            "Metrics: "
-            f"research={summary.research_count}, "
-            f"competition={summary.competition_count}, "
-            f"practice={summary.practice_count}, "
-            f"volunteer_hours={summary.volunteer_hours}, "
-            f"leadership={summary.leadership_count}"
-        ),
-        "Facts:",
-    ]
-    if not summary.facts:
-        lines.append("  - none")
-        return lines
-    for fact in summary.facts:
-        lines.append(
-            "  - "
-            f"{fact.fact_type} | {fact.title} | "
-            f"{fact.source_label or '-'} | "
-            f"{fact.updated_by_name or '-'} | "
-            f"{fact.updated_at.strftime('%Y-%m-%d %H:%M')}"
-        )
-    return lines
-
-
-def _escape_pdf_text(text: str) -> str:
-    return (
-        text.encode("latin-1", "replace")
-        .decode("latin-1")
-        .replace("\\", "\\\\")
-        .replace("(", "\\(")
-        .replace(")", "\\)")
+"""
+    return pdf_branding.official_document_html(
+        title="学生画像快照",
+        subtitle="学生成长信息与画像指标导出",
+        body_html=body,
+        document_code=f"profile-{student.student_no}",
+        generated_at=summary.generated_at,
+        watermark="学生画像",
+        footer_note="本快照按当前登录角色权限生成，仅用于学院内部管理、学生成长记录复核与授权场景查询。",
     )
-
-
-def _fallback_pdf_bytes(lines: list[str]) -> bytes:
-    left = 48
-    top = 792
-    line_height = 15
-    sanitized = [_escape_pdf_text(line) for line in lines]
-    content_lines = ["BT", "/F1 11 Tf", f"{left} {top} Td", f"{line_height} TL"]
-    for index, line in enumerate(sanitized):
-        if index:
-            content_lines.append("T*")
-        content_lines.append(f"({line}) Tj")
-    content_lines.append("ET")
-    stream = "\n".join(content_lines).encode("latin-1")
-
-    objects = [
-        b"<< /Type /Catalog /Pages 2 0 R >>",
-        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        (
-            b"<< /Type /Page /Parent 2 0 R "
-            b"/MediaBox [0 0 595 842] "
-            b"/Resources << /Font << /F1 4 0 R >> >> "
-            b"/Contents 5 0 R >>"
-        ),
-        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-        f"<< /Length {len(stream)} >>\nstream\n".encode("latin-1") + stream + b"\nendstream",
-    ]
-
-    pdf = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
-    offsets = [0]
-    for idx, obj in enumerate(objects, start=1):
-        offsets.append(len(pdf))
-        pdf.extend(f"{idx} 0 obj\n".encode("latin-1"))
-        pdf.extend(obj)
-        pdf.extend(b"\nendobj\n")
-    startxref = len(pdf)
-    pdf.extend(f"xref\n0 {len(offsets)}\n".encode("latin-1"))
-    pdf.extend(b"0000000000 65535 f \n")
-    for offset in offsets[1:]:
-        pdf.extend(f"{offset:010d} 00000 n \n".encode("latin-1"))
-    pdf.extend(
-        (
-            f"trailer << /Size {len(offsets)} /Root 1 0 R >>\n"
-            f"startxref\n{startxref}\n%%EOF"
-        ).encode("latin-1")
-    )
-    return bytes(pdf)
-
-
-def _html_to_pdf_bytes(html: str, *, fallback_lines: list[str] | None = None) -> bytes:
-    try:
-        from weasyprint import HTML  # type: ignore
-    except Exception as exc:  # noqa: BLE001
-        if fallback_lines is not None:
-            return _fallback_pdf_bytes(fallback_lines)
-        raise BizError(
-            "PDF 生成依赖未就绪（weasyprint + GTK 运行时），请联系运维",
-            code=50003,
-            http_status=500,
-        ) from exc
-    buf = io.BytesIO()
-    HTML(string=html).write_pdf(buf)
-    return buf.getvalue()
 
 
 async def generate_snapshot_pdf(
@@ -1684,9 +1594,8 @@ async def generate_snapshot_pdf(
         generated_at=datetime.now(UTC),
         **_summary_counters(counts),
     )
-    pdf_bytes = _html_to_pdf_bytes(
-        _render_profile_snapshot_html(student, summary),
-        fallback_lines=_render_profile_snapshot_lines(student, summary),
+    pdf_bytes = pdf_branding.html_to_pdf_bytes(
+        _render_profile_snapshot_html(student, summary)
     )
     await log_action(
         db,

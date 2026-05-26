@@ -56,7 +56,8 @@ http.interceptors.response.use(
         description: '请重新登录后继续操作',
       })
       if (location.pathname !== '/login') {
-        location.replace('/login')
+        const currentPath = location.pathname + location.search + location.hash
+        location.replace(`/login?redirect=${encodeURIComponent(currentPath)}`)
       }
     } else if (status === 403) {
       notification.error({ message: '无权限', description: msg })

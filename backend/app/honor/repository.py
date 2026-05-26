@@ -65,6 +65,7 @@ async def get_record(db: AsyncSession, record_id: int) -> HonorRecord | None:
         select(HonorRecord)
         .where(HonorRecord.id == record_id)
         .options(selectinload(HonorRecord.recipients))
+        .execution_options(populate_existing=True)
     )
     return (await db.execute(stmt)).scalar_one_or_none()
 
@@ -76,6 +77,7 @@ def _apply_common_filters(
     level: str | None,
     year: int | None,
     q: str | None,
+    is_collective: bool | None,
 ):
     conds = []
     if category_code:
@@ -93,6 +95,8 @@ def _apply_common_filters(
                 HonorRecord.recipients.any(HonorRecipient.display_name.ilike(like)),
             )
         )
+    if is_collective is not None:
+        conds.append(HonorRecord.is_collective.is_(is_collective))
     if conds:
         stmt = stmt.where(and_(*conds))
     return stmt
@@ -105,6 +109,7 @@ async def list_public_records(
     level: str | None = None,
     year: int | None = None,
     q: str | None = None,
+    is_collective: bool | None = None,
     include_historical: bool = False,
     page: int = 1,
     size: int = 20,
@@ -122,6 +127,7 @@ async def list_public_records(
         level=level,
         year=year,
         q=q,
+        is_collective=is_collective,
     )
     if include_historical:
         stmt = stmt.where(
@@ -146,7 +152,11 @@ async def list_public_records(
         await db.execute(select(func.count()).select_from(stmt.subquery()))
     ).scalar_one()
     stmt = (
-        stmt.order_by(HonorRecord.announced_at.desc(), HonorRecord.id.desc())
+        stmt.order_by(
+            HonorRecord.display_order.asc(),
+            HonorRecord.announced_at.desc(),
+            HonorRecord.id.desc(),
+        )
         .offset((page - 1) * size)
         .limit(size)
     )
@@ -162,6 +172,7 @@ async def list_records(
     status: str | None = None,
     year: int | None = None,
     q: str | None = None,
+    is_collective: bool | None = None,
     page: int = 1,
     size: int = 20,
 ) -> tuple[list[HonorRecord], int]:
@@ -172,6 +183,7 @@ async def list_records(
         level=level,
         year=year,
         q=q,
+        is_collective=is_collective,
     )
     if status:
         stmt = stmt.where(HonorRecord.status == status)
@@ -179,7 +191,11 @@ async def list_records(
         await db.execute(select(func.count()).select_from(stmt.subquery()))
     ).scalar_one()
     stmt = (
-        stmt.order_by(HonorRecord.announced_at.desc(), HonorRecord.id.desc())
+        stmt.order_by(
+            HonorRecord.display_order.asc(),
+            HonorRecord.announced_at.desc(),
+            HonorRecord.id.desc(),
+        )
         .offset((page - 1) * size)
         .limit(size)
     )
@@ -195,6 +211,7 @@ async def set_recipients(
     ).scalars().all()
     for row in existing:
         await db.delete(row)
+    await db.flush()
     created: list[HonorRecipient] = []
     for item in recipients:
         row = HonorRecipient(record_id=record_id, **item)

@@ -12,11 +12,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 
 from app.core.dependencies import ActiveStudentDep, CurrentUserDep, DBDep, require_role
 from app.core.exceptions import BizError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
+from app.core.uploads import read_upload_file_limited
 from app.report import service
 from app.report.schemas import (
     AcademicGapAggregateItem,
@@ -45,11 +46,13 @@ router = APIRouter(tags=["report"])
     response_model=ApiResponse[AcademicGapResult],
 )
 async def my_academic_gap(
-    db: DBDep, user: CurrentUserDep
+    db: DBDep,
+    user: CurrentUserDep,
+    term_code: str | None = None,
 ) -> ApiResponse[AcademicGapResult]:
     if user.student_id is None:
         raise BizError("仅学生可查看本人学业缺口", code=40305, http_status=403)
-    result = await service.compute_academic_gap(db, user.student_id)
+    result = await service.compute_academic_gap(db, user.student_id, term_code=term_code)
     return ok(result)
 
 
@@ -64,7 +67,7 @@ async def upload_my_transcript_pdf(
 ) -> ApiResponse[TranscriptPdfUploadResult]:
     if user.student_id is None:
         raise BizError("仅学生可上传本人成绩单 PDF", code=40305, http_status=403)
-    content = await file.read()
+    content = await read_upload_file_limited(file)
     result = await service.upload_transcript_pdf_for_review(
         db,
         student_id=user.student_id,
@@ -83,10 +86,15 @@ async def upload_my_transcript_pdf(
 )
 async def admin_overview(
     db: DBDep,
-    _user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
+    user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
     term_code: str | None = None,
 ) -> ApiResponse[OverviewResult]:
-    return ok(await service.build_overview(db, term_code=term_code))
+    return ok(await service.build_overview(
+        db, 
+        term_code=term_code,
+        viewer_user_id=user.user_id,
+        viewer_roles=user.roles,
+    ))
 
 
 @router.get(
@@ -95,13 +103,14 @@ async def admin_overview(
 )
 async def admin_academic_gap_list(
     db: DBDep,
-    _user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
+    user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
     keyword: str | None = None,
     grade_code: str | None = None,
     major_code: str | None = None,
     risk_level: str | None = None,
-    page: int = 1,
-    page_size: int = 20,
+    term_code: str | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
 ) -> ApiResponse[Paginated[AcademicGapAggregateItem]]:
     items, total = await service.list_academic_gap_overview(
         db,
@@ -109,8 +118,11 @@ async def admin_academic_gap_list(
         grade_code=grade_code,
         major_code=major_code,
         risk_level=risk_level,
+        term_code=term_code,
         page=page,
         page_size=page_size,
+        viewer_user_id=user.user_id,
+        viewer_roles=user.roles,
     )
     return ok(
         Paginated[AcademicGapAggregateItem](
@@ -127,9 +139,16 @@ async def admin_academic_gap_list(
 async def admin_academic_gap(
     student_id: int,
     db: DBDep,
-    _user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
+    user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
+    term_code: str | None = None,
 ) -> ApiResponse[AcademicGapResult]:
-    return ok(await service.compute_academic_gap(db, student_id))
+    await service.ensure_academic_gap_student_visible(
+        db,
+        student_id=student_id,
+        viewer_user_id=user.user_id,
+        viewer_roles=user.roles,
+    )
+    return ok(await service.compute_academic_gap(db, student_id, term_code=term_code))
 
 
 @router.post(

@@ -1,8 +1,8 @@
-# 2026-05-26 S54 默认示例模板开箱即有，同时保留管理端删改权
+# 2026-05-26 S55 默认示例模板开箱即有，同时保留管理端删改权
 
 - 状态：`[x]` 已完成
-- 关联主计划：`S54`
-- 依赖：`S51`、`S52`
+- 关联主计划：`S55`
+- 依赖：`S52`、`S53`
 
 ## 背景
 
@@ -27,15 +27,15 @@
 
 ## 实现方案
 
-- [x] `S54.1` 新增 `backend/scripts/import_common_template_examples.py`，复用现有对象存储、模板资产、知识来源和知识条目能力，将示例模板导入为：
+- [x] `S55.1` 新增 `backend/scripts/import_common_template_examples.py`，复用现有对象存储、模板资产、知识来源和知识条目能力，将示例模板导入为：
   - `TemplateAsset`
   - `KnowledgeSource`
   - 与模板关联的 `KnowledgeEntry`
-- [x] `S54.2` 所有关联知识条目直接发布，确保学生端 `/knowledge/templates` 能查到这些模板。
-- [x] `S54.3` 在 `backend/scripts/seed_default_data.py` 中接入该导入逻辑，并提供保护策略：
+- [x] `S55.2` 所有关联知识条目直接发布，确保学生端 `/knowledge/templates` 能查到这些模板。
+- [x] `S55.3` 在 `backend/scripts/seed_default_data.py` 中接入该导入逻辑，并提供保护策略：
   - `only_missing=True`
   - `skip_if_any_templates=True`
-- [x] `S54.4` 补集成回归样例，覆盖“管理员上传并关联模板后，学生端可见且可下载”的完整链路。
+- [x] `S55.4` 补集成回归样例，覆盖“管理员上传并关联模板后，学生端可见且可下载”的完整链路。
 
 ## 行为约定
 

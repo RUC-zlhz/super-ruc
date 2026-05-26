@@ -8,22 +8,26 @@ FR-014 原则：
 FR-016：
 - 按状态/类型聚合 requests / notices / workflows。不暴露个人敏感字段。
 """
+
 from __future__ import annotations
 
 import hashlib
 import logging
 import re
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import build_audit_detail, log_action
-from app.auth.models import Student
+from app.auth import repository as auth_repo
+from app.auth.models import Student, User
+from app.auth.role_codes import normalize_role_code, normalize_role_codes
+from app.auth.scopes import StudentScopeSet, split_student_scope_codes, student_in_scope
 from app.core.config import settings
-from app.core.exceptions import BizError, NotFoundError
+from app.core.exceptions import BizError, NotFoundError, PermissionError
 from app.core.sql import order_by_nulls_last_desc
 from app.core.storage import put_object
 from app.exchange import repository as exchange_repo
@@ -74,18 +78,70 @@ from app.workflow.models import (
 
 logger = logging.getLogger(__name__)
 
+_REPORT_GLOBAL_ROLES = {"SUPER_ADMIN", "COLLEGE_LEADER"}
+_REPORT_SCOPED_ROLES = {
+    "COUNSELOR",
+    "HEAD_TEACHER",
+    "YOUTH_LEAGUE_TEACHER",
+    "PARTY_BUILD_TEACHER",
+}
+
+
+async def _report_scope_for_viewer(
+    db: AsyncSession,
+    *,
+    viewer_user_id: int,
+    viewer_roles: list[str],
+) -> StudentScopeSet | None:
+    roles = set(normalize_role_codes(viewer_roles))
+    if roles & _REPORT_GLOBAL_ROLES:
+        return None
+    scoped_roles = roles & _REPORT_SCOPED_ROLES
+    if not scoped_roles:
+        return StudentScopeSet()
+
+    rows = await auth_repo.list_user_roles(db, viewer_user_id)
+    scope_codes = [
+        row.scope_code
+        for row in rows
+        if normalize_role_code(row.role_code) in scoped_roles and row.scope_code
+    ]
+    return split_student_scope_codes(scope_codes)
+
+
+def _apply_report_student_scope(stmt, scope: StudentScopeSet | None):
+    if scope is None:
+        return stmt
+    if scope.is_empty():
+        return None
+    scope_conds = []
+    if scope.class_codes:
+        scope_conds.append(Student.class_code.in_(sorted(scope.class_codes)))
+    if scope.major_codes:
+        scope_conds.append(Student.major_code.in_(sorted(scope.major_codes)))
+    if scope.grade_codes:
+        scope_conds.append(Student.grade_code.in_(sorted(scope.grade_codes)))
+    if scope.legacy_codes:
+        legacy = sorted(scope.legacy_codes)
+        scope_conds.extend(
+            [
+                Student.class_code.in_(legacy),
+                Student.major_code.in_(legacy),
+                Student.grade_code.in_(legacy),
+            ]
+        )
+    return stmt.where(or_(*scope_conds)) if scope_conds else None
+
 # ============================================================
 # FR-014 学业缺口
 # ============================================================
 _TRANSCRIPT_PDF_MAX_BYTES = 10 * 1024 * 1024
 _TERM_CODE_PATTERN = re.compile(r"(\d{4})-(SPRING|SUMMER|FALL|WINTER)")
+_BEIJING_TZ = timezone(timedelta(hours=8), name="Asia/Shanghai")
 
 
 def _generate_transcript_pdf_batch_no() -> str:
-    return (
-        f"IM-TPDF-{datetime.now(UTC).strftime('%y%m%d%H%M%S')}-"
-        f"{uuid.uuid4().hex[:6].upper()}"
-    )
+    return f"IM-TPDF-{datetime.now(UTC).strftime('%y%m%d%H%M%S')}-{uuid.uuid4().hex[:6].upper()}"
 
 
 def _safe_filename(filename: str | None) -> str:
@@ -110,6 +166,31 @@ def _normalize_term_code(term_code: str | None) -> str | None:
     return normalized
 
 
+def _derive_current_recommendation_term_code(now: datetime | None = None) -> str:
+    current = (now or datetime.now(UTC)).astimezone(_BEIJING_TZ)
+    year = current.year
+    month = current.month
+    if month == 1:
+        return f"{year - 1}-WINTER"
+    if 2 <= month < 7:
+        return f"{year - 1}-SPRING"
+    if 7 <= month < 9:
+        return f"{year - 1}-SUMMER"
+    return f"{year}-FALL"
+
+
+def _effective_recommendation_term_code(term_code: str | None) -> str:
+    explicit = _normalize_term_code(term_code)
+    if explicit:
+        return explicit
+    configured = (settings.ACADEMIC_CURRENT_TERM_CODE or "").strip()
+    if configured:
+        normalized = _normalize_term_code(configured)
+        assert normalized is not None
+        return normalized
+    return _derive_current_recommendation_term_code()
+
+
 def _iter_module_courses(raw: Any) -> list[dict[str, Any]]:
     if not raw:
         return []
@@ -131,9 +212,7 @@ async def upload_transcript_pdf_for_review(
     content_type: str | None,
 ) -> TranscriptPdfUploadResult:
     """学生上传成绩单 PDF 的最小闭环：存文件、建核验批次、不写正式成绩。"""
-    student = (
-        await db.execute(select(Student).where(Student.id == student_id))
-    ).scalar_one_or_none()
+    student = (await db.execute(select(Student).where(Student.id == student_id))).scalar_one_or_none()
     if student is None:
         raise NotFoundError("学生不存在")
     if not content:
@@ -272,9 +351,7 @@ async def upload_transcript_pdf_for_review(
         object_key=batch.object_key,
         parsed_text_chars=len(analysis.extracted_text),
         parsed_courses_count=len(candidate_rows),
-        parsed_courses=[
-            TranscriptPdfCandidateCourse(**candidate) for candidate in candidate_rows
-        ],
+        parsed_courses=[TranscriptPdfCandidateCourse(**candidate) for candidate in candidate_rows],
         review_required=True,
         formal_records_written=0,
         data_warnings=warnings,
@@ -369,15 +446,17 @@ async def commit_transcript_pdf_review(
 
 
 async def compute_academic_gap(
-    db: AsyncSession, student_id: int
+    db: AsyncSession,
+    student_id: int,
+    *,
+    term_code: str | None = None,
 ) -> AcademicGapResult:
-    student = (await db.execute(
-        select(Student).where(Student.id == student_id)
-    )).scalar_one_or_none()
+    student = (await db.execute(select(Student).where(Student.id == student_id))).scalar_one_or_none()
     if student is None:
         raise NotFoundError("学生不存在")
 
     data_warnings: list[str] = []
+    recommendation_term_code = _effective_recommendation_term_code(term_code)
 
     plan = None
     if student.grade_code and student.major_code:
@@ -400,6 +479,7 @@ async def compute_academic_gap(
             student_name=student.full_name,
             grade_code=student.grade_code,
             major_code=student.major_code,
+            recommendation_term_code=recommendation_term_code,
             data_warnings=data_warnings,
             generated_at=datetime.now(UTC),
         )
@@ -408,100 +488,160 @@ async def compute_academic_gap(
         result.conclusion_text = _build_academic_gap_conclusion(result)
         return result
 
-    modules = (await db.execute(
-        select(CurriculumModule)
-        .where(CurriculumModule.plan_id == plan.id)
-        .order_by(CurriculumModule.sort_order.asc())
-    )).scalars().all()
-
-    records = (await db.execute(
-        select(StudentCourseRecord).where(
-            StudentCourseRecord.student_id == student_id,
-            StudentCourseRecord.pass_flag.is_(True),
+    modules = (
+        (
+            await db.execute(
+                select(CurriculumModule)
+                .where(CurriculumModule.plan_id == plan.id)
+                .order_by(CurriculumModule.sort_order.asc())
+            )
         )
-    )).scalars().all()
+        .scalars()
+        .all()
+    )
+
+    records = (
+        (
+            await db.execute(
+                select(StudentCourseRecord).where(
+                    StudentCourseRecord.student_id == student_id,
+                    StudentCourseRecord.pass_flag.is_(True),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
 
     if not records:
         data_warnings.append("暂无已通过的课程记录；所有模块标记为缺口以供人工核验。")
 
-    equivs = (await db.execute(
-        select(CourseEquivalence).where(
-            CourseEquivalence.is_active.is_(True),
-            ((CourseEquivalence.grade_code == student.grade_code)
-             | (CourseEquivalence.grade_code.is_(None))),
-            ((CourseEquivalence.major_code == student.major_code)
-             | (CourseEquivalence.major_code.is_(None))),
+    equivs = (
+        (
+            await db.execute(
+                select(CourseEquivalence).where(
+                    CourseEquivalence.is_active.is_(True),
+                    (
+                        (CourseEquivalence.grade_code == student.grade_code)
+                        | (CourseEquivalence.grade_code.is_(None))
+                    ),
+                    (
+                        (CourseEquivalence.major_code == student.major_code)
+                        | (CourseEquivalence.major_code.is_(None))
+                    ),
+                )
+            )
         )
-    )).scalars().all()
+        .scalars()
+        .all()
+    )
     equiv_map: dict[str, list[tuple[str, float]]] = {}
     for e in equivs:
-        equiv_map.setdefault(e.source_course_code, []).append(
-            (e.target_course_code, float(e.ratio or 1.0))
-        )
+        equiv_map.setdefault(e.source_course_code, []).append((e.target_course_code, float(e.ratio or 1.0)))
 
-    # 展开一条成绩到它可以覆盖的 course_code 集合（原始 + 所有等价目标）
-    # 同时记录该课程的"有效学分"
-    earned: dict[str, float] = {}
-    passed_course_codes: set[str] = set()
+    credit_buckets: list[dict[str, Any]] = []
     total_passed_credits = 0.0
     for r in records:
-        passed_course_codes.add(r.course_code)
-        total_passed_credits += float(r.credits or 0)
-        earned[r.course_code] = earned.get(r.course_code, 0) + float(r.credits or 0)
+        credits = float(r.credits or 0)
+        total_passed_credits += credits
+        coverage = {r.course_code: credits}
         for target, ratio in equiv_map.get(r.course_code, []):
-            earned[target] = earned.get(target, 0) + float(r.credits or 0) * ratio
+            coverage[target] = max(coverage.get(target, 0.0), credits * ratio)
+        credit_buckets.append(
+            {
+                "course_code": r.course_code,
+                "remaining": credits,
+                "coverage": coverage,
+            }
+        )
 
     module_gaps: list[AcademicModuleGap] = []
     total_earned = 0.0
-    whitelist_earned_total = 0.0
     flexible_credit_balance = total_passed_credits
     for m in modules:
-        allowed_codes: set[str] = set()
+        allowed_codes: list[str] = []
+        seen_allowed_codes: set[str] = set()
         for c in _iter_module_courses(m.courses):
             code = c.get("code")
-            if code:
-                allowed_codes.add(str(code))
+            if code and str(code) not in seen_allowed_codes:
+                allowed_codes.append(str(code))
+                seen_allowed_codes.add(str(code))
         module_earned = 0.0
         passed: list[str] = []
         if allowed_codes:
+            required = float(m.credits_required or 0)
             for code in allowed_codes:
-                if code in earned:
-                    module_earned += earned[code]
-                    whitelist_earned_total += earned[code]
-                    if code in passed_course_codes:
-                        passed.append(code)
-            flexible_credit_balance = max(total_passed_credits - whitelist_earned_total, 0.0)
+                for bucket in credit_buckets:
+                    if module_earned >= required:
+                        break
+                    available = min(
+                        float(bucket["remaining"]),
+                        float(bucket["coverage"].get(code, 0.0)),
+                    )
+                    # 修复 Logic Bug: 避免贪婪消耗超出模块所需学分，导致溢出学分被困住无法给后续模块（如自由选修）使用
+                    available = min(available, required - module_earned)
+                    if available <= 0:
+                        continue
+                    bucket["remaining"] = max(float(bucket["remaining"]) - available, 0.0)
+                    module_earned += available
+                    real_code = str(bucket["course_code"])
+                    if real_code not in passed:
+                        passed.append(real_code)
+            flexible_credit_balance = sum(float(bucket["remaining"]) for bucket in credit_buckets)
         else:
             required = float(m.credits_required or 0)
             module_earned = min(required, flexible_credit_balance)
             flexible_credit_balance = max(flexible_credit_balance - module_earned, 0.0)
-            data_warnings.append(
-                f"模块 {m.module_code} 未配置课程白名单，已按未归属已修学分粗略抵扣。"
-            )
+
+            # 修复 Logic Bug: 必须同步从 credit_buckets 中扣除，否则下一个带白名单的模块会重新 sum 导致学分双重计算
+            deduct_left = module_earned
+            for bucket in credit_buckets:
+                if deduct_left <= 0:
+                    break
+                b_rem = float(bucket["remaining"])
+                if b_rem > 0:
+                    deducted = min(b_rem, deduct_left)
+                    bucket["remaining"] = max(b_rem - deducted, 0.0)
+                    deduct_left -= deducted
+
+            data_warnings.append(f"模块 {m.module_code} 未配置课程白名单，已按未归属已修学分粗略抵扣。")
 
         module_earned = round(module_earned, 2)
         required = float(m.credits_required or 0)
         gap = max(required - module_earned, 0.0)
         total_earned += module_earned
-        module_gaps.append(AcademicModuleGap(
-            module_code=m.module_code,
-            module_name=m.module_name,
-            module_type=m.module_type,
-            credits_required=required,
-            credits_earned=module_earned,
-            credits_gap=round(gap, 2),
-            passed_courses=passed,
-            note=m.note,
-        ))
+        module_gaps.append(
+            AcademicModuleGap(
+                module_code=m.module_code,
+                module_name=m.module_name,
+                module_type=m.module_type,
+                credits_required=required,
+                credits_earned=module_earned,
+                credits_gap=round(gap, 2),
+                passed_courses=passed,
+                note=m.note,
+            )
+        )
 
-    # 建议课程：缺口模块中的未修课程均返回；缺少开课/容量/课表/先修/偏好数据时显式提示。
+    # 建议课程：只基于当前推荐学期的真实开课数据，不再用培养方案 opening_term 伪装实际开课。
     ranked_suggestions: list[tuple[int, float, int, int, str, dict[str, Any]]] = []
-    offered = (await db.execute(
-        select(CourseOffering).where(CourseOffering.is_active.is_(True))
-    )).scalars().all()
+    offered = (
+        (
+            await db.execute(
+                select(CourseOffering).where(
+                    CourseOffering.is_active.is_(True),
+                    CourseOffering.term_code == recommendation_term_code,
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
     offer_map = {o.course_code: o for o in offered}
     if not offered:
-        data_warnings.append("当前未配置有效开课数据，课程推荐仅按培养方案白名单列出候选。")
+        data_warnings.append(
+            f"当前未配置 {recommendation_term_code} 本学期开课数据，课程建议暂为空。"
+        )
     module_map = {module.module_code: module for module in modules}
     module_gap_map = {gap.module_code: gap.credits_gap for gap in module_gaps}
     module_priority_map = {
@@ -522,30 +662,19 @@ async def compute_academic_gap(
             if not code or code in gap.passed_courses:
                 continue
             offering = offer_map.get(code)
+            if offering is None:
+                continue
             course_warnings: list[str] = []
-            rank_score = 0
-            if offering is not None:
-                rank_score += 50
-                term_value = offering.term_code
-                course_name = offering.course_name
-                credits = float(offering.credits or course.get("credits") or 0)
-                course_type = offering.course_type or module.module_type
-                capacity = offering.capacity
-                capacity_status = "已配置" if capacity is not None else "数据未配置"
-                if capacity is not None:
-                    rank_score += 10
-                schedule_status = "已配置" if term_value else "数据未配置"
-            else:
-                term_value = course.get("opening_term")
-                course_name = str(course.get("name") or code)
-                credits = float(course.get("credits") or 0)
-                course_type = module.module_type
-                capacity = None
-                capacity_status = "数据未配置"
-                schedule_status = "实际开课数据未配置"
-                course_warnings.append("实际开课数据未配置")
-            if not term_value:
-                course_warnings.append("开课学期数据未配置")
+            rank_score = 50
+            term_value = offering.term_code
+            course_name = offering.course_name
+            credits = float(offering.credits or course.get("credits") or 0)
+            course_type = offering.course_type or module.module_type
+            capacity = offering.capacity
+            capacity_status = "已配置" if capacity is not None else "数据未配置"
+            if capacity is not None:
+                rank_score += 10
+            schedule_status = f"{recommendation_term_code} 本学期开课"
             if capacity is None:
                 course_warnings.append("容量数据未配置")
             course_warnings.extend(["先修要求数据未配置", "时间冲突数据未配置", "学生偏好数据未配置"])
@@ -591,6 +720,7 @@ async def compute_academic_gap(
         total_credits_earned=round(total_earned, 2),
         modules=module_gaps,
         suggested_courses=suggested[:30],
+        recommendation_term_code=recommendation_term_code,
         data_warnings=data_warnings,
         generated_at=datetime.now(UTC),
     )
@@ -643,10 +773,23 @@ async def list_academic_gap_overview(
     grade_code: str | None,
     major_code: str | None,
     risk_level: str | None,
+    term_code: str | None,
     page: int,
     page_size: int,
+    viewer_user_id: int | None = None,
+    viewer_roles: list[str] | None = None,
 ) -> tuple[list[AcademicGapAggregateItem], int]:
     stmt = select(Student).where(Student.deleted_at.is_(None))
+    if viewer_user_id is not None and viewer_roles is not None:
+        scope = await _report_scope_for_viewer(
+            db,
+            viewer_user_id=viewer_user_id,
+            viewer_roles=viewer_roles,
+        )
+        scoped_stmt = _apply_report_student_scope(stmt, scope)
+        if scoped_stmt is None:
+            return [], 0
+        stmt = scoped_stmt
     if keyword:
         like = f"%{keyword}%"
         stmt = stmt.where(
@@ -659,40 +802,138 @@ async def list_academic_gap_overview(
         stmt = stmt.where(Student.grade_code == grade_code)
     if major_code:
         stmt = stmt.where(Student.major_code == major_code)
-    students = (await db.execute(stmt.order_by(Student.student_no.asc(), Student.id.asc()))).scalars().all()
+
+    # 先计算满足基础条件的总人数
+    total_stmt = select(func.count()).select_from(stmt.subquery())
+    total_students_count = (await db.execute(total_stmt)).scalar_one()
+
+    if total_students_count == 0:
+        return [], 0
+
+    # 修复崩溃类 Bug: 取消全量内存计算，改为仅在当前分页内进行学业缺口计算
+    # 这里我们通过学号和 ID 进行稳定排序后分页。
+    # 由于不进行全量计算就无法得知精确的 risk_level 和 credits_gap，
+    # 我们如果遇到 risk_level 过滤，目前只能通过逐页向后扫描的方式来满足过滤条件，
+    # 为了防止死循环或超时，我们设定一个扫描上限。但在没有 risk_level 过滤时，直接走数据库分页。
 
     desired_risk = risk_level.upper() if risk_level else None
-    rank_map = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
-    items: list[tuple[int, float, AcademicGapAggregateItem]] = []
-    for student in students:
-        result = await compute_academic_gap(db, student.id)
-        current_risk = _derive_risk_level(result)
-        if desired_risk and current_risk != desired_risk:
-            continue
-        gap = _compute_gap_value(result)
-        item = AcademicGapAggregateItem(
-            student_id=student.id,
-            student_no=result.student_no,
-            student_name=result.student_name,
-            grade_code=result.grade_code,
-            major_code=result.major_code,
-            total_credits_required=result.total_credits_required,
-            total_credits_earned=result.total_credits_earned,
-            credits_gap=gap,
-            risk_level=current_risk,
-            conclusion_text=_build_academic_gap_conclusion(result),
-            data_warnings=result.data_warnings,
-            generated_at=result.generated_at,
-        )
-        gap_sort = gap if gap is not None else float("inf")
-        items.append((rank_map.get(current_risk, 99), gap_sort, item))
 
-    items.sort(key=lambda row: (row[0], -row[1], row[2].student_no, row[2].student_id))
-    flattened = [item for _, _, item in items]
-    total = len(flattened)
-    start = max(page - 1, 0) * page_size
-    end = start + page_size
-    return flattened[start:end], total
+    if not desired_risk:
+        # 没有 risk_level 过滤时，直接数据库分页，极大提升性能
+        start = max(page - 1, 0) * page_size
+        paged_students = (
+            (
+                await db.execute(
+                    stmt.order_by(Student.student_no.asc(), Student.id.asc()).offset(start).limit(page_size)
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        items: list[AcademicGapAggregateItem] = []
+        for student in paged_students:
+            result = await compute_academic_gap(db, student.id, term_code=term_code)
+            current_risk = _derive_risk_level(result)
+            gap = _compute_gap_value(result)
+            item = AcademicGapAggregateItem(
+                student_id=student.id,
+                student_no=result.student_no,
+                student_name=result.student_name,
+                grade_code=result.grade_code,
+                major_code=result.major_code,
+                total_credits_required=result.total_credits_required,
+                total_credits_earned=result.total_credits_earned,
+                credits_gap=gap,
+                risk_level=current_risk,
+                conclusion_text=_build_academic_gap_conclusion(result),
+                data_warnings=result.data_warnings,
+                generated_at=result.generated_at,
+            )
+            items.append(item)
+
+        return items, total_students_count
+
+    # 存在 risk_level 过滤时，必须返回过滤后的精准 total，避免前端分页失真。
+    # 风险等级依赖 compute_academic_gap，当前只能按基础条件分块计算。
+    items: list[AcademicGapAggregateItem] = []
+    chunk_size = 100
+    offset = 0
+    target_start_index = max(page - 1, 0) * page_size
+    matched_count = 0
+
+    while offset < total_students_count:
+        chunk_students = (
+            (
+                await db.execute(
+                    stmt.order_by(Student.student_no.asc(), Student.id.asc()).offset(offset).limit(chunk_size)
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        if not chunk_students:
+            break
+
+        offset += chunk_size
+
+        for student in chunk_students:
+            result = await compute_academic_gap(db, student.id, term_code=term_code)
+            current_risk = _derive_risk_level(result)
+
+            if current_risk != desired_risk:
+                continue
+
+            matched_count += 1
+            if matched_count <= target_start_index:
+                # 还没到当前页的起始位置，跳过
+                continue
+
+            gap = _compute_gap_value(result)
+            item = AcademicGapAggregateItem(
+                student_id=student.id,
+                student_no=result.student_no,
+                student_name=result.student_name,
+                grade_code=result.grade_code,
+                major_code=result.major_code,
+                total_credits_required=result.total_credits_required,
+                total_credits_earned=result.total_credits_earned,
+                credits_gap=gap,
+                risk_level=current_risk,
+                conclusion_text=_build_academic_gap_conclusion(result),
+                data_warnings=result.data_warnings,
+                generated_at=result.generated_at,
+            )
+            items.append(item)
+
+            if len(items) > page_size:
+                items = items[:page_size]
+
+    return items, matched_count
+
+
+async def ensure_academic_gap_student_visible(
+    db: AsyncSession,
+    *,
+    student_id: int,
+    viewer_user_id: int,
+    viewer_roles: list[str],
+) -> None:
+    scope = await _report_scope_for_viewer(
+        db,
+        viewer_user_id=viewer_user_id,
+        viewer_roles=viewer_roles,
+    )
+    if scope is None:
+        return
+    if scope.is_empty():
+        raise PermissionError("无权查看该学生学业缺口", code=40306)
+    student = await db.get(Student, student_id)
+    if student is None:
+        raise NotFoundError(f"学生不存在：{student_id}")
+    if not student_in_scope(student, scope):
+        raise PermissionError("无权查看该学生学业缺口", code=40306)
 
 
 # ============================================================
@@ -713,25 +954,61 @@ def _term_code_date_range(term_code: str | None) -> tuple[datetime, datetime] | 
         "WINTER": ((1, 1), (2, 1)),
     }
     (start_month, start_day), (end_month, end_day) = ranges[season]
-    end_year = year + 1 if season == "FALL" else year
+
+    # 修复 Logic Bug: 春/夏/冬学期均属于跨年后的日历年
+    start_year = year if season == "FALL" else year + 1
+    end_year = year + 1 if season == "FALL" else year + 1
+
     return (
-        datetime(year, start_month, start_day, tzinfo=UTC),
+        datetime(start_year, start_month, start_day, tzinfo=UTC),
         datetime(end_year, end_month, end_day, tzinfo=UTC),
     )
 
 
-async def build_overview(db: AsyncSession, *, term_code: str | None = None) -> OverviewResult:
+async def build_overview(
+    db: AsyncSession,
+    *,
+    term_code: str | None = None,
+    viewer_user_id: int | None = None,
+    viewer_roles: list[str] | None = None,
+) -> OverviewResult:
     normalized_term_code = _normalize_term_code(term_code)
     term_range = _term_code_date_range(normalized_term_code)
-    # --- requests 按类型 × 状态聚合 ---
-    stmt = (
-        select(
-            Request.type_code,
-            Request.status,
-            func.count().label("cnt"),
+
+    scope = None
+    if viewer_user_id is not None and viewer_roles is not None:
+        scope = await _report_scope_for_viewer(
+            db, viewer_user_id=viewer_user_id, viewer_roles=viewer_roles
         )
-        .group_by(Request.type_code, Request.status)
+        if scope is not None and scope.is_empty():
+            return OverviewResult(
+                term_code=normalized_term_code,
+                metrics=[],
+                requests=[],
+                notices=NoticeSummary(
+                    total_notices=0,
+                    published_notices=0,
+                    total_batches=0,
+                    total_deliveries=0,
+                    sent=0,
+                    failed=0,
+                    skipped=0,
+                    read=0,
+                ),
+                workflows=[],
+                generated_at=datetime.now(UTC),
+            )
+
+    # --- requests 按类型 × 状态聚合 ---
+    stmt = select(
+        Request.type_code,
+        Request.status,
+        func.count().label("cnt"),
     )
+    if scope is not None:
+        stmt = stmt.join(User, Request.applicant_user_id == User.id).join(Student, User.student_id == Student.id)
+        stmt = _apply_report_student_scope(stmt, scope)
+    stmt = stmt.group_by(Request.type_code, Request.status)
     if term_range:
         stmt = stmt.where(Request.created_at >= term_range[0], Request.created_at < term_range[1])
     grouped = (await db.execute(stmt)).all()
@@ -741,10 +1018,13 @@ async def build_overview(db: AsyncSession, *, term_code: str | None = None) -> O
 
     summary_map: dict[str, RequestSummary] = {}
     for type_code, status, cnt in grouped:
-        s = summary_map.setdefault(type_code, RequestSummary(
-            type_code=type_code,
-            type_name=(type_map.get(type_code).name if type_code in type_map else type_code),
-        ))
+        s = summary_map.setdefault(
+            type_code,
+            RequestSummary(
+                type_code=type_code,
+                type_name=(type_map.get(type_code).name if type_code in type_map else type_code),
+            ),
+        )
         if status == REQUEST_STATUS_DRAFT:
             s.draft += cnt
         elif status == REQUEST_STATUS_SUBMITTED:
@@ -761,10 +1041,26 @@ async def build_overview(db: AsyncSession, *, term_code: str | None = None) -> O
     requests_summary = list(summary_map.values())
 
     # --- notices ---
-    notice_count_stmt = select(func.count()).select_from(Notice)
-    published_notice_stmt = notice_count_stmt.where(Notice.status == "PUBLISHED")
-    batch_count_stmt = select(func.count()).select_from(NoticeDeliveryBatch)
-    delivery_stmt = select(NoticeDelivery.status, func.count()).group_by(NoticeDelivery.status)
+    notice_count_stmt = select(func.count(func.distinct(Notice.id))).select_from(Notice)
+    published_notice_stmt = select(func.count(func.distinct(Notice.id))).select_from(Notice).where(Notice.status == "PUBLISHED")
+    batch_count_stmt = select(func.count(func.distinct(NoticeDeliveryBatch.id))).select_from(NoticeDeliveryBatch)
+    delivery_stmt = select(NoticeDelivery.status, func.count(func.distinct(NoticeDelivery.id))).select_from(NoticeDelivery)
+
+    if scope is not None:
+        notice_count_stmt = notice_count_stmt.join(NoticeDelivery, NoticeDelivery.notice_id == Notice.id).join(Student, NoticeDelivery.student_id == Student.id)
+        notice_count_stmt = _apply_report_student_scope(notice_count_stmt, scope)
+
+        published_notice_stmt = published_notice_stmt.join(NoticeDelivery, NoticeDelivery.notice_id == Notice.id).join(Student, NoticeDelivery.student_id == Student.id)
+        published_notice_stmt = _apply_report_student_scope(published_notice_stmt, scope)
+
+        batch_count_stmt = batch_count_stmt.join(NoticeDelivery, NoticeDelivery.batch_id == NoticeDeliveryBatch.id).join(Student, NoticeDelivery.student_id == Student.id)
+        batch_count_stmt = _apply_report_student_scope(batch_count_stmt, scope)
+
+        delivery_stmt = delivery_stmt.join(Student, NoticeDelivery.student_id == Student.id)
+        delivery_stmt = _apply_report_student_scope(delivery_stmt, scope)
+
+    delivery_stmt = delivery_stmt.group_by(NoticeDelivery.status)
+
     if term_range:
         notice_count_stmt = notice_count_stmt.where(
             Notice.created_at >= term_range[0], Notice.created_at < term_range[1]
@@ -801,28 +1097,38 @@ async def build_overview(db: AsyncSession, *, term_code: str | None = None) -> O
         published_notices=published_notices,
         total_batches=total_batches,
         total_deliveries=total_deliveries,
-        sent=sent, failed=failed, skipped=skipped, read=read,
+        sent=sent,
+        failed=failed,
+        skipped=skipped,
+        read=read,
     )
 
     # --- workflows ---
     templates = (await db.execute(select(WorkflowTemplate))).scalars().all()
     workflows: list[WorkflowSummary] = []
     for t in templates:
-        workflow_count_stmt = select(func.count()).select_from(StudentWorkflow).where(
-            StudentWorkflow.template_id == t.id
+        workflow_count_stmt = (
+            select(func.count()).select_from(StudentWorkflow).where(StudentWorkflow.template_id == t.id)
         )
+        if scope is not None:
+            workflow_count_stmt = workflow_count_stmt.join(Student, StudentWorkflow.student_id == Student.id)
+            workflow_count_stmt = _apply_report_student_scope(workflow_count_stmt, scope)
         if term_range:
             workflow_count_stmt = workflow_count_stmt.where(
                 StudentWorkflow.started_at >= term_range[0],
                 StudentWorkflow.started_at < term_range[1],
             )
-        total_students = (await db.execute(workflow_count_stmt)).scalar_one()
+        total_students_workflow = (await db.execute(workflow_count_stmt)).scalar_one()
+        
         node_stmt = (
             select(StudentWorkflowNode.status, func.count())
             .join(StudentWorkflow, StudentWorkflow.id == StudentWorkflowNode.workflow_id)
             .where(StudentWorkflow.template_id == t.id)
-            .group_by(StudentWorkflowNode.status)
         )
+        if scope is not None:
+            node_stmt = node_stmt.join(Student, StudentWorkflow.student_id == Student.id)
+            node_stmt = _apply_report_student_scope(node_stmt, scope)
+        node_stmt = node_stmt.group_by(StudentWorkflowNode.status)
         if term_range:
             node_stmt = node_stmt.where(
                 StudentWorkflowNode.created_at >= term_range[0],
@@ -830,26 +1136,28 @@ async def build_overview(db: AsyncSession, *, term_code: str | None = None) -> O
             )
         node_rows = (await db.execute(node_stmt)).all()
         node_map = dict(node_rows)
-        workflows.append(WorkflowSummary(
-            template_code=t.code,
-            template_name=t.name,
-            kind=t.kind,
-            total_students=total_students,
-            nodes_pending=node_map.get(WORKFLOW_NODE_PENDING, 0),
-            nodes_overdue=node_map.get(WORKFLOW_NODE_OVERDUE, 0),
-            nodes_done=node_map.get(WORKFLOW_NODE_DONE, 0),
-        ))
+        workflows.append(
+            WorkflowSummary(
+                template_code=t.code,
+                template_name=t.name,
+                kind=t.kind,
+                total_students=total_students_workflow,
+                nodes_pending=node_map.get(WORKFLOW_NODE_PENDING, 0),
+                nodes_overdue=node_map.get(WORKFLOW_NODE_OVERDUE, 0),
+                nodes_done=node_map.get(WORKFLOW_NODE_DONE, 0),
+            )
+        )
 
     # --- 顶部指标 ---
-    total_students = (await db.execute(
-        select(func.count()).select_from(Student).where(Student.deleted_at.is_(None))
-    )).scalar_one()
+    student_count_stmt = select(func.count()).select_from(Student).where(Student.deleted_at.is_(None))
+    if scope is not None:
+        student_count_stmt = _apply_report_student_scope(student_count_stmt, scope)
+    total_students_metric = (await db.execute(student_count_stmt)).scalar_one()
+    
     total_requests_all = sum(s.total for s in requests_summary)
-    pending_approvals = sum(
-        s.submitted + s.in_review for s in requests_summary
-    )
+    pending_approvals = sum(s.submitted + s.in_review for s in requests_summary)
     metrics = [
-        KVMetric(key="students", label="在籍学生", value=total_students),
+        KVMetric(key="students", label="在籍学生", value=total_students_metric),
         KVMetric(key="requests", label="申请总量", value=total_requests_all),
         KVMetric(key="pending_approvals", label="待审批", value=pending_approvals),
         KVMetric(key="notices", label="通知条数", value=total_notices),

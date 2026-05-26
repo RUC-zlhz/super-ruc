@@ -46,7 +46,7 @@ export interface WechatSubscribeAuthorizationResult {
   status: 'accept' | 'reject' | 'ban' | 'filter'
 }
 
-export function getMyNotices(params?: { page?: number; size?: number }) {
+export function getMyNotices(params?: { page?: number; size?: number; unread_only?: boolean }) {
   return get<{ items: StudentNoticeItem[]; meta: any }>('/notices/inbox', params)
 }
 

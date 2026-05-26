@@ -52,8 +52,8 @@ services:
       network: host
       args:
         PYTHON_IMAGE: ${PYTHON_IMAGE:-docker.m.daocloud.io/library/python:3.11-slim}
-        HTTP_PROXY: ${BUILD_HTTP_PROXY:-http://127.0.0.1:18081}
-        HTTPS_PROXY: ${BUILD_HTTPS_PROXY:-http://127.0.0.1:18081}
+        HTTP_PROXY: ${BUILD_HTTP_PROXY:-}
+        HTTPS_PROXY: ${BUILD_HTTPS_PROXY:-}
         NO_PROXY: ${BUILD_NO_PROXY:-localhost,127.0.0.1,::1,db,redis,minio,backend,web}
     restart: unless-stopped
     environment:
@@ -61,12 +61,21 @@ services:
       APP_DEBUG: "false"
       APP_HOST: 0.0.0.0
       APP_PORT: 8080
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      http_proxy: ""
+      https_proxy: ""
+      npm_config_proxy: ""
+      npm_config_https_proxy: ""
+      NO_PROXY: "localhost,127.0.0.1,::1,db,redis,minio,backend,web"
+      no_proxy: "localhost,127.0.0.1,::1,db,redis,minio,backend,web"
       API_V1_PREFIX: /api/v1
       DATABASE_URL: ${DATABASE_URL}
       KINGBASE_DATABASE_URL: ${KINGBASE_DATABASE_URL:-}
       DATABASE_ECHO: "false"
       DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-10}
       DATABASE_MAX_OVERFLOW: ${DATABASE_MAX_OVERFLOW:-20}
+      ACADEMIC_CURRENT_TERM_CODE: ${ACADEMIC_CURRENT_TERM_CODE:-}
       REDIS_URL: ${REDIS_URL}
       AUDIT_ARCHIVE_ENABLED: ${AUDIT_ARCHIVE_ENABLED:-false}
       AUDIT_ARCHIVE_RUN_AT: ${AUDIT_ARCHIVE_RUN_AT:-03:30}
@@ -134,8 +143,8 @@ services:
         NODE_IMAGE: ${NODE_IMAGE:-docker.m.daocloud.io/library/node:20-bookworm-slim}
         NGINX_IMAGE: ${NGINX_IMAGE:-docker.m.daocloud.io/library/nginx:1.27-alpine}
         VITE_API_BASE: /api/v1
-        HTTP_PROXY: ${BUILD_HTTP_PROXY:-http://127.0.0.1:18081}
-        HTTPS_PROXY: ${BUILD_HTTPS_PROXY:-http://127.0.0.1:18081}
+        HTTP_PROXY: ${BUILD_HTTP_PROXY:-}
+        HTTPS_PROXY: ${BUILD_HTTPS_PROXY:-}
         NO_PROXY: ${BUILD_NO_PROXY:-localhost,127.0.0.1,::1,db,redis,minio,backend,web}
     restart: unless-stopped
     ports:

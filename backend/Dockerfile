@@ -3,23 +3,28 @@ FROM ${PYTHON_IMAGE}
 ARG HTTP_PROXY=
 ARG HTTPS_PROXY=
 ARG NO_PROXY=
+ARG DEBIAN_MIRROR=http://mirrors.tuna.tsinghua.edu.cn/debian
+ARG DEBIAN_SECURITY_MIRROR=http://mirrors.tuna.tsinghua.edu.cn/debian-security
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
-    DEBIAN_FRONTEND=noninteractive \
-    HTTP_PROXY=${HTTP_PROXY} \
-    HTTPS_PROXY=${HTTPS_PROXY} \
-    http_proxy=${HTTP_PROXY} \
-    https_proxy=${HTTPS_PROXY} \
-    npm_config_proxy=${HTTP_PROXY} \
-    npm_config_https_proxy=${HTTPS_PROXY} \
-    NO_PROXY=${NO_PROXY} \
-    no_proxy=${NO_PROXY}
+    DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
-RUN apt-get update \
+RUN sed -i \
+        -e "s|http://deb.debian.org/debian-security|${DEBIAN_SECURITY_MIRROR}|g" \
+        -e "s|http://deb.debian.org/debian|${DEBIAN_MIRROR}|g" \
+        /etc/apt/sources.list.d/debian.sources \
+    && printf 'Acquire::ForceIPv4 "true";\nAcquire::Retries "2";\nAcquire::http::Timeout "20";\nAcquire::https::Timeout "20";\n' >/etc/apt/apt.conf.d/99super-ruc-network \
+    && HTTP_PROXY="${HTTP_PROXY}" \
+    HTTPS_PROXY="${HTTPS_PROXY}" \
+    http_proxy="${HTTP_PROXY}" \
+    https_proxy="${HTTPS_PROXY}" \
+    NO_PROXY="${NO_PROXY}" \
+    no_proxy="${NO_PROXY}" \
+    apt-get update \
     && apt-get install -y --no-install-recommends \
         curl \
         libcairo2 \
@@ -35,7 +40,13 @@ COPY alembic ./alembic
 COPY app ./app
 COPY scripts ./scripts
 
-RUN pip install --no-cache-dir .
+RUN HTTP_PROXY="${HTTP_PROXY}" \
+    HTTPS_PROXY="${HTTPS_PROXY}" \
+    http_proxy="${HTTP_PROXY}" \
+    https_proxy="${HTTPS_PROXY}" \
+    NO_PROXY="${NO_PROXY}" \
+    no_proxy="${NO_PROXY}" \
+    pip install --no-cache-dir .
 
 EXPOSE 8080
 

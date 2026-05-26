@@ -208,6 +208,7 @@ import EmptyState from "@/components/EmptyState.vue";
 import {
   getMyRequests,
   getRequestStatusLabel,
+  getRequestTypeBadge,
   type RequestBrief,
 } from "@/api/workflow";
 import { useAuthStore } from "@/store/auth";
@@ -229,6 +230,8 @@ const loading = ref(false);
 const pageError = ref("");
 const hasLoaded = ref(false);
 const lastLoadedTab = ref("");
+const currentPage = ref(1);
+const hasMore = ref(true);
 const auth = useAuthStore();
 const isGuest = computed(() => auth.isLoggedIn && !auth.user?.student_id);
 
@@ -264,12 +267,7 @@ function statusLabel(status: string) {
 }
 
 function requestIcon(typeCode?: string | null) {
-  const code = typeCode || "";
-  if (code.includes("CERT")) return "证";
-  if (code.includes("LEAVE")) return "假";
-  if (code.includes("HONOR") || code.includes("SCHOLAR")) return "奖";
-  if (code.includes("DORM")) return "宿";
-  return "事";
+  return getRequestTypeBadge(typeCode);
 }
 
 function requestToneClass(status: string) {
@@ -324,14 +322,30 @@ async function reload() {
     return;
   }
   loading.value = true;
+  currentPage.value = 1;
+  hasMore.value = true;
   try {
     pageError.value = "";
-    const statusParam = tab.value.includes(",") ? undefined : tab.value || undefined;
-    const response = await getMyRequests({ status: statusParam, page: 1, size: 20 });
-    let items = response.data.items;
-    if (tab.value.includes(",")) {
-      const allowed = new Set(tab.value.split(","));
-      items = items.filter((item) => allowed.has(item.status));
+    const statusList = tab.value.split(",").map((item) => item.trim()).filter(Boolean);
+    let items: RequestBrief[];
+    if (statusList.length > 1) {
+      const responses = await Promise.all(
+        statusList.map((status) => getMyRequests({ status, page: 1, size: 100 })),
+      );
+      const byId = new Map<number, RequestBrief>();
+      for (const response of responses) {
+        for (const item of response.data.items) {
+          byId.set(item.id, item);
+        }
+      }
+      items = Array.from(byId.values()).sort(
+        (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+      );
+      hasMore.value = false;
+    } else {
+      const response = await getMyRequests({ status: statusList[0], page: currentPage.value, size: 20 });
+      items = response.data.items;
+      if (items.length < 20) hasMore.value = false;
     }
     requests.value = items;
     hasLoaded.value = true;
@@ -341,6 +355,30 @@ async function reload() {
     if (!hasLoaded.value || lastLoadedTab.value !== tab.value) {
       requests.value = [];
     }
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function loadMore() {
+  if (!hasMore.value || loading.value) return;
+  const statusList = tab.value.split(",").map((item) => item.trim()).filter(Boolean);
+  if (statusList.length > 1) return;
+
+  loading.value = true;
+  try {
+    const nextPage = currentPage.value + 1;
+    const response = await getMyRequests({ status: statusList[0], page: nextPage, size: 20 });
+    const newItems = response.data.items;
+    if (newItems.length > 0) {
+      requests.value = [...requests.value, ...newItems];
+      currentPage.value = nextPage;
+    }
+    if (newItems.length < 20) {
+      hasMore.value = false;
+    }
+  } catch (error) {
+    uni.showToast({ title: "加载更多失败", icon: "none" });
   } finally {
     loading.value = false;
   }
@@ -392,6 +430,10 @@ onPullDownRefresh(async () => {
   } finally {
     uni.stopPullDownRefresh();
   }
+});
+
+onReachBottom(() => {
+  loadMore();
 });
 </script>
 

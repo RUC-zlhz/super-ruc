@@ -76,6 +76,7 @@ class HonorRecord(Base):
     effective_from: Mapped[date | None] = mapped_column(Date, nullable=True)
     effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
     is_collective: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     # 图文展示内容
     summary: Mapped[str | None] = mapped_column(String(512), nullable=True, comment="事迹摘要")

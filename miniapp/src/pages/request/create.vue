@@ -348,6 +348,7 @@ import {
   getRequestCategoryLabel,
   getRequestDetail,
   getRequestStatusLabel,
+  getRequestTypeBadge,
   isEditableRequestStatus,
   listRequestTypes,
   submitRequest,
@@ -509,12 +510,7 @@ function categoryLabel(category: string) {
 }
 
 function typeIcon(code: string, category: string) {
-  if (category === "CERTIFICATE" || code.includes("CERT")) return "证";
-  if (code.includes("GRADE") || code.includes("SCORE")) return "绩";
-  if (code.includes("SCHOLAR") || code.includes("HONOR")) return "奖";
-  if (code.includes("DORM")) return "宿";
-  if (code.includes("LEAVE")) return "假";
-  return "事";
+  return getRequestTypeBadge(code, category);
 }
 
 function statusLabel(status: string) {
@@ -1280,6 +1276,11 @@ onMounted(async () => {
   font-size: 26rpx;
   color: #1f2937;
   box-shadow: inset 0 2rpx 8rpx rgba(82, 28, 38, 0.03);
+}
+
+.input {
+  height: 88rpx;
+  padding: 0 18rpx;
 }
 
 .textarea {

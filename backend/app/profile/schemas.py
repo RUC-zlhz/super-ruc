@@ -147,6 +147,8 @@ class AcademicCorrectionIn(BaseModel):
 class StudentAcademicInfoPatch(BaseModel):
     student_no: str | None = None
     full_name: str | None = None
+    id_card: str | None = None
+    phone: str | None = None
     gender: str | None = None
     grade_code: str | None = None
     major_code: str | None = None
@@ -159,6 +161,8 @@ class StudentAcademicInfoPatch(BaseModel):
 class StudentCreateIn(BaseModel):
     student_no: str = Field(min_length=1, max_length=32)
     full_name: str = Field(min_length=1, max_length=64)
+    id_card: str | None = Field(default=None, max_length=32)
+    phone: str | None = Field(default=None, max_length=32)
     gender: str | None = Field(default=None, max_length=8)
     grade_code: str | None = Field(default=None, max_length=16)
     major_code: str | None = Field(default=None, max_length=32)

@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import service
-from app.auth.models import Student, User
+from app.auth.models import Student, User, UserRole
 from app.core.exceptions import AuthError, BizError
 
 
@@ -203,6 +203,35 @@ async def test_wx_login_without_student_no_requires_guest_dev_switch(
     )
 
     assert resp.status_code == 403
+
+
+async def test_bound_wx_login_without_student_no_works_when_guest_disabled(
+    client: AsyncClient,
+    db: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service.settings, "WECHAT_GUEST_LOGIN_ENABLED", False)
+
+    async def _bound_code2session(_code: str, *, student_no: str | None = None) -> dict:
+        assert student_no is None
+        return {"openid": "wx_bound_openid", "unionid": "wx_bound_unionid"}
+
+    monkeypatch.setattr(service, "wx_code2session", _bound_code2session)
+    student = Student(student_no="2022110110", full_name="测试学生J")
+    db.add(student)
+    await db.flush()
+    user = User(openid="wx_bound_openid", display_name="测试学生J", student_id=student.id)
+    db.add(user)
+    await db.flush()
+    db.add(UserRole(user_id=user.id, role_code="STUDENT"))
+    await db.commit()
+
+    resp = await client.post("/api/v1/auth/wx-login", json={"code": "wx_code_bound"})
+
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["user"]["student_no"] == "2022110110"
+    assert not any(role["code"] == "GUEST" for role in data["user"]["roles"])
 
 
 async def test_guest_wx_login_can_bind_student_later(

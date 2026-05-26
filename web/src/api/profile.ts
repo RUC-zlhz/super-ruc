@@ -113,6 +113,8 @@ export interface ProfileSummary {
 export interface StudentAcademicInfoPatch {
   student_no?: string | null
   full_name?: string | null
+  id_card?: string | null
+  phone?: string | null
   gender?: string | null
   grade_code?: string | null
   major_code?: string | null
@@ -125,6 +127,8 @@ export interface StudentAcademicInfoPatch {
 export interface StudentCreateInput {
   student_no: string
   full_name: string
+  id_card?: string | null
+  phone?: string | null
   gender?: string | null
   grade_code?: string | null
   major_code?: string | null
@@ -274,7 +278,8 @@ async function optionalAdminGet<T>(url: string, params?: Record<string, unknown>
   if (resp.status === 401) {
     setAccessToken(null)
     if (location.pathname !== '/login') {
-      location.replace('/login')
+      const currentPath = location.pathname + location.search + location.hash
+      location.replace(`/login?redirect=${encodeURIComponent(currentPath)}`)
     }
     throw new Error('登录已失效')
   }
@@ -329,7 +334,8 @@ export async function downloadStudentProfileSnapshot(studentId: number, format: 
   if (resp.status === 401) {
     setAccessToken(null)
     if (location.pathname !== '/login') {
-      location.replace('/login')
+      const currentPath = location.pathname + location.search + location.hash
+      location.replace(`/login?redirect=${encodeURIComponent(currentPath)}`)
     }
     throw new Error('登录已失效')
   }

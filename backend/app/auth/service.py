@@ -1,4 +1,4 @@
-﻿"""Authentication service logic for WeChat login, account binding, and JWT issuance."""
+"""Authentication service logic for WeChat login, account binding, and JWT issuance."""
 from __future__ import annotations
 
 import logging
@@ -101,7 +101,7 @@ async def wx_code2session(code: str, *, student_no: str | None = None) -> dict:
         "grant_type": "authorization_code",
     }
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, trust_env=False) as client:
             resp = await client.get(WX_CODE2SESSION_URL, params=params)
     except httpx.RequestError as exc:
         logger.warning("wechat code2session request failed: %s", exc)
@@ -198,12 +198,6 @@ async def login_with_wechat(
     normalized_full_name = _clean_optional(full_name)
     normalized_id_card_tail = _clean_optional(id_card_tail)
     guest_login_requested = normalized_student_no is None
-    if guest_login_requested and not settings.WECHAT_GUEST_LOGIN_ENABLED:
-        raise BizError(
-            "访客登录仅在开发模式开关开启时可用，请填写学号完成绑定",
-            code=40320,
-            http_status=403,
-        )
     session_data = await wx_code2session(code, student_no=normalized_student_no)
     openid = session_data["openid"]
 
@@ -222,6 +216,17 @@ async def login_with_wechat(
         )
         await db.commit()
         raise AuthError("账号已停用")
+
+    if (
+        guest_login_requested
+        and not settings.WECHAT_GUEST_LOGIN_ENABLED
+        and (user is None or user.student_id is None)
+    ):
+        raise BizError(
+            "访客登录仅在开发模式开关开启时可用，请填写学号完成绑定",
+            code=40320,
+            http_status=403,
+        )
 
     student = None
     if normalized_student_no:
@@ -367,6 +372,7 @@ async def change_password(
 
     user.password_hash = hash_password(new_password)
     user.must_change_password = False
+    user.token_version += 1
     await log_action(
         db,
         event_type="AUTH",

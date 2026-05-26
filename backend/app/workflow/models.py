@@ -359,6 +359,44 @@ class RequestType(Base):
     )
 
 
+class ProofTemplate(Base):
+    """电子证明模板。按申请类型绑定，渲染为 HTML 后生成 PDF。"""
+
+    __tablename__ = "proof_templates"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_type_code: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    version_label: Mapped[str] = mapped_column(String(32), nullable=False, default="v1")
+    html_template: Mapped[str] = mapped_column(Text, nullable=False)
+    field_schema: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
+    created_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    updated_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "request_type_code",
+            "version_label",
+            name="uq_proof_templates_type_version",
+        ),
+        Index(
+            "ix_proof_templates_type_active_default",
+            "request_type_code",
+            "is_active",
+            "is_default",
+        ),
+    )
+
+
 class Request(Base):
     """申请单主表。
 

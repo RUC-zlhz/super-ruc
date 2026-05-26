@@ -5,11 +5,14 @@ import {
 } from "vue-router";
 import { useAuthStore } from "@/store/auth";
 import { getDefaultRouteForRoles } from "@/config/navigation";
+import { getAccessToken } from "@/utils/request";
 import {
   APPROVER_ROLES,
   AUDIT_VIEWER_ROLES,
   CONTENT_EDITOR_ROLES,
   CURRICULUM_ADMIN_ROLES,
+  PROFILE_ADMIN_ROLES,
+  REPORT_VIEWER_ROLES,
   SYSTEM_USER_ROLES,
   hasAnyRole,
 } from "@/utils/permission";
@@ -37,16 +40,12 @@ const routes: RouteRecordRaw[] = [
   {
     path: "/",
     component: MainLayout,
-    redirect: () => {
-      const auth = useAuthStore();
-      return getDefaultRouteForRoles(auth.roleCodes);
-    },
     children: [
       {
         path: "dashboard",
         name: "dashboard",
         component: () => import("@/views/dashboard/OperationDashboard.vue"),
-        meta: { title: "运营看板", roles: ["SUPER_ADMIN", "COLLEGE_LEADER"] },
+        meta: { title: "运营看板", roles: REPORT_VIEWER_ROLES },
       },
       {
         path: "approval/workbench",
@@ -135,7 +134,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import("@/views/profile/StudentProfile.vue"),
         meta: {
           title: "学生画像",
-          roles: SYSTEM_USER_ROLES,
+          roles: PROFILE_ADMIN_ROLES,
         },
       },
     ],
@@ -179,11 +178,19 @@ router.beforeEach(async (to) => {
   if (!auth.user) {
     try {
       await auth.fetchMe();
-    } catch {
-      auth.logout();
-      return { path: "/login", query: { redirect: to.fullPath } };
+    } catch (e) {
+      if (!getAccessToken()) {
+        auth.logout();
+        return { path: "/login", query: { redirect: to.fullPath } };
+      }
+      throw e;
     }
   }
+
+  if (to.path === "/") {
+    return { path: getDefaultRouteForRoles(auth.roleCodes) };
+  }
+
   const requiredRoles = (to.meta.roles as string[] | undefined) ?? undefined;
   if (!hasAnyRole(auth.roleCodes, requiredRoles)) {
     return { path: "/error/403" };

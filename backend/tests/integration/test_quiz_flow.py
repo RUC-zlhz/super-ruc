@@ -335,6 +335,82 @@ async def test_quiz_deleted_question_not_drawn(
     assert draw.status_code == 404
 
 
+async def test_quiz_question_import_preview_commit_and_student_draw_source(
+    client: AsyncClient,
+    db: AsyncSession,
+    admin_client: AsyncClient,
+) -> None:
+    template = await admin_client.get(
+        "/api/v1/admin/quiz/questions/import-template",
+        params={"format": "xlsx"},
+    )
+    assert template.status_code == 200, template.text
+    assert template.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    existing = await _create_question(
+        admin_client,
+        topic="导入题库",
+        qtype="JUDGE",
+        stem="党员必须按期交纳党费。",
+        options_json=None,
+        correct_key="TRUE",
+        explanation="旧解析",
+    )
+    csv_text = "\n".join(
+        [
+            "topic,qtype,stem,option_a,option_b,option_c,option_d,correct_key,explanation,difficulty,is_active,source_name,source_url",
+            "导入题库,JUDGE,党员必须按期交纳党费。,,,,,对,以官方题库为准,EASY,true,共产党员网知识自测,https://www.12371.cn/special/zszc/",
+            '导入题库,MULTI,以下哪些属于党员义务？,学习党的理论,执行党的决定,遵守党的纪律,个人自由优先,"c,a",以党章为准,MEDIUM,true,共产党员网知识自测,https://www.12371.cn/special/zszc/',
+        ]
+    )
+    preview = await admin_client.post(
+        "/api/v1/admin/quiz/questions/import-preview",
+        files={"file": ("quiz.csv", ("\ufeff" + csv_text).encode("utf-8"), "text/csv")},
+    )
+    assert preview.status_code == 200, preview.text
+    preview_data = preview.json()["data"]
+    assert preview_data["batch"]["status"] == "VALIDATED"
+    assert preview_data["batch"]["warn_rows"] == 1
+    assert preview_data["batch"]["fatal_rows"] == 0
+    assert any("更新已有题目" in (row["message"] or "") for row in preview_data["rows"])
+
+    commit = await admin_client.post(
+        f"/api/v1/admin/quiz/questions/import-commit/{preview_data['batch']['id']}"
+    )
+    assert commit.status_code == 200, commit.text
+    summary = commit.json()["data"]
+    assert summary["created_count"] == 1
+    assert summary["updated_count"] == 1
+
+    listing = await admin_client.get(
+        "/api/v1/admin/quiz/questions",
+        params={"topic": "导入题库", "page": 1, "size": 20},
+    )
+    assert listing.status_code == 200, listing.text
+    rows = listing.json()["data"]["items"]
+    imported = {row["stem"]: row for row in rows}
+    assert imported["党员必须按期交纳党费。"]["id"] == existing["id"]
+    assert imported["党员必须按期交纳党费。"]["source_official"] is True
+    assert imported["以下哪些属于党员义务？"]["correct_key"] == "A,C"
+    assert imported["以下哪些属于党员义务？"]["import_batch_id"] == preview_data["batch"]["id"]
+
+    token = await _login_as_student(
+        client, db, student_no="Q400001", wx_code="wx_q400001"
+    )
+    draw = await client.get(
+        "/api/v1/quiz/draw",
+        headers={"Authorization": f"Bearer {token}"},
+        params={"topic": "导入题库", "limit": 5},
+    )
+    assert draw.status_code == 200, draw.text
+    for question in draw.json()["data"]["questions"]:
+        assert "correct_key" not in question
+        assert "explanation" not in question
+        assert question["source_name"] == "共产党员网知识自测"
+
+
 async def test_quiz_access_control(
     client: AsyncClient, db: AsyncSession
 ) -> None:

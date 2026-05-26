@@ -15,6 +15,7 @@ from datetime import date, timedelta
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.audit.models import AuditLog
 from app.auth.models import Student, User, UserRole
@@ -22,6 +23,7 @@ from app.core.security import create_token
 from app.workflow.models import (
     StudentWorkflowNode,
     WorkflowReminder,
+    WorkflowTemplate,
 )
 
 
@@ -136,6 +138,122 @@ def _party_template_payload() -> dict:
             },
         ],
     }
+
+
+async def test_default_official_workflow_templates_are_seeded(
+    db: AsyncSession,
+) -> None:
+    party = (
+        await db.execute(
+            select(WorkflowTemplate)
+            .options(selectinload(WorkflowTemplate.nodes))
+            .where(WorkflowTemplate.code == "PARTY_DEVELOPMENT_OFFICIAL_V2")
+        )
+    ).scalar_one()
+    party_nodes = sorted(party.nodes, key=lambda node: node.sort_order)
+    assert party.is_active is True
+    assert party.name == "发展党员工作程序（官方29步）"
+    assert len(party_nodes) == 29
+    assert party_nodes[0].name == "教育引导"
+    assert party_nodes[-1].name == "存档"
+    assert party_nodes[-1].is_terminal is True
+    assert {node.stage_group for node in party_nodes} == {
+        "ACTIVIST_CONFIRMATION",
+        "DEVELOPMENT_TARGET",
+        "PROBATION_ACCEPTANCE",
+        "PROBATION_EDUCATION_FULL_MEMBER",
+    }
+
+    youth = (
+        await db.execute(
+            select(WorkflowTemplate)
+            .options(selectinload(WorkflowTemplate.nodes))
+            .where(WorkflowTemplate.code == "YOUTH_LEAGUE_DEVELOPMENT_OFFICIAL_V2")
+        )
+    ).scalar_one()
+    youth_nodes = sorted(youth.nodes, key=lambda node: node.sort_order)
+    youth_node_names = [node.name for node in youth_nodes]
+    assert youth.is_active is True
+    assert youth.name == "发展团员工作流程（官方15步）"
+    assert len(youth_nodes) == 15
+    assert youth_nodes[0].name == "提交入团申请书"
+    assert youth_nodes[-1].name == "档案管理"
+    assert youth_nodes[-1].is_terminal is True
+    assert "推优入党" not in youth_node_names
+    assert "毕业团员转出" not in youth_node_names
+    assert {node.stage_group for node in youth_nodes} == {
+        "APPLY",
+        "ACTIVIST_CONFIRMATION",
+        "ACTIVIST_EDUCATION",
+        "DEVELOPMENT_TARGET",
+        "NEW_MEMBER_ACCEPTANCE",
+    }
+
+    membership = (
+        await db.execute(
+            select(WorkflowTemplate)
+            .options(selectinload(WorkflowTemplate.nodes))
+            .where(WorkflowTemplate.code == "YOUTH_LEAGUE_MEMBERSHIP_MANAGEMENT_V1")
+        )
+    ).scalar_one()
+    membership_nodes = sorted(membership.nodes, key=lambda node: node.sort_order)
+    assert membership.is_active is True
+    assert [node.name for node in membership_nodes] == ["推优入党", "毕业团员转出"]
+
+    legacy_rows = (
+        await db.execute(
+            select(WorkflowTemplate).where(
+                WorkflowTemplate.code.in_(["PARTY_DEVELOPMENT_V1", "YOUTH_LEAGUE_V1"])
+            )
+        )
+    ).scalars().all()
+    legacy_by_code = {row.code: row for row in legacy_rows}
+    assert legacy_by_code["PARTY_DEVELOPMENT_V1"].is_active is False
+    assert legacy_by_code["YOUTH_LEAGUE_V1"].is_active is False
+
+
+async def test_official_party_template_can_start_and_advance(
+    client: AsyncClient, db: AsyncSession, admin_client: AsyncClient,
+) -> None:
+    token, student_id = await _login_as_student(
+        client, db, student_no="W00029", wx_code="wx_w00029",
+    )
+
+    start = await admin_client.post(
+        "/api/v1/admin/workflow/students",
+        json={
+            "student_id": student_id,
+            "template_code": "PARTY_DEVELOPMENT_OFFICIAL_V2",
+            "note": "官方模板回归",
+        },
+    )
+    assert start.status_code == 200, start.text
+    workflow = start.json()["data"]
+    assert workflow["current_node_name"] == "教育引导"
+    assert len(workflow["nodes"]) == 29
+    node_states = {node["node_code"]: node for node in workflow["nodes"]}
+    first_state = node_states["PARTY_01_EDUCATION_GUIDANCE"]
+    second_state = node_states["PARTY_02_RECEIVE_APPLICATION_TALK"]
+    assert first_state["triggered_at"] is not None
+    assert second_state["triggered_at"] is None
+
+    complete = await admin_client.post(
+        f"/api/v1/admin/workflow/node-states/{first_state['id']}/complete",
+        json={"evidence": "已完成教育引导"},
+    )
+    assert complete.status_code == 200, complete.text
+    advanced = complete.json()["data"]
+    assert advanced["current_node_name"] == "接收入党申请书并派人谈话"
+    advanced_nodes = {node["node_code"]: node for node in advanced["nodes"]}
+    assert advanced_nodes["PARTY_01_EDUCATION_GUIDANCE"]["status"] == "DONE"
+    assert advanced_nodes["PARTY_02_RECEIVE_APPLICATION_TALK"]["triggered_at"] is not None
+
+    mine = await client.get(
+        "/api/v1/workflow/my",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert mine.status_code == 200, mine.text
+    assert mine.json()["data"][0]["template_code"] == "PARTY_DEVELOPMENT_OFFICIAL_V2"
 
 
 async def test_party_template_upsert_start_complete_workflow(
@@ -426,8 +544,8 @@ async def test_scoped_launcher_can_start_only_students_in_scope(
         )
     ).scalar_one()
     assert denied_log.result_code == "DENIED"
-    assert denied_log.detail["student_id"] == out_scope_student_id
-    assert denied_log.detail["template_code"] == "PARTY_DEV_MAIN"
+    assert denied_log.detail["target"]["student_id"] == out_scope_student_id
+    assert denied_log.detail["target"]["template_code"] == "PARTY_DEV_MAIN"
     assert denied_log.detail["reason"] == "OUT_OF_SCOPE"
 
 

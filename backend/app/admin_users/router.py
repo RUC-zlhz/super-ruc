@@ -19,6 +19,7 @@ from app.admin_users.schemas import (
 )
 from app.core.dependencies import CurrentUserDep, DBDep, require_role
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
+from app.core.uploads import read_upload_file_limited
 
 _IMPORT_ROLES = tuple(sorted(service.IMPORTER_ROLES))
 _ImporterRole = require_role(*_IMPORT_ROLES)
@@ -53,7 +54,12 @@ async def import_preview(
     user: Annotated[CurrentUserDep, Depends(_ImporterRole)],
     file: Annotated[UploadFile, File()],
 ) -> ApiResponse[AdminUserImportPreviewResult]:
-    content = await file.read()
+    content = await read_upload_file_limited(
+        file,
+        max_bytes=service.MAX_UPLOAD_BYTES,
+        too_large_message="文件超过 10MB 上限",
+        too_large_code=40082,
+    )
     batch = await service.preview_import(
         db,
         filename=file.filename or "admin-users.xlsx",

@@ -230,9 +230,14 @@ defineExpose({ validate })
   color: #2f2a2b;
   box-shadow: inset 0 2rpx 8rpx rgba(82, 28, 38, 0.03);
 }
+.df-input { 
+  height: 88rpx; 
+  padding: 0 20rpx;
+}
 .df-textarea { min-height: 168rpx; }
 .df-picker {
-  min-height: 76rpx;
+  min-height: 88rpx;
+  padding: 0 20rpx;
   line-height: 1.5;
   display: flex;
   align-items: center;

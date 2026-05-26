@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit.models import AuditLog, RoleFieldPolicy
 from app.audit.policies import POLITICAL_STATUS
 from app.auth.models import ENROLLMENT_ACTIVE, ENROLLMENT_GRADUATED, Student, User, UserRole
-from app.core.security import create_token
+from app.core.security import create_token, decrypt_field
 from app.profile.models import (
     PROFILE_APPROVAL_APPROVED,
     PROFILE_APPROVAL_PENDING,
@@ -894,6 +894,8 @@ async def test_admin_creates_student_updates_master_data_and_unbinds_wechat(
         json={
             "student_no": "P300006",
             "full_name": "新增学生",
+            "id_card": "110101200001019876",
+            "phone": "13900139000",
             "gender": "女",
             "grade_code": "2024",
             "major_code": "CS",
@@ -907,15 +909,40 @@ async def test_admin_creates_student_updates_master_data_and_unbinds_wechat(
     student = created.json()["data"]
     assert student["student_no"] == "P300006"
     assert student["full_name"] == "新增学生"
+    assert "id_card" not in student
+    assert "phone" not in student
+    created_row = (
+        await db.execute(select(Student).where(Student.student_no == "P300006"))
+    ).scalar_one()
+    assert created_row.id_card_enc != "110101200001019876"
+    assert created_row.phone_enc != "13900139000"
+    assert decrypt_field(created_row.id_card_enc) == "110101200001019876"
+    assert decrypt_field(created_row.phone_enc) == "13900139000"
+    create_log = await _latest_audit(db, action="CREATE_STUDENT", entity_id=student["id"])
+    assert create_log is not None
+    assert "110101200001019876" not in str(create_log.detail)
+    assert "13900139000" not in str(create_log.detail)
+    assert "id_card" in create_log.detail["masked_fields"]
+    assert "phone" in create_log.detail["masked_fields"]
 
     updated = await client.patch(
         f"/api/v1/admin/students/{student['id']}/academic-info",
         headers=admin_headers,
-        json={"full_name": "新增学生改名", "class_code": "CS2407"},
+        json={
+            "full_name": "新增学生改名",
+            "class_code": "CS2407",
+            "phone": "13700137000",
+        },
     )
     assert updated.status_code == 200, updated.text
     assert updated.json()["data"]["full_name"] == "新增学生改名"
     assert updated.json()["data"]["class_code"] == "CS2407"
+    await db.refresh(created_row)
+    assert decrypt_field(created_row.phone_enc) == "13700137000"
+    update_log = await _latest_audit(db, action="UPDATE_ACADEMIC_INFO", entity_id=student["id"])
+    assert update_log is not None
+    assert "13700137000" not in str(update_log.detail)
+    assert "phone" in update_log.detail["masked_fields"]
 
     login = await client.post(
         "/api/v1/auth/wx-login",
@@ -923,6 +950,7 @@ async def test_admin_creates_student_updates_master_data_and_unbinds_wechat(
             "code": "wx_profile_unbind",
             "student_no": "P300006",
             "full_name": "新增学生改名",
+            "id_card_tail": "019876",
         },
     )
     assert login.status_code == 200, login.text
@@ -934,7 +962,7 @@ async def test_admin_creates_student_updates_master_data_and_unbinds_wechat(
     assert binding.status_code == 200, binding.text
     binding_data = binding.json()["data"]
     assert binding_data["bound"] is True
-    assert binding_data["openid_masked"].startswith("mock_w")
+    assert binding_data["openid_masked"].startswith("mock_s")
     assert "STUDENT" in binding_data["roles"]
 
     unbound = await client.delete(
@@ -945,7 +973,7 @@ async def test_admin_creates_student_updates_master_data_and_unbinds_wechat(
     assert unbound.json()["data"]["bound"] is False
 
     user = (
-        await db.execute(select(User).where(User.openid == "mock_wx_profile_unbind"))
+        await db.execute(select(User).where(User.openid == "mock_student_P300006"))
     ).scalar_one()
     assert user.student_id is None
     roles = (

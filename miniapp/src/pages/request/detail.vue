@@ -255,6 +255,7 @@ import { computed, onMounted, ref } from "vue";
 import EmptyState from "@/components/EmptyState.vue";
 import {
   getRequestActionLabel,
+  getRequestCategoryBadge,
   getRequestDetail,
   getRequestStatusLabel,
   isEditableRequestStatus,
@@ -292,12 +293,7 @@ function actionClass(action: string) {
 }
 
 function detailIcon(category: string) {
-  if (category === "CERTIFICATE") return "证";
-  if (category === "LEAVE") return "假";
-  if (category === "STAMP") return "章";
-  if (category === "REGISTRATION") return "报";
-  if (category === "MATERIAL") return "材";
-  return "事";
+  return getRequestCategoryBadge(category);
 }
 
 function statusNarrative(status: string) {

@@ -1,8 +1,8 @@
-# 2026-05-26 S52 默认示例知识开箱即有，同时保留教师删改权
+# 2026-05-26 S53 默认示例知识开箱即有，同时保留教师删改权
 
 - 状态：`[x]` 已完成
-- 关联主计划：`S52`
-- 依赖：`S51` 党团平台文件 2 知识导入与学生端检索闭环
+- 关联主计划：`S53`
+- 依赖：`S52` 党团平台文件 2 知识导入与学生端检索闭环
 
 ## 背景
 
@@ -20,12 +20,12 @@
 
 ## 实现方案
 
-- [x] `S52.1` 将 `backend/scripts/import_party_platform_file2_knowledge.py` 提炼为可复用函数 `import_party_platform_file2_knowledge(...)`，支持：
+- [x] `S53.1` 将 `backend/scripts/import_party_platform_file2_knowledge.py` 提炼为可复用函数 `import_party_platform_file2_knowledge(...)`，支持：
   - `only_missing=True`：已有同 slug 条目时直接跳过，不更新
   - `skip_if_any_entries=True`：当前知识库只要已有任意条目，就整批跳过默认示例导入
-- [x] `S52.2` 在 `backend/scripts/seed_default_data.py` 中接入上述函数，作为默认数据的一部分执行。
-- [x] `S52.3` 保持手工显式导入脚本原能力不变；命令行直接执行 `python scripts/import_party_platform_file2_knowledge.py` 时仍可执行完整 upsert。
-- [x] `S52.4` 验证“已有知识时重跑默认数据不覆盖”和“空库只跑默认数据即可带出 11 条示例知识”两种行为。
+- [x] `S53.2` 在 `backend/scripts/seed_default_data.py` 中接入上述函数，作为默认数据的一部分执行。
+- [x] `S53.3` 保持手工显式导入脚本原能力不变；命令行直接执行 `python scripts/import_party_platform_file2_knowledge.py` 时仍可执行完整 upsert。
+- [x] `S53.4` 验证“已有知识时重跑默认数据不覆盖”和“空库只跑默认数据即可带出 11 条示例知识”两种行为。
 
 ## 行为约定
 

@@ -7,9 +7,11 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.models import Student, User
+from app.auth.models import Student, User, UserRole
+from app.core.security import create_token
 from app.exchange.models import (
     IMPORT_TYPE_TRANSCRIPT_PDF_REVIEW,
+    CourseEquivalence,
     CourseOffering,
     CurriculumModule,
     CurriculumPlan,
@@ -18,6 +20,22 @@ from app.exchange.models import (
 )
 from app.report import service as report_service
 from app.workflow.models import Request, RequestType
+
+
+async def _headers_for_role(
+    db: AsyncSession,
+    *,
+    role_code: str,
+    work_no: str,
+    scope_code: str | None = None,
+) -> dict[str, str]:
+    user = User(work_no=work_no, display_name=f"report-{role_code}", is_active=True)
+    db.add(user)
+    await db.flush()
+    db.add(UserRole(user_id=user.id, role_code=role_code, scope_code=scope_code))
+    await db.commit()
+    token = create_token(str(user.id), "access", extra_claims={"roles": [role_code]})
+    return {"Authorization": f"Bearer {token}"}
 
 
 async def _login_as_student(
@@ -112,7 +130,11 @@ async def test_report_routes_use_canonical_contract(
     )
     await db.commit()
 
-    academic_gap = await client.get("/api/v1/report/academic-gap", headers=stu_headers)
+    academic_gap = await client.get(
+        "/api/v1/report/academic-gap",
+        headers=stu_headers,
+        params={"term_code": "2025-FALL"},
+    )
     assert academic_gap.status_code == 200, academic_gap.text
     data = academic_gap.json()["data"]
     assert data["plan_name"] == "2022 级计算机培养方案"
@@ -121,6 +143,7 @@ async def test_report_routes_use_canonical_contract(
     assert "gap_credits" not in data
     assert "generated_at" in data
     assert "disclaimer" in data
+    assert data["recommendation_term_code"] == "2025-FALL"
     assert data["suggested_courses"]
     assert data["suggested_courses"][0]["course_code"] == "CS199"
     assert "graduation" not in str(data["suggested_courses"][0]).lower()
@@ -204,7 +227,10 @@ async def test_report_routes_use_canonical_contract(
     assert invalid_payload["code"] == 42210
     assert "term_code" in invalid_payload["message"]
 
-    admin_gap = await admin_client.get(f"/api/v1/admin/report/academic-gap/{student_id}")
+    admin_gap = await admin_client.get(
+        f"/api/v1/admin/report/academic-gap/{student_id}",
+        params={"term_code": "2025-FALL"},
+    )
     assert admin_gap.status_code == 200, admin_gap.text
     admin_gap_data = admin_gap.json()["data"]
     assert admin_gap_data["student_no"] == "A100001"
@@ -392,7 +418,9 @@ async def test_admin_academic_gap_aggregate_query_uses_items_meta_and_filters(
         params={"risk_level": "HIGH", "page": 1, "page_size": 10},
     )
     assert high_only.status_code == 200, high_only.text
-    high_items = high_only.json()["data"]["items"]
+    high_payload = high_only.json()["data"]
+    assert high_payload["meta"]["total"] == 2
+    high_items = high_payload["items"]
     assert {item["student_no"] for item in high_items} == {"A200001", "A200003"}
 
     keyword = await admin_client.get(
@@ -411,3 +439,227 @@ async def test_admin_academic_gap_aggregate_query_uses_items_meta_and_filters(
     detail_data = detail.json()["data"]
     assert detail_data["student_no"] == "A200001"
     assert "disclaimer" in detail_data
+
+
+async def test_admin_academic_gap_respects_teacher_scope(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    in_scope = Student(
+        student_no="A210001",
+        full_name="scope-in",
+        grade_code="2022",
+        major_code="CS",
+        class_code="CS2201",
+    )
+    out_scope = Student(
+        student_no="A210002",
+        full_name="scope-out",
+        grade_code="2022",
+        major_code="CS",
+        class_code="CS2202",
+    )
+    db.add_all([in_scope, out_scope])
+    await db.commit()
+    await db.refresh(in_scope)
+    await db.refresh(out_scope)
+
+    headers = await _headers_for_role(
+        db,
+        role_code="COUNSELOR",
+        work_no="REPORT-SCOPE-COUNSELOR",
+        scope_code="CLASS:CS2201",
+    )
+
+    listing = await client.get(
+        "/api/v1/admin/report/academic-gap",
+        headers=headers,
+        params={"grade_code": "2022", "page": 1, "page_size": 10},
+    )
+    assert listing.status_code == 200, listing.text
+    payload = listing.json()["data"]
+    assert payload["meta"]["total"] == 1
+    assert [item["student_no"] for item in payload["items"]] == ["A210001"]
+
+    allowed_detail = await client.get(
+        f"/api/v1/admin/report/academic-gap/{in_scope.id}",
+        headers=headers,
+    )
+    assert allowed_detail.status_code == 200, allowed_detail.text
+
+    denied_detail = await client.get(
+        f"/api/v1/admin/report/academic-gap/{out_scope.id}",
+        headers=headers,
+    )
+    assert denied_detail.status_code == 403, denied_detail.text
+
+
+async def test_academic_gap_recommendations_only_use_requested_term(
+    db: AsyncSession,
+) -> None:
+    student = Student(
+        student_no="A220001",
+        full_name="term-gap",
+        grade_code="2022",
+        major_code="CS",
+        class_code="CS2201",
+    )
+    db.add(student)
+    await db.flush()
+    plan = CurriculumPlan(
+        grade_code="2022",
+        major_code="CS",
+        plan_name="2022 学期过滤方案",
+        version_label="2022-term-filter",
+        total_credits_required=3,
+        is_active=True,
+    )
+    db.add(plan)
+    await db.flush()
+    db.add_all(
+        [
+            CurriculumModule(
+                plan_id=plan.id,
+                module_code="CORE",
+                module_name="核心课程",
+                module_type="REQUIRED",
+                credits_required=3,
+                courses=[{"code": "CS-TERM", "name": "学期过滤课程", "credits": 3}],
+                sort_order=1,
+            ),
+            CourseOffering(
+                term_code="2025-SPRING",
+                course_code="CS-TERM",
+                course_name="本学期开课",
+                credits=3,
+                course_type="REQUIRED",
+                is_active=True,
+            ),
+            CourseOffering(
+                term_code="2025-FALL",
+                course_code="CS-TERM",
+                course_name="其他学期开课",
+                credits=3,
+                course_type="REQUIRED",
+                is_active=True,
+            ),
+        ]
+    )
+    await db.commit()
+
+    current = await report_service.compute_academic_gap(
+        db,
+        student.id,
+        term_code="2025-SPRING",
+    )
+    assert current.recommendation_term_code == "2025-SPRING"
+    assert [item["course_name"] for item in current.suggested_courses] == ["本学期开课"]
+
+    other = await report_service.compute_academic_gap(
+        db,
+        student.id,
+        term_code="2025-SUMMER",
+    )
+    assert other.recommendation_term_code == "2025-SUMMER"
+    assert other.suggested_courses == []
+    assert any("2025-SUMMER 本学期开课数据" in warning for warning in other.data_warnings)
+
+
+async def test_academic_gap_equivalent_course_consumes_credit_once(
+    db: AsyncSession,
+) -> None:
+    student = Student(
+        student_no="A200004",
+        full_name="equiv-gap",
+        grade_code="2022",
+        major_code="CS",
+        class_code="CS2201",
+    )
+    db.add(student)
+    await db.flush()
+
+    plan = CurriculumPlan(
+        grade_code="2022",
+        major_code="CS",
+        plan_name="2022 等价课程测试方案",
+        version_label="2022-equiv",
+        total_credits_required=6,
+        is_active=True,
+    )
+    db.add(plan)
+    await db.flush()
+    db.add_all(
+        [
+            CurriculumModule(
+                plan_id=plan.id,
+                module_code="MODULE_B",
+                module_name="模块 B",
+                module_type="REQUIRED",
+                credits_required=3,
+                courses=[{"code": "CS-B", "name": "等价目标 B", "credits": 3}],
+                sort_order=1,
+            ),
+            CurriculumModule(
+                plan_id=plan.id,
+                module_code="MODULE_C",
+                module_name="模块 C",
+                module_type="REQUIRED",
+                credits_required=3,
+                courses=[{"code": "CS-C", "name": "等价目标 C", "credits": 3}],
+                sort_order=2,
+            ),
+            CourseEquivalence(
+                grade_code="2022",
+                major_code="CS",
+                source_course_code="CS-A",
+                source_course_name="源课程 A",
+                target_course_code="CS-B",
+                target_course_name="等价目标 B",
+                ratio=1,
+                is_active=True,
+            ),
+            CourseEquivalence(
+                grade_code="2022",
+                major_code="CS",
+                source_course_code="CS-A",
+                source_course_name="源课程 A",
+                target_course_code="CS-C",
+                target_course_name="等价目标 C",
+                ratio=1,
+                is_active=True,
+            ),
+            StudentCourseRecord(
+                student_id=student.id,
+                term_code="2025-FALL",
+                course_code="CS-A",
+                course_name="源课程 A",
+                credits=3,
+                course_type="REQUIRED",
+                pass_flag=True,
+            ),
+        ]
+    )
+    await db.commit()
+
+    result = await report_service.compute_academic_gap(db, student.id)
+
+    assert result.total_credits_required == 6
+    assert result.total_credits_earned == 3
+    assert result.credits_gap == 3
+    modules = {item.module_code: item for item in result.modules}
+    assert modules["MODULE_B"].credits_earned == 3
+    assert modules["MODULE_C"].credits_earned == 0
+    assert modules["MODULE_B"].passed_courses == ["CS-A"]
+
+
+async def test_admin_academic_gap_rejects_invalid_pagination(
+    admin_client: AsyncClient,
+) -> None:
+    for params in (
+        {"page": 0, "page_size": 20},
+        {"page": 1, "page_size": 0},
+        {"page": 1, "page_size": 101},
+    ):
+        response = await admin_client.get("/api/v1/admin/report/academic-gap", params=params)
+        assert response.status_code == 422, response.text
+        assert response.json()["code"] == 42200

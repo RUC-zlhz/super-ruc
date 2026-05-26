@@ -110,12 +110,12 @@ async def require_active_enrollment(
 
     仅用于学生端的"写"操作（提交申请、画像申诉、补录等）。
     非在读学生（休学 / 毕业 / 转出 / 归档）只保留只读能力。
-    教师类用户 (`student_id is None`) 直接放行。
+    未绑定学生主档的账号不能执行学生侧写操作。
     """
     from app.auth.models import ENROLLMENT_ACTIVE, Student
 
     if user.student_id is None:
-        return user
+        raise PermissionError("仅绑定学生可执行该学生端操作", code=40305)
     student = await db.get(Student, user.student_id)
     if student is None:
         raise PermissionError("学生档案缺失，无法继续操作", code=40310)

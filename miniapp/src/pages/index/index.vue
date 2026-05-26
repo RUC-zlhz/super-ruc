@@ -65,7 +65,7 @@
       <view class="priority-grid">
         <view
           v-for="item in shortcutEntries"
-          :key="item.url"
+          :key="item.key"
           class="priority-card"
           hover-class="hover-scale"
           @tap="goTo(item.url)"
@@ -91,7 +91,7 @@
       <view class="entry-grid">
         <view
           v-for="item in entries"
-          :key="item.url"
+          :key="item.key"
           class="entry-card"
           hover-class="hover-scale"
           @tap="goTo(item.url)"
@@ -268,6 +268,7 @@ const SECTION_LABELS: Record<HomeSectionKey, string> = {
 };
 
 const entries: Array<{
+  key: string;
   mark: string;
   tone: "primary" | "blue" | "gold" | "green" | "orange" | "slate";
   label: string;
@@ -275,6 +276,7 @@ const entries: Array<{
   url: string;
 }> = [
   {
+    key: "my-requests",
     mark: "申",
     tone: "primary",
     label: "我的申请",
@@ -282,6 +284,7 @@ const entries: Array<{
     url: "/pages/request/index",
   },
   {
+    key: "certificate-request",
     mark: "绩",
     tone: "blue",
     label: "成绩证明",
@@ -289,6 +292,7 @@ const entries: Array<{
     url: "/pages/request/create?category=CERTIFICATE&type_code=CERTIFICATE_IN_SCHOOL",
   },
   {
+    key: "honor-public",
     mark: "奖",
     tone: "gold",
     label: "荣誉公示",
@@ -296,6 +300,7 @@ const entries: Array<{
     url: "/pages/honor/index",
   },
   {
+    key: "leave-request",
     mark: "假",
     tone: "green",
     label: "请假审批",
@@ -303,13 +308,15 @@ const entries: Array<{
     url: "/pages/request/create?category=LEAVE&type_code=LEAVE_PERSONAL",
   },
   {
-    mark: "宿",
+    key: "service-request-list",
+    mark: "事",
     tone: "slate",
     label: "事务办理",
     desc: "进入事务申请列表查看可办理事项。",
     url: "/pages/request/index",
   },
   {
+    key: "policy-query",
     mark: "费",
     tone: "orange",
     label: "政策查询",
@@ -317,6 +324,7 @@ const entries: Array<{
     url: "/pages/knowledge/index",
   },
   {
+    key: "course-service",
     mark: "课",
     tone: "blue",
     label: "课程事务",
@@ -324,6 +332,7 @@ const entries: Array<{
     url: "/pages/knowledge/index",
   },
   {
+    key: "help-center",
     mark: "问",
     tone: "primary",
     label: "帮助中心",
@@ -334,6 +343,7 @@ const entries: Array<{
 
 const shortcutEntries = [
   {
+    key: "academic-analysis",
     mark: "学",
     tone: "blue",
     label: "学业分析",
@@ -341,6 +351,7 @@ const shortcutEntries = [
     url: "/pages/academic/index",
   },
   {
+    key: "template-library",
     mark: "模",
     tone: "gold",
     label: "常用模板",
@@ -348,6 +359,7 @@ const shortcutEntries = [
     url: "/pages/knowledge/index",
   },
   {
+    key: "progress-center",
     mark: "进",
     tone: "green",
     label: "进度中心",
@@ -394,15 +406,11 @@ const greeting = computed(() => {
   if (hour < 19) return "下午好";
   return "晚上好";
 });
-const unreadNoticeCount = computed(
-  () => recentNotices.value.filter((item) => !item.read_at).length,
-);
-const pendingRequestCount = computed(
-  () =>
-    requests.value.filter((item) =>
-      ["SUBMITTED", "IN_REVIEW", "REJECTED"].includes(item.status),
-    ).length,
-);
+const unreadNoticeTotal = ref(0);
+const pendingRequestTotal = ref(0);
+
+const unreadNoticeCount = computed(() => unreadNoticeTotal.value);
+const pendingRequestCount = computed(() => pendingRequestTotal.value);
 const activeWorkflowCount = computed(
   () =>
     workflows.value.filter((item) =>
@@ -785,11 +793,15 @@ async function refreshSection(key: HomeSectionKey) {
   try {
     if (key === "notices") {
       const response = await getMyNotices({ page: 1, size: 5 });
+      const unreadResp = await getMyNotices({ unread_only: true, page: 1, size: 1 });
+      unreadNoticeTotal.value = unreadResp.data.meta.total;
       markSectionSuccess("notices", response.data.items || []);
       return;
     }
     if (key === "requests") {
       const response = await getMyRequests({ page: 1, size: 20 });
+      const pendingResp = await getMyRequests({ status: "SUBMITTED,IN_REVIEW,REJECTED", page: 1, size: 1 });
+      pendingRequestTotal.value = pendingResp.data.meta.total;
       markSectionSuccess("requests", response.data.items || []);
       return;
     }

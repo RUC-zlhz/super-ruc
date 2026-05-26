@@ -1,8 +1,8 @@
-# 2026-05-26 S53 小程序开发态本地接口自动回正
+# 2026-05-26 S54 小程序开发态本地接口自动回正
 
 - 状态：`[x]` 已完成
-- 关联主计划：`S53`
-- 依赖：`S51`、`S52`
+- 关联主计划：`S54`
+- 依赖：`S52`、`S53`
 
 ## 背景
 
@@ -25,10 +25,10 @@
 
 ## 实现
 
-- [x] `S53.1` 在 `miniapp/src/utils/request.ts` 中新增开发态本地接口收口逻辑。
-- [x] `S53.2` 当 `import.meta.env.DEV=true` 且未显式配置 `VITE_MINIAPP_API_BASE_URL / VITE_API_BASE_URL` 时，强制使用 `http://127.0.0.1:8080/api/v1`。
-- [x] `S53.3` 若检测到 storage 中保留了其他接口地址，则自动移除 `sip.api_base_url`，并同时清掉 `sip.access_token` 与 `sip.refresh_token`。
-- [x] `S53.4` 保留环境变量优先级，避免后续显式联调地址被开发态逻辑误覆盖。
+- [x] `S54.1` 在 `miniapp/src/utils/request.ts` 中新增开发态本地接口收口逻辑。
+- [x] `S54.2` 当 `import.meta.env.DEV=true` 且未显式配置 `VITE_MINIAPP_API_BASE_URL / VITE_API_BASE_URL` 时，强制使用 `http://127.0.0.1:8080/api/v1`。
+- [x] `S54.3` 若检测到 storage 中保留了其他接口地址，则自动移除 `sip.api_base_url`，并同时清掉 `sip.access_token` 与 `sip.refresh_token`。
+- [x] `S54.4` 保留环境变量优先级，避免后续显式联调地址被开发态逻辑误覆盖。
 
 ## 验证
 

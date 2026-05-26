@@ -213,9 +213,14 @@ async def admin_archive_notice(
 async def admin_preview_target(
     payload: TargetPreviewRequest,
     db: DBDep,
-    _user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
 ) -> ApiResponse[TargetPreviewResult]:
-    return ok(await service.preview_target(db, payload.target_rule))
+    return ok(await service.preview_target(
+        db, 
+        payload.target_rule,
+        viewer_user_id=user.user_id,
+        viewer_roles=user.roles,
+    ))
 
 
 @admin_router.post("/{notice_id}/dispatch", response_model=ApiResponse[NoticeBatchOut])
@@ -231,6 +236,7 @@ async def admin_dispatch(
         note=payload.note,
         operator_id=user.user_id,
         operator_role=",".join(user.roles) or None,
+        operator_roles=user.roles,
     )
     return ok(NoticeBatchOut.model_validate(batch))
 

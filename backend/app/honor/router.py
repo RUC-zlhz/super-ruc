@@ -53,6 +53,7 @@ async def list_public_honors(
     level: str | None = None,
     year: int | None = None,
     q: str | None = None,
+    is_collective: bool | None = None,
     include_archived: bool = False,
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
@@ -63,6 +64,7 @@ async def list_public_honors(
         level=level,
         year=year,
         q=q,
+        is_collective=is_collective,
         include_historical=include_archived,
         page=page,
         size=size,
@@ -119,6 +121,7 @@ async def admin_list_records(
     status: str | None = None,
     year: int | None = None,
     q: str | None = None,
+    is_collective: bool | None = None,
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
 ) -> ApiResponse[Paginated[AdminHonorRecordBrief]]:
@@ -129,6 +132,7 @@ async def admin_list_records(
         status=status,
         year=year,
         q=q,
+        is_collective=is_collective,
         page=page,
         size=size,
     )

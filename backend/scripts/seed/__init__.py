@@ -42,6 +42,8 @@ from . import (  # noqa: E402
     audit_policies,
     honor_categories,
     knowledge_categories,
+    knowledge_entries,
+    proof_templates,
     request_types,
     roles,
     workflow_templates,
@@ -53,8 +55,10 @@ SEEDERS = (
     admin_user,
     audit_policies,
     knowledge_categories,
+    knowledge_entries,
     honor_categories,
     request_types,
+    proof_templates,
     workflow_templates,
 )
 

@@ -21,6 +21,7 @@ from app.workflow.models import (
     WORKFLOW_NODE_DONE,
     WORKFLOW_NODE_OVERDUE,
     WORKFLOW_NODE_PENDING,
+    ProofTemplate,
     Request,
     RequestApprovalRecord,
     RequestAttachment,
@@ -54,7 +55,12 @@ async def list_templates(
         stmt = stmt.where(WorkflowTemplate.kind == kind)
     if active_only:
         stmt = stmt.where(WorkflowTemplate.is_active.is_(True))
-    stmt = stmt.order_by(WorkflowTemplate.id)
+    stmt = stmt.order_by(
+        WorkflowTemplate.is_active.desc(),
+        WorkflowTemplate.kind,
+        WorkflowTemplate.code,
+        WorkflowTemplate.id,
+    )
     return (await db.execute(stmt)).scalars().unique().all()
 
 
@@ -441,6 +447,53 @@ async def get_request_type_by_code(db: AsyncSession, code: str) -> RequestType |
 
 async def create_request_type(db: AsyncSession, **fields) -> RequestType:
     row = RequestType(**fields)
+    db.add(row)
+    await db.flush()
+    return row
+
+
+async def get_proof_template_by_code(
+    db: AsyncSession, code: str
+) -> ProofTemplate | None:
+    stmt = select(ProofTemplate).where(ProofTemplate.code == code)
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def get_active_proof_template(
+    db: AsyncSession, request_type_code: str
+) -> ProofTemplate | None:
+    stmt = (
+        select(ProofTemplate)
+        .where(
+            ProofTemplate.request_type_code == request_type_code,
+            ProofTemplate.is_active.is_(True),
+        )
+        .order_by(ProofTemplate.is_default.desc(), ProofTemplate.id.desc())
+    )
+    return (await db.execute(stmt)).scalars().first()
+
+
+async def list_proof_templates(
+    db: AsyncSession,
+    *,
+    request_type_code: str | None = None,
+    active_only: bool = False,
+) -> Sequence[ProofTemplate]:
+    stmt = select(ProofTemplate)
+    if request_type_code:
+        stmt = stmt.where(ProofTemplate.request_type_code == request_type_code)
+    if active_only:
+        stmt = stmt.where(ProofTemplate.is_active.is_(True))
+    stmt = stmt.order_by(
+        ProofTemplate.request_type_code,
+        ProofTemplate.is_default.desc(),
+        ProofTemplate.id.desc(),
+    )
+    return (await db.execute(stmt)).scalars().all()
+
+
+async def create_proof_template(db: AsyncSession, **fields) -> ProofTemplate:
+    row = ProofTemplate(**fields)
     db.add(row)
     await db.flush()
     return row
