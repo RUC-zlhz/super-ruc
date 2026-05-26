@@ -51,6 +51,7 @@ jobs:
           ENV_FILE: /opt/super-ruc/app/deploy/intranet-prod/.env
           COMPOSE_FILE: /opt/super-ruc/app/deploy/intranet-prod/docker-compose.yml
           COMPOSE_PROJECT_NAME: super-ruc-intranet-prod
+          # Use GitHub's SSH-over-443 endpoint because production may time out on github.com:22.
           DEPLOY_GIT_REMOTE: ssh://git@ssh.github.com:443/RUC-zlhz/super-ruc.git
           DEPLOY_KEY_FILE: /opt/super-ruc/.ssh/super-ruc-prod-deploy-ed25519
           DEPLOY_GIT_ATTEMPTS: 8
