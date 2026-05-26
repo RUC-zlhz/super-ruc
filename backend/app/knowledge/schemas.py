@@ -217,7 +217,7 @@ class AiMatchCandidate(BaseModel):
 
 
 class AiMatchResponse(BaseModel):
-    engine: str = Field(description="retrieval | claude-haiku")
+    engine: str = Field(description="retrieval")
     candidates: list[AiMatchCandidate]
     manual_consult_required: bool = False
     manual_consult_hint: str | None = None

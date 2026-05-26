@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 第 12 组互测使用说明出件、`S36` 党团平台文件 2 知识导入闭环、`S37` 默认示例知识开箱即有、`S38` 小程序开发态本地接口自动回正与 `S39` 默认示例模板开箱即有已完成
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入/敏感字段加密审计、`S50` 第 12 组互测使用说明出件、`S51` 党团平台文件 2 知识导入闭环、`S52` 默认示例知识开箱即有、`S53` 小程序开发态本地接口自动回正与 `S54` 默认示例模板开箱即有均已完成
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -438,13 +438,296 @@
 - 前端构建：`pnpm -C web build` 通过；`pnpm -C miniapp build:mp-weixin` 通过。
 - 阻塞验证：`uv run --extra dev pytest tests/integration/test_auth_flow.py -q --basetemp=.tmp/pytest-tmp-s34-auth` 因 `localhost:54322/sip_db_test` 连接拒绝在 fixture setup 阶段失败，未进入业务断言。
 
-### S35 第 12 组互测使用说明出件
+### S35 电子证明正式模板引擎
+
+- 细化文件：`docs/notes/refinements/2026-05-23-s35-formal-proof-template-engine.md`
+- 当前状态：`[x]` 已完成
+- [x] `S35.1` 新增 `proof_templates` 数据表，支持按申请类型绑定模板、版本、启停和默认模板。
+- [x] `S35.2` 将证明 PDF 生成从内联 HTML 改为模板渲染，保留原 `/api/v1/workflow/proof-preview/{request_id}` 入口。
+- [x] `S35.3` 提供后台模板管理 API：列表、创建/更新、停用、渲染预览。
+- [x] `S35.4` 默认种子提供 `CERTIFICATE_IN_SCHOOL` 在读证明正式模板，保障现有证明申请开箱可用。
+- [x] `S35.5` 已补回归测试覆盖模板渲染、未知占位符拒绝、停用模板后预览失败和管理 API；纯模板引擎单元测试与隔离 Kingbase 申请流集成测试均已通过。
+
+当前结论：
+
+- 电子证明现有实现仅是硬编码 HTML -> PDF 预览；本轮将其升级为受控占位符、版本化、可启停、可后台维护的正式模板引擎。
+
+证据：
+
+- 新增迁移：`backend/alembic/versions/0018_proof_template_engine.py`
+- 后端实现：`backend/app/workflow/pdf_generator.py`、`backend/app/workflow/models.py`、`backend/app/workflow/repository.py`、`backend/app/workflow/service.py`、`backend/app/workflow/router.py`、`backend/app/workflow/schemas.py`
+- 默认种子：`backend/scripts/seed/proof_templates.py`
+- 回归样例：`backend/tests/integration/test_request_flow.py`
+- 静态验证：`uv run --extra dev ruff check ...` 通过；`uv run --extra dev python -m py_compile ...` 通过；模板渲染 smoke 通过；`uv run --extra dev pytest unit_tests/test_proof_template_engine.py -q --basetemp=.tmp/pytest-tmp-s35-proof-unit-final` 通过，结果 `4 passed`；`unit_tests` 已加入 `backend/pyproject.toml` 的 `testpaths`。
+- 数据库验证：隔离 Kingbase `127.0.0.1:54323` 下 `uv run --extra dev alembic upgrade head` 成功执行到 `0018_proof_template_engine`，`uv run --extra dev alembic current` 返回 `0018_proof_template_engine (head)`；`uv run --extra dev python scripts/seed_initial.py --only request_types --only proof_templates` 通过，插入 `proof_templates=1`；`uv run --extra dev pytest tests/integration/test_request_flow.py -q --basetemp=.tmp/pytest-tmp-s35-proof-template-kingbase` 通过，结果 `18 passed`。
+
+### S36 生产 EDR Agent 安装
+
+- 细化文件：`docs/notes/refinements/2026-05-24-s36-edr-agent-production-install.md`
+- 当前状态：`[x]` 已完成
+- [x] `S36.1` 解析 `EDR安全软件安装方法及回退方案-服务器业务组(2025).docx`，确认 Linux 服务器业务组安装命令、控制中心地址和回退命令。
+- [x] `S36.2` 对 `user@10.10.0.13` 做只读环境检查，确认 `sudo`、`curl`、系统架构、现有安装状态和控制中心端口连通性。
+- [x] `S36.3` 下载并留档 Titan Agent 安装脚本，按文档参数以 root 权限执行安装。
+- [x] `S36.4` 完成安装后复核，确认 EDR 进程、目录、crontab、安装日志、控制中心上报和 `super-ruc` 生产服务健康状态。
+
+当前结论：
+
+- `10.10.0.13` 已完成 Titan EDR Agent 安装；`/titan/agent/titanagent` 正在运行，root crontab 已写入更新与监控任务。
+- `super-ruc` 生产容器保持 healthy，`http://127.0.0.1/healthz` 返回 `{"code":0,"message":"ok","data":{"status":"ok"}}`。
+- 如需回退，来源文档给出的 Linux 本机卸载命令为 `sudo bash /titan/agent/install_agent.sh disclean`，仅在确认影响业务或用户明确要求时执行。
+
+证据：
+
+- 来源文档：`D:\Documents\xwechat_files\wxid_d3gc7wjxuoja22_a84b\msg\file\2026-05\EDR安全软件安装方法及回退方案-服务器业务组(2025).docx`
+- 远端留档脚本：`/home/user/edr-install-logs/titan_agent_install.sh`
+- 远端安装日志：`/home/user/edr-install-logs/install-20260524-215338.log`
+- Agent 日志：`/var/log/titanagent/install.log`
+- 业务验证：`docker ps` 中 `web / backend / db / redis / minio` 均为 healthy；`curl http://127.0.0.1/healthz` 返回 ok。
+
+### S37 党团官方流程默认模板修正
+
+- 细化文件：`docs/notes/refinements/2026-05-25-s37-official-party-youth-workflow-templates.md`
+- 当前状态：`[x]` 已完成
+- [x] `S37.1` 新增 `PARTY_DEVELOPMENT_OFFICIAL_V2`，按仓库内 `发展党员工作程序` 的 4 阶段 29 步建立党员发展默认模板。
+- [x] `S37.2` 新增 `YOUTH_LEAGUE_DEVELOPMENT_OFFICIAL_V2`，按仓库内入团资料的 5 阶段 15 步建立发展团员默认模板。
+- [x] `S37.3` 将 `PARTY_DEVELOPMENT_V1` 与 `YOUTH_LEAGUE_V1` 改为 inactive 历史兼容模板，保留旧模板和旧实例可读性。
+- [x] `S37.4` 新增 `YOUTH_LEAGUE_MEMBERSHIP_MANAGEMENT_V1`，把“推优入党 / 毕业团员转出”从入团发展主流程拆到团籍管理模板。
+- [x] `S37.5` 管理端模板查询可查看 inactive 历史模板，学生/公开查询与新发起入口仍只使用 active 模板。
+
+当前结论：
+
+- 默认新发起党团流程已切到官方 V2 模板口径；入团发展主模板不再混入推优入党和毕业团员转出。
+- 旧 V1 模板未删除，历史流程实例仍可通过模板关系读取。
+
+证据：
+
+- 默认种子：`backend/scripts/seed/workflow_templates.py`
+- 后端查询调整：`backend/app/workflow/{repository,service,router}.py`
+- 回归样例：`backend/tests/integration/test_workflow_party_flow.py`、`backend/unit_tests/test_workflow_template_specs.py`
+- 静态验证：`uv run --extra dev ruff check ...` 通过；`uv run --extra dev python -m py_compile ...` 通过。
+- 单元验证：`uv run --extra dev pytest unit_tests/test_workflow_template_specs.py -q --basetemp=.tmp/pytest-tmp-workflow-template-specs` 通过，结果 `2 passed`。
+- 阻塞验证：`uv run --extra dev pytest tests/integration/test_workflow_party_flow.py -q --basetemp=.tmp/pytest-tmp-workflow-official-v2` 因 `localhost:54322/sip_db_test` 连接拒绝在 fixture setup 阶段失败，当前结果为 `13 errors`，未进入业务断言。
+
+### S38 学生画像与荣誉展示 P1 补齐
+
+- 细化文件：`docs/notes/refinements/2026-05-25-s38-profile-honor-p1-web-closure.md`
+- 当前状态：`[x]` 已完成
+- [x] `S38.1` 对照 P1 口径核查学生画像基础信息、成长信息、导入导出、多维检索、本人档案与字段分级展示能力。
+- [x] `S38.2` 荣誉后端补齐 `display_order` 字段、公共/管理列表个人/集体筛选、统一排序与获奖人/集体成员服务端校验。
+- [x] `S38.3` Web 荣誉管理补齐个人/集体筛选、类型列、展示顺序、封面图、媒体 JSON 与获奖人/集体成员编辑器。
+- [x] `S38.4` Miniapp 荣誉公示页补齐个人/集体筛选与列表/详情标识。
+- [x] `S38.5` 补定向回归样例并完成当前可运行的静态、类型和构建验证。
+
+当前结论：
+
+- 外部微信补丁已拆分吸收为当前仓库的 `S38`，没有覆盖已有 `S35/S36/S37` 计划内容。
+- 荣誉展示 P1 的新增录入、筛选、展示顺序和榜样宣传维护入口已形成前后端契约闭环；学生画像 P1 以当前既有实现核查登记为主。
+
+证据：
+
+- 后端实现：`backend/app/honor/{models,schemas,repository,router,service}.py`
+- 迁移：`backend/alembic/versions/0019_honor_display_order_and_collective_filter.py`
+- 回归样例：`backend/tests/integration/test_honor_flow.py`
+- 前端实现：`web/src/api/honor.ts`、`web/src/views/honor/HonorList.vue`、`miniapp/src/api/honor.ts`、`miniapp/src/pages/honor/index.vue`
+- 静态验证：`uv run --project backend --extra dev ruff check ...` 通过；`uv run --project backend --extra dev python -m py_compile ...` 通过。
+- 前端验证：`corepack.cmd pnpm -C web exec vue-tsc --noEmit -p tsconfig.json` 通过；`.\web\node_modules\.bin\vue-tsc.CMD --noEmit -p miniapp\tsconfig.json` 通过；`corepack.cmd pnpm -C web build` 通过；`corepack.cmd pnpm -C miniapp build:mp-weixin` 通过。
+- 阻塞验证：`uv run --project backend --extra dev pytest backend/tests/integration/test_honor_flow.py -q --basetemp=.tmp/pytest-tmp-s37-honor` 因 `localhost:54322/sip_db_test` 连接拒绝在 fixture setup 阶段失败，当前结果为 `4 errors`，未进入业务断言。
+
+### S39 官方风格 PDF 导出版式统一
+
+- 细化文件：`docs/notes/refinements/2026-05-25-s39-official-pdf-branding.md`
+- 当前状态：`[x]` 已完成
+- [x] `S39.1` 盘点当前系统生成型 PDF 导出入口：证明 PDF 与学生画像快照 PDF。
+- [x] `S39.2` 引入中国人民大学官网校徽/校名 SVG 与中国人民大学信息学院官网 logo，作为后端 PDF 生成静态资产。
+- [x] `S39.3` 新增统一 PDF 品牌版式 helper，提供人大红页眉、双 logo、A4 页边距、标题区、正文样式、页脚与水印。
+- [x] `S39.4` 将电子证明 PDF 模板切换为统一品牌版式，默认在读证明模板改为正文片段，不再携带旧 `PREVIEW` 临时水印。
+- [x] `S39.5` 将学生画像快照 PDF 切换为统一品牌版式，并移除纯文本 PDF fallback；WeasyPrint 不可用时改走带双 logo、页眉与水印的 ReportLab 设计版兜底。
+- [x] `S39.6` 完成静态校验、单元测试、PDF 生成 smoke 与计划回写。
+- `2026-05-25` 补充视觉收口：ReportLab 兜底已改为结构化绘制，页面按标题区、元信息表、指标卡、记录表、提示框与签名区分层布局；人大校徽已切换为红色资产，并修复页脚说明与页码的遮挡。
+
+当前结论：
+
+- 本轮不新增业务 PDF 类型；现有系统生成 PDF 统一收口为证明 PDF 和画像快照 PDF 两个后端出口。
+- 成绩单 PDF 属于学生上传与教师核验输入，不是系统导出文件，本轮不改变其解析边界。
+
+证据：
+
+- 后端实现：`backend/app/core/pdf_branding.py`、`backend/app/workflow/pdf_generator.py`、`backend/app/profile/service.py`
+- 品牌资产：`backend/app/pdf_assets/ruc-logo.svg`、`backend/app/pdf_assets/ruc-logo.png`、`backend/app/pdf_assets/info-logo.png`
+- 默认模板：`backend/scripts/seed/proof_templates.py`
+- 依赖：`backend/pyproject.toml` 与 `backend/uv.lock` 新增 `reportlab>=4.2`
+- 验证：`ruff check`、`py_compile`、`unit_tests/test_proof_template_engine.py` 均通过；证明 PDF smoke 生成 `%PDF` 字节流 `133064` bytes，画像快照 PDF smoke 生成 `%PDF` 字节流 `159179` bytes。
+
+### S40 bug-report 生产事实审查
+
+- 细化文件：`docs/notes/refinements/2026-05-25-bug-report-production-review.md`
+- 当前状态：`[x]` 已完成审查，修复实施待后续确认
+- [x] `S40.1` 读取 `bug-report.md` 并按当前代码路径逐条核对。
+- [x] `S40.2` 对 `10.10.0.13:/opt/super-ruc/app` 做只读生产基线检查，确认实际提交、容器状态、运行配置和健康检查。
+- [x] `S40.3` 对报告中的 18 项给出“否定 / 确认风险 / 待业务确认 / 证据不足”结论。
+- [x] `S40.4` 形成后续修复优先级：P1 为上传大小前置限制、学分消耗模型、日期兼容解析、分页参数约束。
+
+当前结论：
+
+- `bug-report.md` 不是全部成立的故障清单；生产当前运行在 `a558c61`，backend/web 和依赖服务 healthy，配置守卫与 Mock/AI 开关相关条目在生产上已被事实否定。
+- 真实需要进入后续修复池的高优先级项是：上传入口先读入内存、学业缺口等价课程重复消耗、导入日期兼容性不足、学业缺口分页参数缺少 `Query` 约束。
+
+### S41 bug-report P1 代码修复
+
+- 细化文件：`docs/notes/refinements/2026-05-25-s41-bug-report-p1-fixes.md`
+- 当前状态：`[x]` 已完成
+- [x] `S41.1` 新增统一上传读取 helper，按 chunk 读取 `UploadFile`，超过上限立即返回 `413`。
+- [x] `S41.2` 替换事务附件、成绩单 PDF、导入中心、知识模板、后台账号导入的直接 `await file.read()`。
+- [x] `S41.3` 修复学业缺口等价课程学分消耗模型，同一条已修成绩只可被一个模块消耗一次。
+- [x] `S41.4` 扩展导入日期解析，支持常见斜杠、中文和 ISO datetime 日期。
+- [x] `S41.5` 为 `/admin/report/academic-gap` 补分页参数边界。
+- [x] `S41.6` 补充上传 helper、日期解析、等价课程消耗和分页参数回归测试。
+
+当前结论：
+
+- 本轮只关闭 S40 审查中的 P1 项；P2 与争议项继续保留在后续修复池。
+- 本轮不做生产部署，部署与生产 smoke 后续单独执行。
+
+### S42 生产运行时代理隔离修复
+
+- 细化文件：`docs/notes/refinements/2026-05-25-s42-runtime-proxy-isolation.md`
+- 当前状态：`[x]` 已完成
+- [x] `S42.1` 将后端 Dockerfile 的构建期代理限定在 `apt / pip` 命令范围内。
+- [x] `S42.2` 将 Web Dockerfile 的构建期代理限定在 `corepack / pnpm` 命令范围内。
+- [x] `S42.3` 更新生产部署说明，明确构建代理不得进入运行时容器。
+- [x] `S42.4` 完成本地 Dockerfile/Compose 静态验证。
+- [x] `S42.5` 同步到 `10.10.0.13` 并通过 Compose 运行时清空代理变量后重建 backend 容器。
+- [x] `S42.6` 复测 `wx-login` 不再因容器内代理连接拒绝返回 `50201`。
+
+当前结论：
+
+- 生产 502 根因已定位为后端容器运行时继承 `HTTP_PROXY / HTTPS_PROXY=http://127.0.0.1:18081`，导致真实微信 `jscode2session` 调用在容器内误连本机代理端口并失败。
+- 已在 Dockerfile 层收口构建期代理，并在 Compose 层增加运行时兜底清空；服务器 backend 容器重建后保持 healthy，容器代理变量为空值，`wx-login` 无效 code 探测返回微信凭证错误 `401` 而非 `50201`。
+
+### S43 生产网络与构建出网治理
+
+- 细化文件：`docs/notes/refinements/2026-05-25-s43-production-network-cleanup.md`
+- 当前状态：`[x]` 已完成
+- [x] `S43.1` 盘点生产主机网络、DNS、Docker daemon 代理、Compose 代理配置、监听端口和容器出口。
+- [x] `S43.2` 将内网生产构建默认切到直连公网与国内镜像源，`BUILD_HTTP_PROXY / BUILD_HTTPS_PROXY` 默认留空。
+- [x] `S43.3` 固化 backend 构建阶段 Debian TUNA 镜像、IPv4 优先、短超时与重试。
+- [x] `S43.4` 将微信 `code2session` HTTP client 固定为 `trust_env=False`，禁止误读环境代理。
+- [x] `S43.5` 停止服务器侧失效的 `127.0.0.1:18081` 构建代理进程，并确认 `18080 / 18081` 不再监听。
+- [x] `S43.6` 在服务器直连模式下重建 backend / web 镜像，重启生产容器并验证健康状态。
+- [x] `S43.7` 复测容器外网出口、项目 smoke、外部 `10.10.0.13` 访问与 `wx-login` 真实微信错误路径。
+
+当前结论：
+
+- `10.10.0.13` 当前可直接访问微信、TUNA PyPI 与 TUNA Debian 镜像源；生产不再依赖反向 SSH 或 `127.0.0.1:18081` 构建代理。
+- backend / web 已用直连网络正式重建并重启，五个生产服务 healthy；`bash deploy/intranet-prod/scripts/smoke.sh` 通过，`POST /api/v1/auth/wx-login` 无效 code 返回微信凭证错误 `401`，后端日志仅记录 `errcode=40029`。
+
+### S44 GitHub Actions 自动部署底座
+
+- 细化文件：`docs/notes/refinements/2026-05-25-s44-github-actions-auto-deploy.md`
+- 当前状态：`[x]` 已完成
+- [x] `S44.1` 选择 self-hosted runner + read-only deploy key 方案，避免 GitHub-hosted runner 访问内网 IP。
+- [x] `S44.2` 在服务器生成生产 deploy key，私钥留在 `/opt/super-ruc/.ssh/`，公钥待登记到 GitHub Deploy keys。
+- [x] `S44.3` 新增自动部署入口脚本，统一执行 GitHub 拉取、网络预检、数据库备份、镜像构建、迁移种子、服务启动和 smoke。
+- [x] `S44.4` 新增 self-hosted runner 安装脚本与 GitHub Actions workflow。
+- [x] `S44.5` 将生产网络治理检查固化到 CI/CD 部署前后，防止回退到 `18080 / 18081` 代理依赖。
+- [x] `S44.6` 将服务器 deploy key 公钥登记到 GitHub 仓库 Deploy keys。
+- [x] `S44.7` 使用 GitHub 一次性 token 注册 `super-ruc-prod` self-hosted runner。
+- [x] `S44.8` 首轮 workflow 部署验证：修正 `actions/checkout` HTTPS 失败，改为直接调用服务器 SSH deploy key 部署入口。
+- [x] `S44.9` 第三轮 workflow 自动部署成功，生产 smoke 与网络预检通过。
+
+当前结论：
+
+- Deploy Key 与 self-hosted runner 已生效；runner 服务已接收 GitHub job。
+- 首轮 job 失败点不是生产构建或 smoke，而是 `actions/checkout@v4` 使用 HTTPS 拉仓库超时；workflow 已改为不 checkout，直接调用服务器生产 checkout 中的 SSH deploy key 部署入口。
+- 第二轮 job 已进入服务器部署入口，但因脚本文件无可执行位返回 `126`；已改为显式 `bash` 调用同目录脚本，并补 Git 可执行位。
+- 第三轮 job 已成功完成，服务器 checkout 到 `1ed58f0`，backend / web 重建后 healthy；`smoke.sh`、`preflight-network.sh` 与外部 `/healthz` 均通过。
+- `2026-05-26` 复核：提交 `2a8fd00` 推送到 `origin/main` 后，runner 日志显示 `Deploy to 10.10.0.13` 成功；服务器 `.deploy/current_commit` 与 `git rev-parse HEAD` 均为 `2a8fd007fb342883be4f3b2a096e05341761f200`，生产 `smoke.sh`、`preflight-network.sh`、外部 `/healthz` 与微信无效 code 错误路径均通过。
+
+### S45 全栈测试与 bug 分级审查
+
+- 细化文件：`docs/notes/refinements/2026-05-26-s45-full-stack-test-bug-audit.md`
+- 当前状态：`[x]` 已完成本轮可测试范围审查
+- [x] `S45.1` 读取主计划、最新细化、现有测试资产和运行入口。
+- [x] `S45.2` 后端静态、单元、可行集成测试：认证、师生权限联通、申请/审批/证明、通知、学业、画像、荣誉、导入上传。
+- [x] `S45.3` Web 管理端类型检查、构建、路由与关键页面可用性测试。
+- [x] `S45.4` Miniapp 学生端类型检查、`mp-weixin` 构建、产物与运行时风险检查。
+- [x] `S45.5` 教师管理端与学生端联通闭环审查。
+- [x] `S45.6` 汇总 bug 候选，按崩溃类 / Logic bug 分类，给出触发条件、预期/实际、证据和基础分。
+
+当前结论：
+
+- 本轮为测试审查与缺陷分级，不直接修复业务代码；报告已沉淀到细化文件。
+- 已通过后端 ruff / compileall / 单元测试、Web 构建与本地浏览器 smoke、Miniapp 类型检查与 `mp-weixin` 构建、生产只读 smoke。
+- 用户确认可启动 Docker 后，已启动 Docker Desktop 并拉起 `deploy/docker-compose.yml` 中的 `sip-kingbase`，`54322` 测试数据库阻塞已关闭。
+- 全量后端 DB 集成测试结果：`109 passed, 10 failed, 3 warnings in 357.78s`；其中 `3` 个失败按新增 Logic bug 计分，`7` 个失败归类为测试断言漂移。
+- 累计确认 `1` 个崩溃类 bug 与 `16` 个 Logic bug，基础分合计 `143`。
+
+### S46 S45 缺陷修复闭环
+
+- 细化文件：`docs/notes/refinements/2026-05-26-s46-s45-bug-fix-closure.md`
+- 当前状态：`[x]` 已完成
+- [x] `S46.1` 修复后端微信已绑定登录、学生端身份依赖、学业看板权限/分页 total、通知来源 SSRF、荣誉 recipients 刷新、知识匹配 engine 契约和工作流拒绝审计结构。
+- [x] `S46.2` 修复 Web 学生画像加载失败错误态、学生画像/运营看板前端角色边界和 403 返回首页默认落点。
+- [x] `S46.3` 修复 Miniapp 微信登录留空路径、申请待处理筛选漏页、知识分类/标签空关键词搜索、知识/荣誉错误态和荣誉媒体入口。
+- [x] `S46.4` 补齐 DB 集成回归断言与测试资产漂移修正，并完成后端全量集成、静态检查、Web/Miniapp 构建和本地浏览器 smoke。
+
+当前结论：
+
+- S45 登记的 `1` 个崩溃类 bug、`16` 个 Logic bug 中，当前代码可直接修复的前后端与 DB 集成缺陷已闭环；原 `109 passed, 10 failed` 的后端全量 DB 集成测试已收口为 `123 passed, 3 warnings in 231.05s`，本轮复核再次通过 `123 passed, 3 warnings in 205.89s`。
+- 仍需真实微信开发者工具/真实 code 联调验证生产微信登录完整体验；该项依赖外部真实微信环境，不阻塞本轮代码与自动化闭环。
+
+### S47 多角色联通完成度审计与补测
+
+- 细化文件：`docs/notes/refinements/2026-05-26-s47-cross-role-linkage-completion-audit.md`
+- 当前状态：`[x]` 已完成
+- [x] `S47.1` 审计 S45/S46 剩余验证缺口，明确当前本机可测项与外部依赖项。
+- [x] `S47.2` 新增 DB 驱动的教师/学生多角色联通 smoke 测试，覆盖通知、申请审批、画像、学业看板与荣誉的跨角色可达性。
+- [x] `S47.3` 回跑新增定向测试与必要全量 gate，若暴露缺陷则按崩溃类 / Logic bug 分级并优先修复。
+- [x] `S47.4` 回写主计划和本细化文件，形成完成度审计结论。
+
+当前结论：
+
+- S47 已补齐 S45 “教师/学生联通 E2E”待补验证；新增 `backend/tests/integration/test_s47_cross_role_linkage_smoke.py` 覆盖通知、申请审批、党团流程、画像、学业看板、荣誉公示的跨角色联通。
+- 验证通过：S47 定向 `1 passed`，后端全量 DB 集成 `124 passed, 3 warnings in 215.90s`，后端 ruff / compileall、Web 构建、Miniapp 类型检查与 `mp-weixin` 构建均通过。
+- 本轮未新增有效崩溃类 bug 或 Logic bug；真实微信 code 登录仍属于外部微信环境项。
+
+### S48 Miniapp 微信开发者工具告警排查与首页 key 修复
+
+- 细化文件：`docs/notes/refinements/2026-05-26-s48-miniapp-devtools-warning-audit.md`
+- 当前状态：`[x]` 已完成
+- [x] `S48.1` 核查 `request-badge` 源码、引用点与 `mp-weixin` 构建产物，明确缺模块报错来自未重新生成或不完整的本地构建产物。
+- [x] `S48.2` 将事务徽章 helper 合并进已有 `api/workflow` 模块并删除独立 `utils/request-badge.ts`，让请求页不再生成 `../../utils/request-badge.js` require。
+- [x] `S48.3` 修复首页入口列表重复 `wx:key`，将 `item.url` key 改为稳定业务 key。
+- [x] `S48.4` 回跑 Miniapp 类型检查、清理后 `mp-weixin` 构建和生成产物检查。
+
+当前结论：
+
+- 最新源码已不再依赖独立 `request-badge` 模块；重新构建后的 `miniapp/dist/build/mp-weixin` 中无 `request-badge` 引用，微信开发者工具若仍报该模块名，说明仍在运行旧缓存或旧项目。
+- 首页重复 key 已修复；`vue-tsc`、清理后 `pnpm -C miniapp build:mp-weixin`、源码 `item.url/item.path` key 残留扫描和生成产物相对 `require()` 缺失扫描均通过。
+
+### S49 官方知识种子、本学期开课推荐、题库导入与敏感字段加密审计
+
+- 细化文件：`docs/notes/refinements/2026-05-26-s49-official-seed-term-quiz-sensitive-closure.md`
+- 当前状态：`[x]` 已完成
+- [x] `S49.1` 新增官方知识正文默认 seed，覆盖休学、复学、奖助、档案转递、校历、信息学院公告/咨询、出国出境、发展党员、知识自测和宿舍调整咨询入口。
+- [x] `S49.2` 学业缺口推荐增加有效推荐学期口径，只使用 `CourseOffering.is_active=True AND term_code=有效学期` 的真实开课数据。
+- [x] `S49.3` 理论自测题库新增 `.xlsx/.csv` 模板下载、导入预览、错误行展示、提交 upsert 和来源追溯字段。
+- [x] `S49.4` 学生身份证号/手机号新增统一加密 helper，后台新增/编辑、学生主档导入和审计 detail 均完成明文脱敏与回归保护。
+
+当前结论：
+
+- 默认知识库不再只有分类 seed，开箱可搜索到官方来源知识条目；对缺少稳定官方细则的事项只提供官方入口和人工咨询提示，避免伪造流程。
+- 学业推荐返回 `recommendation_term_code` 并在无本学期开课数据时给出 warning 和空建议，不再用培养方案候选课程冒充当前开课。
+- 理论自测导入能力已闭环到后端 API、Web 题库页和测试，默认不编造共产党员网无法公开稳定提取的题面与答案。
+- 敏感字段写入、导入预览/存储与审计日志已增加加密/脱敏保护；验证通过后端 ruff、compileall、S49 定向集成 `40 passed`、后端全量 `143 passed`、Web 构建和 Miniapp `mp-weixin` 构建。
+
+### S50 第 12 组互测使用说明出件
 
 - 细化文件：`docs/notes/refinements/2026-05-25-s35-peer-testing-usage-guide.md`
 - 当前状态：`[x]` 已完成互测使用说明文档出件、页面 QC 与计划回写
-- [x] `S35.1` 读取《测试实验指导书》与《基本功能文档》，提炼其他小组互测所需的访问方式、账号、推荐路径与文档要求
-- [x] `S35.2` 基于仓库模板生成《第12组-super-ruc-互测使用说明.docx》，覆盖 Web 管理端优先入口、小程序与本地补充路径、默认数据状态和已知限制
-- [x] `S35.3` 对当前可用环境与共享账号做实测核实，并完成 Word 导出 PDF + 页面渲染检查，收紧目录、条目间距和跨页排版
+- [x] `S50.1` 读取《测试实验指导书》与《基本功能文档》，提炼其他小组互测所需的访问方式、账号、推荐路径与文档要求
+- [x] `S50.2` 基于仓库模板生成《第12组-super-ruc-互测使用说明.docx》，覆盖 Web 管理端优先入口、小程序与本地补充路径、默认数据状态和已知限制
+- [x] `S50.3` 对当前可用环境与共享账号做实测核实，并完成 Word 导出 PDF + 页面渲染检查，收紧目录、条目间距和跨页排版
 
 当前结论：
 
@@ -459,16 +742,16 @@
 - 最终交付：`output/doc/第12组-super-ruc-互测使用说明.docx`
 - 排版验证：使用本机 Word 导出 `PDF` 并渲染出 `9` 页 PNG 页面，已人工复核封面、目录、表格、步骤区与末页收口。
 
-### S36 党团平台文件 2 知识导入与学生端检索闭环
+### S51 党团平台文件 2 知识导入与学生端检索闭环
 
 - 细化文件：`docs/notes/refinements/2026-05-26-s36-party-platform-file2-knowledge-bootstrap.md`
 - 当前状态：`[x]` 已完成导入脚本、学生端检索增强、本地发布与运行态验证
-- [x] `S36.1` 从 `党团平台文件 2/` 的 4 份 PDF 中整理常见问法、关键词与标准答复，生成 FAQ 型知识条目。
-- [x] `S36.2` 新增显式导入脚本 `backend/scripts/import_party_platform_file2_knowledge.py`，按来源 upsert 并直接发布知识条目。
-- [x] `S36.3` 增强 `/knowledge/search` 检索范围，补齐标签与来源名称命中。
-- [x] `S36.4` 增强 `/knowledge/ai-match` 返回摘要、命中原因和来源文件，并在整句搜索未命中时回退到已发布条目集合重排。
-- [x] `S36.5` 补知识库回归样例，覆盖标签命中与自然问法匹配。
-- [x] `S36.6` 在本地开发库执行一次真实导入，并复测奖学金、请假、培养方案和销假问题。
+- [x] `S51.1` 从 `党团平台文件 2/` 的 4 份 PDF 中整理常见问法、关键词与标准答复，生成 FAQ 型知识条目。
+- [x] `S51.2` 新增显式导入脚本 `backend/scripts/import_party_platform_file2_knowledge.py`，按来源 upsert 并直接发布知识条目。
+- [x] `S51.3` 增强 `/knowledge/search` 检索范围，补齐标签与来源名称命中。
+- [x] `S51.4` 增强 `/knowledge/ai-match` 返回摘要、命中原因和来源文件，并在整句搜索未命中时回退到已发布条目集合重排。
+- [x] `S51.5` 补知识库回归样例，覆盖标签命中与自然问法匹配。
+- [x] `S51.6` 在本地开发库执行一次真实导入，并复测奖学金、请假、培养方案和销假问题。
 
 当前结论：
 
@@ -484,14 +767,14 @@
 - 小程序展示：`miniapp/src/api/knowledge.ts`、`miniapp/src/pages/knowledge/index.vue`
 - 验证：`docker compose -f deploy/docker-compose.yml up -d`、`py -m uv run alembic upgrade head`、`py -m uv run python -m scripts.seed_initial`、`py -m uv run python -m scripts.seed_default_data`、`py -m uv run python scripts/import_party_platform_file2_knowledge.py`、`py -m uv run pytest tests/integration/test_knowledge_flow.py -q`（`9 passed`）、`py -m uv run --project backend python -m py_compile ...`、`.\web\node_modules\.bin\vue-tsc.CMD --noEmit -p miniapp\tsconfig.json` 通过。
 
-### S37 默认示例知识开箱即有，同时保留教师删改权
+### S52 默认示例知识开箱即有，同时保留教师删改权
 
 - 细化文件：`docs/notes/refinements/2026-05-26-s37-default-example-knowledge-seed.md`
 - 当前状态：`[x]` 已完成默认数据接入、跳过覆盖保护与空库/非空库双场景验证
-- [x] `S37.1` 将 `backend/scripts/import_party_platform_file2_knowledge.py` 提炼为可复用导入函数，支持“仅补缺失”和“知识库非空则整批跳过”两种保护模式。
-- [x] `S37.2` 在 `backend/scripts/seed_default_data.py` 中接入示例知识导入，让全新环境执行默认数据链路后就能直接看到示例知识。
-- [x] `S37.3` 保持手工显式导入能力不变，继续支持老师/开发者单独执行完整 upsert。
-- [x] `S37.4` 验证“已有知识时重跑默认数据不覆盖”和“空库默认数据自动带出 11 条示例知识”。
+- [x] `S52.1` 将 `backend/scripts/import_party_platform_file2_knowledge.py` 提炼为可复用导入函数，支持“仅补缺失”和“知识库非空则整批跳过”两种保护模式。
+- [x] `S52.2` 在 `backend/scripts/seed_default_data.py` 中接入示例知识导入，让全新环境执行默认数据链路后就能直接看到示例知识。
+- [x] `S52.3` 保持手工显式导入能力不变，继续支持老师/开发者单独执行完整 upsert。
+- [x] `S52.4` 验证“已有知识时重跑默认数据不覆盖”和“空库默认数据自动带出 11 条示例知识”。
 
 当前结论：
 
@@ -507,14 +790,14 @@
   - 在当前开发库复跑 `python -m scripts.seed_default_data`，日志显示 `knowledge skipped_due_to_existing=True`
   - 在隔离数据库 `sip_db_seed_smoke` 执行 `alembic upgrade head`、`python -m scripts.seed_initial`、`python -m scripts.seed_default_data` 后，查询结果 `knowledge_entries=11`
 
-### S38 小程序开发态本地接口自动回正
+### S53 小程序开发态本地接口自动回正
 
 - 细化文件：`docs/notes/refinements/2026-05-26-s38-miniapp-dev-local-api-auto-reset.md`
 - 当前状态：`[x]` 已完成开发态自动回本地接口与旧 storage/token 清理
-- [x] `S38.1` 在 `miniapp/src/utils/request.ts` 中新增开发态本地接口强制回正逻辑。
-- [x] `S38.2` 当开发态未显式配置环境变量接口地址时，默认强制使用 `http://127.0.0.1:8080/api/v1`。
-- [x] `S38.3` 如检测到 storage 中残留其他接口地址，自动移除 `sip.api_base_url` 并清掉旧 token。
-- [x] `S38.4` 保持环境变量优先级，避免正式环境或显式联调地址被误覆盖。
+- [x] `S53.1` 在 `miniapp/src/utils/request.ts` 中新增开发态本地接口强制回正逻辑。
+- [x] `S53.2` 当开发态未显式配置环境变量接口地址时，默认强制使用 `http://127.0.0.1:8080/api/v1`。
+- [x] `S53.3` 如检测到 storage 中残留其他接口地址，自动移除 `sip.api_base_url` 并清掉旧 token。
+- [x] `S53.4` 保持环境变量优先级，避免正式环境或显式联调地址被误覆盖。
 
 当前结论：
 
@@ -527,14 +810,14 @@
 - 实现文件：`miniapp/src/utils/request.ts`
 - 验证：`.\web\node_modules\.bin\vue-tsc.CMD --noEmit -p miniapp\tsconfig.json` 通过
 
-### S39 默认示例模板开箱即有，同时保留管理端删改权
+### S54 默认示例模板开箱即有，同时保留管理端删改权
 
 - 细化文件：`docs/notes/refinements/2026-05-26-s39-default-example-template-seed.md`
 - 当前状态：`[x]` 已完成默认示例模板导入、知识条目关联与学生端下载验证
-- [x] `S39.1` 从 `常用模板/` 中挑选 4 份标准模板，整理为默认示例模板集。
-- [x] `S39.2` 新增 `backend/scripts/import_common_template_examples.py`，按模板、来源和知识条目三层做可复用导入。
-- [x] `S39.3` 在 `backend/scripts/seed_default_data.py` 中接入默认模板导入，且当模板库非空时整批跳过，避免覆盖老师后续删改。
-- [x] `S39.4` 补模板下载回归样例，并在本地真实库验证学生端列表与下载链路可用。
+- [x] `S54.1` 从 `常用模板/` 中挑选 4 份标准模板，整理为默认示例模板集。
+- [x] `S54.2` 新增 `backend/scripts/import_common_template_examples.py`，按模板、来源和知识条目三层做可复用导入。
+- [x] `S54.3` 在 `backend/scripts/seed_default_data.py` 中接入默认模板导入，且当模板库非空时整批跳过，避免覆盖老师后续删改。
+- [x] `S54.4` 补模板下载回归样例，并在本地真实库验证学生端列表与下载链路可用。
 
 当前结论：
 
@@ -1093,11 +1376,26 @@
 | 2026-05-20 | 工作流发起服务端范围校验修复 | `docs/notes/refinements/2026-05-20-workflow-start-scope-guard.md` | `S32.1, S32.2, S32.3, S32.4` | `[x]` | 已将发起学生流程的范围校验下沉到后端服务层，补范围外/空 scope 拒绝审计与回归样例；ruff 与 py_compile 通过，集成测试受本机测试库连接拒绝阻塞 |
 | 2026-05-20 | 党团流程范围权限二次收口 | `docs/notes/refinements/2026-05-20-workflow-scope-closure.md` | `S33.1, S33.2, S33.3, S33.4, S33.5` | `[x]` | 已将流程详情、节点操作、流程列表与提醒列表统一接入后端学生 scope 校验；ruff 与 py_compile 通过，集成测试受本机测试库连接拒绝阻塞 |
 | 2026-05-20 | S34 最终缺口闭合方向 | `docs/notes/refinements/2026-05-20-s34-final-gap-closure-direction.md` | `S34.1, S34.2, S34.3, S34.4, S34.5, S34.6` | `[!]` | 可直接落地项已完成并通过静态/构建验证，且 `f35cf98` 已部署到 `10.10.0.13` 并推送 `origin/main`；真实微信订阅联调和真实学院数据仍等待外部输入 |
-| 2026-05-25 | S35 第 12 组互测使用说明出件 | `docs/notes/refinements/2026-05-25-s35-peer-testing-usage-guide.md` | `S35.1, S35.2, S35.3` | `[x]` | 已按指导书和基本功能文档生成互测使用说明 DOCX，写明远端 Web 入口、共享账号、本地启动、小程序 mock 路径和已知限制，并完成 Word/PDF/PNG 页面检查 |
-| 2026-05-26 | S36 党团平台文件 2 知识导入与学生端检索闭环 | `docs/notes/refinements/2026-05-26-s36-party-platform-file2-knowledge-bootstrap.md` | `S36.1, S36.2, S36.3, S36.4, S36.5, S36.6` | `[x]` | 已将 `党团平台文件 2/` 的 4 份正式文件导入为 11 条已发布知识，补齐标签/来源检索与自然问法回退匹配，并完成本地发布、HTTP 复测、知识库回归 `9 passed`、py_compile 与 miniapp vue-tsc 验证 |
-| 2026-05-26 | S37 默认示例知识开箱即有，同时保留教师删改权 | `docs/notes/refinements/2026-05-26-s37-default-example-knowledge-seed.md` | `S37.1, S37.2, S37.3, S37.4` | `[x]` | 已将示例知识接入 `seed_default_data.py`，空库默认会自动导入 11 条示例知识；知识库非空时整批跳过，避免覆盖老师后续删改；已完成空库/非空库双场景实测 |
-| 2026-05-26 | S38 小程序开发态本地接口自动回正 | `docs/notes/refinements/2026-05-26-s38-miniapp-dev-local-api-auto-reset.md` | `S38.1, S38.2, S38.3, S38.4` | `[x]` | 已在开发态强制回本地接口并自动清理旧 storage/token，无需再手动打开微信开发者工具控制台输入修正命令；miniapp vue-tsc 通过 |
-| 2026-05-26 | S39 默认示例模板开箱即有，同时保留管理端删改权 | `docs/notes/refinements/2026-05-26-s39-default-example-template-seed.md` | `S39.1, S39.2, S39.3, S39.4` | `[x]` | 已将 `常用模板/` 的 4 份标准模板接入默认数据链路，空模板库默认会自动导入模板资产、来源和关联知识条目；模板库非空时整批跳过，避免覆盖老师后续删改；模板下载回归 `1 passed`，本地学生端模板列表与下载接口 HTTP 复测通过 |
+| 2026-05-23 | 电子证明正式模板引擎 | `docs/notes/refinements/2026-05-23-s35-formal-proof-template-engine.md` | `S35.1, S35.2, S35.3, S35.4, S35.5` | `[x]` | 已新增模板表、正式 HTML 模板渲染、后台模板管理 API、默认在读证明模板和回归样例；ruff、py_compile、渲染 smoke、纯单元测试 `4 passed` 与隔离 Kingbase 申请流集成测试 `18 passed` 通过 |
+| 2026-05-24 | 生产 EDR Agent 安装 | `docs/notes/refinements/2026-05-24-s36-edr-agent-production-install.md` | `S36.1, S36.2, S36.3, S36.4` | `[x]` | 已按服务器业务组文档在 `10.10.0.13` 安装 Titan EDR Agent，安装日志显示 success，Agent 进程运行，生产容器与 `/healthz` 保持 healthy |
+| 2026-05-25 | 党团官方流程默认模板修正 | `docs/notes/refinements/2026-05-25-s37-official-party-youth-workflow-templates.md` | `S37.1, S37.2, S37.3, S37.4, S37.5` | `[x]` | 已新增党员发展官方 29 步、发展团员官方 15 步和团籍管理模板，旧 V1 模板转为 inactive 历史兼容；ruff、py_compile 与单元测试 `2 passed` 通过，集成测试受本机测试库拒连阻塞 |
+| 2026-05-25 | 学生画像与荣誉展示 P1 补齐 | `docs/notes/refinements/2026-05-25-s38-profile-honor-p1-web-closure.md` | `S38.1, S38.2, S38.3, S38.4, S38.5` | `[x]` | 已补荣誉 `display_order`、个人/集体筛选、获奖人/集体成员校验、Web 管理入口和 Miniapp 筛选标识；后端静态校验、双端类型检查与构建通过，荣誉集成测试受本机测试库拒连阻塞 |
+| 2026-05-25 | 官方风格 PDF 导出版式统一 | `docs/notes/refinements/2026-05-25-s39-official-pdf-branding.md` | `S39.1, S39.2, S39.3, S39.4, S39.5, S39.6` | `[x]` | 已引入人大/信息学院官网视觉资产，统一证明 PDF 与画像快照 PDF 版式，并补 ReportLab 设计版兜底；ruff、py_compile、单测和双 PDF smoke 通过 |
+| 2026-05-25 | bug-report 生产事实审查 | `docs/notes/refinements/2026-05-25-bug-report-production-review.md` | `S40.1, S40.2, S40.3, S40.4` | `[x]` | 已对照 `bug-report.md`、当前代码和 `10.10.0.13` 实际部署逐项定性；确认 P1 修复池为上传大小前置限制、学分消耗模型、日期兼容解析和分页参数约束 |
+| 2026-05-25 | bug-report P1 代码修复 | `docs/notes/refinements/2026-05-25-s41-bug-report-p1-fixes.md` | `S41.1, S41.2, S41.3, S41.4, S41.5, S41.6` | `[x]` | 已关闭上传大小前置限制、学分消耗模型、日期兼容解析和分页参数约束四类 P1 项，并补定向回归测试；本地 ruff、py_compile 与新增单测通过，远程 `10.10.0.13` 隔离 worktree + 生产镜像 + `sip_db_test_s41` 手写业务断言通过 |
+| 2026-05-25 | S42 生产运行时代理隔离修复 | `docs/notes/refinements/2026-05-25-s42-runtime-proxy-isolation.md` | `S42.1, S42.2, S42.3, S42.4, S42.5, S42.6` | `[x]` | 已定位小程序 `wx-login` 502 为后端运行时误继承构建代理导致微信 `jscode2session` 出口失败；Dockerfile 已限定构建期代理，Compose 已运行时清空代理变量，生产 backend 重建后 `wx-login` 探测从 `50201` 恢复为微信凭证错误 `401` |
+| 2026-05-25 | S43 生产网络与构建出网治理 | `docs/notes/refinements/2026-05-25-s43-production-network-cleanup.md` | `S43.1, S43.2, S43.3, S43.4, S43.5, S43.6, S43.7` | `[x]` | 已确认服务器可直连微信、TUNA PyPI 与 TUNA Debian，停止失效 `18081` 构建代理，backend / web 在无代理直连模式下重建并重启；生产 smoke、外部 `10.10.0.13` 健康检查和 `wx-login` 微信错误路径均通过 |
+| 2026-05-25 | S44 GitHub Actions 自动部署底座 | `docs/notes/refinements/2026-05-25-s44-github-actions-auto-deploy.md` | `S44.1, S44.2, S44.3, S44.4, S44.5, S44.6, S44.7, S44.8, S44.9` | `[x]` | self-hosted runner + read-only deploy key 已闭合；workflow 已成功执行自动部署，`2a8fd00` 推送后服务器当前提交、生产 smoke、网络预检与外部 `/healthz` 均通过 |
+| 2026-05-26 | 全栈测试与 bug 分级审查 | `docs/notes/refinements/2026-05-26-s45-full-stack-test-bug-audit.md` | `S45.1, S45.2, S45.3, S45.4, S45.5, S45.6` | `[x]` | 已完成本轮可测试范围审查与 DB 集成补跑；后端静态/编译/单元、Web 构建与浏览器 smoke、Miniapp 类型/构建/产物扫描、生产只读 smoke 通过；Docker 启动后全量后端集成测试 `109 passed, 10 failed`；累计发现 `1` 个崩溃类 bug 与 `16` 个 Logic bug，基础分 `143` |
+| 2026-05-26 | S45 缺陷修复闭环 | `docs/notes/refinements/2026-05-26-s46-s45-bug-fix-closure.md` | `S46.1, S46.2, S46.3, S46.4` | `[x]` | 已修复 S45 可代码闭环缺陷和测试断言漂移；后端全量 DB 集成 `123 passed`，后端 ruff/compileall/unit、Web 构建、Miniapp 类型检查与 `mp-weixin` 构建、本地 Web 403 smoke 均通过 |
+| 2026-05-26 | S47 多角色联通完成度审计与补测 | `docs/notes/refinements/2026-05-26-s47-cross-role-linkage-completion-audit.md` | `S47.1, S47.2, S47.3, S47.4` | `[x]` | 已补 DB 驱动跨角色联通 smoke，覆盖通知、申请审批、党团流程、画像、学业看板、荣誉公示；S47 定向 `1 passed`，后端全量 DB 集成 `124 passed`，双端构建通过 |
+| 2026-05-26 | S48 Miniapp 微信开发者工具告警排查与首页 key 修复 | `docs/notes/refinements/2026-05-26-s48-miniapp-devtools-warning-audit.md` | `S48.1, S48.2, S48.3, S48.4` | `[x]` | 已移除独立 `request-badge` 模块依赖，最新 `mp-weixin` 产物无 `request-badge` 引用且无缺失相对 require；首页重复 `wx:key` 已修复，Miniapp 类型检查和构建通过 |
+| 2026-05-26 | S49 官方知识种子、本学期开课推荐、题库导入与敏感字段加密审计 | `docs/notes/refinements/2026-05-26-s49-official-seed-term-quiz-sensitive-closure.md` | `S49.1, S49.2, S49.3, S49.4` | `[x]` | 已补官方知识正文 seed、学业推荐有效学期过滤、理论自测题库导入和学生敏感字段加密/审计脱敏；后端 ruff/compileall、S49 定向集成 `40 passed`、后端全量 `143 passed`、Web 构建和 Miniapp `mp-weixin` 构建通过 |
+| 2026-05-25 | S50 第 12 组互测使用说明出件 | `docs/notes/refinements/2026-05-25-s35-peer-testing-usage-guide.md` | `S50.1, S50.2, S50.3` | `[x]` | 已按指导书和基本功能文档生成互测使用说明 DOCX，写明远端 Web 入口、共享账号、本地启动、小程序 mock 路径和已知限制，并完成 Word/PDF/PNG 页面检查 |
+| 2026-05-26 | S51 党团平台文件 2 知识导入与学生端检索闭环 | `docs/notes/refinements/2026-05-26-s36-party-platform-file2-knowledge-bootstrap.md` | `S51.1, S51.2, S51.3, S51.4, S51.5, S51.6` | `[x]` | 已将 `党团平台文件 2/` 的 4 份正式文件导入为 11 条已发布知识，补齐标签/来源检索与自然问法回退匹配，并完成本地发布、HTTP 复测、知识库回归 `9 passed`、py_compile 与 miniapp vue-tsc 验证 |
+| 2026-05-26 | S52 默认示例知识开箱即有，同时保留教师删改权 | `docs/notes/refinements/2026-05-26-s37-default-example-knowledge-seed.md` | `S52.1, S52.2, S52.3, S52.4` | `[x]` | 已将示例知识接入 `seed_default_data.py`，空库默认会自动导入 11 条示例知识；知识库非空时整批跳过，避免覆盖老师后续删改；已完成空库/非空库双场景实测 |
+| 2026-05-26 | S53 小程序开发态本地接口自动回正 | `docs/notes/refinements/2026-05-26-s38-miniapp-dev-local-api-auto-reset.md` | `S53.1, S53.2, S53.3, S53.4` | `[x]` | 已在开发态强制回本地接口并自动清理旧 storage/token，无需再手动打开微信开发者工具控制台输入修正命令；miniapp vue-tsc 通过 |
+| 2026-05-26 | S54 默认示例模板开箱即有，同时保留管理端删改权 | `docs/notes/refinements/2026-05-26-s39-default-example-template-seed.md` | `S54.1, S54.2, S54.3, S54.4` | `[x]` | 已将 `常用模板/` 的 4 份标准模板接入默认数据链路，空模板库默认会自动导入模板资产、来源和关联知识条目；模板库非空时整批跳过，避免覆盖老师后续删改；模板下载回归 `1 passed`，本地学生端模板列表与下载接口 HTTP 复测通过 |
 
 ## 会话更新要求
 
@@ -1184,11 +1482,27 @@
 - `2026-05-20`：新增并完成 `S32` 工作流发起服务端范围校验修复；`POST /admin/workflow/students` 现会在服务层按角色与 `scope_code` 校验目标学生，范围外或空 scope 发起会返回 403 并写入 `WORKFLOW / STUDENT_WORKFLOW / START` 拒绝审计；新增 scoped 成功、范围外拒绝、空 scope 拒绝和超管全局发起回归样例。`ruff check` 与 `py_compile` 通过；`pytest tests/integration/test_workflow_party_flow.py` 因当前测试数据库连接拒绝在 setup 阶段失败，未进入业务断言。
 - `2026-05-20`：新增并完成 `S33` 党团流程范围权限二次收口；流程详情、节点操作、管理列表和提醒列表均已按当前用户角色与 `scope_code` 在后端二次校验，范围外节点操作写入 `WORKFLOW / STUDENT_WORKFLOW_NODE` 拒绝审计；新增详情读取、列表/提醒过滤和节点越权回归样例。`ruff check` 与 `py_compile` 通过；`pytest tests/integration/test_workflow_party_flow.py` 因当前测试数据库连接拒绝在 setup 阶段失败，未进入业务断言。
 - `2026-05-20`：`S34` 可直接落地项已部署到内网生产 `10.10.0.13`。部署前备份 `/opt/super-ruc/backups/super-ruc-20260520-233518-f35cf98.dump`，`deploy.sh local`、`migrate-and-seed.sh`、`smoke.sh` 均通过；`http://10.10.0.13/healthz` 返回 `200`。提交 `f35cf98` 已推送到 GitHub `origin/main`。
-- `2026-05-25`：新增并完成 `S35` 第 12 组互测使用说明出件；基于《测试实验指导书》与《基本功能文档》提炼其他小组上手信息，核实内网 Web 入口 `http://10.10.0.13/`、共享账号 `admin / admin123`、默认数据状态和本地 mock 路径，生成 `output/doc/第12组-super-ruc-互测使用说明.docx`。随后使用本机 Word 导出 PDF 并渲染为 `9` 页 PNG 做页面 QC，收紧目录、条目间距和跨页排版。
-- `2026-05-26`：新增并完成 `S36` 党团平台文件 2 知识导入与学生端检索闭环；新增 `backend/scripts/import_party_platform_file2_knowledge.py`，将 `党团平台文件 2/` 的 4 份 PDF 显式导入为 5 个来源、11 条已发布知识，并增强学生端知识检索与智能匹配的标签/来源命中、摘要/来源展示和整句未命中回退重排逻辑。本地已执行 Docker 依赖、Alembic、基础种子、默认学生数据和知识导入，并通过 `pytest tests/integration/test_knowledge_flow.py -q`（`9 passed`）、后端 `py_compile` 与 miniapp `vue-tsc` 验证；运行态接口已复测“请假怎么请”“国家奖学金多少钱”“2024和2025培养方案有什么区别”“离京离校回来后怎么销假”均可返回候选与来源文件。
-- `2026-05-26`：新增并完成 `S37` 默认示例知识开箱即有，同时保留教师删改权；已将 `党团平台文件 2` 示例知识接入 `scripts.seed_default_data`，但只在知识库为空时自动导入。当前开发库复跑默认数据时日志显示 `knowledge skipped_due_to_existing=True`，证明不会覆盖已有知识；隔离数据库 `sip_db_seed_smoke` 从空库执行 `alembic upgrade head + seed_initial + seed_default_data` 后，已自动得到 `11` 条知识条目，满足互测阶段“开箱即有”的诉求。
-- `2026-05-26`：新增并完成 `S38` 小程序开发态本地接口自动回正；在 `miniapp/src/utils/request.ts` 中加入开发态强制回本地接口的逻辑，当未显式配置环境变量接口地址时，自动忽略旧的 `sip.api_base_url`，并在检测到历史远端地址残留时同步清理旧 token。这样在微信开发者工具中重新编译后即可直接连回本地后端，无需再通过难以输入的调试控制台手工执行 storage 修正命令；`miniapp vue-tsc --noEmit` 已通过。
-- `2026-05-26`：新增并完成 `S39` 默认示例模板开箱即有，同时保留管理端删改权；新增 `backend/scripts/import_common_template_examples.py`，将 `常用模板/` 的 4 份标准模板导入为默认模板资产、来源与关联的已发布知识条目，并接入 `scripts.seed_default_data`。默认数据链路现会在模板库为空时自动导入示例模板、在模板库非空时整批跳过，既满足互测阶段“开箱即有”的模板下载示例，又不覆盖老师后续删改；已通过 `pytest tests/integration/test_knowledge_template_flow.py -q`（`1 passed`）、后端 `py_compile`，以及本地 `GET /api/v1/knowledge/templates` / `GET /api/v1/knowledge/templates/{id}/download` 的 HTTP 复测。
+- `2026-05-23`：完成 `S35` 电子证明正式模板引擎；后端已新增 `proof_templates` 模板表、受控占位符渲染、后台模板列表/保存/预览/停用 API、默认在读证明模板种子和申请流回归样例。`ruff`、`py_compile`、模板渲染 smoke、纯单元测试 `4 passed`、隔离 Kingbase 迁移/种子与申请流集成测试 `18 passed` 均通过。
+- `2026-05-24`：完成 `S36` 生产 EDR Agent 安装；按 `EDR安全软件安装方法及回退方案-服务器业务组(2025).docx` 的 Linux 服务器业务组参数在 `10.10.0.13` 安装 Titan Agent，安装日志显示 `Agent installation success.`，`/titan/agent/titanagent` 进程运行，root crontab 已写入更新与监控任务；安装后 `super-ruc` 生产容器保持 healthy，`http://127.0.0.1/healthz` 返回 ok。
+- `2026-05-25`：完成 `S37` 党团官方流程默认模板修正；默认种子新增 `PARTY_DEVELOPMENT_OFFICIAL_V2` 官方 29 步党员发展模板、`YOUTH_LEAGUE_DEVELOPMENT_OFFICIAL_V2` 官方 15 步发展团员模板和 `YOUTH_LEAGUE_MEMBERSHIP_MANAGEMENT_V1` 团籍管理模板，旧 `PARTY_DEVELOPMENT_V1 / YOUTH_LEAGUE_V1` 转为 inactive 历史兼容；`ruff`、`py_compile` 与 `unit_tests/test_workflow_template_specs.py` 通过，工作流集成测试仍受本机 `localhost:54322/sip_db_test` 拒连阻塞。
+- `2026-05-25`：完成 `S38` 学生画像与荣誉展示 P1 补齐；荣誉后端新增 `display_order` 迁移、个人/集体筛选、统一排序和 recipients 服务端校验，Web 管理端补齐展示顺序、封面图、媒体 JSON 与获奖人/集体成员编辑器，Miniapp 补齐个人/集体筛选与标识；后端 `ruff` / `py_compile`、Web / Miniapp 类型检查与构建均通过，荣誉集成测试因本机 `localhost:54322/sip_db_test` 拒连未进入业务断言。
+- `2026-05-25`：将 `S35/S37/S38` 合并提交 `20b2c5f` 推送到 GitHub `origin/main` 并部署到内网生产 `10.10.0.13`。部署前备份 `/opt/super-ruc/backups/super-ruc-20260525-144925-5072fca.dump`；服务器通过本机 Git bundle 更新到 `20b2c5f` 后执行 `deploy.sh local`、`migrate-and-seed.sh`、`smoke.sh` 均通过；Alembic 已迁移到 `0019_honor_display_order`，幂等种子插入 `proof_templates=1`、新增/更新 `workflow_templates`，五个生产服务均为 healthy。
+- `2026-05-25`：完成 `S39` 官方风格 PDF 导出版式统一；确认本轮只统一证明 PDF 与画像快照 PDF 的品牌版式，不改成绩单上传边界；后端已引入人大/信息学院视觉资产、双 logo 页眉、水印和 ReportLab 设计版兜底，`ruff`、`py_compile`、单测与双 PDF smoke 通过。
+- `2026-05-25`：完成 `S40` bug-report 生产事实审查；实际生产提交为 `a558c61`，`smoke.sh` 与 `/healthz` 通过，`WECHAT_MOCK_ENABLED=False`、`AI_QA_ENABLED=False`。18 项报告中，配置启动、DB 连接、路由死循环、Mock 生产风险等被生产事实否定；上传先读内存、学分等价重复消耗、日期解析兼容性和分页参数约束进入 P1 修复池。
+- `2026-05-25`：完成 `S41` bug-report P1 代码修复；新增统一上传读取 helper 并替换五个直接 `file.read()` 上传入口，学业缺口等价课程改为一次性学分消耗模型，导入日期解析支持斜杠/中文/ISO datetime，`/admin/report/academic-gap` 补分页参数边界，并新增对应单元与集成回归测试。本地 `ruff`、`py_compile` 与新增单测 `4 passed` 通过；因本机 `localhost:54322/sip_db_test` 拒连，另在 `10.10.0.13:/opt/super-ruc/test-runs/s41-p1` 使用生产后端镜像和隔离测试库 `sip_db_test_s41` 完成远程 py_compile 与手写业务断言，输出 `S41 remote manual assertions passed`。
+- `2026-05-25`：完成 `S42` 生产运行时代理隔离修复；确认 `wx-login` 502 根因为旧后端镜像运行时继承 `HTTP_PROXY / HTTPS_PROXY=http://127.0.0.1:18081`，导致真实微信 `jscode2session` 在容器内误连本机代理。已修正 Dockerfile 构建期代理边界，并在 Compose 中运行时清空 backend 代理变量；服务器强制重建 backend 容器后 healthy，`POST /api/v1/auth/wx-login` 无效 code 探测返回微信 `errcode=40029` 对应 `401`，不再返回 `50201`。
+- `2026-05-25`：完成 `S43` 生产网络与构建出网治理；确认 `10.10.0.13` 具备直连公网出口，停止失效 `127.0.0.1:18081` 构建代理，backend Dockerfile 固化 TUNA Debian 镜像、IPv4 优先和短超时重试，微信 `code2session` 固定 `trust_env=False`。服务器无代理重建 backend / web 并重启后五服务 healthy，容器外网探测微信/TUNA PyPI/TUNA Debian 均返回 `200`，`bash deploy/intranet-prod/scripts/smoke.sh` 与外部 `http://10.10.0.13/healthz` 通过，`wx-login` 无效 code 返回 `401` 且日志仅记录微信 `errcode=40029`。
+- `2026-05-25`：完成 `S44` GitHub Actions 自动部署底座；采用服务器 self-hosted runner 规避 GitHub-hosted runner 无法访问内网 IP 的问题，服务器使用 read-only deploy key 拉取 GitHub。已新增部署前后网络预检、从 GitHub 部署入口、runner 安装脚本和 `main` push 自动部署 workflow；`2026-05-26` 复核 `2a8fd00` 推送后自动部署成功，服务器当前提交、生产 smoke、网络预检与外部 `/healthz` 均通过。
+- `2026-05-26`：完成 `S45` 全栈测试与 bug 分级审查；后端 ruff / compileall / 单元测试、Web 构建与浏览器 smoke、Miniapp 类型检查 / `mp-weixin` 构建 / 产物风险扫描、生产只读 smoke 均通过。随后按用户要求启动 Docker Desktop，`sip-kingbase` 健康后补跑全量后端 DB 集成测试，结果 `109 passed, 10 failed, 3 warnings in 357.78s`；10 个失败中 `3` 个按新增 Logic bug 计分、`7` 个为测试断言漂移。最终累计登记 `1` 个崩溃类 bug、`16` 个 Logic bug，基础分合计 `143`。
+- `2026-05-26`：完成 `S46` S45 缺陷修复闭环；修复后端身份/权限/SSRF/审计/契约/刷新问题、Web 角色与错误态、Miniapp 登录/筛选/错误态/媒体入口，并补齐回归测试。验证通过后端全量 DB 集成 `123 passed, 3 warnings in 231.05s`、后端 ruff / compileall / unit、Web 构建、Miniapp 类型检查与 `mp-weixin` 构建、本地 Web 403 smoke；本轮复核再次通过后端全量 DB 集成 `123 passed, 3 warnings in 205.89s`、后端静态/单元、双端构建和 403 浏览器 smoke。
+- `2026-05-26`：完成 `S47` 多角色联通完成度审计与补测；新增 `backend/tests/integration/test_s47_cross_role_linkage_smoke.py`，用真实测试数据库串起学生、辅导员、班主任、党团教师和超管身份，覆盖通知发布/收件已读、学生申请/老师审批、党团流程发起/学生进度、画像访问边界、学业看板 scope、荣誉发布/学生端读取。验证通过 S47 定向 `1 passed in 66.77s`、后端全量 DB 集成 `124 passed, 3 warnings in 215.90s`、后端 ruff / compileall、Web 构建、Miniapp 类型检查与 `mp-weixin` 构建；本轮未新增有效崩溃类 bug 或 Logic bug。
+- `2026-05-26`：完成 `S48` Miniapp 微信开发者工具告警排查与首页 key 修复；为规避开发者工具旧模块索引继续报 `request-badge.js`，已将事务徽章 helper 合并进 `api/workflow` 并删除独立 util，使最新构建产物不再包含 `request-badge` 引用；首页入口列表改用稳定业务 key，消除 `/pages/request/index` 与 `/pages/knowledge/index` 重复 `wx:key` 来源。验证通过 Miniapp 类型检查、清理后 `pnpm -C miniapp build:mp-weixin`、源码 key 残留扫描、`request-badge` 产物残留扫描和生成产物相对 `require()` 缺失扫描。
+- `2026-05-26`：完成 `S49` 官方知识种子、本学期开课推荐、题库导入与敏感字段加密审计；默认 seed 新增官方知识正文和来源链接，学业推荐按 `recommendation_term_code` 过滤本学期真实开课，理论自测题库支持 `.xlsx/.csv` 预览提交导入，学生身份证号/手机号写入路径统一加密并对导入行/审计 detail 脱敏。验证通过后端 `ruff`、`compileall`、S49 定向集成 `40 passed, 3 warnings in 178.21s`、后端全量 `143 passed, 3 warnings in 516.49s`、`pnpm -C web build` 和 `pnpm -C miniapp build:mp-weixin`。
+- `2026-05-25`：新增并完成 `S50` 第 12 组互测使用说明出件；基于《测试实验指导书》与《基本功能文档》提炼其他小组上手信息，核实内网 Web 入口 `http://10.10.0.13/`、共享账号 `admin / admin123`、默认数据状态和本地 mock 路径，生成 `output/doc/第12组-super-ruc-互测使用说明.docx`。随后使用本机 Word 导出 PDF 并渲染为 `9` 页 PNG 做页面 QC，收紧目录、条目间距和跨页排版。
+- `2026-05-26`：新增并完成 `S51` 党团平台文件 2 知识导入与学生端检索闭环；新增 `backend/scripts/import_party_platform_file2_knowledge.py`，将 `党团平台文件 2/` 的 4 份 PDF 显式导入为 5 个来源、11 条已发布知识，并增强学生端知识检索与智能匹配的标签/来源命中、摘要/来源展示和整句未命中回退重排逻辑。本地已执行 Docker 依赖、Alembic、基础种子、默认学生数据和知识导入，并通过 `pytest tests/integration/test_knowledge_flow.py -q`（`9 passed`）、后端 `py_compile` 与 miniapp `vue-tsc` 验证；运行态接口已复测“请假怎么请”“国家奖学金多少钱”“2024和2025培养方案有什么区别”“离京离校回来后怎么销假”均可返回候选与来源文件。
+- `2026-05-26`：新增并完成 `S52` 默认示例知识开箱即有，同时保留教师删改权；已将 `党团平台文件 2` 示例知识接入 `scripts.seed_default_data`，但只在知识库为空时自动导入。当前开发库复跑默认数据时日志显示 `knowledge skipped_due_to_existing=True`，证明不会覆盖已有知识；隔离数据库 `sip_db_seed_smoke` 从空库执行 `alembic upgrade head + seed_initial + seed_default_data` 后，已自动得到 `11` 条知识条目，满足互测阶段“开箱即有”的诉求。
+- `2026-05-26`：新增并完成 `S53` 小程序开发态本地接口自动回正；在 `miniapp/src/utils/request.ts` 中加入开发态强制回本地接口的逻辑，当未显式配置环境变量接口地址时，自动忽略旧的 `sip.api_base_url`，并在检测到历史远端地址残留时同步清理旧 token。这样在微信开发者工具中重新编译后即可直接连回本地后端，无需再通过难以输入的调试控制台手工执行 storage 修正命令；`miniapp vue-tsc --noEmit` 已通过。
+- `2026-05-26`：新增并完成 `S54` 默认示例模板开箱即有，同时保留管理端删改权；新增 `backend/scripts/import_common_template_examples.py`，将 `常用模板/` 的 4 份标准模板导入为默认模板资产、来源与关联的已发布知识条目，并接入 `scripts.seed_default_data`。默认数据链路现会在模板库为空时自动导入示例模板、在模板库非空时整批跳过，既满足互测阶段“开箱即有”的模板下载示例，又不覆盖老师后续删改；已通过 `pytest tests/integration/test_knowledge_template_flow.py -q`（`1 passed`）、后端 `py_compile`，以及本地 `GET /api/v1/knowledge/templates` / `GET /api/v1/knowledge/templates/{id}/download` 的 HTTP 复测。
 - `2026-05-18`：完成 `S24` 拉取后请求权限范围与公开预览门禁收口；班团骨干等协同角色的申请工作台、详情与处理动作已按 `scope_code` 限定可见范围，且本人申请不能绕过协同 scope 执行管理动作；`/preview/requirements` 改为仅开发或显式开关注册；申请流回归 `14 passed`、静态校验与 Web 构建通过。
 - `2026-05-19`：新增并完成 `S28` 内网生产部署与持续交付底座；已落地 `deploy/intranet-prod/` 的 Compose、Nginx、Web Dockerfile、生产 `.env` 模板、部署/迁移/备份/恢复/回滚/smoke 脚本和小程序内网出包入口，并完成本地验证；通过本机 SSH 反向 SOCKS 代理完成服务器 `git / Docker / Compose` 初始化和 Docker 镜像拉取验证；服务器生产 `.env` 就绪后完成五服务上线、Alembic 迁移、幂等基础种子、smoke、本机内网访问与数据库备份脚本验证。
 - `2026-05-19`：新增并完成 `S29` 生产默认数据导入与管理入口补强；为后端生产容器只读挂载 `docs` 默认数据源，新增 `seed-default-data.sh`，在服务器完成默认学生与 `2024-default` 培养方案导入，并补 Web 单个后台账号创建和学生学籍信息编辑入口；`pnpm -C web build`、Compose config、shell 语法检查、服务器 Web 重建与 smoke 通过。
