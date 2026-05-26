@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程当前节点状态展示修正、`S59` 党团流程学生提交材料与老师确认推进闭环与 `S60` 证明 PDF 信息学院品牌与中文字体修复均已完成
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程当前节点状态展示修正、`S59` 党团流程学生提交材料与老师确认推进闭环、`S60` 证明 PDF 信息学院品牌与中文字体修复与 `S61` 生产部署 GitHub SSH 443 与超时治理均已完成
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -966,6 +966,20 @@
 - 验证：后端 `ruff check`、`py_compile` 与 `unit_tests/test_proof_template_engine.py` 通过。
 - 生产部署验证：`main` 推送后 GitHub Actions self-hosted runner 完成部署，生产 `.deploy/current_commit` 到 `d021164ee27f03cf634db55924964845ec2fac74`；backend/web 均 healthy，`smoke.sh` 与外部 `/healthz` 通过；backend 容器 `fc-list :lang=zh` 可见 Noto CJK，`_has_cjk_font_file()` 返回 `True`，生产容器内生成中文 PDF 字节流成功。
 
+### S61 生产部署 GitHub SSH 443 与超时治理
+
+- 细化文件：`docs/notes/refinements/2026-05-27-s61-intranet-deploy-ssh443-timeout.md`
+- 当前状态：`[x]` 已完成生产 GitHub SSH 22 超时定位、SSH 443 切换、deploy key SSH 超时参数补齐和部署验证。
+- [x] `S61.1` 定位第二次文档-only 自动部署卡在生产机 `git ls-remote origin` 的 GitHub SSH 22 连接。
+- [x] `S61.2` 验证生产机使用 `ssh://git@ssh.github.com:443/RUC-zlhz/super-ruc.git` 可正常 `git ls-remote HEAD`。
+- [x] `S61.3` 将 `Intranet Production Deploy` workflow 的 `DEPLOY_GIT_REMOTE` 切到 GitHub SSH 443。
+- [x] `S61.4` 为 `GIT_SSH_COMMAND` 增加 `BatchMode`、`ConnectTimeout` 与 `ServerAlive*` 参数，避免 deploy key 链路长时间挂起。
+- [x] `S61.5` 推送后确认生产 `.deploy/current_commit` 到最新提交，runner job completed，服务仍 healthy。
+
+当前结论：
+
+- 应用层 PDF 修复已在 `d021164` 生效；`S61` 只修复生产自动部署链路的 GitHub SSH 稳定性，不改变业务功能。
+
 ### S6 前端体验增量优化
 
 - [x] `S6.1` Web 共享导航与默认落点收口
@@ -1543,6 +1557,7 @@
 | 2026-05-26 | S58 小程序党团流程当前节点状态展示修正 | `docs/notes/refinements/2026-05-26-s58-miniapp-workflow-current-node-status.md` | `S58.1, S58.2, S58.3, S58.4` | `[x]` | 已确认张念昊入党流程实际为 `ACTIVE` 且当前节点“教育引导”已触发；修正小程序流程详情页，将当前或已触发的 `PENDING` 节点显示为“进行中”，未触发后续节点仍显示“待开始”；Miniapp 类型检查与 `mp-weixin` 构建通过 |
 | 2026-05-26 | S59 党团流程学生提交材料与老师确认推进闭环 | `docs/notes/refinements/2026-05-26-s59-workflow-student-material-submit.md` | `S59.1, S59.2, S59.3, S59.4, S59.5` | `[x]` | 已新增学生提交材料接口、`MATERIAL_SUBMITTED` 状态和 `student_material_required` 节点判定；小程序只对确需学生材料的节点展示提交入口，组织侧节点提示等待老师或支部处理；Web 老师端可查看材料或识别无需学生提交节点，并确认完成推进下一节点；后端与双端验证通过 |
 | 2026-05-27 | S60 证明 PDF 信息学院品牌与中文字体修复 | `docs/notes/refinements/2026-05-27-s60-proof-pdf-cjk-branding-fix.md` | `S60.1, S60.2, S60.3, S60.4, S60.5, S60.6` | `[x]` | 已确认生产证明模板正文是信息学院，定位生产中文渲染异常根因为 backend 容器缺 CJK 字体并回退 Helvetica；Docker 镜像补 `fonts-noto-cjk`，ReportLab fallback 改为 `STSong-Light`，并用单元测试和本地 PDF 渲染锁定中文可读与信息学院品牌 |
+| 2026-05-27 | S61 生产部署 GitHub SSH 443 与超时治理 | `docs/notes/refinements/2026-05-27-s61-intranet-deploy-ssh443-timeout.md` | `S61.1, S61.2, S61.3, S61.4, S61.5` | `[x]` | 已定位生产 runner 到 GitHub SSH 22 超时导致 deploy job 卡住；workflow 改用 `ssh.github.com:443`，deploy key SSH 命令补超时和批处理参数，避免自动部署长时间挂起 |
 
 ## 会话更新要求
 

@@ -51,7 +51,7 @@ jobs:
           ENV_FILE: /opt/super-ruc/app/deploy/intranet-prod/.env
           COMPOSE_FILE: /opt/super-ruc/app/deploy/intranet-prod/docker-compose.yml
           COMPOSE_PROJECT_NAME: super-ruc-intranet-prod
-          DEPLOY_GIT_REMOTE: git@github.com:RUC-zlhz/super-ruc.git
+          DEPLOY_GIT_REMOTE: ssh://git@ssh.github.com:443/RUC-zlhz/super-ruc.git
           DEPLOY_KEY_FILE: /opt/super-ruc/.ssh/super-ruc-prod-deploy-ed25519
           INPUT_DEPLOY_REF: ${{ github.event.inputs.deploy_ref || '' }}
           INPUT_SKIP_BACKUP: ${{ github.event.inputs.skip_backup || 'false' }}

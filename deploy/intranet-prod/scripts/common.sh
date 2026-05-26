@@ -20,7 +20,7 @@ DEPLOY_KEY_FILE=${DEPLOY_KEY_FILE:-/opt/super-ruc/.ssh/super-ruc-prod-deploy-ed2
 
 configure_deploy_git_ssh() {
   if [ -z "${GIT_SSH_COMMAND:-}" ] && [ -r "$DEPLOY_KEY_FILE" ]; then
-    export GIT_SSH_COMMAND="ssh -i $DEPLOY_KEY_FILE -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+    export GIT_SSH_COMMAND="ssh -i $DEPLOY_KEY_FILE -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=1"
   fi
 }
 
