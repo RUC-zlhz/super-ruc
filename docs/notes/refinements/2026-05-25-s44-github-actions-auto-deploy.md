@@ -65,3 +65,10 @@ GitHub 登记要求：
 - 处理方案：`deploy-from-github.sh` 与 `rollback.sh` 内部统一使用 `bash "$SCRIPT_DIR/<script>.sh"` 调用同目录脚本，并补 Git 可执行位，避免不同 checkout 文件模式导致部署失败。
 - 第三轮 workflow 对应提交 `1ed58f0` 已自动部署成功：runner 日志显示 `Job Deploy to 10.10.0.13 completed with result: Succeeded`。
 - 部署后验证：服务器 `/opt/super-ruc/app` 已在 `1ed58f0`，backend / web / db / redis / minio 均 healthy，`bash deploy/intranet-prod/scripts/smoke.sh` 通过，`bash deploy/intranet-prod/scripts/preflight-network.sh` 通过，外部 `http://10.10.0.13/healthz` 返回 ok。
+
+## 2026-05-26 S45/S46/S47 提交部署复核
+
+- 提交 `2a8fd00 fix: close S45 full-stack bug audit` 已推送到 `origin/main`。
+- self-hosted runner 日志显示 `2026-05-26 03:28:46Z` 开始运行 `Deploy to 10.10.0.13`，`2026-05-26 03:33:52Z` 完成且结果为 `Succeeded`。
+- 服务器 `/opt/super-ruc/app/.deploy/current_commit` 与 `git rev-parse HEAD` 均为 `2a8fd007fb342883be4f3b2a096e05341761f200`。
+- 生产复核通过：`bash deploy/intranet-prod/scripts/smoke.sh`、`bash deploy/intranet-prod/scripts/preflight-network.sh`、外部 `http://10.10.0.13/healthz` 与无效微信 code 探测均正常。
