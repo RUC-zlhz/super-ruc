@@ -51,7 +51,7 @@
       row-key="id"
       class="visual-table"
       @change="onTableChange"
-    >
+     :scroll="{ x: 'max-content' }">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <StatusTag :status="record.status" />

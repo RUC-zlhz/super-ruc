@@ -482,7 +482,7 @@
             row-key="code"
             :pagination="false"
             size="small"
-          >
+           :scroll="{ x: 'max-content' }">
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'active'">
                 <a-tag :color="record.is_active ? 'green' : 'default'">
@@ -593,7 +593,7 @@
             size="small"
             :pagination="{ pageSize: 10 }"
             class="mt8"
-          >
+           :scroll="{ x: 'max-content' }">
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'severity'">
                 <a-tag :color="severityColor(record.severity)">{{ record.severity }}</a-tag>
@@ -627,7 +627,7 @@
             row-key="id"
             size="small"
             @change="onImportTableChange"
-          >
+           :scroll="{ x: 'max-content' }">
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'status'">
                 <a-tag :color="importStatusColor(record.status)">{{ record.status }}</a-tag>

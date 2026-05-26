@@ -42,7 +42,7 @@
               row-key="id"
               size="small"
               @change="onEntryTableChange"
-            >
+             :scroll="{ x: 'max-content' }">
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'title'">
                   <div class="table-title">{{ record.title }}</div>
@@ -113,7 +113,7 @@
                 row-key="template_id"
                 size="small"
                 :pagination="false"
-              >
+               :scroll="{ x: 'max-content' }">
                 <template #bodyCell="{ column, record }">
                   <template v-if="column.key === 'template_name'">
                     <div class="table-title">{{ record.template_name }}</div>
@@ -243,7 +243,7 @@
           row-key="id"
           size="small"
           :pagination="false"
-        >
+         :scroll="{ x: 'max-content' }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'source_name'">
               <div class="table-title">
@@ -311,7 +311,7 @@
           :pagination="templatePagination"
           row-key="id"
           @change="onTemplateTableChange"
-        >
+         :scroll="{ x: 'max-content' }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'template_name'">
               <div class="table-title">{{ record.template_name }}</div>
@@ -491,7 +491,7 @@
     </a-drawer>
 
     <a-modal v-model:open="revisionModalOpen" title="版本记录" :footer="null" width="720">
-      <a-table :columns="revisionColumns" :data-source="revisions" row-key="id" size="small" :pagination="false">
+      <a-table :columns="revisionColumns" :data-source="revisions" row-key="id" size="small" :pagination="false" :scroll="{ x: 'max-content' }">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'occurred_at'">{{ formatDateTime(record.occurred_at) }}</template>
           <template v-else-if="column.key === 'status'">

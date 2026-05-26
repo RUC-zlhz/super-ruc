@@ -113,6 +113,7 @@
             row-key="id"
             size="small"
             :pagination="{ pageSize: 50 }"
+            :scroll="{ x: 'max-content' }"
             class="mt8"
           >
             <template #bodyCell="{ column, record }">
@@ -151,6 +152,7 @@
             :data-source="transcriptReviewBatches"
             :loading="transcriptReviewLoading"
             :pagination="{ pageSize: 6 }"
+            :scroll="{ x: 'max-content' }"
             row-key="id"
             size="small"
           >
@@ -216,6 +218,7 @@
               :columns="transcriptReviewRecordCols"
               :data-source="transcriptReviewRecords"
               :pagination="false"
+              :scroll="{ x: 'max-content' }"
               row-key="client_key"
               size="small"
             >
@@ -297,6 +300,7 @@
             :data-source="batches"
             :loading="batchLoading"
             :pagination="batchPagination"
+            :scroll="{ x: 'max-content' }"
             row-key="id"
             @change="onBatchTableChange"
           >
@@ -479,7 +483,7 @@ const rowCols = [
 const transcriptReviewBatchCols = [
   { title: '批次号', dataIndex: 'batch_no', key: 'batch_no', width: 180 },
   { title: '学生', key: 'student', width: 180 },
-  { title: '文件名', dataIndex: 'filename', key: 'filename' },
+  { title: '文件名', dataIndex: 'filename', key: 'filename', ellipsis: true },
   { title: '候选', key: 'parsed', width: 100 },
   { title: '状态', key: 'status', width: 100 },
   { title: '上传时间', dataIndex: 'started_at', key: 'started_at', width: 180 },
@@ -710,7 +714,7 @@ async function onCommitTranscriptPdfReview() {
 const batchCols = [
   { title: '批次号', dataIndex: 'batch_no', key: 'batch_no', width: 160 },
   { title: '类型', dataIndex: 'import_type', key: 'import_type', width: 120 },
-  { title: '文件名', dataIndex: 'filename', key: 'filename' },
+  { title: '文件名', dataIndex: 'filename', key: 'filename', ellipsis: true },
   { title: '状态', key: 'status', width: 100 },
   { title: '总行/正常/警告/致命', key: 'counts', width: 180, customRender: ({ record }: any) =>
     `${record.total_rows} / ${record.ok_rows} / ${record.warn_rows} / ${record.fatal_rows}` },

@@ -76,7 +76,7 @@
             :pagination="false"
             row-key="id"
             size="small"
-          />
+           :scroll="{ x: 'max-content' }" />
         </a-card>
       </a-col>
 

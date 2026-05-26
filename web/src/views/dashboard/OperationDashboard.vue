@@ -234,7 +234,7 @@
                 row-key="student_id"
                 size="small"
                 @change="onAcademicGapTableChange"
-              >
+               :scroll="{ x: 'max-content' }">
                 <template #bodyCell="{ column, record }">
                   <template v-if="column.key === 'student'">
                     <div class="gap-student-name">{{ record.student_name }}</div>
@@ -352,7 +352,7 @@
             :pagination="false"
             row-key="module_code"
             size="small"
-          >
+           :scroll="{ x: 'max-content' }">
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'module'">
                 <div class="gap-student-name">{{ record.module_name }}</div>

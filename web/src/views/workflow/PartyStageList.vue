@@ -78,7 +78,7 @@
           :custom-row="templateRowProps"
           :row-class-name="templateRowClassName"
           row-key="id"
-        >
+         :scroll="{ x: 'max-content' }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'kind'">
               {{ templateKindLabel(record.kind) }}
@@ -139,7 +139,7 @@
           :pagination="flowPagination"
           row-key="id"
           @change="onFlowTableChange"
-        >
+         :scroll="{ x: 'max-content' }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
               <StatusTag :status="record.current_node_status || 'PENDING'" />

@@ -86,7 +86,7 @@
               row-key="id"
               size="small"
               @change="onStuTableChange"
-            >
+             :scroll="{ x: 'max-content' }">
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'enrollment_status'">
                   <a-tag :color="enrollmentStatusColor(record.enrollment_status)">
@@ -257,7 +257,7 @@
             row-key="work_no"
             size="small"
             :pagination="false"
-          />
+           :scroll="{ x: 'max-content' }" />
         </section>
 
         <section class="admin-import-section">
@@ -275,7 +275,7 @@
             row-key="id"
             size="small"
             :pagination="{ pageSize: 10 }"
-          >
+           :scroll="{ x: 'max-content' }">
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'severity'">
                 <a-tag :color="adminSeverityColor(record.severity)">
@@ -305,7 +305,7 @@
             row-key="id"
             size="small"
             @change="onAdminHistoryTableChange"
-          >
+           :scroll="{ x: 'max-content' }">
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'status'">
                 <a-tag :color="adminBatchStatusColor(record.status)">
@@ -338,7 +338,7 @@
           :loading="policyLoading"
           :row-key="policyRowKey"
           size="small"
-        >
+         :scroll="{ x: 'max-content' }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'can_read'">
               <a-tag :color="record.can_read ? 'green' : 'default'">

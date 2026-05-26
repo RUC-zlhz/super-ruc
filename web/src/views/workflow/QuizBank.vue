@@ -110,7 +110,7 @@
           :pagination="{ pageSize: 5 }"
           row-key="id"
           size="small"
-        />
+         :scroll="{ x: 'max-content' }" />
 
         <a-table
           :columns="cols"
@@ -119,7 +119,7 @@
           :pagination="pagination"
           row-key="id"
           @change="onTableChange"
-        >
+         :scroll="{ x: 'max-content' }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'qtype'">
               <a-tag :color="qtypeColor(record.qtype)">{{ qtypeLabel(record.qtype) }}</a-tag>

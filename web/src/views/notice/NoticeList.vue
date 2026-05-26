@@ -51,7 +51,7 @@
       :row-class-name="noticeRowClassName"
       row-key="id"
       @change="onTableChange"
-    >
+     :scroll="{ x: 'max-content' }">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'title'">
           <div class="table-title">{{ record.title }}</div>
@@ -620,7 +620,7 @@
           :pagination="false"
           row-key="id"
           size="small"
-        >
+         :scroll="{ x: 'max-content' }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'channels'">
               <a-tag v-for="channel in parseChannels(record.channels)" :key="channel" size="small">
@@ -733,7 +733,7 @@
           row-key="id"
           size="small"
           @change="onDeliveryTableChange"
-        >
+         :scroll="{ x: 'max-content' }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'channel'">
               <a-tag>{{ channelLabel(record.channel) }}</a-tag>
@@ -830,7 +830,7 @@
           row-key="id"
           size="small"
           @change="onSourceTableChange"
-        >
+         :scroll="{ x: 'max-content' }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'name'">
               <div class="table-title">{{ record.name }}</div>
@@ -897,7 +897,7 @@
             row-key="id"
             size="small"
             @change="onIngestRunTableChange"
-          >
+           :scroll="{ x: 'max-content' }">
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'status'">
                 <a-tag :color="ingestStatusColor(record.status)">{{ record.status }}</a-tag>

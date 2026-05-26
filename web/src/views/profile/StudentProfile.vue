@@ -236,7 +236,7 @@
             :pagination="false"
             row-key="id"
             size="small"
-          >
+           :scroll="{ x: 'max-content' }">
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'target'">
                 <span>{{ fullViewTargetLabel(record) }}</span>

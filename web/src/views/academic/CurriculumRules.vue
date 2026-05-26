@@ -100,7 +100,7 @@
             :pagination="false"
             row-key="module_code"
             size="small"
-          >
+           :scroll="{ x: 'max-content' }">
             <template #bodyCell="{ column, record, index }">
               <template v-if="column.key === 'module_type'">
                 <a-tag :color="record.module_type === 'REQUIRED' ? 'red' : 'blue'">
@@ -139,7 +139,7 @@
                   :pagination="{ pageSize: 8, size: 'small' }"
                   :row-key="courseRowKey"
                   size="small"
-                >
+                 :scroll="{ x: 'max-content' }">
                   <template #bodyCell="{ column, record: course, index }">
                     <template v-if="column.key === 'credits'">
                       {{ formatCredits(course.credits) }}
@@ -170,7 +170,7 @@
             row-key="id"
             size="small"
             @change="onOfferingTableChange"
-          />
+           :scroll="{ x: 'max-content' }" />
         </a-card>
       </section>
 
@@ -189,7 +189,7 @@
           :pagination="{ pageSize: 6, size: 'small' }"
           row-key="id"
           size="small"
-        />
+         :scroll="{ x: 'max-content' }" />
         <div class="equiv-note">
           完全替代、条件替代与部分替代需结合培养方案模块要求共同判断。
         </div>

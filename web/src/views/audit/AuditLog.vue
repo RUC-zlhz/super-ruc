@@ -100,7 +100,7 @@
           :pagination="pagination"
           row-key="id"
           @change="onTableChange"
-        >
+         :scroll="{ x: 'max-content' }">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'storage_scope'">
               <a-tag :color="auditScopeColor(record.storage_scope)">
