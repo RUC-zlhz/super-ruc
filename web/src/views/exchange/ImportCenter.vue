@@ -147,6 +147,9 @@
             show-icon
             message="学生上传的成绩单 PDF 只生成候选批次，教师核验并提交后才写入正式成绩。"
           />
+          <div class="transcript-review-hint">
+            点击批次行或“打开核验”可展开下方课程核验表；推荐课程显示在展开后的候选课程表中。
+          </div>
           <a-table
             :columns="transcriptReviewBatchCols"
             :data-source="transcriptReviewBatches"
@@ -155,9 +158,19 @@
             :scroll="{ x: 'max-content' }"
             row-key="id"
             size="small"
+            :custom-row="getTranscriptReviewBatchRowProps"
+            :row-class-name="getTranscriptReviewBatchRowClassName"
           >
             <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'status'">
+              <template v-if="column.key === 'batch_no'">
+                <div class="transcript-batch-cell">
+                  <div class="transcript-batch-no">{{ record.batch_no }}</div>
+                  <a-button type="link" size="small" class="transcript-batch-open" @click.stop="openTranscriptPdfReview(record.id)">
+                    {{ record.status === 'COMMITTED' ? '打开查看' : '打开核验' }}
+                  </a-button>
+                </div>
+              </template>
+              <template v-else-if="column.key === 'status'">
                 <StatusTag :status="record.status" />
               </template>
               <template v-else-if="column.key === 'student'">
@@ -166,11 +179,6 @@
               </template>
               <template v-else-if="column.key === 'parsed'">
                 {{ record.summary?.parsed_courses_count || 0 }} 条候选
-              </template>
-              <template v-else-if="column.key === 'actions'">
-                <a-button type="link" size="small" @click="openTranscriptPdfReview(record.id)">
-                  {{ record.status === 'COMMITTED' ? '查看' : '核验' }}
-                </a-button>
               </template>
             </template>
           </a-table>
@@ -218,9 +226,9 @@
               :columns="transcriptReviewRecordCols"
               :data-source="transcriptReviewRecords"
               :pagination="false"
-              :scroll="{ x: 'max-content' }"
               row-key="client_key"
               size="small"
+              :scroll="{ x: 1560 }"
             >
               <template #bodyCell="{ column, record, index }">
                 <template v-if="column.key === 'course_code'">
@@ -228,6 +236,26 @@
                 </template>
                 <template v-else-if="column.key === 'course_name'">
                   <a-input v-model:value="record.course_name" :disabled="isTranscriptReviewCommitted" />
+                </template>
+                <template v-else-if="column.key === 'recommendations'">
+                  <div v-if="record.course_recommendations.length" class="recommendation-list">
+                    <div
+                      v-for="recommendation in record.course_recommendations.slice(0, 3)"
+                      :key="`${record.client_key}-${recommendation.course_code}`"
+                      class="recommendation-item"
+                    >
+                      <a-button
+                        size="small"
+                        :disabled="isTranscriptReviewCommitted"
+                        @click="applyTranscriptCourseRecommendation(record, recommendation)"
+                      >
+                        套用 {{ recommendation.course_code }}
+                      </a-button>
+                      <div class="recommendation-name">{{ recommendation.course_name }}</div>
+                      <div class="recommendation-meta">{{ formatTranscriptRecommendationMeta(recommendation) }}</div>
+                    </div>
+                  </div>
+                  <span v-else class="muted">未命中推荐</span>
                 </template>
                 <template v-else-if="column.key === 'credits'">
                   <a-input-number
@@ -413,6 +441,8 @@ import {
   downloadErrorReport, downloadStudents, downloadTranscripts, downloadCurriculum,
   TRANSCRIPT_PDF_REVIEW_IMPORT_TYPE,
   type DefaultImportResult, type ImportType, type ImportPreviewResult, type ImportBatchBrief,
+  type TranscriptPdfCourseRecommendation,
+  type TranscriptPdfParsedCandidate,
   type TranscriptPdfReviewRecord,
 } from '@/api/exchange'
 import StatusTag from '@/components/StatusTag.vue'
@@ -487,11 +517,11 @@ const transcriptReviewBatchCols = [
   { title: '候选', key: 'parsed', width: 100 },
   { title: '状态', key: 'status', width: 100 },
   { title: '上传时间', dataIndex: 'started_at', key: 'started_at', width: 180 },
-  { title: '操作', key: 'actions', width: 90 },
 ]
 const transcriptReviewRecordCols = [
   { title: '课程编码', key: 'course_code', width: 130 },
   { title: '课程名称', key: 'course_name', width: 190 },
+  { title: '推荐课程', key: 'recommendations', width: 280 },
   { title: '学分', key: 'credits', width: 100 },
   { title: '学期', key: 'term_code', width: 130 },
   { title: '成绩', key: 'score', width: 100 },
@@ -508,6 +538,7 @@ interface EditableTranscriptReviewRecord extends TranscriptPdfReviewRecord {
   credits: number
   term_code: string
   pass_flag: boolean
+  course_recommendations: TranscriptPdfCourseRecommendation[]
 }
 
 const transcriptReviewSummary = computed<Record<string, any>>(() => (
@@ -600,8 +631,8 @@ function onDownloadBatchErrors(batchId: number) {
   downloadErrorReport(batchId)
 }
 
-function normalizeReviewRecord(candidate: Record<string, any>, index: number): EditableTranscriptReviewRecord {
-  const score = candidate.score == null || candidate.score === '' ? null : Number(candidate.score)
+function normalizeReviewRecord(candidate: TranscriptPdfParsedCandidate, index: number): EditableTranscriptReviewRecord {
+  const score = candidate.score == null ? null : Number(candidate.score)
   const passFlag = typeof candidate.pass_flag === 'boolean'
     ? candidate.pass_flag
     : (score == null ? true : score >= 60)
@@ -616,6 +647,9 @@ function normalizeReviewRecord(candidate: Record<string, any>, index: number): E
     grade_letter: candidate.grade_letter == null ? null : String(candidate.grade_letter),
     pass_flag: passFlag,
     note: candidate.note == null ? null : String(candidate.note),
+    course_recommendations: Array.isArray(candidate.course_recommendations)
+      ? candidate.course_recommendations
+      : [],
   }
 }
 
@@ -623,11 +657,11 @@ function buildTranscriptReviewRecords(detail: ImportPreviewResult): EditableTran
   const summaryCandidates = detail.batch.summary?.candidate_courses
   const rowCandidates = detail.rows
     .filter((row) => row.field_name === 'parsed_courses' && row.raw_data)
-    .map((row) => row.raw_data as Record<string, any>)
+    .map((row) => row.raw_data as TranscriptPdfParsedCandidate)
   const candidates = Array.isArray(summaryCandidates) && summaryCandidates.length
     ? summaryCandidates
     : rowCandidates
-  return candidates.map((item, index) => normalizeReviewRecord(item, index))
+  return (candidates as TranscriptPdfParsedCandidate[]).map((item, index) => normalizeReviewRecord(item, index))
 }
 
 async function loadTranscriptPdfReviews() {
@@ -656,12 +690,43 @@ async function openTranscriptPdfReview(batchId: number) {
   }
 }
 
+function getTranscriptReviewBatchRowProps(record: ImportBatchBrief) {
+  return {
+    onClick: () => { void openTranscriptPdfReview(record.id) },
+  }
+}
+
+function getTranscriptReviewBatchRowClassName(record: ImportBatchBrief) {
+  return transcriptReviewDetail.value?.batch.id === record.id
+    ? 'transcript-review-batch-row is-active'
+    : 'transcript-review-batch-row'
+}
+
 function addTranscriptReviewRecord() {
   transcriptReviewRecords.value.push(normalizeReviewRecord({}, transcriptReviewRecords.value.length))
 }
 
 function removeTranscriptReviewRecord(index: number) {
   transcriptReviewRecords.value.splice(index, 1)
+}
+
+function applyTranscriptCourseRecommendation(
+  record: Record<string, any>,
+  recommendation: TranscriptPdfCourseRecommendation,
+) {
+  record.course_code = recommendation.course_code
+  record.course_name = recommendation.course_name
+  if ((!record.credits || record.credits <= 0) && recommendation.credits != null) {
+    record.credits = Number(recommendation.credits)
+  }
+}
+
+function formatTranscriptRecommendationMeta(recommendation: TranscriptPdfCourseRecommendation) {
+  const moduleName = recommendation.module_names?.[0]
+  const matchScore = typeof recommendation.match_score === 'number'
+    ? `${Math.round(recommendation.match_score * 100)}%`
+    : '-'
+  return [moduleName, recommendation.match_reason, matchScore].filter(Boolean).join(' · ')
 }
 
 function validateTranscriptReviewRecords() {
@@ -804,6 +869,73 @@ onMounted(() => {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
+}
+
+.transcript-review-hint {
+  margin: -4px 0 12px;
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.transcript-batch-cell {
+  display: grid;
+  gap: 6px;
+}
+
+.transcript-batch-no {
+  color: var(--text);
+  font-weight: 700;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.transcript-batch-open {
+  width: fit-content;
+  padding: 0;
+}
+
+.recommendation-list {
+  display: grid;
+  gap: 8px;
+}
+
+.recommendation-item {
+  padding: 8px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: #fff8f9;
+}
+
+.recommendation-name {
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.recommendation-meta {
+  margin-top: 4px;
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+:deep(.transcript-review-batch-row) {
+  cursor: pointer;
+}
+
+:deep(.transcript-review-batch-row td) {
+  transition: background-color 0.2s ease;
+}
+
+:deep(.transcript-review-batch-row:hover td) {
+  background: #fff8f9;
+}
+
+:deep(.transcript-review-batch-row.is-active td) {
+  background: #fff2f4;
 }
 
 .import-hero :deep(.ant-card-body) {

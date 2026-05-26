@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程当前节点状态展示修正、`S59` 党团流程学生提交材料与老师确认推进闭环、`S60` 证明 PDF 信息学院品牌与中文字体修复、`S61` 生产部署 GitHub SSH 443 与超时治理与 `S62` 学业缺口课程推荐无开课数据兜底增强均已完成
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程当前节点状态展示修正、`S59` 党团流程学生提交材料与老师确认推进闭环、`S60` 证明 PDF 信息学院品牌与中文字体修复、`S61` 生产部署 GitHub SSH 443 与超时治理、`S62` 学业缺口课程推荐无开课数据兜底增强与 `S63` 成绩单课程匹配推荐和教师审核辅助均已完成
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -1001,6 +1001,30 @@
 - 回归测试：`backend/tests/integration/test_report_contract_flow.py`、`backend/tests/integration/test_s12_gap_closure.py`。
 - 验证：后端 `ruff check` 与 `py_compile` 通过；后端定向集成 `13 passed, 3 warnings in 106.36s`；`pnpm -C web build`、Miniapp `vue-tsc` 与 `pnpm -C miniapp build:mp-weixin` 均通过。
 
+### S63 成绩单课程匹配推荐与教师审核辅助
+
+- 细化文件：`docs/notes/refinements/2026-05-27-s63-transcript-course-matching-recommendation.md`
+- 当前状态：`[x]` 已完成 PR #5 融合、课程推荐、教师审核页接线与定向验证。
+- [x] `S63.1` 后端基于受控培养方案课程库，为成绩单 PDF 候选课程生成可解释的课程代码推荐列表。
+- [x] `S63.2` 匹配策略使用确定性规则收口：课程代码精确匹配、课程名称归一化精确匹配、别名/包含匹配、相似度排序与学分一致性加权，不引入生成式 RAG。
+- [x] `S63.3` 新版人大成绩单解析兼容“课程名 / 教师 / 课程属性 / 多列成绩 / 学期汇总”排版。
+- [x] `S63.4` Web 教师审核页支持展示推荐课程，并可一键套用推荐的课程代码与课程名称，同时保留人工覆盖输入。
+- [x] `S63.5` 与 S62 学业缺口推荐兜底完成代码融合，保留两个功能面。
+
+当前结论：
+
+- 成绩单审核链路已从“只能人工查课程代码”升级为“系统先基于信息学院培养方案做受控推荐，教师再点选或手填确认”。
+- 当前方案刻意不使用生成式 RAG，而是复用仓库内已落库的培养方案课程白名单，保证推荐结果可解释、可回归、可审计，不改变“教师提交后才落正式成绩”的治理边界。
+- 本轮合并保留了 S62 学业缺口课程推荐兜底；成绩单课程匹配推荐只作用于 PDF 核验批次，不改变学业缺口页的“本学期开课 / 培养方案候选”来源标记。
+
+证据：
+
+- PR #5 head：`86dbf33 feat: add transcript course recommendations and parser fixes`
+- 后端实现：`backend/app/report/service.py`、`backend/app/report/schemas.py`、`backend/app/report/transcript_pdf.py`
+- Web 审核页：`web/src/views/exchange/ImportCenter.vue`、`web/src/api/exchange.ts`
+- 定向回归：`backend/tests/integration/test_report_contract_flow.py` 已新增成绩单上传返回推荐课程断言；`backend/tests/test_transcript_pdf_analysis.py` 已新增新版人大成绩单解析样例。
+- 验证：后端 `ruff check` 与 `py_compile` 通过；`pytest tests/test_transcript_pdf_analysis.py tests/integration/test_report_contract_flow.py tests/integration/test_s12_gap_closure.py -q` 结果 `17 passed, 3 warnings in 119.40s`；首次 `pnpm -C web build` 暴露并修复 `ImportCenter.vue` 重复 `:scroll` 属性，修复后 Web 构建通过。
+
 ### S6 前端体验增量优化
 
 - [x] `S6.1` Web 共享导航与默认落点收口
@@ -1580,6 +1604,7 @@
 | 2026-05-27 | S60 证明 PDF 信息学院品牌与中文字体修复 | `docs/notes/refinements/2026-05-27-s60-proof-pdf-cjk-branding-fix.md` | `S60.1, S60.2, S60.3, S60.4, S60.5, S60.6` | `[x]` | 已确认生产证明模板正文是信息学院，定位生产中文渲染异常根因为 backend 容器缺 CJK 字体并回退 Helvetica；Docker 镜像补 `fonts-noto-cjk`，ReportLab fallback 改为 `STSong-Light`，并用单元测试和本地 PDF 渲染锁定中文可读与信息学院品牌 |
 | 2026-05-27 | S61 生产部署 GitHub SSH 443 与超时治理 | `docs/notes/refinements/2026-05-27-s61-intranet-deploy-ssh443-timeout.md` | `S61.1, S61.2, S61.3, S61.4, S61.5` | `[x]` | 已定位生产 runner 到 GitHub SSH 22 超时导致 deploy job 卡住；workflow 改用 `ssh.github.com:443`，deploy key SSH 命令补超时和批处理参数，`ls-remote/fetch` 增加重试，避免自动部署长时间挂起或单次抖动即失败 |
 | 2026-05-27 | S62 学业缺口课程推荐无开课数据兜底增强 | `docs/notes/refinements/2026-05-27-s62-academic-recommendation-fallback.md` | `S62.1, S62.2, S62.3, S62.4, S62.5` | `[x]` | 已完成真实开课优先、缺开课记录时返回培养方案候选、建议来源字段和 Miniapp / Web 来源展示；后端定向集成 `13 passed`，Web 构建、Miniapp 类型检查与 `mp-weixin` 构建均通过 |
+| 2026-05-27 | S63 成绩单课程匹配推荐与教师审核辅助 | `docs/notes/refinements/2026-05-27-s63-transcript-course-matching-recommendation.md` | `S63.1, S63.2, S63.3, S63.4, S63.5` | `[x]` | 已融合 PR #5，为成绩单 PDF 候选课程补受控课程库推荐、教师审核页一键套用和新版人大成绩单解析，并保留 S62 学业缺口推荐兜底；后端定向 `17 passed`，Web 构建通过 |
 
 ## 会话更新要求
 
@@ -1709,3 +1734,5 @@
 - `2026-05-26`：完成 `S49` 官方知识种子、本学期开课推荐、题库导入与敏感字段加密审计；默认 seed 新增官方知识正文和来源链接，学业推荐按 `recommendation_term_code` 过滤本学期真实开课，理论自测题库支持 `.xlsx/.csv` 预览提交导入，学生身份证号/手机号写入路径统一加密并对导入行/审计 detail 脱敏。验证通过后端 `ruff`、`compileall`、S49 定向集成 `40 passed, 3 warnings in 178.21s`、后端全量 `143 passed, 3 warnings in 516.49s`、`pnpm -C web build` 和 `pnpm -C miniapp build:mp-weixin`。
 - `2026-05-26`：完成 `S50` 当前 HEAD 测试工程师 bug 审查；新增细化文件 `docs/notes/refinements/2026-05-26-s50-current-head-bug-audit.md`，并将 `bug-report.md` 替换为当前 `0374c2e` 的有效计分报告。验证通过后端 `ruff`、`compileall`、全量 pytest `143 passed, 3 warnings in 275.89s`、`pnpm -C web build`、Miniapp 类型检查与 `mp-weixin` 构建、生产只读 smoke 和小程序产物风险残留扫描。本轮未发现新增崩溃类 bug，确认 `14` 个 Logic bug，基础分合计 `112`。
 - `2026-05-27`：完成 `S62` 学业缺口课程推荐无开课数据兜底增强；后端在真实本学期开课推荐之外增加 `CURRICULUM_CANDIDATE` 培养方案候选兜底，并用 `is_current_term_offering=False`、`schedule_status`、`data_warnings` 明确不代表实际开课。Miniapp 学业页和 Web 管理端学业缺口抽屉均展示“本学期开课 / 培养方案候选”来源标签；验证通过后端 `ruff`、`py_compile`、定向集成 `13 passed`、`pnpm -C web build`、Miniapp `vue-tsc` 与 `mp-weixin` 构建。
+- `2026-05-27`：完成 `S63` PR #5 成绩单课程匹配推荐与教师审核辅助融合；后端基于受控培养方案课程库为成绩单 PDF 候选课程生成推荐列表，匹配策略收口为课程代码/课程名精确匹配、别名/包含匹配、相似度排序与学分一致性加权；新版人大成绩单排版可解析“课程名 + 教师 + 课程属性 + 成绩/绩点”并回填学期汇总；Web 教师审核页支持一键套用推荐课程并将批次行设为可点击展开。
+- `2026-05-27`：S63 融合验证通过；后端 `ruff` / `py_compile` 通过，成绩单解析、成绩单上传推荐、学业缺口兜底和 S12 默认培养方案定向回归共 `17 passed`；Web 首次构建发现并修复合并后的重复 `:scroll` 属性，随后 `pnpm -C web build` 通过。

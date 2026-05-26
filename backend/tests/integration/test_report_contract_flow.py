@@ -19,6 +19,7 @@ from app.exchange.models import (
     StudentCourseRecord,
 )
 from app.report import service as report_service
+from app.report.transcript_pdf import TranscriptPdfAnalysis, TranscriptPdfCandidate
 from app.workflow.models import Request, RequestType
 
 
@@ -278,6 +279,79 @@ async def test_student_transcript_pdf_upload_creates_review_record_without_forma
         )
     ).scalars().all()
     assert records == []
+
+
+async def test_student_transcript_pdf_upload_returns_course_recommendations(
+    client: AsyncClient,
+    db: AsyncSession,
+    monkeypatch,
+) -> None:
+    token, student_id = await _login_as_student(
+        client, db, student_no="A100004", wx_code="wx_a100004"
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+
+    plan = CurriculumPlan(
+        grade_code="2022",
+        major_code="CS",
+        plan_name="2022 推荐匹配方案",
+        version_label="teacher-v1",
+        total_credits_required=3,
+        is_active=True,
+    )
+    db.add(plan)
+    await db.flush()
+    db.add(
+        CurriculumModule(
+            plan_id=plan.id,
+            module_code="CORE",
+            module_name="专业核心课",
+            module_type="REQUIRED",
+            credits_required=3,
+            courses=[{"code": "CS200", "name": "离散数学", "credits": 3}],
+            sort_order=1,
+        )
+    )
+    await db.commit()
+
+    def _fake_analyze_transcript_pdf(*_args, **_kwargs) -> TranscriptPdfAnalysis:
+        return TranscriptPdfAnalysis(
+            extracted_text="离散数学 学分 3 成绩 92",
+            data_warnings=[],
+            candidate_courses=[
+                TranscriptPdfCandidate(
+                    line_no=1,
+                    raw_text="离散数学 学分 3 成绩 92",
+                    course_code=None,
+                    course_name="离散数学",
+                    credits=3,
+                    term_code="2025-FALL",
+                    score=92,
+                    pass_flag=True,
+                    confidence="HIGH",
+                )
+            ],
+        )
+
+    monkeypatch.setattr(report_service, "analyze_transcript_pdf", _fake_analyze_transcript_pdf)
+
+    upload = await client.post(
+        "/api/v1/report/transcript-pdf",
+        headers=headers,
+        files={"file": ("transcript.pdf", b"%PDF-1.4\n%%EOF", "application/pdf")},
+    )
+    assert upload.status_code == 200, upload.text
+    data = upload.json()["data"]
+    assert data["parsed_courses_count"] == 1
+    recommendations = data["parsed_courses"][0]["course_recommendations"]
+    assert recommendations
+    assert recommendations[0]["course_code"] == "CS200"
+    assert recommendations[0]["course_name"] == "离散数学"
+    assert "课程名称精确匹配" in recommendations[0]["match_reason"]
+
+    batch = await db.get(ImportBatch, data["upload_id"])
+    assert batch is not None
+    assert batch.summary["candidate_courses"][0]["course_recommendations"][0]["course_code"] == "CS200"
 
 
 async def test_student_transcript_pdf_upload_maps_object_storage_failure_to_biz_error(
