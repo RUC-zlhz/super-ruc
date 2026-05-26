@@ -27,3 +27,5 @@
 - 后端 `ruff check` 通过。
 - `backend/unit_tests/test_proof_template_engine.py` 通过。
 - 本地 smoke backend 镜像中 `_register_reportlab_font()` 返回 `STSong-Light`，不再先触发 Noto TTC 注册异常。
+- 生产部署验证：`main` 推送后 GitHub Actions self-hosted runner 完成部署，生产 `.deploy/current_commit` 到 `d021164ee27f03cf634db55924964845ec2fac74`，backend/web 均 healthy，`smoke.sh` 与外部 `/healthz` 通过。
+- 生产字体验证：backend 容器 `fc-list :lang=zh` 可见 Noto CJK，`_has_cjk_font_file()` 返回 `True`，`html_to_pdf_bytes()` 可生成包含“中国人民大学信息学院”的中文 PDF 字节流。

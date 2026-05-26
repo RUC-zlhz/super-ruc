@@ -964,6 +964,7 @@
 - 实现文件：`backend/Dockerfile`、`backend/app/core/pdf_branding.py`、`backend/unit_tests/test_proof_template_engine.py`。
 - 本地视觉验证：`tmp/pdfs/proof-font-smoke.pdf` 渲染为 `tmp/pdfs/proof-font-smoke.png` 后中文正常显示。
 - 验证：后端 `ruff check`、`py_compile` 与 `unit_tests/test_proof_template_engine.py` 通过。
+- 生产部署验证：`main` 推送后 GitHub Actions self-hosted runner 完成部署，生产 `.deploy/current_commit` 到 `d021164ee27f03cf634db55924964845ec2fac74`；backend/web 均 healthy，`smoke.sh` 与外部 `/healthz` 通过；backend 容器 `fc-list :lang=zh` 可见 Noto CJK，`_has_cjk_font_file()` 返回 `True`，生产容器内生成中文 PDF 字节流成功。
 
 ### S6 前端体验增量优化
 
