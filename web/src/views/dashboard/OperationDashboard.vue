@@ -375,6 +375,45 @@
               </template>
             </template>
           </a-table>
+
+          <a-divider orientation="left">选课参考</a-divider>
+          <a-table
+            v-if="academicGapDetail.suggested_courses.length"
+            :columns="academicGapSuggestionColumns"
+            :data-source="academicGapDetail.suggested_courses"
+            :pagination="false"
+            :row-key="suggestionRowKey"
+            size="small"
+            :scroll="{ x: 'max-content' }"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'course'">
+                <div class="gap-student-name">{{ record.course_name || record.course_code || '-' }}</div>
+                <div class="detail-muted">
+                  {{ [record.course_code, record.module_name].filter(Boolean).join(' · ') || '-' }}
+                </div>
+              </template>
+              <template v-else-if="column.key === 'basis'">
+                <a-tag :color="record.is_current_term_offering ? 'green' : 'orange'">
+                  {{ record.recommendation_basis_label || (record.is_current_term_offering ? '本学期开课' : '培养方案候选') }}
+                </a-tag>
+                <div class="detail-muted">{{ record.schedule_status || '-' }}</div>
+              </template>
+              <template v-else-if="column.key === 'credits'">
+                {{ formatCredits(record.credits) }}
+              </template>
+              <template v-else-if="column.key === 'reason'">
+                <div>{{ record.reason || '-' }}</div>
+                <div v-if="record.opening_term_hint" class="detail-muted">
+                  培养方案开课学期：{{ record.opening_term_hint }}
+                </div>
+                <div v-if="record.data_warnings?.length" class="detail-muted">
+                  {{ record.data_warnings[0] }}
+                </div>
+              </template>
+            </template>
+          </a-table>
+          <a-empty v-else description="暂无选课参考" />
         </template>
         <a-empty v-else-if="!academicGapDetailLoading" description="暂无学业缺口明细" />
       </a-spin>
@@ -406,6 +445,7 @@ import {
   formatCredits,
   type AcademicGapAggregateItem,
   type AcademicGapResult,
+  type AcademicSuggestedCourse,
   type OverviewResult,
 } from '@/api/report'
 
@@ -458,6 +498,13 @@ const academicGapDetailColumns = [
   { title: '已获学分', key: 'credits_earned', width: 100 },
   { title: '差额参考', key: 'credits_gap', width: 100 },
   { title: '备注', key: 'note', width: 220 },
+]
+
+const academicGapSuggestionColumns = [
+  { title: '课程', key: 'course', width: 220 },
+  { title: '来源', key: 'basis', width: 160 },
+  { title: '学分', key: 'credits', width: 90 },
+  { title: '推荐原因与限制', key: 'reason', width: 320 },
 ]
 
 const dashboard = computed(() => buildDashboardViewModel(overview.value, academicGapRows.value))
@@ -592,6 +639,15 @@ function academicGapRowProps(record: AcademicGapAggregateItem) {
 
 function academicGapRowClassName(record: AcademicGapAggregateItem) {
   return 'selectable-gap-row'
+}
+
+function suggestionRowKey(record: AcademicSuggestedCourse, index?: number) {
+  return [
+    record.recommendation_basis || 'UNKNOWN',
+    record.course_code || record.course_name || 'course',
+    record.module_code || 'module',
+    index ?? 0,
+  ].join(':')
 }
 
 async function openAcademicGapDetail(studentId: number) {

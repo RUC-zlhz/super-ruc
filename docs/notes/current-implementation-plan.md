@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程当前节点状态展示修正、`S59` 党团流程学生提交材料与老师确认推进闭环、`S60` 证明 PDF 信息学院品牌与中文字体修复与 `S61` 生产部署 GitHub SSH 443 与超时治理均已完成
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程当前节点状态展示修正、`S59` 党团流程学生提交材料与老师确认推进闭环、`S60` 证明 PDF 信息学院品牌与中文字体修复、`S61` 生产部署 GitHub SSH 443 与超时治理与 `S62` 学业缺口课程推荐无开课数据兜底增强均已完成
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -980,6 +980,27 @@
 
 - 应用层 PDF 修复已在 `d021164` 生效；`S61` 只修复生产自动部署链路的 GitHub SSH 稳定性，不改变业务功能。
 
+### S62 学业缺口课程推荐无开课数据兜底增强
+
+- 细化文件：`docs/notes/refinements/2026-05-27-s62-academic-recommendation-fallback.md`
+- 当前状态：`[x]` 已完成后端兜底推荐、前端来源展示、定向回归与双端构建验证。
+- [x] `S62.1` 后端真实本学期开课推荐继续优先，命中 `CourseOffering` 的建议标记为 `CURRENT_TERM_OFFERING`。
+- [x] `S62.2` 缺少开课记录时返回培养方案候选课程，标记为 `CURRICULUM_CANDIDATE` 且 `is_current_term_offering=False`。
+- [x] `S62.3` 建议项补充来源、开课状态、容量/先修/冲突等数据限制提示。
+- [x] `S62.4` Miniapp 与 Web 管理端展示建议来源，区分“本学期开课”和“培养方案候选”。
+- [x] `S62.5` 回跑后端定向回归、前端类型检查与构建。
+
+当前结论：
+
+- 本轮保持 S49 的事实边界：不把培养方案候选课程冒充本学期开课；但在生产 `course_offerings=0` 时不再只能返回空建议。
+- 学业缺口建议项现在按 `CURRENT_TERM_OFFERING` / `CURRICULUM_CANDIDATE` 标记来源，Miniapp 与 Web 管理端均会显示来源标签和限制说明。
+
+证据：
+
+- 实现文件：`backend/app/report/service.py`、`miniapp/src/{api/report.ts,pages/academic/index.vue}`、`web/src/{api/report.ts,views/dashboard/OperationDashboard.vue}`。
+- 回归测试：`backend/tests/integration/test_report_contract_flow.py`、`backend/tests/integration/test_s12_gap_closure.py`。
+- 验证：后端 `ruff check` 与 `py_compile` 通过；后端定向集成 `13 passed, 3 warnings in 106.36s`；`pnpm -C web build`、Miniapp `vue-tsc` 与 `pnpm -C miniapp build:mp-weixin` 均通过。
+
 ### S6 前端体验增量优化
 
 - [x] `S6.1` Web 共享导航与默认落点收口
@@ -1558,6 +1579,7 @@
 | 2026-05-26 | S59 党团流程学生提交材料与老师确认推进闭环 | `docs/notes/refinements/2026-05-26-s59-workflow-student-material-submit.md` | `S59.1, S59.2, S59.3, S59.4, S59.5` | `[x]` | 已新增学生提交材料接口、`MATERIAL_SUBMITTED` 状态和 `student_material_required` 节点判定；小程序只对确需学生材料的节点展示提交入口，组织侧节点提示等待老师或支部处理；Web 老师端可查看材料或识别无需学生提交节点，并确认完成推进下一节点；后端与双端验证通过 |
 | 2026-05-27 | S60 证明 PDF 信息学院品牌与中文字体修复 | `docs/notes/refinements/2026-05-27-s60-proof-pdf-cjk-branding-fix.md` | `S60.1, S60.2, S60.3, S60.4, S60.5, S60.6` | `[x]` | 已确认生产证明模板正文是信息学院，定位生产中文渲染异常根因为 backend 容器缺 CJK 字体并回退 Helvetica；Docker 镜像补 `fonts-noto-cjk`，ReportLab fallback 改为 `STSong-Light`，并用单元测试和本地 PDF 渲染锁定中文可读与信息学院品牌 |
 | 2026-05-27 | S61 生产部署 GitHub SSH 443 与超时治理 | `docs/notes/refinements/2026-05-27-s61-intranet-deploy-ssh443-timeout.md` | `S61.1, S61.2, S61.3, S61.4, S61.5` | `[x]` | 已定位生产 runner 到 GitHub SSH 22 超时导致 deploy job 卡住；workflow 改用 `ssh.github.com:443`，deploy key SSH 命令补超时和批处理参数，`ls-remote/fetch` 增加重试，避免自动部署长时间挂起或单次抖动即失败 |
+| 2026-05-27 | S62 学业缺口课程推荐无开课数据兜底增强 | `docs/notes/refinements/2026-05-27-s62-academic-recommendation-fallback.md` | `S62.1, S62.2, S62.3, S62.4, S62.5` | `[x]` | 已完成真实开课优先、缺开课记录时返回培养方案候选、建议来源字段和 Miniapp / Web 来源展示；后端定向集成 `13 passed`，Web 构建、Miniapp 类型检查与 `mp-weixin` 构建均通过 |
 
 ## 会话更新要求
 
@@ -1686,3 +1708,4 @@
 - `2026-05-26`：完成 `S48` Miniapp 微信开发者工具告警排查与首页 key 修复；为规避开发者工具旧模块索引继续报 `request-badge.js`，已将事务徽章 helper 合并进 `api/workflow` 并删除独立 util，使最新构建产物不再包含 `request-badge` 引用；首页入口列表改用稳定业务 key，消除 `/pages/request/index` 与 `/pages/knowledge/index` 重复 `wx:key` 来源。验证通过 Miniapp 类型检查、清理后 `pnpm -C miniapp build:mp-weixin`、源码 key 残留扫描、`request-badge` 产物残留扫描和生成产物相对 `require()` 缺失扫描。
 - `2026-05-26`：完成 `S49` 官方知识种子、本学期开课推荐、题库导入与敏感字段加密审计；默认 seed 新增官方知识正文和来源链接，学业推荐按 `recommendation_term_code` 过滤本学期真实开课，理论自测题库支持 `.xlsx/.csv` 预览提交导入，学生身份证号/手机号写入路径统一加密并对导入行/审计 detail 脱敏。验证通过后端 `ruff`、`compileall`、S49 定向集成 `40 passed, 3 warnings in 178.21s`、后端全量 `143 passed, 3 warnings in 516.49s`、`pnpm -C web build` 和 `pnpm -C miniapp build:mp-weixin`。
 - `2026-05-26`：完成 `S50` 当前 HEAD 测试工程师 bug 审查；新增细化文件 `docs/notes/refinements/2026-05-26-s50-current-head-bug-audit.md`，并将 `bug-report.md` 替换为当前 `0374c2e` 的有效计分报告。验证通过后端 `ruff`、`compileall`、全量 pytest `143 passed, 3 warnings in 275.89s`、`pnpm -C web build`、Miniapp 类型检查与 `mp-weixin` 构建、生产只读 smoke 和小程序产物风险残留扫描。本轮未发现新增崩溃类 bug，确认 `14` 个 Logic bug，基础分合计 `112`。
+- `2026-05-27`：完成 `S62` 学业缺口课程推荐无开课数据兜底增强；后端在真实本学期开课推荐之外增加 `CURRICULUM_CANDIDATE` 培养方案候选兜底，并用 `is_current_term_offering=False`、`schedule_status`、`data_warnings` 明确不代表实际开课。Miniapp 学业页和 Web 管理端学业缺口抽屉均展示“本学期开课 / 培养方案候选”来源标签；验证通过后端 `ruff`、`py_compile`、定向集成 `13 passed`、`pnpm -C web build`、Miniapp `vue-tsc` 与 `mp-weixin` 构建。

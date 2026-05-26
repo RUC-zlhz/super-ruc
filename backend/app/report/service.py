@@ -201,6 +201,37 @@ def _iter_module_courses(raw: Any) -> list[dict[str, Any]]:
     return []
 
 
+def _split_code_filter(raw: str | None) -> set[str]:
+    if not raw:
+        return set()
+    return {item.strip() for item in re.split(r"[,，;；、\s]+", raw) if item.strip()}
+
+
+def _code_filter_matches(raw: str | None, value: str | None) -> bool:
+    codes = _split_code_filter(raw)
+    if not codes:
+        return True
+    if not value:
+        return False
+    return value.strip() in codes
+
+
+def _offering_visible_to_student(offering: CourseOffering, student: Student) -> bool:
+    return _code_filter_matches(offering.major_codes, student.major_code) and _code_filter_matches(
+        offering.grade_codes,
+        student.grade_code,
+    )
+
+
+def _course_name_from_curriculum(course: dict[str, Any], code: str) -> str:
+    return str(course.get("name") or course.get("course_name") or code).strip()
+
+
+def _opening_term_hint(course: dict[str, Any]) -> str | None:
+    hint = str(course.get("opening_term") or "").strip()
+    return hint or None
+
+
 async def upload_transcript_pdf_for_review(
     db: AsyncSession,
     *,
@@ -623,7 +654,7 @@ async def compute_academic_gap(
             )
         )
 
-    # 建议课程：只基于当前推荐学期的真实开课数据，不再用培养方案 opening_term 伪装实际开课。
+    # 建议课程：真实开课优先；无开课表或部分课程缺少开课记录时，补充“培养方案候选”但显式标明非本学期开课。
     ranked_suggestions: list[tuple[int, float, int, int, str, dict[str, Any]]] = []
     offered = (
         (
@@ -637,10 +668,11 @@ async def compute_academic_gap(
         .scalars()
         .all()
     )
-    offer_map = {o.course_code: o for o in offered}
+    offer_map = {o.course_code: o for o in offered if _offering_visible_to_student(o, student)}
     if not offered:
         data_warnings.append(
-            f"当前未配置 {recommendation_term_code} 本学期开课数据，课程建议暂为空。"
+            f"当前未配置 {recommendation_term_code} 本学期开课数据，已改为返回培养方案候选课程；"
+            "这些候选不能代表本学期实际开课、容量或时间安排。"
         )
     module_map = {module.module_code: module for module in modules}
     module_gap_map = {gap.module_code: gap.credits_gap for gap in module_gaps}
@@ -650,6 +682,7 @@ async def compute_academic_gap(
         "GENERAL": 2,
         "ELECTIVE": 3,
     }
+    used_curriculum_fallback = False
     for module_order, gap in enumerate(module_gaps):
         if gap.credits_gap <= 0:
             continue
@@ -662,22 +695,48 @@ async def compute_academic_gap(
             if not code or code in gap.passed_courses:
                 continue
             offering = offer_map.get(code)
-            if offering is None:
-                continue
             course_warnings: list[str] = []
-            rank_score = 50
-            term_value = offering.term_code
-            course_name = offering.course_name
-            credits = float(offering.credits or course.get("credits") or 0)
-            course_type = offering.course_type or module.module_type
-            capacity = offering.capacity
-            capacity_status = "已配置" if capacity is not None else "数据未配置"
-            if capacity is not None:
-                rank_score += 10
-            schedule_status = f"{recommendation_term_code} 本学期开课"
-            if capacity is None:
-                course_warnings.append("容量数据未配置")
-            course_warnings.extend(["先修要求数据未配置", "时间冲突数据未配置", "学生偏好数据未配置"])
+            opening_hint = _opening_term_hint(course)
+            if offering is not None:
+                rank_score = 60
+                term_value = offering.term_code
+                course_name = offering.course_name
+                credits = float(offering.credits or course.get("credits") or 0)
+                course_type = offering.course_type or module.module_type
+                capacity = offering.capacity
+                capacity_status = "已配置" if capacity is not None else "数据未配置"
+                if capacity is not None:
+                    rank_score += 10
+                schedule_status = f"{recommendation_term_code} 本学期开课"
+                recommendation_basis = "CURRENT_TERM_OFFERING"
+                recommendation_basis_label = "本学期开课"
+                is_current_term_offering = True
+                if capacity is None:
+                    course_warnings.append("容量数据未配置")
+                course_warnings.extend(["先修要求数据未配置", "时间冲突数据未配置", "学生偏好数据未配置"])
+                data_status = "PARTIAL" if course_warnings else "COMPLETE"
+                teacher = offering.teacher
+            else:
+                used_curriculum_fallback = True
+                rank_score = 25 + (5 if opening_hint else 0)
+                term_value = None
+                course_name = _course_name_from_curriculum(course, code)
+                credits = float(course.get("credits") or 0)
+                course_type = str(course.get("course_type") or module.module_type)
+                capacity = None
+                capacity_status = "无本学期开课数据"
+                schedule_status = f"未确认 {recommendation_term_code} 开课"
+                recommendation_basis = "CURRICULUM_CANDIDATE"
+                recommendation_basis_label = "培养方案候选"
+                is_current_term_offering = False
+                teacher = None
+                course_warnings.extend(
+                    [
+                        f"未找到 {recommendation_term_code} 本学期开课记录",
+                        "不能确认容量、上课时间、先修要求或本学期是否可选",
+                    ]
+                )
+                data_status = "REFERENCE_ONLY"
             ranked_suggestions.append(
                 (
                     rank_score,
@@ -695,17 +754,32 @@ async def compute_academic_gap(
                         "course_type": course_type,
                         "capacity": capacity,
                         "capacity_status": capacity_status,
+                        "teacher": teacher,
+                        "opening_term_hint": opening_hint,
                         "schedule_status": schedule_status,
                         "prerequisite_status": "数据未配置",
                         "conflict_status": "数据未配置",
                         "preference_status": "数据未配置",
                         "rank_score": rank_score,
-                        "data_status": "PARTIAL" if course_warnings else "COMPLETE",
+                        "recommendation_basis": recommendation_basis,
+                        "recommendation_basis_label": recommendation_basis_label,
+                        "is_current_term_offering": is_current_term_offering,
+                        "data_status": data_status,
                         "data_warnings": course_warnings,
-                        "reason": f"模块 {gap.module_name} 尚有 {format(gap.credits_gap, '.1f')} 学分差额",
+                        "reason": (
+                            f"模块 {gap.module_name} 尚有 {format(gap.credits_gap, '.1f')} 学分差额；"
+                            f"依据：{recommendation_basis_label}"
+                        ),
                     },
                 )
             )
+    if used_curriculum_fallback and offered:
+        data_warnings.append(
+            f"部分缺口课程缺少 {recommendation_term_code} 本学期开课记录，已补充培养方案候选课程；"
+            "候选课程需以教务开课表和老师审核为准。"
+        )
+    if not ranked_suggestions:
+        data_warnings.append("当前缺口模块缺少课程清单或可匹配开课记录，暂无法生成选课参考。")
     ranked_suggestions.sort(key=lambda item: (-item[0], -item[1], item[2], item[3], item[4]))
     suggested = [item for _, _, _, _, _, item in ranked_suggestions]
 

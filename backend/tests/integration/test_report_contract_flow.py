@@ -146,6 +146,8 @@ async def test_report_routes_use_canonical_contract(
     assert data["recommendation_term_code"] == "2025-FALL"
     assert data["suggested_courses"]
     assert data["suggested_courses"][0]["course_code"] == "CS199"
+    assert data["suggested_courses"][0]["recommendation_basis"] == "CURRENT_TERM_OFFERING"
+    assert data["suggested_courses"][0]["is_current_term_offering"] is True
     assert "graduation" not in str(data["suggested_courses"][0]).lower()
     assert len(data["modules"]) == 2
     first_module = data["modules"][0]
@@ -554,6 +556,8 @@ async def test_academic_gap_recommendations_only_use_requested_term(
     )
     assert current.recommendation_term_code == "2025-SPRING"
     assert [item["course_name"] for item in current.suggested_courses] == ["本学期开课"]
+    assert current.suggested_courses[0]["recommendation_basis"] == "CURRENT_TERM_OFFERING"
+    assert current.suggested_courses[0]["is_current_term_offering"] is True
 
     other = await report_service.compute_academic_gap(
         db,
@@ -561,8 +565,12 @@ async def test_academic_gap_recommendations_only_use_requested_term(
         term_code="2025-SUMMER",
     )
     assert other.recommendation_term_code == "2025-SUMMER"
-    assert other.suggested_courses == []
-    assert any("2025-SUMMER 本学期开课数据" in warning for warning in other.data_warnings)
+    assert [item["course_name"] for item in other.suggested_courses] == ["学期过滤课程"]
+    assert other.suggested_courses[0]["term_code"] is None
+    assert other.suggested_courses[0]["recommendation_basis"] == "CURRICULUM_CANDIDATE"
+    assert other.suggested_courses[0]["is_current_term_offering"] is False
+    assert all(item["course_name"] != "其他学期开课" for item in other.suggested_courses)
+    assert any("培养方案候选课程" in warning for warning in other.data_warnings)
 
 
 async def test_academic_gap_equivalent_course_consumes_credit_once(

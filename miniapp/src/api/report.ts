@@ -26,6 +26,15 @@ export interface SuggestedCourse {
   course_name?: string | null
   credits?: number | null
   course_type?: string | null
+  term_code?: string | null
+  teacher?: string | null
+  opening_term_hint?: string | null
+  schedule_status?: string | null
+  recommendation_basis?: 'CURRENT_TERM_OFFERING' | 'CURRICULUM_CANDIDATE' | string | null
+  recommendation_basis_label?: string | null
+  is_current_term_offering?: boolean | null
+  data_status?: string | null
+  data_warnings?: string[]
   reason?: string | null
 }
 

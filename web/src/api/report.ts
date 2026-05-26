@@ -13,6 +13,25 @@ export interface AcademicModuleGap {
   note?: string | null
 }
 
+export interface AcademicSuggestedCourse {
+  module_code?: string | null
+  module_name?: string | null
+  course_code?: string | null
+  course_name?: string | null
+  credits?: number | null
+  term_code?: string | null
+  course_type?: string | null
+  teacher?: string | null
+  opening_term_hint?: string | null
+  schedule_status?: string | null
+  recommendation_basis?: 'CURRENT_TERM_OFFERING' | 'CURRICULUM_CANDIDATE' | string | null
+  recommendation_basis_label?: string | null
+  is_current_term_offering?: boolean | null
+  data_status?: string | null
+  data_warnings?: string[]
+  reason?: string | null
+}
+
 export interface AcademicGapResult {
   student_no: string
   student_name: string
@@ -26,7 +45,7 @@ export interface AcademicGapResult {
   risk_level?: 'HIGH' | 'MEDIUM' | 'LOW'
   conclusion_text?: string
   modules: AcademicModuleGap[]
-  suggested_courses: Record<string, unknown>[]
+  suggested_courses: AcademicSuggestedCourse[]
   recommendation_term_code?: string | null
   disclaimer: string
   data_warnings: string[]

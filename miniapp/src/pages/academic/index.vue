@@ -220,7 +220,7 @@
 
       <view class="section">
         <view class="section-head">
-          <text class="section-title">课程类型建议</text>
+          <text class="section-title">选课参考</text>
           <text class="plan-name">
             {{ result.recommendation_term_code || '当前学期' }} · 共 {{ result.suggested_courses?.length || 0 }} 条
           </text>
@@ -232,15 +232,29 @@
         >
           <view class="suggest-head">
             <text class="suggest-title">{{ course.course_name || course.course_code || '待选课程' }}</text>
-            <text class="suggest-tag">{{ course.course_type || course.module_name || '参考建议' }}</text>
+            <view class="suggest-tags">
+              <text class="source-pill" :class="{ current: course.is_current_term_offering }">
+                {{ course.recommendation_basis_label || (course.is_current_term_offering ? '本学期开课' : '培养方案候选') }}
+              </text>
+              <text class="suggest-tag">{{ course.course_type || course.module_name || '参考建议' }}</text>
+            </view>
           </view>
           <text class="suggest-meta">
             {{ [course.course_code, course.module_name, formatCredits(course.credits)].filter(Boolean).join(' · ') }}
           </text>
+          <text v-if="course.schedule_status" class="suggest-status">
+            {{ course.schedule_status }}
+          </text>
+          <text v-if="course.opening_term_hint" class="suggest-status">
+            培养方案开课学期：{{ course.opening_term_hint }}
+          </text>
           <text v-if="course.reason" class="suggest-reason">{{ course.reason }}</text>
+          <text v-if="course.data_warnings?.length" class="suggest-warning">
+            {{ course.data_warnings[0] }}
+          </text>
         </view>
         <view v-if="!result.suggested_courses?.length" class="empty-tiny">
-          暂无课程类型建议，请以教务审核和培养方案为准。
+          暂无选课参考，请以教务审核和培养方案为准。
         </view>
       </view>
 
@@ -879,28 +893,62 @@ onPullDownRefresh(async () => {
 
 .suggest-title {
   flex: 1;
+  min-width: 0;
   color: #242022;
   font-size: 28rpx;
   line-height: 1.45;
   font-weight: 800;
 }
 
-.suggest-tag {
+.suggest-tags {
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8rpx;
+  max-width: 210rpx;
+}
+
+.source-pill {
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  background: #fff7ed;
+  color: #b45309;
+  font-size: 22rpx;
+  line-height: 1.2;
+}
+
+.source-pill.current {
+  background: #ecfdf3;
+  color: #15803d;
+}
+
+.suggest-tag {
   padding: 6rpx 14rpx;
   border-radius: 999rpx;
   background: #fff1f2;
   color: #b70f24;
   font-size: 22rpx;
+  line-height: 1.2;
 }
 
 .suggest-meta,
-.suggest-reason {
+.suggest-reason,
+.suggest-status,
+.suggest-warning {
   display: block;
   margin-top: 8rpx;
   color: #6b7280;
   font-size: 23rpx;
   line-height: 1.55;
+}
+
+.suggest-status {
+  color: #475569;
+}
+
+.suggest-warning {
+  color: #b45309;
 }
 
 .section {
