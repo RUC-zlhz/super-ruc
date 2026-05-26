@@ -1,6 +1,6 @@
 # 2026-05-26 S56 PR #4 融合与生产模板 seed 修复
 
-- 状态：`[-]` 生产验证进行中
+- 状态：`[x]` 已完成
 - 关联主计划：`S56`
 - 依赖：`S51`、`S52`、`S53`、`S54`、`S55`
 
@@ -25,7 +25,7 @@ PR #4 已合并到远端 `origin/main` 并部署到生产提交 `cebfe10d`，但
 - [x] `S56.4` 在生产 `seed-default-data.sh` 中增加容器内模板文件预检，缺文件时在备份和导入前失败。
 - [x] `S56.5` 修正互测说明脚本，避免继续写“知识条目 0 条”，并补充默认常用模板状态。
 - [x] `S56.6` 完成本地静态、后端回归和前端构建验证。
-- [ ] `S56.7` 完成生产默认模板 seed 验证。
+- [x] `S56.7` 完成生产默认模板 seed 验证。
 
 ## 验证计划
 
@@ -33,7 +33,8 @@ PR #4 已合并到远端 `origin/main` 并部署到生产提交 `cebfe10d`，但
 - 模板目录解析单测：`uv run --extra dev pytest unit_tests/test_common_template_examples.py -q`，结果 `3 passed`。
 - 后端回归：Docker `sip-kingbase` 健康后，`uv run --extra dev pytest tests/integration/test_knowledge_flow.py tests/integration/test_knowledge_template_flow.py -q -o cache_dir=.tmp/pytest-cache-s56-run --basetemp=.tmp/pytest-tmp-s56-run` 复跑通过，结果 `11 passed in 84.03s`。
 - 前端：`pnpm -C web build`、`vue-tsc --noEmit -p miniapp/tsconfig.json` 与 `pnpm -C miniapp build:mp-weixin` 均通过。
-- 生产：待先备份，再重建/运行默认数据 seed，确认 `template_assets=4`、服务健康检查通过。
+- GitHub Actions：手动触发 `Intranet Production Deploy`，run `26454802193` 成功，生产部署到 `c567fec1cebe81a71bf879e91a398d680e08e0b4`。
+- 生产：部署备份 `/opt/super-ruc/backups/super-ruc-20260526-223525-c567fec1.dump`；随后运行 `seed-default-data.sh`，seed 备份 `/opt/super-ruc/backups/super-ruc-20260526-224424-c567fec1.dump`；模板预检显示 `Default template examples available: /docs/source/common-templates`；导入日志显示 `template assets created=4`、`template entries created=4`、`knowledge skipped_due_to_existing=True`；数据库复核 `knowledge_entries=16`、`template_assets=4`、`knowledge_entry_templates=4`，模板均为 `ACTIVE` 且位于 `sip-templates`，`/healthz` 正常。
 
 ## 行为约定
 

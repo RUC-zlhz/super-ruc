@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入/敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正与 `S55` 默认示例模板开箱即有均已完成；`S56` PR #4 融合与生产模板 seed 修复正在验证
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入/敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有与 `S56` PR #4 融合与生产模板 seed 修复均已完成
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -856,14 +856,14 @@
 ### S56 PR #4 融合与生产模板 seed 修复
 
 - 细化文件：`docs/notes/refinements/2026-05-26-s56-pr4-fusion-template-seed-fix.md`
-- 当前状态：`[-]` 已完成本地分支融合、模板资产迁移、路径解析修复、生产 seed 预检、互测说明修正与本地验证；生产验证进行中
+- 当前状态：`[x]` 已完成本地分支融合、模板资产迁移、路径解析修复、生产 seed 预检、互测说明修正、本地验证、GitHub Actions 部署验证与生产默认模板 seed 验证
 - [x] `S56.1` 从本地 `main` 创建 `codex/fuse-pr4-production-seed` 分支并合并 `origin/main`，保留 `941ac06` Web 表格横向滚动优化。
 - [x] `S56.2` 将 4 份运行时模板资产从旧 `常用模板/` 迁移到 `docs/source/common-templates/`。
 - [x] `S56.3` 将模板示例导入脚本改为支持 `COMMON_TEMPLATE_EXAMPLE_ROOT`、生产 `/docs/source/common-templates`、本地 docs fallback 与旧路径兼容。
 - [x] `S56.4` 在 `deploy/intranet-prod/scripts/seed-default-data.sh` 中增加 backend 容器内模板文件预检。
 - [x] `S56.5` 修正互测说明生成脚本中的默认知识/模板状态描述。
 - [x] `S56.6` 完成本地后端/前端验证。
-- [ ] `S56.7` 完成生产默认模板 seed 验证。
+- [x] `S56.7` 完成生产默认模板 seed 验证。
 
 当前结论：
 
@@ -877,6 +877,8 @@
 - 实现文件：`backend/scripts/import_common_template_examples.py`、`deploy/intranet-prod/scripts/seed-default-data.sh`、`scripts/docs/build_peer_testing_usage_guide.py`
 - 模板资产：`docs/source/common-templates/`
 - 本地验证：后端 `py_compile` 通过；`unit_tests/test_common_template_examples.py` 结果 `3 passed`；知识库集成测试在 Docker `sip-kingbase` 的 `localhost:54322/sip_db_test` 上复跑，结果 `11 passed in 84.03s`；`pnpm -C web build`、Miniapp `vue-tsc` 与 `pnpm -C miniapp build:mp-weixin` 均通过。
+- GitHub Actions：手动触发 `Intranet Production Deploy`，run `26454802193` 成功，部署提交 `c567fec1cebe81a71bf879e91a398d680e08e0b4`。
+- 生产验证：部署备份 `/opt/super-ruc/backups/super-ruc-20260526-223525-c567fec1.dump`；默认数据 seed 备份 `/opt/super-ruc/backups/super-ruc-20260526-224424-c567fec1.dump`；`seed-default-data.sh` 预检模板目录 `/docs/source/common-templates` 成功，导入 `template assets created=4`、`template entries created=4`，并因已有官方知识保持 `knowledge skipped_due_to_existing=True`；数据库复核 `knowledge_entries=16`、`template_assets=4`、`knowledge_entry_templates=4`，`/healthz` 返回 `{"status":"ok"}`。
 ### S6 前端体验增量优化
 
 - [x] `S6.1` Web 共享导航与默认落点收口
@@ -1449,7 +1451,7 @@
 | 2026-05-26 | S53 默认示例知识开箱即有，同时保留教师删改权 | `docs/notes/refinements/2026-05-26-s37-default-example-knowledge-seed.md` | `S53.1, S53.2, S53.3, S53.4` | `[x]` | 已将示例知识接入 `seed_default_data.py`，空库默认会自动导入 11 条示例知识；知识库非空时整批跳过，避免覆盖老师后续删改；已完成空库/非空库双场景实测 |
 | 2026-05-26 | S54 小程序开发态本地接口自动回正 | `docs/notes/refinements/2026-05-26-s38-miniapp-dev-local-api-auto-reset.md` | `S54.1, S54.2, S54.3, S54.4` | `[x]` | 已在开发态强制回本地接口并自动清理旧 storage/token，无需再手动打开微信开发者工具控制台输入修正命令；miniapp vue-tsc 通过 |
 | 2026-05-26 | S55 默认示例模板开箱即有，同时保留管理端删改权 | `docs/notes/refinements/2026-05-26-s39-default-example-template-seed.md` | `S55.1, S55.2, S55.3, S55.4` | `[x]` | 已将 `常用模板/` 的 4 份标准模板接入默认数据链路，空模板库默认会自动导入模板资产、来源和关联知识条目；模板库非空时整批跳过，避免覆盖老师后续删改；模板下载回归 `1 passed`，本地学生端模板列表与下载接口 HTTP 复测通过 |
-| 2026-05-26 | S56 PR #4 融合与生产模板 seed 修复 | `docs/notes/refinements/2026-05-26-s56-pr4-fusion-template-seed-fix.md` | `S56.1, S56.2, S56.3, S56.4, S56.5, S56.6, S56.7` | `[-]` | 已融合 `origin/main` 与本地 `941ac06`，模板资产迁移到 `docs/source/common-templates/`，并修正生产容器模板路径、seed 预检和互测说明；本地后端/前端验证通过，生产验证进行中 |
+| 2026-05-26 | S56 PR #4 融合与生产模板 seed 修复 | `docs/notes/refinements/2026-05-26-s56-pr4-fusion-template-seed-fix.md` | `S56.1, S56.2, S56.3, S56.4, S56.5, S56.6, S56.7` | `[x]` | 已融合 `origin/main` 与本地 `941ac06`，模板资产迁移到 `docs/source/common-templates/`，并修正生产容器模板路径、seed 预检和互测说明；GitHub Actions 部署成功，生产默认模板 seed 后 `template_assets=4`、`knowledge_entries=16`、`/healthz` 正常 |
 
 ## 会话更新要求
 
