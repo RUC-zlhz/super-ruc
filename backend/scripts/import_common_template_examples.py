@@ -1,14 +1,16 @@
-"""Import example downloadable templates from 常用模板 into the knowledge library."""
+"""Import example downloadable templates into the knowledge library."""
 from __future__ import annotations
 
 import asyncio
 import hashlib
 import logging
 import mimetypes
+import os
 import sys
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 
 from sqlalchemy import func, select
@@ -35,7 +37,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("import-common-template-examples")
 
-_TEMPLATE_ROOT = Path(__file__).resolve().parents[2] / "常用模板"
+_TEMPLATE_ROOT_ENV = "COMMON_TEMPLATE_EXAMPLE_ROOT"
+_DEFAULT_TEMPLATE_RELATIVE_ROOT = Path("docs/source/common-templates")
+_LEGACY_TEMPLATE_RELATIVE_ROOT = Path("常用模板")
 
 
 @dataclass(frozen=True)
@@ -221,6 +225,69 @@ _TEMPLATE_SEEDS: tuple[TemplateExampleSeed, ...] = (
 )
 
 
+def _required_template_filenames() -> tuple[str, ...]:
+    return tuple(seed.filename for seed in _TEMPLATE_SEEDS)
+
+
+def _candidate_template_roots() -> list[Path]:
+    script_path = Path(__file__).resolve()
+    candidates = [
+        Path("/docs/source/common-templates"),
+        script_path.parents[2] / _DEFAULT_TEMPLATE_RELATIVE_ROOT,
+        script_path.parents[1] / _DEFAULT_TEMPLATE_RELATIVE_ROOT,
+        script_path.parents[2] / _LEGACY_TEMPLATE_RELATIVE_ROOT,
+        script_path.parents[1] / _LEGACY_TEMPLATE_RELATIVE_ROOT,
+        Path("/app") / _LEGACY_TEMPLATE_RELATIVE_ROOT,
+        Path("/") / _LEGACY_TEMPLATE_RELATIVE_ROOT,
+    ]
+
+    seen: set[Path] = set()
+    unique: list[Path] = []
+    for path in candidates:
+        resolved = path.expanduser()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        unique.append(resolved)
+    return unique
+
+
+def _missing_template_files(root: Path) -> list[str]:
+    return [filename for filename in _required_template_filenames() if not (root / filename).is_file()]
+
+
+def _format_template_root_error(candidates: list[Path]) -> str:
+    required = "、".join(_required_template_filenames())
+    searched = "；".join(str(path) for path in candidates)
+    return f"Template example files not found. Required: {required}. Searched: {searched}"
+
+
+@lru_cache(maxsize=1)
+def get_template_example_root() -> Path:
+    """Resolve the runtime directory that contains the bundled example templates."""
+    env_root = os.environ.get(_TEMPLATE_ROOT_ENV)
+    if env_root and env_root.strip():
+        root = Path(env_root.strip()).expanduser()
+        missing = _missing_template_files(root)
+        if missing:
+            raise FileNotFoundError(
+                f"{_TEMPLATE_ROOT_ENV}={root} is missing template files: {', '.join(missing)}"
+            )
+        return root
+
+    candidates = _candidate_template_roots()
+    for root in candidates:
+        if root.is_dir() and not _missing_template_files(root):
+            return root
+
+    raise FileNotFoundError(_format_template_root_error(candidates))
+
+
+def assert_template_example_files_available() -> Path:
+    """Fail early when default-data seeding cannot see all bundled templates."""
+    return get_template_example_root()
+
+
 async def _resolve_operator(db: AsyncSession) -> tuple[int, str]:
     admin = (
         await db.execute(select(User).where(User.work_no == "admin").limit(1))
@@ -267,7 +334,7 @@ async def _upsert_source(
 
 
 def _template_file_path(seed: TemplateExampleSeed) -> Path:
-    return _TEMPLATE_ROOT / seed.filename
+    return get_template_example_root() / seed.filename
 
 
 def _template_content_type(seed: TemplateExampleSeed) -> str:

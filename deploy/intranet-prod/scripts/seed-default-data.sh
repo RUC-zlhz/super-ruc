@@ -23,6 +23,13 @@ compose up -d db redis minio backend
 compose exec -T backend sh -lc \
   'test -f /docs/source/students/students.xlsx && test -f "/docs/source/training program/2024_information.md"'
 
+compose exec -T backend python - <<'PY'
+from scripts.import_common_template_examples import assert_template_example_files_available
+
+root = assert_template_example_files_available()
+print(f"Default template examples available: {root}")
+PY
+
 if [ "${SKIP_BACKUP:-0}" != "1" ]; then
   bash "$SCRIPT_DIR/backup-db.sh"
 fi

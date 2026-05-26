@@ -202,7 +202,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { onPullDownRefresh, onShow } from "@dcloudio/uni-app";
+import { onPullDownRefresh, onReachBottom, onShow } from "@dcloudio/uni-app";
 import InlineStateNotice from "@/components/InlineStateNotice.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import {
