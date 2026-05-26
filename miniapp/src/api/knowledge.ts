@@ -66,6 +66,7 @@ export interface AiMatchCandidate {
   entry_id: number
   slug: string
   title: string
+  summary?: string | null
   score: number
   reason?: string | null
   source_name?: string | null

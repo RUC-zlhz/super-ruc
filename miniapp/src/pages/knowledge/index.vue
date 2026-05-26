@@ -119,6 +119,7 @@
         <view class="ai-item-reason">
           {{ candidate.reason || '基于已发布知识条目匹配' }} · {{ Math.round(candidate.score * 100) }}%
         </view>
+        <view v-if="candidate.summary" class="ai-item-summary">{{ candidate.summary }}</view>
         <view v-if="candidate.source_name || candidate.source_url" class="source-row">
           <text class="source-label">{{ candidate.source_is_official ? '官方来源' : '来源' }}</text>
           <text class="source-name">{{ candidate.source_name || '已发布来源' }}</text>
@@ -718,6 +719,12 @@ onMounted(async () => {
   margin-top: 6rpx;
   font-size: 23rpx;
   color: #6b6365;
+}
+.ai-item-summary {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #47383d;
 }
 .consult-card {
   margin-top: 16rpx;

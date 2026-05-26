@@ -206,6 +206,7 @@ class AiMatchCandidate(BaseModel):
     entry_id: int
     slug: str
     title: str
+    summary: str | None = None
     score: float
     reason: str | None = None
     source_name: str | None = None
@@ -216,7 +217,7 @@ class AiMatchCandidate(BaseModel):
 
 
 class AiMatchResponse(BaseModel):
-    engine: str = Field(description="keyword | claude-haiku")
+    engine: str = Field(description="retrieval | claude-haiku")
     candidates: list[AiMatchCandidate]
     manual_consult_required: bool = False
     manual_consult_hint: str | None = None
