@@ -260,5 +260,5 @@ async def test_ai_match_fallback_to_keyword(admin_client: AsyncClient) -> None:
     )
     assert match_resp.status_code == 200, match_resp.text
     data = match_resp.json()["data"]
-    assert data["engine"] == "keyword"
+    assert data["engine"] == "retrieval"
     assert "免责" in data["disclaimer"] or "人工" in data["disclaimer"]

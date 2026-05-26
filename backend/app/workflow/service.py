@@ -356,11 +356,10 @@ async def _ensure_workflow_start_allowed(
         actor_role=operator_role,
         message="无权为该学生发起流程",
         code=40306,
-        detail={
-            "student_id": student.id,
-            "template_code": template_code,
-            "reason": reason,
-        },
+        detail=build_audit_detail(
+            target={"student_id": student.id, "template_code": template_code},
+            reason=reason,
+        ),
     )
 
 

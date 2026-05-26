@@ -138,6 +138,16 @@
       <view class="ai-disclaimer">{{ aiResult.disclaimer }}</view>
     </view>
 
+    <InlineStateNotice
+      v-if="searchError"
+      compact
+      tone="error"
+      title="知识搜索失败"
+      :description="searchError"
+      action-text="重试"
+      @action="onSearch"
+    />
+
     <view v-if="results.length" class="result-list">
       <view class="result-item" v-for="item in results" :key="item.id" @tap="onDetail(item)">
           <view class="result-icon">{{ resultIcon(item.category_code) }}</view>
@@ -172,7 +182,7 @@
       </view>
     </view>
 
-    <view v-else-if="searched" class="empty">
+    <view v-else-if="searched && !searchError" class="empty">
       <text>未找到相关知识，请尝试调整关键字</text>
     </view>
 
@@ -261,6 +271,7 @@ import {
   type KnowledgeTemplateItem,
 } from '@/api/knowledge'
 import { UNI_BUTTON_TYPE } from '@/utils/uni-button'
+import { getErrorMessage } from '@/utils/error'
 
 const query = ref('')
 const categories = ref<KnowledgeCategory[]>([])
@@ -270,6 +281,7 @@ const selectedTag = ref<string | null>(null)
 const results = ref<KnowledgeEntry[]>([])
 const matchedBy = ref('')
 const searched = ref(false)
+const searchError = ref('')
 const selected = ref<KnowledgeEntryDetail | null>(null)
 const aiResult = ref<AiMatchResult | null>(null)
 const aiLoading = ref(false)
@@ -289,12 +301,13 @@ const detailBody = computed(() => {
 })
 
 async function onSearch() {
-  if (!query.value.trim()) return
+  const keyword = query.value.trim()
   searched.value = true
+  searchError.value = ''
   aiResult.value = null
   try {
     const resp = await searchKnowledge({
-      q: query.value,
+      q: keyword || undefined,
       category: selectedCategory.value,
       tag: selectedTag.value,
       page: 1,
@@ -302,8 +315,10 @@ async function onSearch() {
     })
     results.value = resp.data.items
     matchedBy.value = resp.data.meta.total > 0 ? 'keyword' : ''
-  } catch {
+  } catch (error) {
     results.value = []
+    matchedBy.value = ''
+    searchError.value = getErrorMessage(error, '知识搜索暂不可用')
   }
 }
 

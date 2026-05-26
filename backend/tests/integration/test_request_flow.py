@@ -872,6 +872,30 @@ async def test_request_endpoints_reject_anonymous_and_student_role(
     assert resp.status_code == 403
 
 
+async def test_student_request_create_requires_bound_student_identity(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    headers = await _headers_for_role(
+        db,
+        role_code="COUNSELOR",
+        work_no="REQ-NO-STUDENT",
+    )
+
+    resp = await client.post(
+        "/api/v1/requests",
+        headers=headers,
+        json={
+            "type_code": "LEAVE_PERSONAL",
+            "title": "教师账号不应创建学生侧申请",
+            "form_data": {"reason": "权限边界测试"},
+        },
+    )
+
+    assert resp.status_code == 403, resp.text
+    assert resp.json()["code"] == 40305
+
+
 async def test_collaborator_role_can_view_request_workbench_and_detail(
     client: AsyncClient,
     db: AsyncSession,

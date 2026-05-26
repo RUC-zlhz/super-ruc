@@ -322,12 +322,24 @@ async function reload() {
   loading.value = true;
   try {
     pageError.value = "";
-    const statusParam = tab.value.includes(",") ? undefined : tab.value || undefined;
-    const response = await getMyRequests({ status: statusParam, page: 1, size: 20 });
-    let items = response.data.items;
-    if (tab.value.includes(",")) {
-      const allowed = new Set(tab.value.split(","));
-      items = items.filter((item) => allowed.has(item.status));
+    const statusList = tab.value.split(",").map((item) => item.trim()).filter(Boolean);
+    let items: RequestBrief[];
+    if (statusList.length > 1) {
+      const responses = await Promise.all(
+        statusList.map((status) => getMyRequests({ status, page: 1, size: 100 })),
+      );
+      const byId = new Map<number, RequestBrief>();
+      for (const response of responses) {
+        for (const item of response.data.items) {
+          byId.set(item.id, item);
+        }
+      }
+      items = Array.from(byId.values()).sort(
+        (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+      );
+    } else {
+      const response = await getMyRequests({ status: statusList[0], page: 1, size: 20 });
+      items = response.data.items;
     }
     requests.value = items;
     hasLoaded.value = true;

@@ -10,6 +10,8 @@ import {
   AUDIT_VIEWER_ROLES,
   CONTENT_EDITOR_ROLES,
   CURRICULUM_ADMIN_ROLES,
+  PROFILE_ADMIN_ROLES,
+  REPORT_VIEWER_ROLES,
   SYSTEM_USER_ROLES,
   hasAnyRole,
 } from "@/utils/permission";
@@ -46,7 +48,7 @@ const routes: RouteRecordRaw[] = [
         path: "dashboard",
         name: "dashboard",
         component: () => import("@/views/dashboard/OperationDashboard.vue"),
-        meta: { title: "运营看板", roles: ["SUPER_ADMIN", "COLLEGE_LEADER"] },
+        meta: { title: "运营看板", roles: REPORT_VIEWER_ROLES },
       },
       {
         path: "approval/workbench",
@@ -135,7 +137,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import("@/views/profile/StudentProfile.vue"),
         meta: {
           title: "学生画像",
-          roles: SYSTEM_USER_ROLES,
+          roles: PROFILE_ADMIN_ROLES,
         },
       },
     ],

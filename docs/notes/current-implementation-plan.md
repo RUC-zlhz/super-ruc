@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座均已完成
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测均已完成
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -642,6 +642,54 @@
 - 第二轮 job 已进入服务器部署入口，但因脚本文件无可执行位返回 `126`；已改为显式 `bash` 调用同目录脚本，并补 Git 可执行位。
 - 第三轮 job 已成功完成，服务器 checkout 到 `1ed58f0`，backend / web 重建后 healthy；`smoke.sh`、`preflight-network.sh` 与外部 `/healthz` 均通过。
 
+### S45 全栈测试与 bug 分级审查
+
+- 细化文件：`docs/notes/refinements/2026-05-26-s45-full-stack-test-bug-audit.md`
+- 当前状态：`[x]` 已完成本轮可测试范围审查
+- [x] `S45.1` 读取主计划、最新细化、现有测试资产和运行入口。
+- [x] `S45.2` 后端静态、单元、可行集成测试：认证、师生权限联通、申请/审批/证明、通知、学业、画像、荣誉、导入上传。
+- [x] `S45.3` Web 管理端类型检查、构建、路由与关键页面可用性测试。
+- [x] `S45.4` Miniapp 学生端类型检查、`mp-weixin` 构建、产物与运行时风险检查。
+- [x] `S45.5` 教师管理端与学生端联通闭环审查。
+- [x] `S45.6` 汇总 bug 候选，按崩溃类 / Logic bug 分类，给出触发条件、预期/实际、证据和基础分。
+
+当前结论：
+
+- 本轮为测试审查与缺陷分级，不直接修复业务代码；报告已沉淀到细化文件。
+- 已通过后端 ruff / compileall / 单元测试、Web 构建与本地浏览器 smoke、Miniapp 类型检查与 `mp-weixin` 构建、生产只读 smoke。
+- 用户确认可启动 Docker 后，已启动 Docker Desktop 并拉起 `deploy/docker-compose.yml` 中的 `sip-kingbase`，`54322` 测试数据库阻塞已关闭。
+- 全量后端 DB 集成测试结果：`109 passed, 10 failed, 3 warnings in 357.78s`；其中 `3` 个失败按新增 Logic bug 计分，`7` 个失败归类为测试断言漂移。
+- 累计确认 `1` 个崩溃类 bug 与 `16` 个 Logic bug，基础分合计 `143`。
+
+### S46 S45 缺陷修复闭环
+
+- 细化文件：`docs/notes/refinements/2026-05-26-s46-s45-bug-fix-closure.md`
+- 当前状态：`[x]` 已完成
+- [x] `S46.1` 修复后端微信已绑定登录、学生端身份依赖、学业看板权限/分页 total、通知来源 SSRF、荣誉 recipients 刷新、知识匹配 engine 契约和工作流拒绝审计结构。
+- [x] `S46.2` 修复 Web 学生画像加载失败错误态、学生画像/运营看板前端角色边界和 403 返回首页默认落点。
+- [x] `S46.3` 修复 Miniapp 微信登录留空路径、申请待处理筛选漏页、知识分类/标签空关键词搜索、知识/荣誉错误态和荣誉媒体入口。
+- [x] `S46.4` 补齐 DB 集成回归断言与测试资产漂移修正，并完成后端全量集成、静态检查、Web/Miniapp 构建和本地浏览器 smoke。
+
+当前结论：
+
+- S45 登记的 `1` 个崩溃类 bug、`16` 个 Logic bug 中，当前代码可直接修复的前后端与 DB 集成缺陷已闭环；原 `109 passed, 10 failed` 的后端全量 DB 集成测试已收口为 `123 passed, 3 warnings in 231.05s`，本轮复核再次通过 `123 passed, 3 warnings in 205.89s`。
+- 仍需真实微信开发者工具/真实 code 联调验证生产微信登录完整体验；该项依赖外部真实微信环境，不阻塞本轮代码与自动化闭环。
+
+### S47 多角色联通完成度审计与补测
+
+- 细化文件：`docs/notes/refinements/2026-05-26-s47-cross-role-linkage-completion-audit.md`
+- 当前状态：`[x]` 已完成
+- [x] `S47.1` 审计 S45/S46 剩余验证缺口，明确当前本机可测项与外部依赖项。
+- [x] `S47.2` 新增 DB 驱动的教师/学生多角色联通 smoke 测试，覆盖通知、申请审批、画像、学业看板与荣誉的跨角色可达性。
+- [x] `S47.3` 回跑新增定向测试与必要全量 gate，若暴露缺陷则按崩溃类 / Logic bug 分级并优先修复。
+- [x] `S47.4` 回写主计划和本细化文件，形成完成度审计结论。
+
+当前结论：
+
+- S47 已补齐 S45 “教师/学生联通 E2E”待补验证；新增 `backend/tests/integration/test_s47_cross_role_linkage_smoke.py` 覆盖通知、申请审批、党团流程、画像、学业看板、荣誉公示的跨角色联通。
+- 验证通过：S47 定向 `1 passed`，后端全量 DB 集成 `124 passed, 3 warnings in 215.90s`，后端 ruff / compileall、Web 构建、Miniapp 类型检查与 `mp-weixin` 构建均通过。
+- 本轮未新增有效崩溃类 bug 或 Logic bug；真实微信 code 登录仍属于外部微信环境项。
+
 ### S6 前端体验增量优化
 
 - [x] `S6.1` Web 共享导航与默认落点收口
@@ -1203,6 +1251,9 @@
 | 2026-05-25 | S42 生产运行时代理隔离修复 | `docs/notes/refinements/2026-05-25-s42-runtime-proxy-isolation.md` | `S42.1, S42.2, S42.3, S42.4, S42.5, S42.6` | `[x]` | 已定位小程序 `wx-login` 502 为后端运行时误继承构建代理导致微信 `jscode2session` 出口失败；Dockerfile 已限定构建期代理，Compose 已运行时清空代理变量，生产 backend 重建后 `wx-login` 探测从 `50201` 恢复为微信凭证错误 `401` |
 | 2026-05-25 | S43 生产网络与构建出网治理 | `docs/notes/refinements/2026-05-25-s43-production-network-cleanup.md` | `S43.1, S43.2, S43.3, S43.4, S43.5, S43.6, S43.7` | `[x]` | 已确认服务器可直连微信、TUNA PyPI 与 TUNA Debian，停止失效 `18081` 构建代理，backend / web 在无代理直连模式下重建并重启；生产 smoke、外部 `10.10.0.13` 健康检查和 `wx-login` 微信错误路径均通过 |
 | 2026-05-25 | S44 GitHub Actions 自动部署底座 | `docs/notes/refinements/2026-05-25-s44-github-actions-auto-deploy.md` | `S44.1, S44.2, S44.3, S44.4, S44.5, S44.6, S44.7` | `[!]` | 已实现 self-hosted runner + read-only deploy key 自动部署脚本、workflow 和网络预检；等待 GitHub Deploy Key 登记与 runner token 注册后进行首轮 workflow 验证 |
+| 2026-05-26 | 全栈测试与 bug 分级审查 | `docs/notes/refinements/2026-05-26-s45-full-stack-test-bug-audit.md` | `S45.1, S45.2, S45.3, S45.4, S45.5, S45.6` | `[x]` | 已完成本轮可测试范围审查与 DB 集成补跑；后端静态/编译/单元、Web 构建与浏览器 smoke、Miniapp 类型/构建/产物扫描、生产只读 smoke 通过；Docker 启动后全量后端集成测试 `109 passed, 10 failed`；累计发现 `1` 个崩溃类 bug 与 `16` 个 Logic bug，基础分 `143` |
+| 2026-05-26 | S45 缺陷修复闭环 | `docs/notes/refinements/2026-05-26-s46-s45-bug-fix-closure.md` | `S46.1, S46.2, S46.3, S46.4` | `[x]` | 已修复 S45 可代码闭环缺陷和测试断言漂移；后端全量 DB 集成 `123 passed`，后端 ruff/compileall/unit、Web 构建、Miniapp 类型检查与 `mp-weixin` 构建、本地 Web 403 smoke 均通过 |
+| 2026-05-26 | S47 多角色联通完成度审计与补测 | `docs/notes/refinements/2026-05-26-s47-cross-role-linkage-completion-audit.md` | `S47.1, S47.2, S47.3, S47.4` | `[x]` | 已补 DB 驱动跨角色联通 smoke，覆盖通知、申请审批、党团流程、画像、学业看板、荣誉公示；S47 定向 `1 passed`，后端全量 DB 集成 `124 passed`，双端构建通过 |
 
 ## 会话更新要求
 
@@ -1304,3 +1355,6 @@
 - `2026-05-25`：完成 `S42` 生产运行时代理隔离修复；确认 `wx-login` 502 根因为旧后端镜像运行时继承 `HTTP_PROXY / HTTPS_PROXY=http://127.0.0.1:18081`，导致真实微信 `jscode2session` 在容器内误连本机代理。已修正 Dockerfile 构建期代理边界，并在 Compose 中运行时清空 backend 代理变量；服务器强制重建 backend 容器后 healthy，`POST /api/v1/auth/wx-login` 无效 code 探测返回微信 `errcode=40029` 对应 `401`，不再返回 `50201`。
 - `2026-05-25`：完成 `S43` 生产网络与构建出网治理；确认 `10.10.0.13` 具备直连公网出口，停止失效 `127.0.0.1:18081` 构建代理，backend Dockerfile 固化 TUNA Debian 镜像、IPv4 优先和短超时重试，微信 `code2session` 固定 `trust_env=False`。服务器无代理重建 backend / web 并重启后五服务 healthy，容器外网探测微信/TUNA PyPI/TUNA Debian 均返回 `200`，`bash deploy/intranet-prod/scripts/smoke.sh` 与外部 `http://10.10.0.13/healthz` 通过，`wx-login` 无效 code 返回 `401` 且日志仅记录微信 `errcode=40029`。
 - `2026-05-25`：新增 `S44` GitHub Actions 自动部署底座；采用服务器 self-hosted runner 规避 GitHub-hosted runner 无法访问内网 IP 的问题，服务器使用 read-only deploy key 拉取 GitHub。已新增部署前后网络预检、从 GitHub 部署入口、runner 安装脚本和 `main` push 自动部署 workflow；当前阻塞在 GitHub Deploy Key 公钥登记与 runner 一次性 token 注册，完成后可触发首轮 workflow 验证。
+- `2026-05-26`：完成 `S45` 全栈测试与 bug 分级审查；后端 ruff / compileall / 单元测试、Web 构建与浏览器 smoke、Miniapp 类型检查 / `mp-weixin` 构建 / 产物风险扫描、生产只读 smoke 均通过。随后按用户要求启动 Docker Desktop，`sip-kingbase` 健康后补跑全量后端 DB 集成测试，结果 `109 passed, 10 failed, 3 warnings in 357.78s`；10 个失败中 `3` 个按新增 Logic bug 计分、`7` 个为测试断言漂移。最终累计登记 `1` 个崩溃类 bug、`16` 个 Logic bug，基础分合计 `143`。
+- `2026-05-26`：完成 `S46` S45 缺陷修复闭环；修复后端身份/权限/SSRF/审计/契约/刷新问题、Web 角色与错误态、Miniapp 登录/筛选/错误态/媒体入口，并补齐回归测试。验证通过后端全量 DB 集成 `123 passed, 3 warnings in 231.05s`、后端 ruff / compileall / unit、Web 构建、Miniapp 类型检查与 `mp-weixin` 构建、本地 Web 403 smoke；本轮复核再次通过后端全量 DB 集成 `123 passed, 3 warnings in 205.89s`、后端静态/单元、双端构建和 403 浏览器 smoke。
+- `2026-05-26`：完成 `S47` 多角色联通完成度审计与补测；新增 `backend/tests/integration/test_s47_cross_role_linkage_smoke.py`，用真实测试数据库串起学生、辅导员、班主任、党团教师和超管身份，覆盖通知发布/收件已读、学生申请/老师审批、党团流程发起/学生进度、画像访问边界、学业看板 scope、荣誉发布/学生端读取。验证通过 S47 定向 `1 passed in 66.77s`、后端全量 DB 集成 `124 passed, 3 warnings in 215.90s`、后端 ruff / compileall、Web 构建、Miniapp 类型检查与 `mp-weixin` 构建；本轮未新增有效崩溃类 bug 或 Logic bug。

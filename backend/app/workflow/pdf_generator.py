@@ -163,6 +163,10 @@ def render_proof_html(
     )
 
 
+def _html_to_pdf_bytes(html_text: str) -> bytes:
+    return pdf_branding.html_to_pdf_bytes(html_text)
+
+
 async def _get_approved_certificate_request(
     db: AsyncSession, request_id: int
 ) -> Request:
@@ -212,6 +216,6 @@ async def generate_proof_pdf(
         student = await db.get(Student, req.applicant_student_id)
 
     html_text = render_proof_html(template, req, student)
-    pdf_bytes = pdf_branding.html_to_pdf_bytes(html_text)
+    pdf_bytes = _html_to_pdf_bytes(html_text)
     filename = f"proof-{req.request_no}.pdf"
     return pdf_bytes, filename

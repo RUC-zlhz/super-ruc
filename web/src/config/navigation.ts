@@ -15,6 +15,7 @@ import {
   AUDIT_VIEWER_ROLES,
   CONTENT_EDITOR_ROLES,
   CURRICULUM_ADMIN_ROLES,
+  REPORT_VIEWER_ROLES,
   SYSTEM_USER_ROLES,
   hasAnyRole,
 } from "@/utils/permission";
@@ -40,7 +41,7 @@ export const NAV_GROUPS: NavGroup[] = [
         key: "/dashboard",
         label: "运营看板",
         icon: DashboardOutlined,
-        roles: ["SUPER_ADMIN", "COLLEGE_LEADER"],
+        roles: REPORT_VIEWER_ROLES,
       },
     ],
   },

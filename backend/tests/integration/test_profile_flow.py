@@ -934,7 +934,7 @@ async def test_admin_creates_student_updates_master_data_and_unbinds_wechat(
     assert binding.status_code == 200, binding.text
     binding_data = binding.json()["data"]
     assert binding_data["bound"] is True
-    assert binding_data["openid_masked"].startswith("mock_w")
+    assert binding_data["openid_masked"].startswith("mock_s")
     assert "STUDENT" in binding_data["roles"]
 
     unbound = await client.delete(
@@ -945,7 +945,7 @@ async def test_admin_creates_student_updates_master_data_and_unbinds_wechat(
     assert unbound.json()["data"]["bound"] is False
 
     user = (
-        await db.execute(select(User).where(User.openid == "mock_wx_profile_unbind"))
+        await db.execute(select(User).where(User.openid == "mock_student_P300006"))
     ).scalar_one()
     assert user.student_id is None
     roles = (

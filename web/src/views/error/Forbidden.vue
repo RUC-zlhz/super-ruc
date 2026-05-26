@@ -10,7 +10,7 @@
         <h1>抱歉，您暂无权限访问该页面</h1>
         <p>您当前的角色或账号权限不足，无法访问此页面或执行此操作。</p>
         <div class="actions">
-          <a-button type="primary" size="large" @click="$router.replace('/dashboard')">
+          <a-button type="primary" size="large" @click="goHome">
             返回首页
           </a-button>
           <a-button type="link" size="large">联系管理员</a-button>
@@ -21,6 +21,19 @@
     <footer>© 2026 中国人民大学 · 管理后台</footer>
   </div>
 </template>
+
+<script setup lang="ts">
+import { useRouter } from "vue-router";
+import { getDefaultRouteForRoles } from "@/config/navigation";
+import { useAuthStore } from "@/store/auth";
+
+const router = useRouter();
+const auth = useAuthStore();
+
+function goHome() {
+  router.replace(getDefaultRouteForRoles(auth.roleCodes));
+}
+</script>
 
 <style scoped>
 .forbidden-wrap {

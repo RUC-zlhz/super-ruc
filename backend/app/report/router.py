@@ -96,7 +96,7 @@ async def admin_overview(
 )
 async def admin_academic_gap_list(
     db: DBDep,
-    _user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
+    user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
     keyword: str | None = None,
     grade_code: str | None = None,
     major_code: str | None = None,
@@ -112,6 +112,8 @@ async def admin_academic_gap_list(
         risk_level=risk_level,
         page=page,
         page_size=page_size,
+        viewer_user_id=user.user_id,
+        viewer_roles=user.roles,
     )
     return ok(
         Paginated[AcademicGapAggregateItem](
@@ -128,8 +130,14 @@ async def admin_academic_gap_list(
 async def admin_academic_gap(
     student_id: int,
     db: DBDep,
-    _user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
+    user: Annotated[CurrentUserDep, Depends(_LeaderRole)],
 ) -> ApiResponse[AcademicGapResult]:
+    await service.ensure_academic_gap_student_visible(
+        db,
+        student_id=student_id,
+        viewer_user_id=user.user_id,
+        viewer_roles=user.roles,
+    )
     return ok(await service.compute_academic_gap(db, student_id))
 
 

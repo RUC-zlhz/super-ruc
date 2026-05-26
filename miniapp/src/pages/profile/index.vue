@@ -33,7 +33,7 @@
           <input
             class="bind-input"
             v-model="studentNoForBinding"
-            :placeholder="guestLoginEnabled ? '填写学号绑定，留空以开发访客登录' : '填写学号绑定登录'"
+            :placeholder="guestLoginEnabled ? '首次绑定填写学号，留空以开发访客登录' : '已绑定可留空登录，首次绑定填写学号'"
             confirm-type="next"
           />
           <input
@@ -816,10 +816,6 @@ async function onWxLogin() {
   const normalizedStudentNo = studentNoForBinding.value.trim()
   const normalizedFullName = fullNameForBinding.value.trim()
   const normalizedIdCardTail = idCardTailForBinding.value.trim()
-  if (!guestLoginEnabled && !normalizedStudentNo) {
-    uni.showToast({ title: '请填写学号完成绑定登录', icon: 'none' })
-    return
-  }
   if (!normalizedStudentNo && (normalizedFullName || normalizedIdCardTail)) {
     uni.showToast({ title: '绑定学生时请先填写学号', icon: 'none' })
     return

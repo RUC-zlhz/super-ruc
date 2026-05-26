@@ -70,6 +70,16 @@
       当前结果包含历史荣誉，相关信息仅供参考
     </view>
 
+    <InlineStateNotice
+      v-if="pageError"
+      compact
+      :tone="items.length ? 'warning' : 'error'"
+      :title="items.length ? '荣誉列表未完全更新' : '荣誉列表加载失败'"
+      :description="items.length ? `${pageError}，当前保留上次加载结果。` : `${pageError}，可点击重试重新同步。`"
+      action-text="重试"
+      @action="retryLoad"
+    />
+
     <view v-if="items.length" class="list">
       <view
         v-for="honor in items"
@@ -111,7 +121,7 @@
       </view>
     </view>
 
-    <view v-else-if="!loading" class="empty">暂无荣誉记录</view>
+    <view v-else-if="!loading && !pageError" class="empty">暂无荣誉记录</view>
 
     <view v-if="hasMore" class="load-more" @tap="loadMore">
       {{ loading ? '加载中...' : '加载更多' }}
@@ -191,7 +201,7 @@
         </view>
 
         <view class="detail-footer">
-          <view class="detail-action secondary" @tap="showAttachmentHint">查看附件</view>
+          <view v-if="selectedMediaUrls.length" class="detail-action secondary" @tap="openHonorMedia">查看媒体</view>
           <view class="detail-action" @tap="shareHonor">分享荣誉</view>
         </view>
       </view>
@@ -201,6 +211,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import InlineStateNotice from '@/components/InlineStateNotice.vue'
 import {
   getHonorDetail,
   listHonorCategories,
@@ -209,6 +220,7 @@ import {
   type HonorRecordBrief,
   type HonorRecordDetail,
 } from '@/api/honor'
+import { getErrorMessage } from '@/utils/error'
 
 const LEVEL_LABELS: Record<string, string> = {
   NATIONAL: '国家级',
@@ -266,8 +278,10 @@ const size = 20
 const total = ref(0)
 const loading = ref(false)
 const hasMore = computed(() => !loading.value && items.value.length < total.value)
+const pageError = ref('')
 
 const selected = ref<HonorRecordDetail | null>(null)
+const selectedMediaUrls = computed(() => (selected.value ? honorMediaUrls(selected.value) : []))
 
 const categoryMap = computed(() => {
   const map = new Map<string, string>()
@@ -358,6 +372,7 @@ async function reload(reset = true) {
   }
   loading.value = true
   try {
+    pageError.value = ''
     const resp = await listPublicHonors({
       category_code: filters.category_code || undefined,
       level: filters.level || undefined,
@@ -370,9 +385,18 @@ async function reload(reset = true) {
     const nextItems = visibleItems(resp.data.items || [])
     items.value = reset ? nextItems : [...items.value, ...nextItems]
     total.value = resp.data.meta?.total || items.value.length
+  } catch (error) {
+    pageError.value = getErrorMessage(error, '荣誉列表暂不可用')
+    if (!reset && page.value > 1) {
+      page.value -= 1
+    }
   } finally {
     loading.value = false
   }
+}
+
+function retryLoad() {
+  void reload(true).catch(() => undefined)
 }
 
 function onCategory(code: string) {
@@ -427,8 +451,46 @@ function closeDetail() {
   selected.value = null
 }
 
-function showAttachmentHint() {
-  uni.showToast({ title: '附件查看入口已保留，请以后端附件数据为准', icon: 'none' })
+function honorMediaUrls(record: HonorRecordDetail) {
+  const urls = new Set<string>()
+  const pushUrl = (value: unknown) => {
+    if (!value) return
+    if (typeof value === 'string') {
+      const text = value.trim()
+      if (/^https?:\/\//i.test(text)) urls.add(text)
+      return
+    }
+    if (Array.isArray(value)) {
+      value.forEach(pushUrl)
+      return
+    }
+    if (typeof value === 'object') {
+      Object.values(value as Record<string, unknown>).forEach(pushUrl)
+    }
+  }
+  pushUrl(record.cover_image_url)
+  pushUrl(record.media)
+  return Array.from(urls)
+}
+
+function isImageUrl(url: string) {
+  return /\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(url)
+}
+
+function openHonorMedia() {
+  const urls = selectedMediaUrls.value
+  if (!urls.length) return
+  const images = urls.filter(isImageUrl)
+  if (images.length) {
+    uni.previewImage({ urls: images, current: images[0] })
+    return
+  }
+  uni.setClipboardData({
+    data: urls[0],
+    success() {
+      uni.showToast({ title: '媒体链接已复制', icon: 'none' })
+    },
+  })
 }
 
 function shareHonor() {

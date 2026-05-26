@@ -7,7 +7,8 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.models import Student, User
+from app.auth.models import Student, User, UserRole
+from app.core.security import create_token
 from app.exchange.models import (
     IMPORT_TYPE_TRANSCRIPT_PDF_REVIEW,
     CourseEquivalence,
@@ -19,6 +20,22 @@ from app.exchange.models import (
 )
 from app.report import service as report_service
 from app.workflow.models import Request, RequestType
+
+
+async def _headers_for_role(
+    db: AsyncSession,
+    *,
+    role_code: str,
+    work_no: str,
+    scope_code: str | None = None,
+) -> dict[str, str]:
+    user = User(work_no=work_no, display_name=f"report-{role_code}", is_active=True)
+    db.add(user)
+    await db.flush()
+    db.add(UserRole(user_id=user.id, role_code=role_code, scope_code=scope_code))
+    await db.commit()
+    token = create_token(str(user.id), "access", extra_claims={"roles": [role_code]})
+    return {"Authorization": f"Bearer {token}"}
 
 
 async def _login_as_student(
@@ -393,7 +410,9 @@ async def test_admin_academic_gap_aggregate_query_uses_items_meta_and_filters(
         params={"risk_level": "HIGH", "page": 1, "page_size": 10},
     )
     assert high_only.status_code == 200, high_only.text
-    high_items = high_only.json()["data"]["items"]
+    high_payload = high_only.json()["data"]
+    assert high_payload["meta"]["total"] == 2
+    high_items = high_payload["items"]
     assert {item["student_no"] for item in high_items} == {"A200001", "A200003"}
 
     keyword = await admin_client.get(
@@ -412,6 +431,59 @@ async def test_admin_academic_gap_aggregate_query_uses_items_meta_and_filters(
     detail_data = detail.json()["data"]
     assert detail_data["student_no"] == "A200001"
     assert "disclaimer" in detail_data
+
+
+async def test_admin_academic_gap_respects_teacher_scope(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    in_scope = Student(
+        student_no="A210001",
+        full_name="scope-in",
+        grade_code="2022",
+        major_code="CS",
+        class_code="CS2201",
+    )
+    out_scope = Student(
+        student_no="A210002",
+        full_name="scope-out",
+        grade_code="2022",
+        major_code="CS",
+        class_code="CS2202",
+    )
+    db.add_all([in_scope, out_scope])
+    await db.commit()
+    await db.refresh(in_scope)
+    await db.refresh(out_scope)
+
+    headers = await _headers_for_role(
+        db,
+        role_code="COUNSELOR",
+        work_no="REPORT-SCOPE-COUNSELOR",
+        scope_code="CLASS:CS2201",
+    )
+
+    listing = await client.get(
+        "/api/v1/admin/report/academic-gap",
+        headers=headers,
+        params={"grade_code": "2022", "page": 1, "page_size": 10},
+    )
+    assert listing.status_code == 200, listing.text
+    payload = listing.json()["data"]
+    assert payload["meta"]["total"] == 1
+    assert [item["student_no"] for item in payload["items"]] == ["A210001"]
+
+    allowed_detail = await client.get(
+        f"/api/v1/admin/report/academic-gap/{in_scope.id}",
+        headers=headers,
+    )
+    assert allowed_detail.status_code == 200, allowed_detail.text
+
+    denied_detail = await client.get(
+        f"/api/v1/admin/report/academic-gap/{out_scope.id}",
+        headers=headers,
+    )
+    assert denied_detail.status_code == 403, denied_detail.text
 
 
 async def test_academic_gap_equivalent_course_consumes_credit_once(

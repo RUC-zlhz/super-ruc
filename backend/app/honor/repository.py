@@ -65,6 +65,7 @@ async def get_record(db: AsyncSession, record_id: int) -> HonorRecord | None:
         select(HonorRecord)
         .where(HonorRecord.id == record_id)
         .options(selectinload(HonorRecord.recipients))
+        .execution_options(populate_existing=True)
     )
     return (await db.execute(stmt)).scalar_one_or_none()
 
@@ -210,6 +211,7 @@ async def set_recipients(
     ).scalars().all()
     for row in existing:
         await db.delete(row)
+    await db.flush()
     created: list[HonorRecipient] = []
     for item in recipients:
         row = HonorRecipient(record_id=record_id, **item)

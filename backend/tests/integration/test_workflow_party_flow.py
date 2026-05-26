@@ -544,8 +544,8 @@ async def test_scoped_launcher_can_start_only_students_in_scope(
         )
     ).scalar_one()
     assert denied_log.result_code == "DENIED"
-    assert denied_log.detail["student_id"] == out_scope_student_id
-    assert denied_log.detail["template_code"] == "PARTY_DEV_MAIN"
+    assert denied_log.detail["target"]["student_id"] == out_scope_student_id
+    assert denied_log.detail["target"]["template_code"] == "PARTY_DEV_MAIN"
     assert denied_log.detail["reason"] == "OUT_OF_SCOPE"
 
 

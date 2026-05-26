@@ -536,6 +536,8 @@ async def test_notice_ingest_sources_and_sms_retry_receipt(
     monkeypatch,
 ) -> None:
     class FakeResponse:
+        is_redirect = False
+        url = "https://info.ruc.edu.cn/rss.xml"
         content = (
             b"<rss><channel><item><title>S12 RSS Notice</title>"
             b"<link>https://info.ruc.edu.cn/rss/s12</link>"
@@ -555,9 +557,13 @@ async def test_notice_ingest_sources_and_sms_retry_receipt(
         async def __aexit__(self, *_args) -> None:
             return None
 
-        async def get(self, _url: str) -> FakeResponse:
+        async def get(self, _url: str, **_kwargs) -> FakeResponse:
             return FakeResponse()
 
+    def _resolve_to_public(*_args, **_kwargs):
+        return [notice_service.ip_address("93.184.216.34")]
+
+    monkeypatch.setattr(notice_service, "_resolve_host_addresses", _resolve_to_public)
     monkeypatch.setattr(notice_service.httpx, "AsyncClient", FakeAsyncClient)
 
     source = await admin_client.post(

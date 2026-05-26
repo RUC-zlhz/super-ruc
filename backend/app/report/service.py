@@ -22,9 +22,12 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import build_audit_detail, log_action
+from app.auth import repository as auth_repo
 from app.auth.models import Student
+from app.auth.role_codes import normalize_role_code, normalize_role_codes
+from app.auth.scopes import StudentScopeSet, split_student_scope_codes, student_in_scope
 from app.core.config import settings
-from app.core.exceptions import BizError, NotFoundError
+from app.core.exceptions import BizError, NotFoundError, PermissionError
 from app.core.sql import order_by_nulls_last_desc
 from app.core.storage import put_object
 from app.exchange import repository as exchange_repo
@@ -74,6 +77,60 @@ from app.workflow.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+_REPORT_GLOBAL_ROLES = {"SUPER_ADMIN", "COLLEGE_LEADER"}
+_REPORT_SCOPED_ROLES = {
+    "COUNSELOR",
+    "HEAD_TEACHER",
+    "YOUTH_LEAGUE_TEACHER",
+    "PARTY_BUILD_TEACHER",
+}
+
+
+async def _report_scope_for_viewer(
+    db: AsyncSession,
+    *,
+    viewer_user_id: int,
+    viewer_roles: list[str],
+) -> StudentScopeSet | None:
+    roles = set(normalize_role_codes(viewer_roles))
+    if roles & _REPORT_GLOBAL_ROLES:
+        return None
+    scoped_roles = roles & _REPORT_SCOPED_ROLES
+    if not scoped_roles:
+        return StudentScopeSet()
+
+    rows = await auth_repo.list_user_roles(db, viewer_user_id)
+    scope_codes = [
+        row.scope_code
+        for row in rows
+        if normalize_role_code(row.role_code) in scoped_roles and row.scope_code
+    ]
+    return split_student_scope_codes(scope_codes)
+
+
+def _apply_report_student_scope(stmt, scope: StudentScopeSet | None):
+    if scope is None:
+        return stmt
+    if scope.is_empty():
+        return None
+    scope_conds = []
+    if scope.class_codes:
+        scope_conds.append(Student.class_code.in_(sorted(scope.class_codes)))
+    if scope.major_codes:
+        scope_conds.append(Student.major_code.in_(sorted(scope.major_codes)))
+    if scope.grade_codes:
+        scope_conds.append(Student.grade_code.in_(sorted(scope.grade_codes)))
+    if scope.legacy_codes:
+        legacy = sorted(scope.legacy_codes)
+        scope_conds.extend(
+            [
+                Student.class_code.in_(legacy),
+                Student.major_code.in_(legacy),
+                Student.grade_code.in_(legacy),
+            ]
+        )
+    return stmt.where(or_(*scope_conds)) if scope_conds else None
 
 # ============================================================
 # FR-014 学业缺口
@@ -684,8 +741,20 @@ async def list_academic_gap_overview(
     risk_level: str | None,
     page: int,
     page_size: int,
+    viewer_user_id: int | None = None,
+    viewer_roles: list[str] | None = None,
 ) -> tuple[list[AcademicGapAggregateItem], int]:
     stmt = select(Student).where(Student.deleted_at.is_(None))
+    if viewer_user_id is not None and viewer_roles is not None:
+        scope = await _report_scope_for_viewer(
+            db,
+            viewer_user_id=viewer_user_id,
+            viewer_roles=viewer_roles,
+        )
+        scoped_stmt = _apply_report_student_scope(stmt, scope)
+        if scoped_stmt is None:
+            return [], 0
+        stmt = scoped_stmt
     if keyword:
         like = f"%{keyword}%"
         stmt = stmt.where(
@@ -750,18 +819,15 @@ async def list_academic_gap_overview(
 
         return items, total_students_count
 
-    # 存在 risk_level 过滤时的 fallback 方案 (流式扫描，带安全熔断)
-    # 注意：这里的 total 无法精准返回满足该风险等级的总人数（除非全量算），
-    # 故返回基础查询的总数，前端分页页码可能不准，但防止了服务卡死。
-    items = []
+    # 存在 risk_level 过滤时，必须返回过滤后的精准 total，避免前端分页失真。
+    # 风险等级依赖 compute_academic_gap，当前只能按基础条件分块计算。
+    items: list[AcademicGapAggregateItem] = []
     chunk_size = 100
     offset = 0
-    max_scan_students = 2000  # 安全熔断阈值，防止把数据库扫爆
-    scanned = 0
     target_start_index = max(page - 1, 0) * page_size
-    collected_count = 0
+    matched_count = 0
 
-    while scanned < max_scan_students and offset < total_students_count:
+    while offset < total_students_count:
         chunk_students = (
             (
                 await db.execute(
@@ -778,15 +844,14 @@ async def list_academic_gap_overview(
         offset += chunk_size
 
         for student in chunk_students:
-            scanned += 1
             result = await compute_academic_gap(db, student.id)
             current_risk = _derive_risk_level(result)
 
             if current_risk != desired_risk:
                 continue
 
-            collected_count += 1
-            if collected_count <= target_start_index:
+            matched_count += 1
+            if matched_count <= target_start_index:
                 # 还没到当前页的起始位置，跳过
                 continue
 
@@ -807,10 +872,33 @@ async def list_academic_gap_overview(
             )
             items.append(item)
 
-            if len(items) >= page_size:
-                return items, total_students_count
+            if len(items) > page_size:
+                items = items[:page_size]
 
-    return items, total_students_count
+    return items, matched_count
+
+
+async def ensure_academic_gap_student_visible(
+    db: AsyncSession,
+    *,
+    student_id: int,
+    viewer_user_id: int,
+    viewer_roles: list[str],
+) -> None:
+    scope = await _report_scope_for_viewer(
+        db,
+        viewer_user_id=viewer_user_id,
+        viewer_roles=viewer_roles,
+    )
+    if scope is None:
+        return
+    if scope.is_empty():
+        raise PermissionError("无权查看该学生学业缺口", code=40306)
+    student = await db.get(Student, student_id)
+    if student is None:
+        raise NotFoundError(f"学生不存在：{student_id}")
+    if not student_in_scope(student, scope):
+        raise PermissionError("无权查看该学生学业缺口", code=40306)
 
 
 # ============================================================

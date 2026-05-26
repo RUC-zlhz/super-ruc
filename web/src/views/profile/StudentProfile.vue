@@ -20,6 +20,19 @@
     </a-page-header>
 
     <a-spin :spinning="loading">
+      <a-alert
+        v-if="loadError"
+        class="mb16"
+        :type="profile ? 'warning' : 'error'"
+        show-icon
+        :message="profile ? '画像辅助信息未完全更新' : '学生画像加载失败'"
+        :description="loadError"
+      >
+        <template #action>
+          <a-button size="small" @click="loadProfile">重试</a-button>
+        </template>
+      </a-alert>
+
       <template v-if="profile">
         <a-alert
           v-if="isReadonlyProfile"
@@ -454,6 +467,7 @@ const studentId = Number(route.params.studentId)
 
 const profile = ref<ProfileSummary | null>(null)
 const loading = ref(false)
+const loadError = ref('')
 const pendingCorrectionCount = ref(0)
 const pendingFacts = ref<ProfileFactOut[]>([])
 const pendingFactsSupported = ref(true)
@@ -721,16 +735,36 @@ async function loadPendingFacts() {
 
 async function loadProfile() {
   loading.value = true
+  loadError.value = ''
   try {
-    const [profileResp, correctionResp, fullViewResp] = await Promise.all([
-      adminGetProfile(studentId),
+    const profileResp = await adminGetProfile(studentId)
+    profile.value = profileResp.data
+    const [correctionResp, fullViewResp] = await Promise.allSettled([
       adminListCorrections({ student_id: studentId, status: 'PENDING', page: 1, size: 1 }),
       adminListFullViewRequests({ student_id: studentId, page: 1, size: 20 }),
     ])
-    profile.value = profileResp.data
-    pendingCorrectionCount.value = correctionResp.data.meta.total
-    fullViewRequests.value = fullViewResp.data.items
+    if (correctionResp.status === 'fulfilled') {
+      pendingCorrectionCount.value = correctionResp.value.data.meta.total
+    } else {
+      pendingCorrectionCount.value = 0
+      loadError.value = '画像主体已加载，但纠错申诉统计暂时不可用。'
+    }
+    if (fullViewResp.status === 'fulfilled') {
+      fullViewRequests.value = fullViewResp.value.data.items
+    } else {
+      fullViewRequests.value = []
+      loadError.value = loadError.value
+        ? `${loadError.value} 完整字段查看申请列表暂时不可用。`
+        : '画像主体已加载，但完整字段查看申请列表暂时不可用。'
+    }
     await loadPendingFacts()
+  } catch (error) {
+    loadError.value = error instanceof Error ? error.message : '请确认当前账号权限或稍后重试。'
+    if (!profile.value) {
+      pendingCorrectionCount.value = 0
+      pendingFacts.value = []
+      fullViewRequests.value = []
+    }
   } finally {
     loading.value = false
   }
