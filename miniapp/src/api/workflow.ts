@@ -19,6 +19,7 @@ export interface StudentWorkflowNode {
   sort_order: number
   stage_group?: string | null
   required_task?: string | null
+  student_material_required?: boolean
   status: string
   triggered_at?: string | null
   due_date?: string | null
@@ -47,6 +48,13 @@ export function getMyWorkflows() {
 
 export function getWorkflowDetail(id: number) {
   return get<StudentWorkflow>(`/workflow/${id}`)
+}
+
+export function submitWorkflowNodeMaterial(
+  stateId: number,
+  payload: { evidence: string; note?: string | null },
+) {
+  return post<StudentWorkflow>(`/workflow/node-states/${stateId}/submit`, payload)
 }
 
 export interface RequestBrief {

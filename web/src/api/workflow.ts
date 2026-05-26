@@ -5,7 +5,13 @@ import type { StudentBasic } from './profile'
 
 export type WorkflowTemplateKind = 'PARTY' | 'YOUTH_LEAGUE' | 'OTHER'
 export type WorkflowTriggerRule = 'PREV_DONE' | 'MANUAL' | 'ON_APPLY' | 'ON_DATE'
-export type WorkflowNodeStatus = 'PENDING' | 'DONE' | 'OVERDUE' | 'DEFERRED' | 'MANUAL_FOLLOW_UP'
+export type WorkflowNodeStatus =
+  | 'PENDING'
+  | 'MATERIAL_SUBMITTED'
+  | 'DONE'
+  | 'OVERDUE'
+  | 'DEFERRED'
+  | 'MANUAL_FOLLOW_UP'
 export type ReminderChannel = 'IN_APP'
 export type ReminderStatus = 'PENDING' | 'SENT' | 'CANCELLED' | 'FAILED'
 export type ReminderRunStatus = 'RUNNING' | 'COMPLETED' | 'FAILED'
@@ -73,8 +79,12 @@ export interface WorkflowStudentBrief {
   student_name?: string | null
   template_code: string
   template_name: string
+  current_node_state_id?: number | null
   current_node_name?: string | null
   current_node_status?: WorkflowNodeStatus | string | null
+  current_node_student_material_required?: boolean
+  current_node_evidence?: string | null
+  current_node_note?: string | null
   due_date?: string | null
 }
 
@@ -299,6 +309,16 @@ export function searchWorkflowStudents(params: {
 
 export function startWorkflowStudent(payload: WorkflowStudentStartPayload) {
   return post<ApiEnvelope<WorkflowStudentDetail>>('/admin/workflow/students', payload)
+}
+
+export function completeWorkflowNode(
+  stateId: number,
+  payload: { evidence?: string | null; note?: string | null },
+) {
+  return post<ApiEnvelope<WorkflowStudentDetail>>(
+    `/admin/workflow/node-states/${stateId}/complete`,
+    payload,
+  )
 }
 
 export async function listWorkflowReminderRecords(params: {

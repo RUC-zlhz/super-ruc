@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入/敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有与 `S56` PR #4 融合与生产模板 seed 修复均已完成
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程当前节点状态展示修正、`S59` 党团流程学生提交材料与老师确认推进闭环与 `S60` 证明 PDF 信息学院品牌与中文字体修复均已完成
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -879,6 +879,92 @@
 - 本地验证：后端 `py_compile` 通过；`unit_tests/test_common_template_examples.py` 结果 `3 passed`；知识库集成测试在 Docker `sip-kingbase` 的 `localhost:54322/sip_db_test` 上复跑，结果 `11 passed in 84.03s`；`pnpm -C web build`、Miniapp `vue-tsc` 与 `pnpm -C miniapp build:mp-weixin` 均通过。
 - GitHub Actions：手动触发 `Intranet Production Deploy`，run `26454802193` 成功，部署提交 `c567fec1cebe81a71bf879e91a398d680e08e0b4`。
 - 生产验证：部署备份 `/opt/super-ruc/backups/super-ruc-20260526-223525-c567fec1.dump`；默认数据 seed 备份 `/opt/super-ruc/backups/super-ruc-20260526-224424-c567fec1.dump`；`seed-default-data.sh` 预检模板目录 `/docs/source/common-templates` 成功，导入 `template assets created=4`、`template entries created=4`，并因已有官方知识保持 `knowledge skipped_due_to_existing=True`；数据库复核 `knowledge_entries=16`、`template_assets=4`、`knowledge_entry_templates=4`，`/healthz` 返回 `{"status":"ok"}`。
+
+### S57 生产证明 PDF 预览验证与使用说明校正
+
+- 细化文件：`docs/notes/refinements/2026-05-26-s57-proof-preview-production-verification.md`
+- 当前状态：`[x]` 已完成生产证明申请实例创建、状态门禁验证、PDF 预览接口验证和使用说明修正。
+- [x] `S57.1` 复核生产证明模板与申请类型配置，确认 `CERTIFICATE_IN_SCHOOL` 绑定有效证明模板。
+- [x] `S57.2` 通过学生账号创建 `[验证]` 在读证明申请，并验证 `DRAFT` / `SUBMITTED` 状态均不能预览 PDF。
+- [x] `S57.3` 将申请置为 `APPROVED` 后验证学生侧 `/api/v1/workflow/proof-preview/{id}` 返回 `application/pdf` 且响应体为有效 PDF。
+- [x] `S57.4` 将 `docs/source/user-manual.md` 证明预览口径修正为“审批通过后开放预览”。
+
+当前结论：
+
+- 证明 PDF 预览链路在生产可用，但不是“发起后即可预览”，而是“申请审批通过后可在申请详情中预览”。
+- 生产当前缺少持久化 `COUNSELOR` 教师账号；`CERTIFICATE_IN_SCHOOL` 的审批角色为 `COUNSELOR`，`SUPER_ADMIN` 登录态审批会被 `40304` 拦截。正式验收需准备具备 `COUNSELOR` 角色的教师账号，或后续调整证明类申请的审批角色配置。
+
+证据：
+
+- 生产申请：`id=1`，`request_no=CERT-260526153239-DF9E03`，`title=[验证] 证明 PDF 预览链路`，最终状态 `APPROVED`。
+- 预览门禁：`DRAFT` 与 `SUBMITTED` 状态均返回 `40029` “仅已批准的申请可预览证明 PDF”。
+- PDF 验证：审批通过后学生侧预览返回 `200`、`content-type=application/pdf`、`Content-Disposition=inline; filename="proof-CERT-260526153239-DF9E03.pdf"`，响应体以 `%PDF-1.7` 开头。
+
+### S58 小程序党团流程当前节点状态展示修正
+
+- 细化文件：`docs/notes/refinements/2026-05-26-s58-miniapp-workflow-current-node-status.md`
+- 当前状态：`[x]` 已完成生产数据核查、小程序展示修正与构建验证。
+- [x] `S58.1` 复核生产中 `张念昊 / 2024201540` 的入党流程实例和节点运行态。
+- [x] `S58.2` 修正小程序流程详情页当前节点定位逻辑，优先使用后端 `current_node_id`。
+- [x] `S58.3` 将“已触发或当前节点的 PENDING”展示为“进行中”，保留未触发后续节点为“待开始”。
+- [x] `S58.4` 完成 Miniapp 类型检查与微信小程序构建验证。
+
+当前结论：
+
+- 张念昊的入党流程不是未开始；生产中该流程状态为 `ACTIVE`，当前节点为“教育引导”，节点 `PENDING` 但已有 `triggered_at`。
+- 旧展示问题来自前端把所有 `PENDING` 统一翻译为“待开始”，没有区分“当前已触发但未完成”和“后续尚未触发”。
+
+证据：
+
+- 生产复核：`workflow_id=1`，模板 `PARTY_DEVELOPMENT_OFFICIAL_V2`，当前节点“教育引导”，`done_nodes=0/29`，`current_node_triggered_at=2026-05-26 12:27:23.345075+00:00`。
+- 实现文件：`miniapp/src/pages/workflow/detail.vue`
+- 验证：`.\web\node_modules\.bin\vue-tsc.CMD --noEmit -p miniapp\tsconfig.json` 通过；`pnpm -C miniapp build:mp-weixin` 通过。
+
+### S59 党团流程学生提交材料与老师确认推进闭环
+
+- 细化文件：`docs/notes/refinements/2026-05-26-s59-workflow-student-material-submit.md`
+- 当前状态：`[x]` 已完成学生材料节点判定、学生提交材料接口、小程序按节点展示提交入口、Web 老师确认入口与验证。
+- [x] `S59.1` 新增学生侧当前节点材料提交接口，并限制只能提交本人流程的当前节点。
+- [x] `S59.2` 新增节点状态 `MATERIAL_SUBMITTED`，表示学生已提交材料、等待老师确认。
+- [x] `S59.3` 新增 `student_material_required` 节点响应字段；只有需要学生材料的节点允许提交，组织侧节点提示等待老师或支部处理。
+- [x] `S59.4` Web 党团流程列表展示学生提交材料状态，并提供老师“确认完成”按钮推进下一节点；材料列区分“待学生提交”和“无需学生提交，老师可直接确认”。
+- [x] `S59.5` 完成后端静态、定向集成、Web 构建与 Miniapp 构建验证。
+
+当前结论：
+
+- 党团流程不再只是“老师发起、学生查看”；学生可以在确需学生材料的当前节点提交材料说明，老师确认后再进入下一节点。
+- “教育引导”等组织侧节点不开放学生提交，学生端显示等待老师或支部处理；老师端可直接确认这类组织侧节点并推进流程。
+- 学生提交不会绕过审批：节点状态先进入 `MATERIAL_SUBMITTED`，只有老师侧确认完成后才会触发下一节点。
+
+证据：
+
+- 实现文件：`backend/app/workflow/{models,state_machine,schemas,router,service}.py`、`miniapp/src/{api/workflow.ts,pages/workflow/detail.vue}`、`web/src/{api/workflow.ts,components/StatusTag.vue,views/workflow/PartyStageList.vue}`。
+- 回归样例：`backend/tests/integration/test_workflow_party_flow.py::test_official_party_template_can_start_and_advance`。
+- 验证：后端 `ruff check` 与 `py_compile` 通过；定向集成测试覆盖组织侧节点拒绝学生提交、`PARTY_BUILD_TEACHER` 在 scope 内发起/查看/确认组织侧节点、学生提交材料节点后由老师确认推进；Web `vue-tsc` 与 `pnpm -C web build` 通过；Miniapp `vue-tsc` 与 `pnpm -C miniapp build:mp-weixin` 通过。
+
+### S60 证明 PDF 信息学院品牌与中文字体修复
+
+- 细化文件：`docs/notes/refinements/2026-05-27-s60-proof-pdf-cjk-branding-fix.md`
+- 当前状态：`[x]` 已完成生产事实核查、Docker 字体补齐、ReportLab CJK fallback、模板品牌锁定测试和本地渲染验证。
+- [x] `S60.1` 核查生产数据库 `proof_templates`，确认默认证明模板当前内容为“中国人民大学信息学院”，未发现“社会学院”字样。
+- [x] `S60.2` 核查生产 backend 容器字体，确认当前无 Noto/WenQuanYi CJK 字体，ReportLab fallback 为 `Helvetica`。
+- [x] `S60.3` backend Docker 镜像安装 `fontconfig` 与 `fonts-noto-cjk`，并执行 `fc-cache -f`。
+- [x] `S60.4` ReportLab fallback 增加 `STSong-Light`，并在 Linux 缺 CJK 字体文件时直接使用 ReportLab CID fallback；ReportLab 字体候选避开 Noto CJK TTC，避免额外注册异常日志。
+- [x] `S60.5` 单元测试锁定证明模板信息学院品牌与 CJK fallback 行为。
+- [x] `S60.6` 本地生成证明 PDF 并渲染 PNG，确认中文可读且版头/正文/水印/落款均为信息学院。
+
+当前结论：
+
+- “社会学院”不是当前仓库种子或生产数据库证明模板内容；实际确认到的生产缺陷是容器缺少中文字体，导致 PDF 中文渲染异常，视觉上可能出现错误或不可读。
+- 修复后生产重建 backend 镜像即可获得 Noto CJK 字体；即便运行环境仍缺字体文件，ReportLab fallback 也不会退回 `Helvetica`，且不会直接尝试注册 Noto CJK TTC。
+
+证据：
+
+- 生产核查：`proof_templates` 中 `CERTIFICATE_IN_SCHOOL_V1` 的模板正文为“中国人民大学信息学院”；生产 backend 容器 `_register_reportlab_font()` 当前返回 `Helvetica`。
+- 实现文件：`backend/Dockerfile`、`backend/app/core/pdf_branding.py`、`backend/unit_tests/test_proof_template_engine.py`。
+- 本地视觉验证：`tmp/pdfs/proof-font-smoke.pdf` 渲染为 `tmp/pdfs/proof-font-smoke.png` 后中文正常显示。
+- 验证：后端 `ruff check`、`py_compile` 与 `unit_tests/test_proof_template_engine.py` 通过。
+
 ### S6 前端体验增量优化
 
 - [x] `S6.1` Web 共享导航与默认落点收口
@@ -1452,6 +1538,10 @@
 | 2026-05-26 | S54 小程序开发态本地接口自动回正 | `docs/notes/refinements/2026-05-26-s38-miniapp-dev-local-api-auto-reset.md` | `S54.1, S54.2, S54.3, S54.4` | `[x]` | 已在开发态强制回本地接口并自动清理旧 storage/token，无需再手动打开微信开发者工具控制台输入修正命令；miniapp vue-tsc 通过 |
 | 2026-05-26 | S55 默认示例模板开箱即有，同时保留管理端删改权 | `docs/notes/refinements/2026-05-26-s39-default-example-template-seed.md` | `S55.1, S55.2, S55.3, S55.4` | `[x]` | 已将 `常用模板/` 的 4 份标准模板接入默认数据链路，空模板库默认会自动导入模板资产、来源和关联知识条目；模板库非空时整批跳过，避免覆盖老师后续删改；模板下载回归 `1 passed`，本地学生端模板列表与下载接口 HTTP 复测通过 |
 | 2026-05-26 | S56 PR #4 融合与生产模板 seed 修复 | `docs/notes/refinements/2026-05-26-s56-pr4-fusion-template-seed-fix.md` | `S56.1, S56.2, S56.3, S56.4, S56.5, S56.6, S56.7` | `[x]` | 已融合 `origin/main` 与本地 `941ac06`，模板资产迁移到 `docs/source/common-templates/`，并修正生产容器模板路径、seed 预检和互测说明；GitHub Actions 部署成功，生产默认模板 seed 后 `template_assets=4`、`knowledge_entries=16`、`/healthz` 正常 |
+| 2026-05-26 | S57 生产证明 PDF 预览验证与使用说明校正 | `docs/notes/refinements/2026-05-26-s57-proof-preview-production-verification.md` | `S57.1, S57.2, S57.3, S57.4` | `[x]` | 已创建 `[验证]` 在读证明申请并确认 `DRAFT` / `SUBMITTED` 不可预览，`APPROVED` 后学生侧预览返回有效 PDF；使用说明已改为审批通过后开放预览，并记录生产缺少持久化 `COUNSELOR` 账号的验收前置条件 |
+| 2026-05-26 | S58 小程序党团流程当前节点状态展示修正 | `docs/notes/refinements/2026-05-26-s58-miniapp-workflow-current-node-status.md` | `S58.1, S58.2, S58.3, S58.4` | `[x]` | 已确认张念昊入党流程实际为 `ACTIVE` 且当前节点“教育引导”已触发；修正小程序流程详情页，将当前或已触发的 `PENDING` 节点显示为“进行中”，未触发后续节点仍显示“待开始”；Miniapp 类型检查与 `mp-weixin` 构建通过 |
+| 2026-05-26 | S59 党团流程学生提交材料与老师确认推进闭环 | `docs/notes/refinements/2026-05-26-s59-workflow-student-material-submit.md` | `S59.1, S59.2, S59.3, S59.4, S59.5` | `[x]` | 已新增学生提交材料接口、`MATERIAL_SUBMITTED` 状态和 `student_material_required` 节点判定；小程序只对确需学生材料的节点展示提交入口，组织侧节点提示等待老师或支部处理；Web 老师端可查看材料或识别无需学生提交节点，并确认完成推进下一节点；后端与双端验证通过 |
+| 2026-05-27 | S60 证明 PDF 信息学院品牌与中文字体修复 | `docs/notes/refinements/2026-05-27-s60-proof-pdf-cjk-branding-fix.md` | `S60.1, S60.2, S60.3, S60.4, S60.5, S60.6` | `[x]` | 已确认生产证明模板正文是信息学院，定位生产中文渲染异常根因为 backend 容器缺 CJK 字体并回退 Helvetica；Docker 镜像补 `fonts-noto-cjk`，ReportLab fallback 改为 `STSong-Light`，并用单元测试和本地 PDF 渲染锁定中文可读与信息学院品牌 |
 
 ## 会话更新要求
 

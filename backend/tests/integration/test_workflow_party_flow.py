@@ -236,10 +236,20 @@ async def test_official_party_template_can_start_and_advance(
     second_state = node_states["PARTY_02_RECEIVE_APPLICATION_TALK"]
     assert first_state["triggered_at"] is not None
     assert second_state["triggered_at"] is None
+    assert first_state["student_material_required"] is False
+    assert second_state["student_material_required"] is True
+
+    rejected_submit = await client.post(
+        f"/api/v1/workflow/node-states/{first_state['id']}/submit",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"evidence": "已完成教育引导材料说明"},
+    )
+    assert rejected_submit.status_code == 400, rejected_submit.text
+    assert rejected_submit.json()["code"] == 40032
 
     complete = await admin_client.post(
         f"/api/v1/admin/workflow/node-states/{first_state['id']}/complete",
-        json={"evidence": "已完成教育引导"},
+        json={"evidence": "已完成教育引导", "note": "老师确认完成"},
     )
     assert complete.status_code == 200, complete.text
     advanced = complete.json()["data"]
@@ -248,12 +258,117 @@ async def test_official_party_template_can_start_and_advance(
     assert advanced_nodes["PARTY_01_EDUCATION_GUIDANCE"]["status"] == "DONE"
     assert advanced_nodes["PARTY_02_RECEIVE_APPLICATION_TALK"]["triggered_at"] is not None
 
+    submit_application = await client.post(
+        f"/api/v1/workflow/node-states/{second_state['id']}/submit",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"evidence": "入党申请书已提交", "note": "等待谈话安排"},
+    )
+    assert submit_application.status_code == 200, submit_application.text
+    submitted = submit_application.json()["data"]
+    submitted_nodes = {node["node_code"]: node for node in submitted["nodes"]}
+    assert submitted_nodes["PARTY_02_RECEIVE_APPLICATION_TALK"]["status"] == "MATERIAL_SUBMITTED"
+    assert submitted_nodes["PARTY_02_RECEIVE_APPLICATION_TALK"]["evidence"] == "入党申请书已提交"
+
     mine = await client.get(
         "/api/v1/workflow/my",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert mine.status_code == 200, mine.text
     assert mine.json()["data"][0]["template_code"] == "PARTY_DEVELOPMENT_OFFICIAL_V2"
+
+
+async def test_scoped_party_teacher_can_process_official_workflow_nodes(
+    client: AsyncClient, db: AsyncSession,
+) -> None:
+    student_token, student_id = await _login_as_student(
+        client, db, student_no="W00030", wx_code="wx_w00030",
+    )
+    teacher_token = await _create_role_token(
+        db,
+        work_no="WFPARTY01",
+        role_code="PARTY_BUILD_TEACHER",
+        scope_code="CLASS:CS2201",
+    )
+    teacher_headers = {"Authorization": f"Bearer {teacher_token}"}
+
+    start = await client.post(
+        "/api/v1/admin/workflow/students",
+        headers=teacher_headers,
+        json={
+            "student_id": student_id,
+            "template_code": "PARTY_DEVELOPMENT_OFFICIAL_V2",
+            "note": "党务老师发起",
+        },
+    )
+    assert start.status_code == 200, start.text
+    started = start.json()["data"]
+    node_states = {node["node_code"]: node for node in started["nodes"]}
+    first_state = node_states["PARTY_01_EDUCATION_GUIDANCE"]
+    second_state = node_states["PARTY_02_RECEIVE_APPLICATION_TALK"]
+
+    listed = await client.get(
+        "/api/v1/admin/workflow/students",
+        headers=teacher_headers,
+        params={"student_no": "W00030", "template_code": "PARTY_DEVELOPMENT_OFFICIAL_V2"},
+    )
+    assert listed.status_code == 200, listed.text
+    listed_items = listed.json()["data"]["items"]
+    assert len(listed_items) == 1
+    assert listed_items[0]["current_node_name"] == "教育引导"
+    assert listed_items[0]["current_node_state_id"] == first_state["id"]
+    assert listed_items[0]["current_node_student_material_required"] is False
+
+    complete_org_node = await client.post(
+        f"/api/v1/admin/workflow/node-states/{first_state['id']}/complete",
+        headers=teacher_headers,
+        json={"note": "教育引导已完成"},
+    )
+    assert complete_org_node.status_code == 200, complete_org_node.text
+    after_org = complete_org_node.json()["data"]
+    assert after_org["current_node_name"] == "接收入党申请书并派人谈话"
+
+    listed_after_org = await client.get(
+        "/api/v1/admin/workflow/students",
+        headers=teacher_headers,
+        params={"student_no": "W00030", "template_code": "PARTY_DEVELOPMENT_OFFICIAL_V2"},
+    )
+    assert listed_after_org.status_code == 200, listed_after_org.text
+    current_item = listed_after_org.json()["data"]["items"][0]
+    assert current_item["current_node_state_id"] == second_state["id"]
+    assert current_item["current_node_student_material_required"] is True
+    assert current_item["current_node_evidence"] is None
+
+    submit_application = await client.post(
+        f"/api/v1/workflow/node-states/{second_state['id']}/submit",
+        headers={"Authorization": f"Bearer {student_token}"},
+        json={"evidence": "入党申请书已提交", "note": "请老师确认"},
+    )
+    assert submit_application.status_code == 200, submit_application.text
+
+    listed_after_submit = await client.get(
+        "/api/v1/admin/workflow/students",
+        headers=teacher_headers,
+        params={"student_no": "W00030", "template_code": "PARTY_DEVELOPMENT_OFFICIAL_V2"},
+    )
+    assert listed_after_submit.status_code == 200, listed_after_submit.text
+    submitted_item = listed_after_submit.json()["data"]["items"][0]
+    assert submitted_item["current_node_status"] == "MATERIAL_SUBMITTED"
+    assert submitted_item["current_node_evidence"] == "入党申请书已提交"
+
+    complete_material_node = await client.post(
+        f"/api/v1/admin/workflow/node-states/{second_state['id']}/complete",
+        headers=teacher_headers,
+        json={"note": "申请书已核验，进入备案"},
+    )
+    assert complete_material_node.status_code == 200, complete_material_node.text
+    after_material = complete_material_node.json()["data"]
+    assert after_material["current_node_name"] == "确定入党积极分子并报党委备案"
+    after_material_nodes = {node["node_code"]: node for node in after_material["nodes"]}
+    assert after_material_nodes["PARTY_02_RECEIVE_APPLICATION_TALK"]["status"] == "DONE"
+    assert (
+        after_material_nodes["PARTY_02_RECEIVE_APPLICATION_TALK"]["evidence"]
+        == "入党申请书已提交"
+    )
 
 
 async def test_party_template_upsert_start_complete_workflow(

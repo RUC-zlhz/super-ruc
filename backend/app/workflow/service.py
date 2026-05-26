@@ -14,7 +14,14 @@ from app.auth.models import Student
 from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES, normalize_role_codes
 from app.auth.scopes import StudentScopeSet, split_student_scope_codes, student_in_scope
 from app.core.config import settings
-from app.core.exceptions import BizError, ConflictError, NotFoundError
+from app.core.exceptions import (
+    BizError,
+    ConflictError,
+    NotFoundError,
+)
+from app.core.exceptions import (
+    PermissionError as AppPermissionError,
+)
 from app.core.storage import put_object
 from app.notice import repository as notice_repo
 from app.notice.models import (
@@ -47,6 +54,7 @@ from app.workflow.models import (
     REQUEST_STATUS_SUBMITTED,
     WORKFLOW_NODE_DONE,
     WORKFLOW_NODE_MANUAL,
+    WORKFLOW_NODE_MATERIAL_SUBMITTED,
     WORKFLOW_NODE_OVERDUE,
     WORKFLOW_NODE_PENDING,
     ProofTemplate,
@@ -108,6 +116,54 @@ _WORKFLOW_SCOPED_ROLES = {
     "PARTY_BUILD_TEACHER",
     *ROLE_CODE_COLLABORATOR_ROLES,
 }
+
+_STUDENT_MATERIAL_REQUIRED_NODE_CODES = frozenset(
+    {
+        "APPLY_SUBMIT",
+        "PARTY_SCHOOL",
+        "POLITICAL_REVIEW",
+        "PARTY_02_RECEIVE_APPLICATION_TALK",
+        "PARTY_05_INSPECTION",
+        "PARTY_10_SHORT_TRAINING",
+        "PARTY_23_SUBMIT_FULL_MEMBER_APPLICATION",
+        "LEAGUE_APPLY",
+        "LEAGUE_LECTURE",
+        "YOUTH_01_SUBMIT_APPLICATION",
+        "YOUTH_10_FILL_APPLICATION_FORM",
+    }
+)
+
+_STUDENT_MATERIAL_TASK_MARKERS = (
+    "学生提交",
+    "学生递交",
+    "提交入党申请书",
+    "递交入党申请书",
+    "提交入团申请书",
+    "递交入团申请书",
+    "提交转正申请书",
+    "递交转正申请书",
+    "提交思想汇报",
+    "递交思想汇报",
+    "提交书面申请",
+    "提交申请",
+    "填写入团志愿书",
+    "上传材料",
+    "提交材料",
+    "补交材料",
+    "补充材料",
+    "提交证明",
+    "提交结业证",
+)
+
+
+def _is_student_material_required(node: WorkflowNode | None) -> bool:
+    if node is None:
+        return False
+    code = (node.code or "").strip().upper()
+    if code in _STUDENT_MATERIAL_REQUIRED_NODE_CODES:
+        return True
+    text = f"{node.name or ''} {node.required_task or ''}"
+    return any(marker in text for marker in _STUDENT_MATERIAL_TASK_MARKERS)
 
 
 # ======================================================================
@@ -208,6 +264,7 @@ def _node_state_to_out(state: StudentWorkflowNode) -> StudentWorkflowNodeOut:
         sort_order=n.sort_order,
         stage_group=n.stage_group,
         required_task=n.required_task,
+        student_material_required=_is_student_material_required(n),
         status=state.status,
         triggered_at=state.triggered_at,
         due_date=state.due_date,
@@ -549,6 +606,58 @@ async def list_my_workflows(
     return [_workflow_to_detail(r) for r in rows]
 
 
+async def submit_node_material(
+    db: AsyncSession,
+    *,
+    state_id: int,
+    evidence: str,
+    note: str | None,
+    operator_id: int,
+    student_id: int | None,
+) -> StudentWorkflowDetail:
+    if student_id is None:
+        raise AppPermissionError("仅绑定学生可提交党团流程材料", code=40305)
+    state = await repo.get_student_node_state(db, state_id)
+    if state is None:
+        raise NotFoundError("节点状态不存在")
+    sw = state.workflow
+    if sw.student_id != student_id:
+        raise AppPermissionError("只能提交本人流程的当前节点材料", code=40306)
+    if sw.status != "ACTIVE":
+        raise ConflictError("该流程当前不可提交材料")
+    if sw.current_node_id != state.node_id:
+        raise BizError("只能提交当前节点材料", code=40031)
+    if state.status == WORKFLOW_NODE_DONE:
+        raise ConflictError("节点已完成，不能重复提交材料", code=40916)
+    if not _is_student_material_required(state.node):
+        raise BizError("当前节点无需学生提交材料，请等待老师或支部处理", code=40032)
+
+    submitted = datetime.now(UTC)
+    state.status = WORKFLOW_NODE_MATERIAL_SUBMITTED
+    state.evidence = evidence.strip()
+    state.note = note.strip() if note else None
+    if state.triggered_at is None:
+        state.triggered_at = submitted
+
+    await log_action(
+        db,
+        event_type="WORKFLOW",
+        entity_code="STUDENT_WORKFLOW_NODE",
+        action="SUBMIT_MATERIAL",
+        entity_id=state.id,
+        actor_user_id=operator_id,
+        actor_role="STUDENT",
+        detail=build_audit_detail(
+            target={"workflow_id": sw.id, "state_id": state.id, "node_id": state.node_id},
+            metrics={"has_note": bool(state.note)},
+        ),
+    )
+    await db.commit()
+    full = await repo.get_student_workflow(db, sw.id)
+    assert full is not None
+    return _workflow_to_detail(full)
+
+
 async def complete_node(
     db: AsyncSession,
     state_id: int,
@@ -573,8 +682,10 @@ async def complete_node(
     state.status = WORKFLOW_NODE_DONE
     state.completed_at = datetime.now(UTC)
     state.completed_by = operator_id
-    state.evidence = evidence
-    state.note = note
+    if evidence is not None:
+        state.evidence = evidence
+    if note is not None:
+        state.note = note
     cancelled = await _cancel_unsent_reminders_for_state(
         db,
         state_id=state.id,
@@ -711,8 +822,14 @@ async def list_admin_workflows(
                 student_name=stu.full_name if stu else None,
                 template_code=sw.template.code,
                 template_name=sw.template.name,
+                current_node_state_id=cur_state.id if cur_state else None,
                 current_node_name=cur_state.node.name if cur_state and cur_state.node else None,
                 current_node_status=cur_state.status if cur_state else None,
+                current_node_student_material_required=_is_student_material_required(
+                    cur_state.node if cur_state else None
+                ),
+                current_node_evidence=cur_state.evidence if cur_state else None,
+                current_node_note=cur_state.note if cur_state else None,
                 due_date=cur_state.due_date if cur_state else None,
             )
         )

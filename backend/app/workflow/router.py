@@ -60,6 +60,7 @@ from app.workflow.schemas import (
     RequestTypeIn,
     RequestTypeOut,
     RequestUpdate,
+    StudentNodeSubmitIn,
     StudentWorkflowBrief,
     StudentWorkflowDetail,
     StudentWorkflowStart,
@@ -117,6 +118,28 @@ async def get_workflow(
         db, workflow_id, user.user_id, user.student_id, user.roles
     )
     return ok(detail)
+
+
+@router.post(
+    "/node-states/{state_id}/submit",
+    response_model=ApiResponse[StudentWorkflowDetail],
+)
+async def submit_node_material(
+    state_id: int,
+    payload: StudentNodeSubmitIn,
+    db: DBDep,
+    user: ActiveStudentDep,
+) -> ApiResponse[StudentWorkflowDetail]:
+    return ok(
+        await service.submit_node_material(
+            db,
+            state_id=state_id,
+            evidence=payload.evidence,
+            note=payload.note,
+            operator_id=user.user_id,
+            student_id=user.student_id,
+        )
+    )
 
 
 @router.get("/public/templates", response_model=ApiResponse[list[WorkflowTemplateOut]])

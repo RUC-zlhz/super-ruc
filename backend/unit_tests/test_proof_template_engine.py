@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 import pytest
 
 from app.auth.models import Student
+from app.core import pdf_branding
 from app.core.exceptions import BizError
 from app.workflow.models import REQUEST_STATUS_APPROVED, ProofTemplate, Request, RequestType
 from app.workflow.pdf_generator import (
@@ -18,6 +19,7 @@ from app.workflow.pdf_generator import (
     render_template_html,
     validate_template_placeholders,
 )
+from scripts.seed.proof_templates import _IN_SCHOOL_TEMPLATE
 
 
 def _certificate_request() -> Request:
@@ -122,3 +124,22 @@ def test_render_proof_html_uses_request_type_and_approval_context() -> None:
     assert "2024000001 CERT-260524-UNIT" in html
     assert "2026-05-20 2026-05-23" in html
     assert "同意开具" in html
+
+
+def test_default_proof_template_is_information_school_branded() -> None:
+    assert "中国人民大学信息学院" in _IN_SCHOOL_TEMPLATE
+    assert "社会学院" not in _IN_SCHOOL_TEMPLATE
+    assert "社会与人口学院" not in _IN_SCHOOL_TEMPLATE
+
+
+def test_reportlab_font_fallback_uses_cjk_cid_font(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(pdf_branding.Path, "exists", lambda _path: False)
+
+    assert pdf_branding._has_cjk_font_file() is False
+    assert pdf_branding._register_reportlab_font() == "STSong-Light"
+
+
+def test_reportlab_ttf_candidates_skip_noto_cjk_ttc() -> None:
+    candidates = "\n".join(str(path) for path in pdf_branding._REPORTLAB_TTF_FONT_CANDIDATES)
+
+    assert "NotoSansCJK" not in candidates

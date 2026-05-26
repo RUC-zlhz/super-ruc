@@ -6,7 +6,7 @@ A. 党团流程（FR-004/005）
 - WorkflowTemplate: 流程定义（党员发展 / 团员管理 等）
 - WorkflowNode: 阶段节点（顺序、触发条件、到期规则、提醒规则）
 - StudentWorkflow: 学生的流程实例（继承自 WorkflowTemplate 的一次运行）
-- StudentWorkflowNode: 学生在某节点的状态（PENDING/DONE/OVERDUE/DEFERRED）
+- StudentWorkflowNode: 学生在某节点的状态（PENDING/MATERIAL_SUBMITTED/DONE/OVERDUE/DEFERRED）
 - WorkflowReminder: 提醒记录（待推送或已推送）
 
 B. 常见事务申请（FR-006/007/008）
@@ -48,6 +48,7 @@ WORKFLOW_KIND_PARTY = "PARTY"
 WORKFLOW_KIND_YOUTH = "YOUTH_LEAGUE"
 
 WORKFLOW_NODE_PENDING = "PENDING"
+WORKFLOW_NODE_MATERIAL_SUBMITTED = "MATERIAL_SUBMITTED"
 WORKFLOW_NODE_DONE = "DONE"
 WORKFLOW_NODE_OVERDUE = "OVERDUE"
 WORKFLOW_NODE_DEFERRED = "DEFERRED"

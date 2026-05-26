@@ -20,6 +20,20 @@ DARK_RED = "#7f1022"
 INK = "#1f2933"
 MUTED = "#667085"
 
+_CJK_FONT_CANDIDATES = (
+    Path(r"C:\Windows\Fonts\msyh.ttc"),
+    Path(r"C:\Windows\Fonts\simsun.ttc"),
+    Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+    Path("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"),
+    Path("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"),
+)
+
+_REPORTLAB_TTF_FONT_CANDIDATES = (
+    Path(r"C:\Windows\Fonts\msyh.ttc"),
+    Path(r"C:\Windows\Fonts\simsun.ttc"),
+    Path("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"),
+)
+
 
 @lru_cache(maxsize=8)
 def _asset_data_uri(filename: str, mime_type: str) -> str:
@@ -304,6 +318,9 @@ def official_document_html(
 def html_to_pdf_bytes(html_text: str) -> bytes:
     if os.name == "nt":
         return _reportlab_pdf_bytes(html_text)
+    if not _has_cjk_font_file():
+        logger.warning("CJK font file unavailable; using reportlab CID fallback")
+        return _reportlab_pdf_bytes(html_text)
     try:
         from weasyprint import HTML  # type: ignore
     except Exception as exc:  # noqa: BLE001
@@ -313,6 +330,10 @@ def html_to_pdf_bytes(html_text: str) -> bytes:
     buf = io.BytesIO()
     HTML(string=html_text).write_pdf(buf)
     return buf.getvalue()
+
+
+def _has_cjk_font_file() -> bool:
+    return any(path.exists() for path in _CJK_FONT_CANDIDATES)
 
 
 class _PlainTextExtractor(HTMLParser):
@@ -355,16 +376,10 @@ class _PlainTextExtractor(HTMLParser):
 
 def _register_reportlab_font() -> str:
     from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
     from reportlab.pdfbase.ttfonts import TTFont
 
-    candidates = [
-        Path(r"C:\Windows\Fonts\msyh.ttc"),
-        Path(r"C:\Windows\Fonts\simsun.ttc"),
-        Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
-        Path("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"),
-        Path("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"),
-    ]
-    for path in candidates:
+    for path in _REPORTLAB_TTF_FONT_CANDIDATES:
         if not path.exists():
             continue
         try:
@@ -372,6 +387,11 @@ def _register_reportlab_font() -> str:
             return "SIP-CJK"
         except Exception:  # noqa: BLE001
             logger.warning("failed to register PDF font: %s", path, exc_info=True)
+    try:
+        pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
+        return "STSong-Light"
+    except Exception:  # noqa: BLE001
+        logger.warning("failed to register built-in PDF CID font", exc_info=True)
     return "Helvetica"
 
 

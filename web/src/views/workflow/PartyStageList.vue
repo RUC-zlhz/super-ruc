@@ -144,8 +144,30 @@
             <template v-if="column.key === 'status'">
               <StatusTag :status="record.current_node_status || 'PENDING'" />
             </template>
+            <template v-else-if="column.key === 'material'">
+              <div class="material-cell">
+                <template v-if="record.current_node_student_material_required">
+                  <span>{{ record.current_node_evidence || '待学生提交' }}</span>
+                  <small v-if="record.current_node_note">{{ record.current_node_note }}</small>
+                </template>
+                <template v-else>
+                  <span>无需学生提交</span>
+                  <small>老师可直接确认</small>
+                </template>
+              </div>
+            </template>
             <template v-else-if="column.key === 'due_date'">
               {{ record.due_date || '-' }}
+            </template>
+            <template v-else-if="column.key === 'actions'">
+              <a-button
+                size="small"
+                type="primary"
+                :disabled="!record.current_node_state_id || record.current_node_status === 'DONE'"
+                @click="confirmCompleteCurrentNode(record)"
+              >
+                确认完成
+              </a-button>
             </template>
           </template>
         </a-table>
@@ -643,7 +665,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import {
   BellOutlined,
   BranchesOutlined,
@@ -661,6 +683,7 @@ import StatusTag from '@/components/StatusTag.vue'
 import { useAuthStore } from '@/store/auth'
 import { hasAnyRole } from '@/utils/permission'
 import {
+  completeWorkflowNode,
   executeWorkflowReminderRun,
   listWorkflowReminderRecords,
   listWorkflowReminderRuns,
@@ -865,7 +888,9 @@ const flowCols = [
   { title: '模板', dataIndex: 'template_name', key: 'template_name', width: 220 },
   { title: '当前节点', dataIndex: 'current_node_name', key: 'current_node_name' },
   { title: '节点状态', key: 'status', width: 120 },
+  { title: '学生提交材料', key: 'material', width: 260 },
   { title: '到期日', key: 'due_date', width: 140 },
+  { title: '操作', key: 'actions', width: 120 },
 ]
 
 const reminderCols = [
@@ -1135,6 +1160,28 @@ async function reloadStudentFlows() {
   }
 }
 
+function confirmCompleteCurrentNode(record: Partial<WorkflowStudentBrief>) {
+  if (!record.current_node_state_id) {
+    message.warning('当前流程没有可确认的节点')
+    return
+  }
+  Modal.confirm({
+    title: '确认完成当前节点',
+    content: `确认将 ${record.student_name || record.student_no || '该学生'} 的“${record.current_node_name || '当前节点'}”标记为已完成，并推进到下一节点？`,
+    okText: '确认完成',
+    cancelText: '取消',
+    async onOk() {
+      await completeWorkflowNode(record.current_node_state_id as number, {
+        evidence: record.current_node_evidence || undefined,
+        note: record.current_node_note || '老师确认完成',
+      })
+      message.success('节点已完成，流程已推进')
+      await reloadStudentFlows()
+      await loadReminderRecords()
+    },
+  })
+}
+
 function resetFlowFilters() {
   flowFilters.student_no = undefined
   flowFilters.template_code = undefined
@@ -1386,6 +1433,7 @@ onMounted(async () => {
 }
 
 .metric-icon {
+  position: static;
   display: inline-grid;
   width: 42px;
   height: 42px;
@@ -1721,6 +1769,23 @@ onMounted(async () => {
 
 :deep(.selected-start-student-row > td) {
   background: #fff8ed !important;
+}
+
+.material-cell {
+  display: grid;
+  gap: 4px;
+  max-width: 260px;
+}
+
+.material-cell span,
+.material-cell small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.material-cell small {
+  color: var(--text-3);
 }
 
 .mb16 {

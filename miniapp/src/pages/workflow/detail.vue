@@ -49,11 +49,11 @@
             <text class="section-title">下一步需要完成</text>
             <text class="section-subtitle">聚焦当前节点任务、说明和材料提示</text>
           </view>
-          <text class="next-status">{{ currentNode ? nodeStatusLabel(currentNode.status) : "待同步" }}</text>
+          <text class="next-status">{{ currentNode ? nodeStatusLabel(currentNode) : "待同步" }}</text>
         </view>
 
         <text class="next-main">
-          {{ workflow.next_action_hint || currentNode?.required_task || "当前暂无额外待办说明" }}
+          {{ currentActionText }}
         </text>
 
         <view class="progress-track">
@@ -86,6 +86,37 @@
             <text class="next-value">{{ currentNode.evidence }}</text>
           </view>
         </view>
+
+        <view v-if="canSubmitMaterial" class="material-panel">
+          <text class="material-title">提交当前节点材料</text>
+          <textarea
+            v-model="materialText"
+            class="material-input"
+            maxlength="2000"
+            placeholder="填写已完成事项、材料链接或简要说明"
+            auto-height
+          />
+          <textarea
+            v-model="materialNote"
+            class="material-input note"
+            maxlength="1000"
+            placeholder="补充说明（可选）"
+            auto-height
+          />
+          <view
+            class="material-submit"
+            :class="{ disabled: materialSubmitting }"
+            hover-class="hover-opacity"
+            @tap="submitMaterial"
+          >
+            {{ materialSubmitting ? "提交中" : materialSubmitText }}
+          </view>
+          <text class="material-hint">提交后由老师确认，确认完成后才会进入下一节点。</text>
+        </view>
+        <view v-else-if="isTeacherHandledCurrentNode" class="material-wait-panel">
+          <text class="material-title">无需学生提交材料</text>
+          <text class="material-hint">该节点由老师或支部处理，请等待进度更新。</text>
+        </view>
       </view>
 
       <view class="section">
@@ -104,15 +135,15 @@
             :class="{ current: currentNode?.id === node.id }"
           >
             <view class="node-rail">
-              <view class="node-dot" :class="nodeDotClass(node.status)" />
+              <view class="node-dot" :class="nodeDotClass(node)" />
               <view v-if="index < nodes.length - 1" class="node-line" />
             </view>
 
             <view class="node-body">
               <view class="node-head">
                 <text class="node-name">{{ node.node_name }}</text>
-                <text class="node-status" :class="node.status.toLowerCase()">
-                  {{ nodeStatusLabel(node.status) }}
+                <text class="node-status" :class="nodeStatusClass(node)">
+                  {{ nodeStatusLabel(node) }}
                 </text>
               </view>
               <text class="node-code">节点编码：{{ node.node_code }}</text>
@@ -136,7 +167,7 @@
         <view class="bottom-copy">
           <text class="bottom-title">{{ currentNode?.node_name || "当前待办" }}</text>
           <text class="bottom-desc">
-            {{ workflow.next_action_hint || "查看当前节点详情并及时准备材料。" }}
+            {{ currentActionText }}
           </text>
         </view>
         <view class="bottom-button" hover-class="hover-opacity" @tap="scrollToCurrentTask">查看待办</view>
@@ -163,6 +194,7 @@ import { onPullDownRefresh } from "@dcloudio/uni-app";
 import EmptyState from "@/components/EmptyState.vue";
 import {
   getWorkflowDetail,
+  submitWorkflowNodeMaterial,
   type StudentWorkflow,
   type StudentWorkflowNode,
 } from "@/api/workflow";
@@ -171,6 +203,9 @@ const workflow = ref<StudentWorkflow | null>(null);
 const nodes = ref<StudentWorkflowNode[]>([]);
 const loading = ref(false);
 const workflowId = ref<number | null>(null);
+const materialText = ref("");
+const materialNote = ref("");
+const materialSubmitting = ref(false);
 
 function goBack() {
   uni.navigateBack({ delta: 1 })
@@ -186,6 +221,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const NODE_STATUS_LABELS: Record<string, string> = {
   PENDING: "待开始",
+  MATERIAL_SUBMITTED: "待老师确认",
   DONE: "已完成",
   OVERDUE: "已逾期",
   DEFERRED: "已延期",
@@ -194,6 +230,7 @@ const NODE_STATUS_LABELS: Record<string, string> = {
 
 const currentNode = computed(() => {
   return (
+    nodes.value.find((node) => node.node_id === workflow.value?.current_node_id) ||
     nodes.value.find((node) => node.status !== "DONE") ||
     nodes.value[nodes.value.length - 1] ||
     null
@@ -207,18 +244,65 @@ const progressPercent = computed(() => {
   return Math.round((doneCount.value / nodes.value.length) * 100);
 });
 
+const canSubmitMaterial = computed(() => {
+  if (!isActiveCurrentNode.value || !currentNode.value) return false;
+  return currentNode.value.student_material_required === true;
+});
+
+const isActiveCurrentNode = computed(() => {
+  if (!workflow.value || !currentNode.value) return false;
+  return (
+    workflow.value.status === "ACTIVE" &&
+    currentNode.value.node_id === workflow.value.current_node_id &&
+    currentNode.value.status !== "DONE"
+  );
+});
+
+const isTeacherHandledCurrentNode = computed(() => {
+  if (!isActiveCurrentNode.value || !currentNode.value) return false;
+  return currentNode.value.student_material_required !== true;
+});
+
+const currentActionText = computed(() => {
+  const explicit = workflow.value?.next_action_hint || currentNode.value?.required_task;
+  if (explicit) return explicit;
+  if (isTeacherHandledCurrentNode.value) {
+    return "该节点由老师或支部处理，无需学生提交材料；请等待进度更新。";
+  }
+  return "当前暂无额外待办说明";
+});
+
+const materialSubmitText = computed(() =>
+  currentNode.value?.status === "MATERIAL_SUBMITTED" ? "更新材料" : "提交材料",
+);
+
 function statusLabel(status: string) {
   return STATUS_LABELS[status] || status;
 }
 
-function nodeStatusLabel(status: string) {
-  return NODE_STATUS_LABELS[status] || status;
+function isTriggeredPendingNode(node: StudentWorkflowNode) {
+  return (
+    node.status === "PENDING" &&
+    (!!node.triggered_at || node.node_id === workflow.value?.current_node_id)
+  );
 }
 
-function nodeDotClass(status: string) {
-  if (status === "DONE") return "completed";
-  if (status === "OVERDUE") return "overdue";
-  if (status === "DEFERRED" || status === "MANUAL_FOLLOW_UP") return "manual";
+function nodeStatusLabel(node: StudentWorkflowNode) {
+  if (isTriggeredPendingNode(node)) return "进行中";
+  return NODE_STATUS_LABELS[node.status] || node.status;
+}
+
+function nodeStatusClass(node: StudentWorkflowNode) {
+  if (isTriggeredPendingNode(node)) return "in-progress";
+  return node.status.toLowerCase();
+}
+
+function nodeDotClass(node: StudentWorkflowNode) {
+  if (isTriggeredPendingNode(node)) return "in-progress";
+  if (node.status === "MATERIAL_SUBMITTED") return "submitted";
+  if (node.status === "DONE") return "completed";
+  if (node.status === "OVERDUE") return "overdue";
+  if (node.status === "DEFERRED" || node.status === "MANUAL_FOLLOW_UP") return "manual";
   return "pending";
 }
 
@@ -235,6 +319,37 @@ function scrollToCurrentTask() {
   });
 }
 
+function syncMaterialForm() {
+  materialText.value = currentNode.value?.evidence || "";
+  materialNote.value = currentNode.value?.note || "";
+}
+
+async function submitMaterial() {
+  if (materialSubmitting.value) return;
+  if (!currentNode.value || !canSubmitMaterial.value) return;
+  const evidence = materialText.value.trim();
+  const note = materialNote.value.trim();
+  if (!evidence) {
+    uni.showToast({ title: "请填写材料说明", icon: "none" });
+    return;
+  }
+  materialSubmitting.value = true;
+  try {
+    const response = await submitWorkflowNodeMaterial(currentNode.value.id, {
+      evidence,
+      note: note || null,
+    });
+    workflow.value = response.data;
+    nodes.value = response.data.nodes || [];
+    syncMaterialForm();
+    uni.showToast({ title: "已提交待老师确认", icon: "success" });
+  } catch {
+    uni.showToast({ title: "提交失败，请稍后重试", icon: "none" });
+  } finally {
+    materialSubmitting.value = false;
+  }
+}
+
 async function loadDetail() {
   if (workflowId.value == null) return;
   loading.value = true;
@@ -242,9 +357,12 @@ async function loadDetail() {
     const response = await getWorkflowDetail(workflowId.value);
     workflow.value = response.data;
     nodes.value = response.data.nodes || [];
+    syncMaterialForm();
   } catch {
     workflow.value = null;
     nodes.value = [];
+    materialText.value = "";
+    materialNote.value = "";
   } finally {
     loading.value = false;
   }
@@ -494,6 +612,72 @@ onPullDownRefresh(async () => {
   color: #334155;
 }
 
+.material-panel {
+  margin-top: 22rpx;
+  padding: 20rpx;
+  border-radius: 22rpx;
+  background: #fff8f9;
+  border: 1rpx solid #f0c9cf;
+}
+
+.material-wait-panel {
+  margin-top: 22rpx;
+  padding: 20rpx;
+  border-radius: 22rpx;
+  background: #f8fafc;
+  border: 1rpx solid #e2e8f0;
+}
+
+.material-title {
+  display: block;
+  font-size: 25rpx;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.material-input {
+  width: 100%;
+  min-height: 128rpx;
+  box-sizing: border-box;
+  margin-top: 16rpx;
+  padding: 18rpx;
+  border-radius: 18rpx;
+  background: #fff;
+  border: 1rpx solid #f1e6e8;
+  color: #334155;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.material-input.note {
+  min-height: 88rpx;
+}
+
+.material-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 18rpx;
+  min-height: 76rpx;
+  border-radius: 999rpx;
+  background: #b70f24;
+  color: #fff;
+  font-size: 26rpx;
+  font-weight: 800;
+}
+
+.material-submit.disabled {
+  opacity: 0.65;
+}
+
+.material-hint {
+  display: block;
+  margin-top: 12rpx;
+  color: #94a3b8;
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
 .timeline {
   margin-top: 22rpx;
 }
@@ -539,6 +723,16 @@ onPullDownRefresh(async () => {
 .node-dot.manual {
   background: #f59e0b;
   border-color: #f59e0b;
+}
+
+.node-dot.in-progress {
+  background: #b70f24;
+  border-color: #b70f24;
+}
+
+.node-dot.submitted {
+  background: #2563eb;
+  border-color: #2563eb;
 }
 
 .node-dot.pending {
@@ -599,6 +793,18 @@ onPullDownRefresh(async () => {
 .node-status.manual_follow_up {
   background: #fff7ed;
   color: #c2410c;
+}
+
+.node-status.in-progress {
+  background: #fff1f2;
+  color: #b70f24;
+  font-weight: 700;
+}
+
+.node-status.material_submitted {
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 700;
 }
 
 .node-status.pending {

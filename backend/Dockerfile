@@ -27,11 +27,14 @@ RUN sed -i \
     apt-get update \
     && apt-get install -y --no-install-recommends \
         curl \
+        fontconfig \
+        fonts-noto-cjk \
         libcairo2 \
         libgdk-pixbuf-2.0-0 \
         libpango-1.0-0 \
         libpangoft2-1.0-0 \
         shared-mime-info \
+    && fc-cache -f \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml README.md ./

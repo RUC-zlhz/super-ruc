@@ -33,6 +33,7 @@ from app.workflow.models import (
     REQUEST_STATUS_SUBMITTED,
     REQUEST_STATUS_WITHDRAWN,
     WORKFLOW_NODE_DONE,
+    WORKFLOW_NODE_MATERIAL_SUBMITTED,
     WORKFLOW_NODE_OVERDUE,
     WORKFLOW_NODE_PENDING,
 )
@@ -171,7 +172,13 @@ class ApprovalStateMachine:
 # 节点（StudentWorkflowNode）状态机
 # =====================================================================
 _NODE_MANUAL_STATUSES: frozenset[str] = frozenset(
-    {"DEFERRED", "MANUAL_FOLLOW_UP", WORKFLOW_NODE_PENDING, WORKFLOW_NODE_OVERDUE}
+    {
+        "DEFERRED",
+        "MANUAL_FOLLOW_UP",
+        WORKFLOW_NODE_PENDING,
+        WORKFLOW_NODE_MATERIAL_SUBMITTED,
+        WORKFLOW_NODE_OVERDUE,
+    }
 )
 
 

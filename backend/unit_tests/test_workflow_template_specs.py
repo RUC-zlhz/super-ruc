@@ -13,6 +13,9 @@ def test_official_workflow_template_specs_are_complete() -> None:
     assert party.name == "发展党员工作程序（官方29步）"
     assert len(party.nodes) == 29
     assert party.nodes[0].name == "教育引导"
+    assert party.nodes[0].required_task is None
+    assert party.nodes[1].required_task == "提交入党申请书；后续谈话由党组织安排"
+    assert party.nodes[22].required_task == "提交转正申请书"
     assert party.nodes[-1].name == "存档"
     assert party.nodes[-1].is_terminal is True
     assert {node.stage_group for node in party.nodes} == {
@@ -28,6 +31,8 @@ def test_official_workflow_template_specs_are_complete() -> None:
     assert youth.name == "发展团员工作流程（官方15步）"
     assert len(youth.nodes) == 15
     assert youth.nodes[0].name == "提交入团申请书"
+    assert youth.nodes[0].required_task == "提交入团申请书"
+    assert youth.nodes[9].required_task == "填写入团志愿书"
     assert youth.nodes[-1].name == "档案管理"
     assert youth.nodes[-1].is_terminal is True
     assert "推优入党" not in youth_node_names

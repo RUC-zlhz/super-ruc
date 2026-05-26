@@ -90,6 +90,7 @@ class StudentWorkflowNodeOut(BaseModel):
     sort_order: int
     stage_group: str | None
     required_task: str | None
+    student_material_required: bool = False
     status: str
     triggered_at: datetime | None
     due_date: date | None
@@ -127,8 +128,12 @@ class StudentWorkflowBrief(BaseModel):
     student_name: str | None
     template_code: str
     template_name: str
+    current_node_state_id: int | None
     current_node_name: str | None
     current_node_status: str | None
+    current_node_student_material_required: bool = False
+    current_node_evidence: str | None
+    current_node_note: str | None
     due_date: date | None
 
 
@@ -141,6 +146,11 @@ class StudentWorkflowStart(BaseModel):
 class NodeCompleteIn(BaseModel):
     evidence: str | None = None
     note: str | None = None
+
+
+class StudentNodeSubmitIn(BaseModel):
+    evidence: str = Field(min_length=1, max_length=2000)
+    note: str | None = Field(default=None, max_length=1000)
 
 
 class NodeMarkStatusIn(BaseModel):
