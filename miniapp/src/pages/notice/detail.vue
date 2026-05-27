@@ -138,7 +138,12 @@ function shareNotice() {
 }
 
 function goBack() {
-  uni.navigateBack({ delta: 1 })
+  uni.navigateBack({
+    delta: 1,
+    fail() {
+      uni.switchTab({ url: '/pages/notice/index' })
+    },
+  })
 }
 
 async function loadDetail() {

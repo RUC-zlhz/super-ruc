@@ -373,6 +373,12 @@ function nextQ() {
 }
 
 async function submitQuiz() {
+  const firstUnansweredIndex = questions.value.findIndex((q) => !answers[q.id]);
+  if (firstUnansweredIndex >= 0) {
+    currentIdx.value = firstUnansweredIndex;
+    uni.showToast({ title: `请先完成第 ${firstUnansweredIndex + 1} 题`, icon: "none" });
+    return;
+  }
   submitting.value = true;
   try {
     const payload = {

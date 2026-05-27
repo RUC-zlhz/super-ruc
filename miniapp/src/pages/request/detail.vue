@@ -391,7 +391,12 @@ async function loadDetail() {
 
 function onEdit() {
   if (requestId.value == null) return;
-  uni.navigateTo({ url: `/pages/request/create?id=${requestId.value}` });
+  uni.navigateTo({
+    url: `/pages/request/create?id=${requestId.value}`,
+    fail() {
+      uni.showToast({ title: "页面跳转失败", icon: "none" });
+    },
+  });
 }
 
 function operatorIdLabel(operatorId?: number | string | null) {

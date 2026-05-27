@@ -989,6 +989,10 @@ function removeGrowthAttachment(index: number) {
 
 async function onSubmitFullView(targetType: 'STUDENT_FIELD' | 'PROFILE_FACTS', fieldName?: string) {
   if (!ensureEditable()) return
+  if (fullViewSubmitting.value) {
+    uni.showToast({ title: '正在提交，请稍候', icon: 'none' })
+    return
+  }
   const key = fullViewTargetKey(targetType, fieldName)
   const status = fullViewRequestStatus(targetType, fieldName)
   if (status === 'PENDING') {

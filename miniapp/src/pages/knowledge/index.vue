@@ -324,7 +324,11 @@ async function onSearch() {
 }
 
 async function onAiMatch() {
-  if (!query.value.trim() || aiLoading.value) return
+  if (aiLoading.value) return
+  if (!query.value.trim()) {
+    uni.showToast({ title: '请先输入检索问题', icon: 'none' })
+    return
+  }
   aiLoading.value = true
   try {
     const resp = await aiMatchKnowledge(query.value, 3)
@@ -348,6 +352,7 @@ async function onDetailById(id: number) {
     selected.value = resp.data
   } catch {
     selected.value = null
+    uni.showToast({ title: '知识详情打开失败', icon: 'none' })
   }
 }
 

@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程当前节点状态展示修正、`S59` 党团流程学生提交材料与老师确认推进闭环、`S60` 证明 PDF 信息学院品牌与中文字体修复、`S61` 生产部署 GitHub SSH 443 与超时治理、`S62` 学业缺口课程推荐无开课数据兜底增强与 `S63` 成绩单课程匹配推荐和教师审核辅助均已完成
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程当前节点状态展示修正、`S59` 党团流程学生提交材料与老师确认推进闭环、`S60` 证明 PDF 信息学院品牌与中文字体修复、`S61` 生产部署 GitHub SSH 443 与超时治理、`S62` 学业缺口课程推荐无开课数据兜底增强、`S63` 成绩单课程匹配推荐和教师审核辅助、`S64` 微信订阅消息可达性复测已完成；`S65` 小程序按钮源码级反馈修复完成，DevTools 自动化点击验收仍受本机自动化 WebSocket 端点连接阻塞
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -1025,6 +1025,52 @@
 - 定向回归：`backend/tests/integration/test_report_contract_flow.py` 已新增成绩单上传返回推荐课程断言；`backend/tests/test_transcript_pdf_analysis.py` 已新增新版人大成绩单解析样例。
 - 验证：后端 `ruff check` 与 `py_compile` 通过；`pytest tests/test_transcript_pdf_analysis.py tests/integration/test_report_contract_flow.py tests/integration/test_s12_gap_closure.py -q` 结果 `17 passed, 3 warnings in 119.40s`；首次 `pnpm -C web build` 暴露并修复 `ImportCenter.vue` 重复 `:scroll` 属性，修复后 Web 构建通过。
 
+### S64 微信订阅消息可达性复测
+
+- 细化文件：`docs/notes/refinements/2026-05-27-s64-wechat-subscribe-reachability-test.md`
+- 当前状态：`[x]` 已完成代码级链路与生产微信 API 可达性复测；真实手机端送达因生产库暂无小程序端 `accept` 授权记录，仍需测试用户授权。
+- [x] `S64.1` 复核微信订阅消息与站内信边界，确认本次范围是微信小程序订阅消息，不是 `IN_APP` 站内通知。
+- [x] `S64.2` 复测订阅配置、授权保存、模板字段映射、发送成功记录与微信失败记录。
+- [x] `S64.3` 检查本地微信订阅消息真实送达前置配置。
+- [x] `S64.4` 输出可达性结论和真实联调所需条件。
+
+当前结论：
+
+- 微信订阅消息代码级链路可达：小程序订阅入口、后端授权保存、发送 payload 构建、投递记录与失败记录均有测试覆盖并通过。
+- 生产 `10.10.0.13` 已配置 `WECHAT_SUBSCRIBE_ENABLED`、真实 `WECHAT_APPID / WECHAT_SECRET` 和两个订阅模板 ID；backend 容器成功获取微信 `access_token`，证明生产到微信平台 API 可达。
+- 生产库 `wechat_subscribe_authorizations` 当前 `total=0`、`accept=0`；对唯一已绑定微信的学生 `2024201540 / 张念昊` 直接调用微信订阅消息发送接口，微信返回 `43101 user refuse to accept the msg`，因此还没有可用于真实手机送达的用户授权记录。
+
+证据：
+
+- 定向回归：`backend/tests/integration/test_notice_flow.py::test_wechat_subscribe_config_and_authorization_record`、`backend/tests/integration/test_notice_flow.py::test_wechat_subscribe_send_records_success_and_failure`
+- 验证：`uv run --extra dev pytest tests/integration/test_notice_flow.py::test_wechat_subscribe_config_and_authorization_record tests/integration/test_notice_flow.py::test_wechat_subscribe_send_records_success_and_failure -q -o cache_dir=.tmp/pytest-cache-wechat-reachability --basetemp=.tmp/pytest-tmp-wechat-reachability`，结果 `2 passed in 81.04s`。
+- 环境检查：本地 `backend/.env` 存在 `WECHAT_APPID=` 与 `WECHAT_SECRET=` 空值。
+- 生产复测：`user@10.10.0.13` 当前提交 `8604b69d`；`backend / web / db / redis / minio` 均 healthy，`smoke.sh` 通过；生产 backend 容器获取微信 token 成功，token 长度 `137`；生产授权表 `total=0`、`accept=0`；真实发送尝试返回微信 `errcode=43101`。
+
+### S65 小程序按钮反馈与效果审查
+
+- 细化文件：`docs/notes/refinements/2026-05-27-s65-miniapp-button-feedback-audit.md`
+- 当前状态：`[!]` 已完成源码级按钮绑定审查和反馈修复；微信开发者工具 CLI 可打开项目，但自动化点击验收仍受当前 DevTools WebSocket 端点连接阻塞。
+- [x] `S65.1` 扫描 `miniapp/src` 中所有 Vue 页面与组件的事件绑定，确认无缺失处理函数。
+- [x] `S65.2` 修复知识库、理论自测、申请详情、通知详情、学业上传和画像完整查看申请中的反馈不足。
+- [x] `S65.3` 对失败跳转、空输入、未答题、非 PDF 选择和重复提交补齐明确反馈。
+- [x] `S65.4` 运行 miniapp 类型检查与 `mp-weixin` 构建。
+- [!] `S65.5` 通过微信开发者工具 CLI 接入真实点击自动化；CLI 可用且项目可打开，`@dcloudio/uni-automator` / `miniprogram-automator` 尚未连通当前 DevTools 自动化协议端点。
+
+当前结论：
+
+- 小程序源码层面的按钮/点击事件均有可解析处理函数；本轮发现并修复 7 处反馈或失败回退不足。
+- 已通过事件绑定扫描、Miniapp `vue-tsc` 和 `pnpm -C miniapp build:mp-weixin`；微信开发者工具 CLI `auto/open` 可用。
+- 未完成真实逐按钮点击断言：当前 IDE HTTP 端口 `51972` 可用，但 `miniprogram-automator` 连接 `ws://127.0.0.1:51972` 失败；扫描到的内部 WS 端口 `31611` 可升级但不是 automator 协议，连接后关闭。
+
+证据：
+
+- 事件绑定扫描输出：`ALL_MINIAPP_EVENT_HANDLERS_RESOLVED`。
+- 验证：`.\web\node_modules\.bin\vue-tsc.CMD --noEmit -p miniapp\tsconfig.json` 通过。
+- 验证：`pnpm -C miniapp build:mp-weixin` 通过，生成物可导入 `dist\build\mp-weixin`。
+- 微信开发者工具 CLI：`D:\Software\WeChatDevTool\cli.bat auto --project D:\Codes\super-ruc\miniapp --port 51972 --trust-project` 成功；`D:\Software\WeChatDevTool\cli.bat open --project D:\Codes\super-ruc\miniapp\dist\dev\mp-weixin --port 51972` 成功。
+- DevTools 自动化阻塞：`@dcloudio/uni-automator` 在 Windows 下遇到 `.CMD` spawn / runtime 连接问题；`miniprogram-automator@0.12.1` 未能连接当前 DevTools automator 端点。
+
 ### S6 前端体验增量优化
 
 - [x] `S6.1` Web 共享导航与默认落点收口
@@ -1605,6 +1651,8 @@
 | 2026-05-27 | S61 生产部署 GitHub SSH 443 与超时治理 | `docs/notes/refinements/2026-05-27-s61-intranet-deploy-ssh443-timeout.md` | `S61.1, S61.2, S61.3, S61.4, S61.5` | `[x]` | 已定位生产 runner 到 GitHub SSH 22 超时导致 deploy job 卡住；workflow 改用 `ssh.github.com:443`，deploy key SSH 命令补超时和批处理参数，`ls-remote/fetch` 增加重试，避免自动部署长时间挂起或单次抖动即失败 |
 | 2026-05-27 | S62 学业缺口课程推荐无开课数据兜底增强 | `docs/notes/refinements/2026-05-27-s62-academic-recommendation-fallback.md` | `S62.1, S62.2, S62.3, S62.4, S62.5` | `[x]` | 已完成真实开课优先、缺开课记录时返回培养方案候选、建议来源字段和 Miniapp / Web 来源展示；后端定向集成 `13 passed`，Web 构建、Miniapp 类型检查与 `mp-weixin` 构建均通过 |
 | 2026-05-27 | S63 成绩单课程匹配推荐与教师审核辅助 | `docs/notes/refinements/2026-05-27-s63-transcript-course-matching-recommendation.md` | `S63.1, S63.2, S63.3, S63.4, S63.5` | `[x]` | 已融合 PR #5，为成绩单 PDF 候选课程补受控课程库推荐、教师审核页一键套用和新版人大成绩单解析，并保留 S62 学业缺口推荐兜底；后端定向 `17 passed`，Web 构建通过 |
+| 2026-05-27 | S64 微信订阅消息可达性复测 | `docs/notes/refinements/2026-05-27-s64-wechat-subscribe-reachability-test.md` | `S64.1, S64.2, S64.3, S64.4` | `[x]` | 已确认非站内信的微信订阅消息代码级链路可达，定向集成 `2 passed`；生产真实微信凭据与模板已配置，微信 token 获取成功，真实发送尝试返回微信 `43101`，说明仍需小程序端测试用户授权 |
+| 2026-05-27 | S65 小程序按钮反馈与效果审查 | `docs/notes/refinements/2026-05-27-s65-miniapp-button-feedback-audit.md` | `S65.1, S65.2, S65.3, S65.4, S65.5` | `[!]` | 已扫描小程序事件绑定并修复 7 处按钮反馈或失败回退不足；事件绑定扫描、Miniapp 类型检查与 `mp-weixin` 构建均通过；微信开发者工具 CLI 可打开项目，但 automator WebSocket 连接当前阻塞 |
 
 ## 会话更新要求
 
@@ -1736,3 +1784,5 @@
 - `2026-05-27`：完成 `S62` 学业缺口课程推荐无开课数据兜底增强；后端在真实本学期开课推荐之外增加 `CURRICULUM_CANDIDATE` 培养方案候选兜底，并用 `is_current_term_offering=False`、`schedule_status`、`data_warnings` 明确不代表实际开课。Miniapp 学业页和 Web 管理端学业缺口抽屉均展示“本学期开课 / 培养方案候选”来源标签；验证通过后端 `ruff`、`py_compile`、定向集成 `13 passed`、`pnpm -C web build`、Miniapp `vue-tsc` 与 `mp-weixin` 构建。
 - `2026-05-27`：完成 `S63` PR #5 成绩单课程匹配推荐与教师审核辅助融合；后端基于受控培养方案课程库为成绩单 PDF 候选课程生成推荐列表，匹配策略收口为课程代码/课程名精确匹配、别名/包含匹配、相似度排序与学分一致性加权；新版人大成绩单排版可解析“课程名 + 教师 + 课程属性 + 成绩/绩点”并回填学期汇总；Web 教师审核页支持一键套用推荐课程并将批次行设为可点击展开。
 - `2026-05-27`：S63 融合验证通过；后端 `ruff` / `py_compile` 通过，成绩单解析、成绩单上传推荐、学业缺口兜底和 S12 默认培养方案定向回归共 `17 passed`；Web 首次构建发现并修复合并后的重复 `:scroll` 属性，随后 `pnpm -C web build` 通过。
+- `2026-05-27`：完成 `S64` 微信订阅消息可达性复测；确认用户所说“不是站内信”对应当前系统的微信小程序订阅消息链路。后端定向集成覆盖订阅配置、授权保存、模板字段映射、发送成功记录与微信失败记录，结果 `2 passed in 81.04s`；随后进入生产 `10.10.0.13` 复测，服务 healthy、`smoke.sh` 通过、真实微信配置齐全且 backend 容器获取微信 `access_token` 成功。当前生产库 `wechat_subscribe_authorizations` 为 `total=0 / accept=0`；对唯一已绑定微信的学生 `2024201540 / 张念昊` 真实调用订阅消息发送接口返回微信 `43101 user refuse to accept the msg`，真实手机端送达仍需测试用户在小程序端完成订阅授权。
+- `2026-05-27`：推进 `S65` 小程序按钮反馈与效果审查；静态扫描 `miniapp/src` 全部 Vue 页面与组件事件绑定，确认无缺失处理函数；修复知识检索匹配空输入、知识详情失败、理论自测未答题提交、申请详情编辑跳转失败、通知详情返回兜底、学业 PDF 后缀校验和画像完整查看重复提交反馈。Miniapp 类型检查与 `mp-weixin` 构建通过；微信开发者工具 CLI `auto/open` 可打开项目，真实自动化点击断言仍因 DevTools automator WebSocket 协议端点未连通而阻塞。

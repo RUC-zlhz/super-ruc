@@ -25,7 +25,7 @@
         <text class="weak-icon">i</text>
         <view class="weak-copy">
           <text class="weak-title">学业结论边界</text>
-          <text class="weak-text">{{ result?.disclaimer || defaultDisclaimer }}</text>
+          <text class="weak-text">{{ academicDisclaimerText }}</text>
         </view>
       </view>
 
@@ -72,8 +72,8 @@
         <text class="warning-icon">!</text>
         <view class="warning-copy">
         <text class="warning-title">数据提示</text>
-        <template v-if="result.data_warnings?.length">
-        <text v-for="warning in result.data_warnings" :key="warning" class="warning-item">
+        <template v-if="academicDataWarnings.length">
+        <text v-for="warning in academicDataWarnings" :key="warning" class="warning-item">
           {{ warning }}
         </text>
         </template>
@@ -222,11 +222,11 @@
         <view class="section-head">
           <text class="section-title">选课参考</text>
           <text class="plan-name">
-            {{ result.recommendation_term_code || '当前学期' }} · 共 {{ result.suggested_courses?.length || 0 }} 条
+            {{ result.recommendation_term_code || '当前学期' }} · 共 {{ suggestedCourses.length }} 条
           </text>
         </view>
         <view
-          v-for="course in result.suggested_courses || []"
+          v-for="course in suggestedCourses"
           :key="suggestedCourseKey(course)"
           class="suggest-card"
         >
@@ -249,11 +249,11 @@
             培养方案开课学期：{{ course.opening_term_hint }}
           </text>
           <text v-if="course.reason" class="suggest-reason">{{ course.reason }}</text>
-          <text v-if="course.data_warnings?.length" class="suggest-warning">
-            {{ course.data_warnings[0] }}
+          <text v-if="courseWarnings(course).length" class="suggest-warning">
+            {{ firstCourseWarning(course) }}
           </text>
         </view>
-        <view v-if="!result.suggested_courses?.length" class="empty-tiny">
+        <view v-if="!suggestedCourses.length" class="empty-tiny">
           暂无选课参考，请以教务审核和培养方案为准。
         </view>
       </view>
@@ -324,6 +324,9 @@ const riskLabel = computed(() => RISK_LABELS[riskLevel.value] || '待核验')
 const riskToneClass = computed(() => `risk-${riskLevel.value.toLowerCase()}`)
 const gapModuleCount = computed(() => result.value?.modules.filter((item) => item.credits_gap > 0).length || 0)
 const highPrioritySuggestionCount = computed(() => result.value?.suggested_courses?.length || 0)
+const academicDisclaimerText = computed(() => result.value?.disclaimer || defaultDisclaimer)
+const academicDataWarnings = computed(() => result.value?.data_warnings || [])
+const suggestedCourses = computed(() => result.value?.suggested_courses || [])
 const fallbackConclusion = computed(() => {
   if (totalGapCredits.value == null) return '当前缺少培养方案或成绩数据，暂不能形成学分差额结论。'
   if (totalGapCredits.value <= 0) return '按当前数据未发现总学分差额。'
@@ -363,6 +366,14 @@ function suggestedCourseKey(course: SuggestedCourse) {
   ].join('-')
 }
 
+function courseWarnings(course: SuggestedCourse) {
+  return course.data_warnings || []
+}
+
+function firstCourseWarning(course: SuggestedCourse) {
+  return courseWarnings(course)[0] || ''
+}
+
 function candidateCourseKey(course: TranscriptPdfCandidateCourse) {
   return [course.line_no, course.course_code || course.course_name || course.raw_text].join('-')
 }
@@ -383,7 +394,8 @@ async function onUploadTranscriptPdf() {
   const file = selected?.tempFiles?.[0] as { path?: string; tempFilePath?: string; name?: string } | undefined
   const filePath = file?.path || file?.tempFilePath
   if (!filePath) return
-  if (file?.name && !file.name.toLowerCase().endsWith('.pdf')) {
+  const fileNameOrPath = file?.name || filePath
+  if (!fileNameOrPath.toLowerCase().endsWith('.pdf')) {
     uni.showToast({ title: '请选择 PDF 文件', icon: 'none' })
     return
   }
