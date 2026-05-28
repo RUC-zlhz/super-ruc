@@ -108,7 +108,7 @@ async function onSubmit() {
     if (auth.user?.must_change_password) {
       Modal.confirm({
         title: '请尽快修改初始密码',
-        content: '当前账号仍在使用初始密码 admin123。为避免账号被共用，建议登录后立即修改密码。',
+        content: '当前账号仍在使用系统生成的初始密码。为避免账号被共用，建议登录后立即修改为个人密码。',
         okText: '立即修改',
         cancelText: '稍后处理',
         async onOk() {

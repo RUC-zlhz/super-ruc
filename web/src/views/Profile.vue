@@ -46,7 +46,7 @@
           type="warning"
           show-icon
           message="当前账号仍使用初始密码"
-          description="初始密码为 admin123。请尽快修改为个人密码，避免账号被共用。"
+          description="该密码由系统生成并仅用于首次登录。请尽快修改为个人密码，避免账号被共用。"
         />
 
         <a-row :gutter="[18, 18]">
@@ -116,7 +116,7 @@
             class="password-modal-tip"
             type="warning"
             show-icon
-            message="请不要继续使用初始密码 admin123"
+            message="请尽快修改当前初始密码"
           />
           <a-form layout="vertical">
             <a-form-item label="原密码" required>
