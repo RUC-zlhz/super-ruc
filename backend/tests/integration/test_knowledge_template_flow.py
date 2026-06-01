@@ -99,3 +99,14 @@ async def test_student_template_list_and_download_after_publish(
     assert download_url.startswith("file://")
     local_path = Path(download_url.removeprefix("file:///"))
     assert local_path.exists()
+
+    file_resp = await client.get(
+        f"/api/v1/knowledge/templates/{template_id}/file",
+        headers={"Authorization": f"Bearer {student_token}"},
+    )
+    assert file_resp.status_code == 200, file_resp.text
+    assert file_resp.content == b"template-bytes"
+    assert file_resp.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    assert "filename*=" in file_resp.headers["content-disposition"]

@@ -169,12 +169,12 @@ async def get_student_node_state(
 
 
 async def list_pending_nodes_for_reminder(
-    db: AsyncSession, *, as_of: date
+    db: AsyncSession, *, as_of: date, include_without_due_date: bool = False
 ) -> Sequence[StudentWorkflowNode]:
     """返回需要生成提醒的节点状态：
     - status IN (PENDING, OVERDUE)
-    - due_date - reminder_lead_days <= as_of
-    逻辑层再做过滤。"""
+    - 默认要求 due_date 存在；手动强制提醒可纳入未设截止日期的当前节点
+    - due_date - reminder_lead_days <= as_of 由逻辑层再做过滤。"""
     stmt = (
         select(StudentWorkflowNode)
         .options(
@@ -182,8 +182,9 @@ async def list_pending_nodes_for_reminder(
             selectinload(StudentWorkflowNode.workflow).selectinload(StudentWorkflow.template),
         )
         .where(StudentWorkflowNode.status.in_([WORKFLOW_NODE_PENDING, WORKFLOW_NODE_OVERDUE]))
-        .where(StudentWorkflowNode.due_date.is_not(None))
     )
+    if not include_without_due_date:
+        stmt = stmt.where(StudentWorkflowNode.due_date.is_not(None))
     return (await db.execute(stmt)).scalars().all()
 
 

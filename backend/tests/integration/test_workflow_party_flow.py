@@ -564,6 +564,47 @@ async def test_workflow_reminders_overdue_path(
     assert reminder_item["status"] == "SENT"
 
 
+async def test_manual_workflow_reminder_can_force_current_node_before_due(
+    client: AsyncClient, db: AsyncSession, admin_client: AsyncClient,
+) -> None:
+    _tok, student_id = await _login_as_student(
+        client, db, student_no="W20002", wx_code="wx_w20002",
+    )
+
+    await admin_client.post(
+        "/api/v1/admin/workflow/templates", json=_party_template_payload(),
+    )
+    start = await admin_client.post(
+        "/api/v1/admin/workflow/students",
+        json={"student_id": student_id, "template_code": "PARTY_DEV_MAIN"},
+    )
+    assert start.status_code == 200, start.text
+
+    gen_without_force = await admin_client.post(
+        "/api/v1/admin/workflow/reminders/generate",
+        json={"channel": "IN_APP"},
+    )
+    assert gen_without_force.status_code == 200, gen_without_force.text
+    assert gen_without_force.json()["data"]["created_count"] == 0
+
+    gen = await admin_client.post(
+        "/api/v1/admin/workflow/reminders/generate",
+        json={"channel": "IN_APP", "force_current_nodes": True},
+    )
+    assert gen.status_code == 200, gen.text
+    run = gen.json()["data"]
+    assert run["created_count"] == 1
+    assert run["sent_count"] == 1
+
+    inbox = await client.get(
+        "/api/v1/notices",
+        headers={"Authorization": f"Bearer {_tok}"},
+    )
+    assert inbox.status_code == 200, inbox.text
+    items = inbox.json()["data"]["items"]
+    assert any(item["category"] == "WORKFLOW" and "党团流程提醒" in item["title"] for item in items)
+
+
 async def test_complete_node_cancels_unsent_workflow_reminders(
     client: AsyncClient, db: AsyncSession, admin_client: AsyncClient,
 ) -> None:

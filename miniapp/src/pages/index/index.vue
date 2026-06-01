@@ -219,6 +219,7 @@ import {
   type StudentWorkflow,
 } from "@/api/workflow";
 import { getErrorMessage } from "@/utils/error";
+import { formatShanghaiDateTime } from "@/utils/datetime";
 import { openMiniappPage, openNoticeDetail } from "@/utils/navigation";
 
 type HomeSectionKey = "notices" | "requests" | "workflows";
@@ -619,9 +620,7 @@ function noticeCategoryLabel(notice: StudentNoticeItem) {
 }
 
 function formatDate(value?: string | null) {
-  if (!value) return "";
-  const normalized = value.replace("T", " ");
-  return normalized.length >= 16 ? normalized.slice(0, 16) : normalized;
+  return formatShanghaiDateTime(value);
 }
 
 function formatDateTime(value?: string | null) {

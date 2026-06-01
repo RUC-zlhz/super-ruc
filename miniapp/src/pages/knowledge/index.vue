@@ -94,7 +94,7 @@
               size="mini"
               :type="UNI_BUTTON_TYPE.primary"
               :loading="downloadingTemplateId === tpl.id"
-              @tap="openTemplate(tpl.id)"
+              @tap="openTemplate(tpl.id, tpl.template_type)"
             >下载</button>
           </view>
         </view>
@@ -246,7 +246,7 @@
             size="mini"
               :type="UNI_BUTTON_TYPE.primary"
               :loading="downloadingTemplateId === tpl.template_id"
-              @tap="openTemplate(tpl.template_id)"
+              @tap="openTemplate(tpl.template_id, tpl.template_type)"
             >打开</button>
           </view>
         </view>
@@ -260,6 +260,8 @@ import { computed, onMounted, ref } from 'vue'
 import InlineStateNotice from '@/components/InlineStateNotice.vue'
 import {
   aiMatchKnowledge,
+  downloadTemplateFromUrl,
+  downloadTemplateFile,
   getEntryDetail,
   getTemplateDownloadLink,
   listKnowledgeCategories,
@@ -273,6 +275,7 @@ import {
 } from '@/api/knowledge'
 import { UNI_BUTTON_TYPE } from '@/utils/uni-button'
 import { getErrorMessage } from '@/utils/error'
+import { formatShanghaiDateTime } from '@/utils/datetime'
 
 const query = ref('')
 const categories = ref<KnowledgeCategory[]>([])
@@ -388,37 +391,45 @@ async function loadTemplates() {
   }
 }
 
-async function openTemplate(templateId: number) {
+function templateFileType(templateType?: string | null) {
+  const normalized = (templateType || '').trim().toLowerCase()
+  return ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf'].includes(normalized) ? normalized : undefined
+}
+
+async function openTemplate(templateId: number, templateType?: string | null) {
   if (downloadingTemplateId.value) return
   downloadingTemplateId.value = templateId
   try {
-    const resp = await getTemplateDownloadLink(templateId)
-    uni.downloadFile({
-      url: resp.data.download_url,
-      success(res) {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          uni.openDocument({
-            filePath: res.tempFilePath,
-            showMenu: true,
-            fail() {
-              uni.showToast({ title: '模板已下载，暂无法打开', icon: 'none' })
-            },
-          })
-        } else {
-          uni.showToast({ title: '模板下载失败', icon: 'none' })
-        }
-      },
-      fail() {
-        uni.showToast({ title: '模板下载失败', icon: 'none' })
-      },
-      complete() {
-        downloadingTemplateId.value = null
-      },
-    })
+    const { tempFilePath } = await downloadTemplateWithFallback(templateId)
+    openDownloadedTemplate(tempFilePath, templateType)
   } catch {
     downloadingTemplateId.value = null
-    uni.showToast({ title: '模板下载链接生成失败', icon: 'none' })
+    uni.showToast({ title: '模板下载失败', icon: 'none' })
   }
+}
+
+async function downloadTemplateWithFallback(templateId: number) {
+  try {
+    return await downloadTemplateFile(templateId)
+  } catch {
+    const resp = await getTemplateDownloadLink(templateId)
+    return downloadTemplateFromUrl(resp.data.download_url)
+  }
+}
+
+function openDownloadedTemplate(tempFilePath: string, templateType?: string | null) {
+  uni.openDocument({
+    filePath: tempFilePath,
+    fileType: templateFileType(templateType),
+    showMenu: true,
+    success() {
+      downloadingTemplateId.value = null
+    },
+    fail() {
+      downloadingTemplateId.value = null
+      uni.showToast({ title: '模板已下载，当前设备暂无法打开', icon: 'none' })
+    },
+  })
 }
 
 function copyUrl(url: string, title = '链接已复制') {
@@ -431,9 +442,7 @@ function copyUrl(url: string, title = '链接已复制') {
 }
 
 function formatTemplateDate(value?: string | null) {
-  if (!value) return ''
-  const normalized = value.replace('T', ' ').replace('Z', '')
-  return normalized.length >= 16 ? normalized.slice(0, 16) : normalized
+  return formatShanghaiDateTime(value)
 }
 
 function resultIcon(category?: string | null) {

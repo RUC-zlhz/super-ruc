@@ -113,6 +113,40 @@ async def test_admin_flow_create_publish_search(admin_client: AsyncClient) -> No
     assert detail["source"]["source_name"].startswith("《学生手册")
 
 
+async def test_admin_create_draft_entry_with_url_source(admin_client: AsyncClient) -> None:
+    source_resp = await admin_client.post(
+        "/api/v1/admin/knowledge/sources",
+        json={
+            "source_name": "学院办事指南",
+            "source_url": "https://info.ruc.edu.cn/service/template",
+            "issuing_org": "信息学院",
+            "version_label": "2026-v1",
+            "is_official": True,
+        },
+    )
+    assert source_resp.status_code == 200, source_resp.text
+    source_id = source_resp.json()["data"]["id"]
+
+    entry_resp = await admin_client.post(
+        "/api/v1/admin/knowledge/entries",
+        json={
+            "slug": "s68-url-source-draft",
+            "title": "带来源链接的草稿条目",
+            "summary": "用于验证带实际 URL 来源的知识条目可以保存为草稿。",
+            "category_code": "SERVICE",
+            "source_id": source_id,
+            "body_md": "正文内容",
+            "version_label": "2026-v1",
+            "tags": ["互测反馈", "来源链接"],
+        },
+    )
+    assert entry_resp.status_code == 200, entry_resp.text
+    data = entry_resp.json()["data"]
+    assert data["status"] == "DRAFT"
+    assert data["source"]["source_url"] == "https://info.ruc.edu.cn/service/template"
+    assert "来源链接" in data["tags"]
+
+
 async def test_admin_endpoint_rejects_unauthenticated(client: AsyncClient) -> None:
     """C-03：没 token 直接 401，不能依赖前端隐藏。"""
     resp = await client.post(

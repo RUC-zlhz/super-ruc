@@ -932,14 +932,15 @@ def _build_reminder_message(
     *,
     template: WorkflowTemplate,
     node: WorkflowNode,
-    due_date: date,
+    due_date: date | None,
 ) -> tuple[str, str, str]:
     title = f"党团流程提醒：{template.name} - {node.name}"
-    summary = f"{node.name} 需在 {due_date} 前跟进"
+    due_text = str(due_date) if due_date else "未设置，请按学院要求及时跟进"
+    summary = f"{node.name} 需及时跟进" if due_date is None else f"{node.name} 需在 {due_date} 前跟进"
     body = "\n".join(
         [
             f"你在《{template.name}》中的当前节点为：{node.name}",
-            f"截止日期：{due_date}",
+            f"截止日期：{due_text}",
             f"待完成事项：{node.required_task or '请按学院要求及时跟进'}",
         ]
     )
@@ -954,6 +955,7 @@ async def run_reminder_cycle(
     trigger_mode: str,
     operator_id: int | None,
     operator_role: str | None,
+    force_current_nodes: bool = False,
 ) -> ReminderRunOut:
     as_of = as_of or date.today()
     run = await repo.create_reminder_run(
@@ -977,15 +979,24 @@ async def run_reminder_cycle(
     failed_count = 0
     user_cache: dict[int, int | None] = {}
     try:
-        states = await repo.list_pending_nodes_for_reminder(db, as_of=as_of)
+        states = await repo.list_pending_nodes_for_reminder(
+            db, as_of=as_of, include_without_due_date=force_current_nodes
+        )
         for state in states:
-            if state.due_date is None or state.node is None or state.workflow is None:
+            if state.node is None or state.workflow is None:
                 skipped_count += 1
                 continue
 
             node = state.node
             workflow = state.workflow
             template = workflow.template
+
+            if force_current_nodes and workflow.current_node_id != state.node_id:
+                skipped_count += 1
+                continue
+            if state.due_date is None and not force_current_nodes:
+                skipped_count += 1
+                continue
 
             if not node.reminder_enabled:
                 skipped_count += 1
@@ -996,12 +1007,12 @@ async def run_reminder_cycle(
                 raise BizError("流程提醒一期仅支持站内提醒 IN_APP", code=40086)
 
             lead_days = node.reminder_lead_days or 0
-            remind_on = state.due_date - timedelta(days=lead_days)
-            if remind_on > as_of:
+            remind_on = state.due_date - timedelta(days=lead_days) if state.due_date else None
+            if remind_on is not None and remind_on > as_of and not force_current_nodes:
                 skipped_count += 1
                 continue
 
-            if state.due_date < as_of and state.status == WORKFLOW_NODE_PENDING:
+            if state.due_date is not None and state.due_date < as_of and state.status == WORKFLOW_NODE_PENDING:
                 state.status = WORKFLOW_NODE_OVERDUE
 
             existing = await repo.list_reminders_for_state(
@@ -1021,10 +1032,12 @@ async def run_reminder_cycle(
             if active_reminders:
                 interval_days = node.repeat_interval_days
                 if interval_days is None or interval_days <= 0:
-                    skipped_count += 1
-                    continue
+                    if not force_current_nodes:
+                        skipped_count += 1
+                        continue
+                    interval_days = None
                 last_date = max(row.reminder_date for row in active_reminders)
-                if (as_of - last_date).days < interval_days:
+                if interval_days is not None and (as_of - last_date).days < interval_days and not force_current_nodes:
                     skipped_count += 1
                     continue
 
@@ -1130,6 +1143,7 @@ async def generate_reminders(
     channel: str,
     operator_id: int,
     operator_role: str | None,
+    force_current_nodes: bool = False,
 ) -> ReminderRunOut:
     return await run_reminder_cycle(
         db,
@@ -1138,6 +1152,7 @@ async def generate_reminders(
         trigger_mode="MANUAL",
         operator_id=operator_id,
         operator_role=operator_role,
+        force_current_nodes=force_current_nodes,
     )
 
 
@@ -1198,6 +1213,32 @@ def _request_to_brief(req: Request) -> RequestBrief:
         submitted_at=req.submitted_at,
         updated_at=req.updated_at,
     )
+
+
+def _parse_request_date(value: object) -> date | None:
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    try:
+        return date.fromisoformat(text)
+    except ValueError as exc:
+        raise BizError("日期格式应为 YYYY-MM-DD", code=40043) from exc
+
+
+def _validate_request_form_data(rt, form_data: dict | None) -> None:
+    if not rt or not isinstance(form_data, dict):
+        return
+    category = (rt.category or "").upper()
+    type_code = (rt.code or "").upper()
+    if category != "LEAVE" and "LEAVE" not in type_code:
+        return
+
+    start_date = _parse_request_date(form_data.get("start_date"))
+    end_date = _parse_request_date(form_data.get("end_date"))
+    if start_date is not None and end_date is not None and start_date > end_date:
+        raise BizError("请假起始日期不能晚于结束日期", code=40044)
 
 
 # ======================================================================
@@ -1265,6 +1306,7 @@ async def create_draft_request(
     rt = await repo.get_request_type_by_code(db, payload.type_code)
     if rt is None or not rt.is_active:
         raise NotFoundError(f"事务类型不存在或已停用：{payload.type_code}")
+    _validate_request_form_data(rt, payload.form_data)
 
     applicant_student_id = await _ensure_applicant_student_id(
         db, applicant_user_id, None
@@ -1310,6 +1352,7 @@ async def submit_request(
     rt = req.type_ref
     if rt and rt.attachment_required and not (req.attachments or []):
         raise BizError("此事务要求上传附件", code=40017)
+    _validate_request_form_data(rt, req.form_data)
 
     action = (
         REQUEST_ACTION_RESUBMIT
@@ -1362,6 +1405,8 @@ async def update_draft_request(
     ApprovalStateMachine.assert_editable(req.status)
 
     changed = payload.model_dump(exclude_unset=True)
+    next_form_data = changed.get("form_data", req.form_data)
+    _validate_request_form_data(req.type_ref, next_form_data)
     for k, v in changed.items():
         setattr(req, k, v)
     await db.commit()

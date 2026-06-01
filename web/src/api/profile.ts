@@ -327,10 +327,15 @@ export function adminDecideFullViewRequest(id: number, payload: ProfileFullViewD
 
 export async function downloadStudentProfileSnapshot(studentId: number, format: 'pdf' | 'xlsx') {
   const token = getAccessToken()
-  const resp = await fetch(buildUrl(`/admin/profile/${studentId}/snapshot.${format}`), {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    credentials: 'same-origin',
-  })
+  let resp: Response
+  try {
+    resp = await fetch(buildUrl(`/admin/profile/${studentId}/snapshot.${format}`), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'same-origin',
+    })
+  } catch {
+    throw new Error('画像快照下载失败：网络异常')
+  }
   if (resp.status === 401) {
     setAccessToken(null)
     if (location.pathname !== '/login') {
@@ -339,11 +344,17 @@ export async function downloadStudentProfileSnapshot(studentId: number, format: 
     }
     throw new Error('登录已失效')
   }
-  if (resp.status === 404 || resp.status === 405 || resp.status === 501) {
-    return false
+  if (resp.status === 403) {
+    throw new Error('画像快照下载失败：当前账号无导出权限')
+  }
+  if (resp.status === 404) {
+    throw new Error('画像快照下载失败：学生画像不存在')
+  }
+  if (resp.status === 405 || resp.status === 501) {
+    throw new Error('画像快照下载失败：导出接口暂不可用')
   }
   if (!resp.ok) {
-    throw new Error('画像快照下载失败')
+    throw new Error(`画像快照下载失败：服务返回 ${resp.status}`)
   }
   const blob = await resp.blob()
   const url = URL.createObjectURL(blob)

@@ -996,12 +996,10 @@ async function onDecideFullView(record: Record<string, any> | ProfileFullViewReq
 async function onDownloadSnapshot(format: 'pdf' | 'xlsx') {
   snapshotLoading.value = format
   try {
-    const ok = await downloadStudentProfileSnapshot(studentId, format)
-    if (!ok) {
-      message.error('画像快照下载失败，请确认权限或稍后重试')
-      return
-    }
+    await downloadStudentProfileSnapshot(studentId, format)
     message.success(`已开始下载 ${format.toUpperCase()} 快照`)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '画像快照下载失败，请确认权限或稍后重试')
   } finally {
     snapshotLoading.value = ''
   }

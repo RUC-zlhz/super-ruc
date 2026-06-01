@@ -1,4 +1,4 @@
-import { get, post } from '@/utils/request'
+import { buildApiUrl, download, get, getAuthHeader, post } from '@/utils/request'
 
 export interface KnowledgeCategory {
   code: string
@@ -133,6 +133,29 @@ export function aiMatchKnowledge(query: string, topK = 3) {
 
 export function getTemplateDownloadLink(templateId: number) {
   return get<TemplateDownloadLink>(`/knowledge/templates/${templateId}/download`)
+}
+
+export function downloadTemplateFile(templateId: number) {
+  return download(`/knowledge/templates/${templateId}/file`)
+}
+
+export function downloadTemplateFromUrl(url: string) {
+  return new Promise<{ tempFilePath: string; statusCode: number }>((resolve, reject) => {
+    uni.downloadFile({
+      url: url.startsWith('http://') || url.startsWith('https://') ? url : buildApiUrl(url),
+      header: getAuthHeader(),
+      success(res) {
+        if (res.statusCode >= 200 && res.statusCode < 300 && res.tempFilePath) {
+          resolve({ tempFilePath: res.tempFilePath, statusCode: res.statusCode })
+          return
+        }
+        reject(new Error('模板下载失败'))
+      },
+      fail(err) {
+        reject(err)
+      },
+    })
+  })
 }
 
 export function listStudentTemplates(params?: {

@@ -114,6 +114,20 @@ def presigned_get(bucket: str, object_key: str, expires_minutes: int = 10) -> st
     )
 
 
+def get_object_bytes(bucket: str, object_key: str) -> bytes:
+    if _use_local_fallback():
+        path = _local_object_path(bucket, object_key)
+        return path.read_bytes()
+
+    client = get_minio_client()
+    response = client.get_object(bucket, object_key)
+    try:
+        return response.read()
+    finally:
+        response.close()
+        response.release_conn()
+
+
 def remove_object(bucket: str, object_key: str) -> None:
     if _use_local_fallback():
         path = _local_object_path(bucket, object_key)

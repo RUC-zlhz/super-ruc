@@ -70,7 +70,7 @@
           <text class="notice-source">{{ noticeTag(n) }}</text>
           <text class="notice-preview" v-if="n.summary">{{ n.summary.slice(0, 80) }}</text>
           <view class="notice-footer">
-            <text class="notice-date">◷ {{ n.published_at?.slice(0, 16).replace('T', ' ') }}</text>
+            <text class="notice-date">◷ {{ formatNoticeTime(n.published_at) }}</text>
             <view class="notice-arrow"><view class="mini-chevron" /></view>
           </view>
         </view>
@@ -106,6 +106,7 @@ import {
 } from '@/api/notice'
 import { getErrorMessage } from '@/utils/error'
 import { openNoticeDetail } from '@/utils/navigation'
+import { formatShanghaiDateTime } from '@/utils/datetime'
 
 type NoticeTab = 'all' | 'unread' | 'read'
 
@@ -155,6 +156,10 @@ function noticeIcon(notice: StudentNoticeItem) {
   if (tag.includes('SYSTEM') || tag.includes('系统')) return '⚙'
   if (tag.includes('CAMPUS') || tag.includes('校园')) return '园'
   return '铃'
+}
+
+function formatNoticeTime(value?: string | null) {
+  return formatShanghaiDateTime(value)
 }
 
 const visibleNotices = computed(() => {

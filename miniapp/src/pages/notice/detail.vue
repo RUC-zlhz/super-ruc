@@ -84,6 +84,7 @@
 import { onMounted, ref } from 'vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { getNoticeDetail, markRead, type NoticeDetail } from '@/api/notice'
+import { formatShanghaiDateTime } from '@/utils/datetime'
 
 const notice = ref<NoticeDetail | null>(null)
 const loading = ref(false)
@@ -105,8 +106,7 @@ function sourceClass(s: string) {
 }
 
 function fmt(s?: string | null) {
-  if (!s) return ''
-  return s.slice(0, 16).replace('T', ' ')
+  return formatShanghaiDateTime(s)
 }
 
 function noticeShareText() {

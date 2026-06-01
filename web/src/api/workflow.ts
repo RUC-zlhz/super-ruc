@@ -365,6 +365,7 @@ export async function executeWorkflowReminderRun(payload: {
   const response = await post<ApiEnvelope<WorkflowReminderRun>>('/admin/workflow/reminders/generate', {
     as_of_date: payload.as_of_date,
     channel: 'IN_APP',
+    force_current_nodes: true,
   })
   return {
     route: '/admin/workflow/reminders/generate',

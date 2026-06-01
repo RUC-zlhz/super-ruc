@@ -470,6 +470,7 @@ async def admin_generate_reminders(
         db,
         as_of=payload.as_of_date,
         channel=payload.channel,
+        force_current_nodes=payload.force_current_nodes,
         operator_id=user.user_id,
         operator_role=",".join(user.roles) or None,
     )

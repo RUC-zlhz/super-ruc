@@ -23,7 +23,7 @@ from app.auth.models import Student, User, UserRole
 from app.core import storage
 from app.core.security import create_token
 from app.workflow import pdf_generator
-from app.workflow.models import ProofTemplate, RequestType
+from app.workflow.models import ProofTemplate, Request, RequestType
 
 
 async def _login_as_student(
@@ -155,6 +155,71 @@ async def test_request_happy_path_draft_submit_claim_approve(
     assert approved["decision_comment"] == "已核实，批准"
     actions = {r["action"] for r in approved["approval_records"]}
     assert {"SUBMIT", "CLAIM", "APPROVE"}.issubset(actions)
+
+
+async def test_leave_request_rejects_start_date_after_end_date(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    token = await _login_as_student(
+        client, db, student_no="R100099", wx_code="wx_r100099"
+    )
+    stu_headers = {"Authorization": f"Bearer {token}"}
+    invalid_form = {
+        "reason": "日期顺序回归",
+        "start_date": "2026-05-30",
+        "end_date": "2026-05-29",
+        "leave_type": "事假",
+    }
+
+    invalid_create = await client.post(
+        "/api/v1/requests",
+        headers=stu_headers,
+        json={
+            "type_code": "LEAVE_PERSONAL",
+            "title": "逆序请假",
+            "form_data": invalid_form,
+        },
+    )
+    assert invalid_create.status_code == 400, invalid_create.text
+    assert invalid_create.json()["code"] == 40044
+
+    valid_create = await client.post(
+        "/api/v1/requests",
+        headers=stu_headers,
+        json={
+            "type_code": "LEAVE_PERSONAL",
+            "title": "有效请假草稿",
+            "form_data": {
+                "reason": "日期顺序回归",
+                "start_date": "2026-05-29",
+                "end_date": "2026-05-30",
+                "leave_type": "事假",
+            },
+        },
+    )
+    assert valid_create.status_code == 200, valid_create.text
+    request_id = valid_create.json()["data"]["id"]
+
+    invalid_update = await client.patch(
+        f"/api/v1/requests/{request_id}",
+        headers=stu_headers,
+        json={"form_data": invalid_form},
+    )
+    assert invalid_update.status_code == 400, invalid_update.text
+    assert invalid_update.json()["code"] == 40044
+
+    request_row = await db.get(Request, request_id)
+    assert request_row is not None
+    request_row.form_data = invalid_form
+    await db.commit()
+
+    invalid_submit = await client.post(
+        f"/api/v1/requests/{request_id}/submit",
+        headers=stu_headers,
+    )
+    assert invalid_submit.status_code == 400, invalid_submit.text
+    assert invalid_submit.json()["code"] == 40044
 
 
 async def test_request_reject_then_resubmit_bumps_revision(

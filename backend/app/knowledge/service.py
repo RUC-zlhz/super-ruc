@@ -5,6 +5,7 @@ import hashlib
 import logging
 import uuid
 from datetime import UTC, datetime
+from pathlib import PurePosixPath
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit.service import log_action
 from app.core.config import settings
 from app.core.exceptions import BizError, ConflictError, NotFoundError
-from app.core.storage import presigned_get, put_object
+from app.core.storage import get_object_bytes, presigned_get, put_object
 from app.knowledge import ai_matcher
 from app.knowledge import repository as repo
 from app.knowledge.models import (
@@ -559,3 +560,40 @@ async def template_download_url(
     )
     await db.commit()
     return tpl, url, expires_minutes
+
+
+def _template_download_filename(tpl: TemplateAsset) -> str:
+    suffix = PurePosixPath(tpl.object_key).suffix
+    if suffix and not tpl.template_name.endswith(suffix):
+        return f"{tpl.template_name}{suffix}"
+    return tpl.template_name
+
+
+async def template_download_file(
+    db: AsyncSession,
+    template_id: int,
+    operator_id: int | None = None,
+    operator_role: str | None = None,
+) -> tuple[TemplateAsset, bytes, str, str]:
+    tpl = await repo.get_template(db, template_id)
+    if tpl is None or tpl.status != TEMPLATE_STATUS_ACTIVE:
+        raise NotFoundError("模板不存在或已停用")
+    if not _can_admin_download_template(operator_role):
+        if not await repo.template_has_published_entry(db, template_id):
+            raise NotFoundError("模板不存在或未发布")
+    try:
+        data = get_object_bytes(tpl.object_bucket, tpl.object_key)
+    except Exception as e:
+        raise BizError(f"下载模板文件失败：{e}", code=50003, http_status=500) from e
+    await log_action(
+        db,
+        event_type="KNOWLEDGE",
+        entity_code="TEMPLATE",
+        action="DOWNLOAD",
+        entity_id=tpl.id,
+        actor_user_id=operator_id,
+        actor_role=operator_role,
+        detail={"mode": "stream"},
+    )
+    await db.commit()
+    return tpl, data, _template_download_filename(tpl), tpl.mime_type or "application/octet-stream"

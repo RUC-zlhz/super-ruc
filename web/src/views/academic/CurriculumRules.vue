@@ -134,6 +134,7 @@
                   </a-button>
                 </div>
                 <a-table
+                  v-if="normalizeCourses(record.courses).length"
                   :columns="courseCols"
                   :data-source="normalizeCourses(record.courses)"
                   :pagination="{ pageSize: 8, size: 'small' }"
@@ -156,6 +157,12 @@
                     </template>
                   </template>
                 </a-table>
+                <div v-else class="course-empty">
+                  <span>暂无课程明细</span>
+                  <a-button size="small" type="link" @click="openCourseEditor(asModule(record))">
+                    新增课程
+                  </a-button>
+                </div>
               </div>
             </template>
           </a-table>
@@ -977,6 +984,7 @@ onMounted(() => {
 }
 
 .course-detail {
+  min-height: 112px;
   padding: 12px;
   border: 1px solid var(--line-soft);
   border-radius: var(--radius);
@@ -991,6 +999,19 @@ onMounted(() => {
   margin-bottom: 10px;
   color: var(--text);
   font-weight: 700;
+}
+
+.course-empty {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px dashed var(--line-soft);
+  border-radius: var(--radius);
+  background: #fafafa;
+  color: var(--text-3);
+  font-size: 13px;
 }
 
 .equiv-panel {

@@ -633,6 +633,27 @@ function applyPresetType() {
   presetFallbackTarget.value = typeCode || category || "";
 }
 
+function isLeaveRequestType(type: RequestType | null) {
+  if (!type) return false;
+  const category = (type.category || "").toUpperCase();
+  const code = (type.code || "").toUpperCase();
+  return category === "LEAVE" || code.includes("LEAVE");
+}
+
+function validateLeaveDateRange() {
+  if (!isLeaveRequestType(activeType.value)) return null;
+  const startDate = typeof formData.value.start_date === "string"
+    ? formData.value.start_date.trim()
+    : "";
+  const endDate = typeof formData.value.end_date === "string"
+    ? formData.value.end_date.trim()
+    : "";
+  if (startDate && endDate && startDate > endDate) {
+    return "请假起始日期不能晚于结束日期。";
+  }
+  return null;
+}
+
 function validateForm() {
   const errors: string[] = [];
   if (!activeType.value) return false;
@@ -643,6 +664,10 @@ function validateForm() {
   const { ok } = validation || { ok: true };
   if (!ok) {
     errors.push("请完善动态表单中的必填字段。");
+  }
+  const leaveDateError = validateLeaveDateRange();
+  if (leaveDateError) {
+    errors.push(leaveDateError);
   }
   setFormErrors(errors);
   if (errors.length) {

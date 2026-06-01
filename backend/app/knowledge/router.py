@@ -14,9 +14,12 @@ admin 侧（前缀 /admin/knowledge）：
 """
 from __future__ import annotations
 
+from io import BytesIO
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi.responses import StreamingResponse
 
 from app.audit.service import build_audit_detail, log_action
 from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES
@@ -83,6 +86,20 @@ async def search(
     return ok(Paginated[EntryBrief](items=items, meta=PageMeta(page=page, size=size, total=total)))
 
 
+def _template_file_response(data: bytes, filename: str, media_type: str) -> StreamingResponse:
+    ascii_filename = "".join(ch if ch.isascii() and ch not in {'"', "\\"} else "_" for ch in filename)
+    encoded_filename = quote(filename)
+    return StreamingResponse(
+        BytesIO(data),
+        media_type=media_type,
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=\"{ascii_filename}\"; filename*=UTF-8''{encoded_filename}"
+            )
+        },
+    )
+
+
 @router.get("/templates", response_model=ApiResponse[Paginated[TemplateOut]])
 async def list_student_templates(
     db: DBDep,
@@ -123,6 +140,18 @@ async def download_template(
         db, template_id, operator_id=user.user_id, operator_role=",".join(user.roles)
     )
     return ok(TemplateDownloadLink(template_id=template_id, download_url=url, expires_in_minutes=minutes))
+
+
+@router.get("/templates/{template_id}/file")
+async def download_template_file(
+    template_id: int,
+    db: DBDep,
+    user: CurrentUserDep,
+) -> StreamingResponse:
+    _, data, filename, media_type = await service.template_download_file(
+        db, template_id, operator_id=user.user_id, operator_role=",".join(user.roles)
+    )
+    return _template_file_response(data, filename, media_type)
 
 
 # ========== 管理侧：分类 ==========
@@ -425,3 +454,18 @@ async def admin_download_template(
         operator_role=",".join(user.roles) or None,
     )
     return ok(TemplateDownloadLink(template_id=template_id, download_url=url, expires_in_minutes=minutes))
+
+
+@admin_router.get("/templates/{template_id}/file")
+async def admin_download_template_file(
+    template_id: int,
+    db: DBDep,
+    user: Annotated[CurrentUserDep, Depends(_EditorRole)],
+) -> StreamingResponse:
+    _, data, filename, media_type = await service.template_download_file(
+        db,
+        template_id,
+        operator_id=user.user_id,
+        operator_role=",".join(user.roles) or None,
+    )
+    return _template_file_response(data, filename, media_type)

@@ -161,6 +161,7 @@ class NodeMarkStatusIn(BaseModel):
 class ReminderGenerateIn(BaseModel):
     as_of_date: date | None = None
     channel: str = "IN_APP"
+    force_current_nodes: bool = False
 
     @field_validator("channel")
     @classmethod
