@@ -94,7 +94,7 @@
               size="mini"
               :type="UNI_BUTTON_TYPE.primary"
               :loading="downloadingTemplateId === tpl.id"
-              @tap="openTemplate(tpl.id, tpl.template_type)"
+              @tap="openTemplate(tpl.id, tpl.template_type, tpl.template_name)"
             >下载</button>
           </view>
         </view>
@@ -246,7 +246,7 @@
             size="mini"
               :type="UNI_BUTTON_TYPE.primary"
               :loading="downloadingTemplateId === tpl.template_id"
-              @tap="openTemplate(tpl.template_id, tpl.template_type)"
+              @tap="openTemplate(tpl.template_id, tpl.template_type, tpl.template_name)"
             >打开</button>
           </view>
         </view>
@@ -260,10 +260,8 @@ import { computed, onMounted, ref } from 'vue'
 import InlineStateNotice from '@/components/InlineStateNotice.vue'
 import {
   aiMatchKnowledge,
-  downloadTemplateFromUrl,
   downloadTemplateFile,
   getEntryDetail,
-  getTemplateDownloadLink,
   listKnowledgeCategories,
   listStudentTemplates,
   searchKnowledge,
@@ -273,6 +271,7 @@ import {
   type KnowledgeEntryDetail,
   type KnowledgeTemplateItem,
 } from '@/api/knowledge'
+import { saveFileToDiskIfSupported } from '@/utils/file'
 import { UNI_BUTTON_TYPE } from '@/utils/uni-button'
 import { getErrorMessage } from '@/utils/error'
 import { formatShanghaiDateTime } from '@/utils/datetime'
@@ -396,30 +395,39 @@ function templateFileType(templateType?: string | null) {
   return ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf'].includes(normalized) ? normalized : undefined
 }
 
-async function openTemplate(templateId: number, templateType?: string | null) {
+async function openTemplate(
+  templateId: number,
+  templateType?: string | null,
+  templateName?: string | null,
+) {
   if (downloadingTemplateId.value) return
   downloadingTemplateId.value = templateId
   try {
-    const { tempFilePath } = await downloadTemplateWithFallback(templateId)
-    openDownloadedTemplate(tempFilePath, templateType)
-  } catch {
+    const { filePath } = await downloadTemplateFile(templateId, {
+      templateName,
+      templateType,
+    })
+    try {
+      const savedToDisk = await saveFileToDiskIfSupported(filePath)
+      if (savedToDisk) {
+        uni.showToast({ title: '模板已保存到本地', icon: 'none' })
+      }
+    } catch (error) {
+      uni.showToast({
+        title: getErrorMessage(error, '文件已下载，但保存到系统失败'),
+        icon: 'none',
+      })
+    }
+    openDownloadedTemplate(filePath, templateType)
+  } catch (error) {
     downloadingTemplateId.value = null
-    uni.showToast({ title: '模板下载失败', icon: 'none' })
+    uni.showToast({ title: getErrorMessage(error, '模板下载失败'), icon: 'none' })
   }
 }
 
-async function downloadTemplateWithFallback(templateId: number) {
-  try {
-    return await downloadTemplateFile(templateId)
-  } catch {
-    const resp = await getTemplateDownloadLink(templateId)
-    return downloadTemplateFromUrl(resp.data.download_url)
-  }
-}
-
-function openDownloadedTemplate(tempFilePath: string, templateType?: string | null) {
+function openDownloadedTemplate(filePath: string, templateType?: string | null) {
   uni.openDocument({
-    filePath: tempFilePath,
+    filePath,
     fileType: templateFileType(templateType),
     showMenu: true,
     success() {

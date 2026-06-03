@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程当前节点状态展示修正、`S59` 党团流程学生提交材料与老师确认推进闭环、`S60` 证明 PDF 信息学院品牌与中文字体修复、`S61` 生产部署 GitHub SSH 443 与超时治理、`S62` 学业缺口课程推荐无开课数据兜底增强、`S63` 成绩单课程匹配推荐和教师审核辅助、`S64` 微信订阅消息可达性复测已完成；`S65` 小程序按钮源码级反馈修复完成，DevTools 自动化点击验收仍受本机自动化 WebSocket 端点连接阻塞；`S66` 管理端初始密码提醒文案去硬编码已完成；`S67` 请假起止日期顺序校验代码修复完成，DB 集成回归待本机测试库恢复后补跑；`S68` 第 12 组收到 bug 复现、代码修复与定向验证已完成；`S69` 仓库本地缓存忽略与 GitHub 同步已完成
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程当前节点状态展示修正、`S59` 党团流程学生提交材料与老师确认推进闭环、`S60` 证明 PDF 信息学院品牌与中文字体修复、`S61` 生产部署 GitHub SSH 443 与超时治理、`S62` 学业缺口课程推荐无开课数据兜底增强、`S63` 成绩单课程匹配推荐和教师审核辅助、`S64` 微信订阅消息可达性复测已完成；`S65` 小程序按钮源码级反馈修复完成，DevTools 自动化点击验收仍受本机自动化 WebSocket 端点连接阻塞；`S66` 管理端初始密码提醒文案去硬编码已完成；`S67` 请假起止日期顺序校验代码修复与 DB 集成回归补跑已完成；`S68` 第 12 组收到 bug 复现、代码修复与定向验证已完成；`S69` 仓库本地缓存忽略与 GitHub 同步已完成；`S70` 小程序模板文件直下载与本地落盘已完成
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -1088,18 +1088,19 @@
 ### S67 请假起止日期顺序校验
 
 - 细化文件：`docs/notes/refinements/2026-05-29-s67-leave-date-range-validation.md`
-- 当前状态：`[!]` 代码修复与可用静态/单元/构建验证已完成；DB 集成测试受本机测试库拒连阻塞。
+- 当前状态：`[x]` 代码修复与全部验证已完成；`2026-06-03` 已在恢复后的本机测试库上补跑定向 DB 集成回归。
 - [x] `S67.1` 复核请假类型 schema、Miniapp 动态表单和后端申请服务，确认缺少 `start_date <= end_date` 校验。
 - [x] `S67.2` 在小程序申请创建页补请假类型日期顺序校验，保存草稿、保存修改和提交前均可拦截。
 - [x] `S67.3` 在后端申请服务补请假日期顺序兜底，覆盖创建草稿、修改草稿和提交草稿。
 - [x] `S67.4` 新增无数据库单元测试与 DB 集成回归用例，锁定逆序日期拒绝。
-- [!] `S67.5` 定向 DB 集成回归当前受本机 `ConnectionRefusedError: [WinError 1225]` 阻塞，待测试库恢复后补跑。
+- [x] `S67.5` 定向 DB 集成回归已在恢复后的本机 `localhost:54322/sip_db_test` 上补跑通过。
 
 当前结论：
 
 - 请假申请现在在小程序端和后端 API 端同时拒绝“起始日期晚于结束日期”的输入。
 - 已通过后端 ruff、py_compile、无数据库单元测试 `3 passed`、Miniapp 类型检查与 `mp-weixin` 构建。
 - 新增 DB 集成用例 `test_leave_request_rejects_start_date_after_end_date` 已落盘，但本机测试库拒连导致未进入业务断言。
+- `2026-06-03` 补充验证：用户确认 Docker 已开启后，已启动 `deploy/docker-compose.yml` 中的 `sip-kingbase`，恢复 `localhost:54322` 测试库；随后在 `backend/.venv` 上执行 `python -m pytest tests/integration/test_request_flow.py::test_leave_request_rejects_start_date_after_end_date -q -o cache_dir=../.tmp/pytest-cache-s67-leave-rerun --basetemp=../.tmp/pytest-tmp-s67-leave-rerun`，结果 `1 passed in 12.20s`，`S67` 正式闭环。
 
 ### S68 第 12 组收到 bug 复现与代码修复
 
@@ -1134,6 +1135,20 @@
 
 - 本轮整理只改变仓库忽略规则和计划记录，不改变业务代码、构建配置或运行逻辑。
 - `.pytest_cache/`、`.ruff_cache/`、`.uv-cache/`、`.uv-cache-local/` 已纳入根目录忽略范围。
+
+### S70 小程序模板文件直下载与本地落盘
+
+- 细化文件：`docs/notes/refinements/2026-06-03-s70-miniapp-template-direct-download.md`
+- 当前状态：`[x]` 已完成小程序模板文件二进制下载、本地落盘、系统保存兼容与页面错误提示收口。
+- [x] `S70.1` 新增小程序认证态二进制文件下载 helper，直接请求 `/knowledge/templates/{id}/file`。
+- [x] `S70.2` 将模板文件写入小程序本地用户文件目录，不再依赖 `downloadFile` 作为主链路。
+- [x] `S70.3` 在微信能力存在时尝试调用 `saveFileToDisk`，让用户可将文件显式保存到系统。
+- [x] `S70.4` 更新知识库模板下载页面，传入真实模板名、收口错误提示并保留下载后直接打开文档能力。
+
+当前结论：
+
+- 学生端模板下载主链路已从“文件流失败后回退预签名 URL”升级为“认证接口直取文件二进制 + 本地落盘 + 打开文档 + 可用时保存到系统”。
+- 已通过 Miniapp 类型检查与 `mp-weixin` 构建验证。
 
 ### S6 前端体验增量优化
 
@@ -1718,9 +1733,10 @@
 | 2026-05-27 | S64 微信订阅消息可达性复测 | `docs/notes/refinements/2026-05-27-s64-wechat-subscribe-reachability-test.md` | `S64.1, S64.2, S64.3, S64.4` | `[x]` | 已确认非站内信的微信订阅消息代码级链路可达，定向集成 `2 passed`；生产真实微信凭据与模板已配置，微信 token 获取成功，真实发送尝试返回微信 `43101`，说明仍需小程序端测试用户授权 |
 | 2026-05-27 | S65 小程序按钮反馈与效果审查 | `docs/notes/refinements/2026-05-27-s65-miniapp-button-feedback-audit.md` | `S65.1, S65.2, S65.3, S65.4, S65.5` | `[!]` | 已扫描小程序事件绑定并修复 7 处按钮反馈或失败回退不足；事件绑定扫描、Miniapp 类型检查与 `mp-weixin` 构建均通过；微信开发者工具 CLI 可打开项目，但 automator WebSocket 连接当前阻塞 |
 | 2026-05-28 | S66 管理端初始密码提醒文案去硬编码 | `docs/notes/refinements/2026-05-28-s66-admin-initial-password-copy-normalization.md` | `S66.1, S66.2, S66.3` | `[x]` | 已确认问题在 Web 文案硬编码，并完成登录页/个人信息页提示收口；`web vue-tsc` 与 `pnpm -C web build` 通过 |
-| 2026-05-29 | S67 请假起止日期顺序校验 | `docs/notes/refinements/2026-05-29-s67-leave-date-range-validation.md` | `S67.1, S67.2, S67.3, S67.4, S67.5` | `[!]` | 已完成 Miniapp 保存/提交前校验与后端创建/修改/提交兜底；后端 ruff、py_compile、无数据库单元测试 `3 passed`、Miniapp 类型检查与 `mp-weixin` 构建通过；DB 集成回归受本机测试库拒连阻塞 |
+| 2026-05-29 | S67 请假起止日期顺序校验 | `docs/notes/refinements/2026-05-29-s67-leave-date-range-validation.md` | `S67.1, S67.2, S67.3, S67.4, S67.5` | `[x]` | 已完成 Miniapp 保存/提交前校验与后端创建/修改/提交兜底；后端 ruff、py_compile、无数据库单元测试 `3 passed`、Miniapp 类型检查与 `mp-weixin` 构建通过；`2026-06-03` 在恢复后的本机 `localhost:54322/sip_db_test` 上补跑定向 DB 集成回归 `1 passed in 12.20s`，阻塞关闭 |
 | 2026-06-01 | S68 第 12 组收到 bug 复现与代码修复 | `docs/notes/refinements/2026-06-01-s68-peer-received-bug-fixes.md` | `S68.1, S68.2, S68.3, S68.4, S68.5, S68.6, S68.7` | `[x]` | 已修复小程序通知时间、模板下载回退、Web 画像快照错误反馈和培养方案空课程明细；知识 URL 来源新增草稿回归已通过；后端 ruff/py_compile、Miniapp 类型检查、Web build、Miniapp build 与 S68 定向 DB 集成 `4 passed` 通过 |
 | 2026-06-03 | S69 仓库本地缓存忽略与 GitHub 同步 | `docs/notes/refinements/2026-06-03-s69-repo-hygiene-github-upload.md` | `S69.1, S69.2, S69.3, S69.4` | `[x]` | 已补根目录 `.pytest_cache/`、`.ruff_cache/`、`.uv-cache/`、`.uv-cache-local/` 忽略规则；`git check-ignore`、`git diff --check` 与 Git 状态复核通过，并已提交推送到 GitHub |
+| 2026-06-03 | S70 小程序模板文件直下载与本地落盘 | `docs/notes/refinements/2026-06-03-s70-miniapp-template-direct-download.md` | `S70.1, S70.2, S70.3, S70.4` | `[x]` | 已将学生端模板下载主链路切换为认证接口二进制直取、本地落盘、可用时保存到系统并继续打开文档；Miniapp `vue-tsc` 与 `mp-weixin` 构建通过 |
 
 ## 会话更新要求
 
@@ -1856,5 +1872,7 @@
 - `2026-05-27`：推进 `S65` 小程序按钮反馈与效果审查；静态扫描 `miniapp/src` 全部 Vue 页面与组件事件绑定，确认无缺失处理函数；修复知识检索匹配空输入、知识详情失败、理论自测未答题提交、申请详情编辑跳转失败、通知详情返回兜底、学业 PDF 后缀校验和画像完整查看重复提交反馈。Miniapp 类型检查与 `mp-weixin` 构建通过；微信开发者工具 CLI `auto/open` 可打开项目，真实自动化点击断言仍因 DevTools automator WebSocket 协议端点未连通而阻塞。
 - `2026-05-28`：完成 `S66` 管理端初始密码提醒文案去硬编码；确认新管理员首次登录看到 `admin123` 提示是 Web 侧把 `must_change_password` 提醒写死为默认超管文案所致。现已将登录页、个人信息页和改密弹窗统一改为通用“系统生成的初始密码/当前初始密码”提示，避免系统生成密码的新管理员看到误导信息；验证通过 `.\web\node_modules\.bin\vue-tsc.CMD --noEmit -p web\tsconfig.json` 与 `pnpm -C web build`。
 - `2026-05-29`：完成 `S67` 请假起止日期顺序校验代码修复；小程序申请创建页会在保存草稿、保存修改和提交前拦截“起始日期晚于结束日期”，后端申请服务也在创建草稿、修改草稿和提交草稿三处兜底拒绝。验证通过后端 ruff、py_compile、无数据库单元测试 `3 passed`、Miniapp 类型检查与 `mp-weixin` 构建；新增 DB 集成回归用例受本机测试库 `WinError 1225` 拒连阻塞，待测试库恢复后补跑。
+- `2026-06-03`：补完 `S67` 请假起止日期顺序校验的 DB 集成回归闭环；用户确认 Docker 已开启后，已启动 `deploy/docker-compose.yml` 中的 `sip-kingbase` 并恢复 `localhost:54322` 测试库，随后在 `backend/.venv` 上补跑 `tests/integration/test_request_flow.py::test_leave_request_rejects_start_date_after_end_date`，结果 `1 passed in 12.20s`。至此 `S67` 从“代码已修复、环境阻塞待补跑”更新为正式闭环。
 - `2026-06-01`：完成 `S68` 第 12 组收到 bug 复现与代码修复；修复小程序通知时间按上海时区格式化、小程序模板下载认证文件流与预签名链接回退、Web 画像快照下载失败可见反馈、培养方案 0 课程明细稳定空态；新增知识条目带 URL 来源保存草稿回归用例；后端 ruff/py_compile、Miniapp 类型检查、Web build、Miniapp build 通过；启动本地 Docker 开发数据库后，S68 定向 DB 集成回归 `4 passed in 76.87s`。
 - `2026-06-03`：完成 `S69` 仓库本地缓存忽略与 GitHub 同步；补充根目录 `.pytest_cache/`、`.ruff_cache/`、`.uv-cache/`、`.uv-cache-local/` 忽略规则，消除本地 pytest 缓存权限导致的 Git 状态噪声；`git check-ignore`、`git diff --check` 与 Git 状态复核通过，并已提交推送到 GitHub `origin/main`。
+- `2026-06-03`：完成 `S70` 小程序模板文件直下载与本地落盘；新增 `miniapp/src/utils/file.ts`，将学生端模板下载主链路改为认证接口二进制直取、本地用户目录落盘、微信能力存在时调用 `saveFileToDisk`，并在知识库页传入真实模板名、展示更具体的错误提示。验证通过 `.\web\node_modules\.bin\vue-tsc.CMD --noEmit -p miniapp\tsconfig.json` 与 `corepack pnpm -C miniapp build:mp-weixin`。

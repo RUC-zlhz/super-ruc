@@ -1,4 +1,5 @@
-import { buildApiUrl, download, get, getAuthHeader, post } from '@/utils/request'
+import { buildApiUrl, get, getAuthHeader, post } from '@/utils/request'
+import { downloadBinaryFile } from '@/utils/file'
 
 export interface KnowledgeCategory {
   code: string
@@ -135,8 +136,17 @@ export function getTemplateDownloadLink(templateId: number) {
   return get<TemplateDownloadLink>(`/knowledge/templates/${templateId}/download`)
 }
 
-export function downloadTemplateFile(templateId: number) {
-  return download(`/knowledge/templates/${templateId}/file`)
+export function downloadTemplateFile(
+  templateId: number,
+  options?: {
+    templateName?: string | null
+    templateType?: string | null
+  },
+) {
+  return downloadBinaryFile(`/knowledge/templates/${templateId}/file`, {
+    fallbackName: options?.templateName || `template-${templateId}`,
+    preferredExtension: options?.templateType?.trim().toLowerCase() || null,
+  })
 }
 
 export function downloadTemplateFromUrl(url: string) {
