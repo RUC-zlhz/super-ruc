@@ -25,6 +25,10 @@
 # ---------------------------------------------------------------
 # Python / FastAPI（后端）
 # ---------------------------------------------------------------
+.pytest_cache/
+.ruff_cache/
+.uv-cache/
+.uv-cache-local/
 backend/.venv/
 backend/__pycache__/
 backend/**/__pycache__/
