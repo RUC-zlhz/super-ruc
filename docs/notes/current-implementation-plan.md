@@ -1148,7 +1148,9 @@
 当前结论：
 
 - 学生端模板下载主链路已从“文件流失败后回退预签名 URL”升级为“认证接口直取文件二进制 + 本地落盘 + 打开文档 + 可用时保存到系统”。
-- 已通过 Miniapp 类型检查与 `mp-weixin` 构建验证。
+- 已通过 Miniapp 类型检查与 `mp-weixin` 构建验证；`2026-06-06` 复核 PR #6 时再次通过 Miniapp 类型检查、`mp-weixin` 构建和 `git diff --check`。
+- `2026-06-06` 已合并 GitHub PR #6 到 `main`，merge commit 为 `c81cf643eb372b96efe0a000ff2a4c834c046e39`；自动部署 run `27066179182` 成功。
+- 本轮 PR 复核尝试补跑 `tests/integration/test_knowledge_template_flow.py`，但本机 Docker Desktop 未运行，`localhost:54322/sip_db_test` 拒连，未进入业务断言；该测试此前已有后端文件流契约覆盖。
 
 ### S6 前端体验增量优化
 
@@ -1736,7 +1738,7 @@
 | 2026-05-29 | S67 请假起止日期顺序校验 | `docs/notes/refinements/2026-05-29-s67-leave-date-range-validation.md` | `S67.1, S67.2, S67.3, S67.4, S67.5` | `[x]` | 已完成 Miniapp 保存/提交前校验与后端创建/修改/提交兜底；后端 ruff、py_compile、无数据库单元测试 `3 passed`、Miniapp 类型检查与 `mp-weixin` 构建通过；`2026-06-03` 在恢复后的本机 `localhost:54322/sip_db_test` 上补跑定向 DB 集成回归 `1 passed in 12.20s`，阻塞关闭 |
 | 2026-06-01 | S68 第 12 组收到 bug 复现与代码修复 | `docs/notes/refinements/2026-06-01-s68-peer-received-bug-fixes.md` | `S68.1, S68.2, S68.3, S68.4, S68.5, S68.6, S68.7` | `[x]` | 已修复小程序通知时间、模板下载回退、Web 画像快照错误反馈和培养方案空课程明细；知识 URL 来源新增草稿回归已通过；后端 ruff/py_compile、Miniapp 类型检查、Web build、Miniapp build 与 S68 定向 DB 集成 `4 passed` 通过 |
 | 2026-06-03 | S69 仓库本地缓存忽略与 GitHub 同步 | `docs/notes/refinements/2026-06-03-s69-repo-hygiene-github-upload.md` | `S69.1, S69.2, S69.3, S69.4` | `[x]` | 已补根目录 `.pytest_cache/`、`.ruff_cache/`、`.uv-cache/`、`.uv-cache-local/` 忽略规则；`git check-ignore`、`git diff --check` 与 Git 状态复核通过，并已提交推送到 GitHub |
-| 2026-06-03 | S70 小程序模板文件直下载与本地落盘 | `docs/notes/refinements/2026-06-03-s70-miniapp-template-direct-download.md` | `S70.1, S70.2, S70.3, S70.4` | `[x]` | 已将学生端模板下载主链路切换为认证接口二进制直取、本地落盘、可用时保存到系统并继续打开文档；Miniapp `vue-tsc` 与 `mp-weixin` 构建通过 |
+| 2026-06-03 | S70 小程序模板文件直下载与本地落盘 | `docs/notes/refinements/2026-06-03-s70-miniapp-template-direct-download.md` | `S70.1, S70.2, S70.3, S70.4` | `[x]` | 已将学生端模板下载主链路切换为认证接口二进制直取、本地落盘、可用时保存到系统并继续打开文档；Miniapp `vue-tsc` 与 `mp-weixin` 构建通过；`2026-06-06` PR #6 已合并到 `main`，自动部署 run `27066179182` 成功 |
 
 ## 会话更新要求
 
@@ -1876,3 +1878,4 @@
 - `2026-06-01`：完成 `S68` 第 12 组收到 bug 复现与代码修复；修复小程序通知时间按上海时区格式化、小程序模板下载认证文件流与预签名链接回退、Web 画像快照下载失败可见反馈、培养方案 0 课程明细稳定空态；新增知识条目带 URL 来源保存草稿回归用例；后端 ruff/py_compile、Miniapp 类型检查、Web build、Miniapp build 通过；启动本地 Docker 开发数据库后，S68 定向 DB 集成回归 `4 passed in 76.87s`。
 - `2026-06-03`：完成 `S69` 仓库本地缓存忽略与 GitHub 同步；补充根目录 `.pytest_cache/`、`.ruff_cache/`、`.uv-cache/`、`.uv-cache-local/` 忽略规则，消除本地 pytest 缓存权限导致的 Git 状态噪声；`git check-ignore`、`git diff --check` 与 Git 状态复核通过，并已提交推送到 GitHub `origin/main`。
 - `2026-06-03`：完成 `S70` 小程序模板文件直下载与本地落盘；新增 `miniapp/src/utils/file.ts`，将学生端模板下载主链路改为认证接口二进制直取、本地用户目录落盘、微信能力存在时调用 `saveFileToDisk`，并在知识库页传入真实模板名、展示更具体的错误提示。验证通过 `.\web\node_modules\.bin\vue-tsc.CMD --noEmit -p miniapp\tsconfig.json` 与 `corepack pnpm -C miniapp build:mp-weixin`。
+- `2026-06-06`：完成 PR #6 审查与合并复核；本地在 PR head `8933447` 上通过 Miniapp 类型检查、`corepack pnpm -C miniapp build:mp-weixin` 和 `git diff --check`，后端知识模板集成测试因 Docker Desktop 未运行导致 `localhost:54322/sip_db_test` 拒连而未进入业务断言。随后 GitHub PR #6 以 merge commit `c81cf643eb372b96efe0a000ff2a4c834c046e39` 合并到 `main`，`Intranet Production Deploy` run `27066179182` 成功。
