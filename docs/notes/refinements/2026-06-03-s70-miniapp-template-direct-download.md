@@ -49,6 +49,7 @@
 - `2026-06-06` PR #6 合并前复核：在 PR head `8933447` 上再次执行 `.\web\node_modules\.bin\vue-tsc.CMD --noEmit -p miniapp\tsconfig.json`、`corepack pnpm -C miniapp build:mp-weixin` 与 `git diff --check origin/main...HEAD`，均通过。
 - `2026-06-06` 后端契约复核：`tests/integration/test_knowledge_template_flow.py` 已覆盖学生端 `/knowledge/templates/{id}/file` 文件流响应、`content-type` 与 `content-disposition`；本轮尝试补跑该测试时，本机 Docker Desktop 未运行导致 `localhost:54322/sip_db_test` 拒连，未进入业务断言。
 - `2026-06-06` 合并与部署：GitHub PR #6 已合并到 `main`，merge commit 为 `c81cf643eb372b96efe0a000ff2a4c834c046e39`；`Intranet Production Deploy` run `27066179182` 成功。
+- `2026-06-06` 服务器补查：按用户补充要求，遇到本机 DB 拒连后使用 GitHub Actions 部署后的生产服务器检查；服务器 checkout 与 `.deploy/current_commit` 均为 `bb5db624a53b6ef3ff3a78d2af08ba8d6bf3e87c`，生产 smoke 通过，backend/web/db/redis/minio 均 healthy；模板文件接口只读复测返回 `template_total=4`、`file_status=200`、`content_disposition_has_filename_star=True`、`bytes=11854`。
 
 ## 结论
 
