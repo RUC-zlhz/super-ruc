@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程当前节点状态展示修正、`S59` 党团流程学生提交材料与老师确认推进闭环、`S60` 证明 PDF 信息学院品牌与中文字体修复、`S61` 生产部署 GitHub SSH 443 与超时治理、`S62` 学业缺口课程推荐无开课数据兜底增强、`S63` 成绩单课程匹配推荐和教师审核辅助、`S64` 微信订阅消息可达性复测已完成；`S65` 小程序按钮源码级反馈修复完成，DevTools 自动化点击验收仍受本机自动化 WebSocket 端点连接阻塞；`S66` 管理端初始密码提醒文案去硬编码已完成；`S67` 请假起止日期顺序校验代码修复与 DB 集成回归补跑已完成；`S68` 第 12 组收到 bug 复现、代码修复与定向验证已完成；`S69` 仓库本地缓存忽略与 GitHub 同步已完成；`S70` 小程序模板文件直下载与本地落盘已完成；`S71` 用户使用说明书与软件测试报告出件已完成；`S72` 教师管理端登录失败提示修复正在验证与部署
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程当前节点状态展示修正、`S59` 党团流程学生提交材料与老师确认推进闭环、`S60` 证明 PDF 信息学院品牌与中文字体修复、`S61` 生产部署 GitHub SSH 443 与超时治理、`S62` 学业缺口课程推荐无开课数据兜底增强、`S63` 成绩单课程匹配推荐和教师审核辅助、`S64` 微信订阅消息可达性复测已完成；`S65` 小程序按钮源码级反馈修复完成，DevTools 自动化点击验收仍受本机自动化 WebSocket 端点连接阻塞；`S66` 管理端初始密码提醒文案去硬编码已完成；`S67` 请假起止日期顺序校验代码修复与 DB 集成回归补跑已完成；`S68` 第 12 组收到 bug 复现、代码修复与定向验证已完成；`S69` 仓库本地缓存忽略与 GitHub 同步已完成；`S70` 小程序模板文件直下载与本地落盘已完成；`S71` 用户使用说明书与软件测试报告出件已完成；`S72` 教师管理端登录失败提示修复与生产部署已完成
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -1188,17 +1188,19 @@
 ### S72 教师管理端登录失败提示修复与部署监督
 
 - 细化文件：`docs/notes/refinements/2026-06-08-s72-web-login-error-feedback-deploy.md`
-- 当前状态：`[-]` 本地 Web 构建已通过，待 GitHub 推送与自动部署复核。
+- 当前状态：`[x]` 已完成。
 - [x] `S72.1` 定位登录失败提示误判链路：后端 `/auth/login` 对账号密码错误返回 `401 工号或密码错误`，Web 全局 401 拦截器误展示为登录失效。
 - [x] `S72.2` 修改 `web/src/utils/request.ts`，将 `/auth/login` 的 401 从会话失效分支排除，直接展示后端错误文案。
 - [x] `S72.3` 修改 `web/src/views/Login.vue`，登录失败时由请求层展示错误并阻止 Promise 继续冒泡。
 - [x] `S72.4` 运行 Web 类型检查与构建验证。
-- [ ] `S72.5` 推送 GitHub 并监督 GitHub Actions 自动部署成功。
+- [x] `S72.5` 推送 GitHub 并监督 GitHub Actions 自动部署成功。
 
 当前结论：
 
 - 登录接口错误凭证不再误导为“登录已失效”；已登录态接口的 401 保护逻辑保持原行为。
 - 本地验证 `corepack pnpm -C web build` 与 `git diff --check` 均通过。
+- 提交 `eb10ae9297e94397648f4c15cc0f31cd19e8b57f` 已推送 `origin/main`；GitHub Actions `Intranet Production Deploy` run `27111760299` 成功完成。
+- 生产 `GET http://10.10.0.13/healthz` 返回 `code=0,message=ok,status=ok`；生产错误凭证登录探测返回 `401 工号或密码错误`。
 
 ### S6 前端体验增量优化
 
@@ -1788,7 +1790,7 @@
 | 2026-06-03 | S69 仓库本地缓存忽略与 GitHub 同步 | `docs/notes/refinements/2026-06-03-s69-repo-hygiene-github-upload.md` | `S69.1, S69.2, S69.3, S69.4` | `[x]` | 已补根目录 `.pytest_cache/`、`.ruff_cache/`、`.uv-cache/`、`.uv-cache-local/` 忽略规则；`git check-ignore`、`git diff --check` 与 Git 状态复核通过，并已提交推送到 GitHub |
 | 2026-06-03 | S70 小程序模板文件直下载与本地落盘 | `docs/notes/refinements/2026-06-03-s70-miniapp-template-direct-download.md` | `S70.1, S70.2, S70.3, S70.4` | `[x]` | 已将学生端模板下载主链路切换为认证接口二进制直取、本地落盘、可用时保存到系统并继续打开文档；Miniapp `vue-tsc` 与 `mp-weixin` 构建通过；`2026-06-06` PR #6 已合并到 `main`，自动部署 run `27066179182` 成功；服务器补查模板文件接口返回 `200` |
 | 2026-06-07 | S71 真实部署事实回填校正 | `docs/notes/refinements/2026-06-07-s71-production-facts-realignment.md` | `S71.5` | `[x]` | 已按 `10.10.0.13` 在线抽检重写用户手册与测试报告，修正访问方式、共享账号失效、线上验证边界和页数 QC；重新出件后用户手册 `12` 页、测试报告 `8` 页 |
-| 2026-06-08 | S72 教师管理端登录失败提示修复与部署监督 | `docs/notes/refinements/2026-06-08-s72-web-login-error-feedback-deploy.md` | `S72.1, S72.2, S72.3, S72.4, S72.5` | `[-]` | 已修复 `/auth/login` 401 被误展示为登录失效的问题；Web 构建与 `git diff --check` 通过，待 GitHub Actions 部署复核 |
+| 2026-06-08 | S72 教师管理端登录失败提示修复与部署监督 | `docs/notes/refinements/2026-06-08-s72-web-login-error-feedback-deploy.md` | `S72.1, S72.2, S72.3, S72.4, S72.5` | `[x]` | 已修复 `/auth/login` 401 被误展示为登录失效的问题；Web 构建、`git diff --check`、GitHub Actions run `27111760299` 与生产健康检查均通过 |
 
 ## 会话更新要求
 
@@ -1932,4 +1934,4 @@
 - `2026-06-06`：按用户补充要求，遇到本机 DB 拒连后改用 GitHub Actions 部署后的服务器环境检查；服务器 `/opt/super-ruc/app` 与 `.deploy/current_commit` 均为 `bb5db624a53b6ef3ff3a78d2af08ba8d6bf3e87c`，`docker compose ps` 显示 backend/web/db/redis/minio 均 healthy，`deploy/intranet-prod/scripts/smoke.sh` 通过；在 backend 容器内生成短时 access token 后只读检查模板列表与文件接口，结果 `template_total=4`、`file_status=200`、`content_disposition_has_filename_star=True`、`bytes=11854`。
 - `2026-06-06`：完成 `S71` 用户使用说明书与软件测试报告出件；已将两个乱码模板重命名并迁移到 `docs/templates/用户使用说明书模板.docx` 与 `docs/templates/软件测试报告模板.docx`，新增 `scripts/docs/docx_common.py`、`build_project_user_manual.py`、`build_project_test_report.py`，生成 `output/doc/用户使用说明书-信息学院学生综合服务与党团管理平台-v1.0.docx` 与 `output/doc/软件测试报告-信息学院学生综合服务与党团管理平台-v1.0.docx`。随后使用本机 Word 导出 PDF、`pdftoppm` 渲染页面 PNG 做人工 QC，确认用户手册 `11` 页、测试报告 `7` 页版式可读。
 - `2026-06-07`：按用户补充要求，以 `http://10.10.0.13/` 真实部署为准重做 `S71` 文档口径；在线核对根页标题、`/healthz`、知识搜索、知识分类、受保护接口未登录 `401`，以及历史共享口令 `admin / admin123` 登录 `401`。随后更新两份出件脚本，重新生成 `output/doc/用户使用说明书-信息学院学生综合服务与党团管理平台-v1.0.docx` 与 `output/doc/软件测试报告-信息学院学生综合服务与党团管理平台-v1.0.docx`，并完成 Word/PDF/PNG 页面 QC，最终页数分别为 `12` 页和 `8` 页。
-- `2026-06-08`：新增 `S72` 教师管理端登录失败提示修复；已定位为 Web 全局 401 拦截器误把 `/auth/login` 的账号密码错误当作会话失效，并完成 `request.ts` 与 `Login.vue` 代码修复。随后执行 `corepack pnpm -C web build` 与 `git diff --check` 通过，后续继续执行 GitHub 推送与 Actions 自动部署监督。
+- `2026-06-08`：完成 `S72` 教师管理端登录失败提示修复；已定位为 Web 全局 401 拦截器误把 `/auth/login` 的账号密码错误当作会话失效，并完成 `request.ts` 与 `Login.vue` 代码修复。随后执行 `corepack pnpm -C web build` 与 `git diff --check` 通过，提交 `eb10ae9297e94397648f4c15cc0f31cd19e8b57f` 已推送到 `origin/main`，GitHub Actions `Intranet Production Deploy` run `27111760299` 成功；生产 `/healthz` 返回 ok，错误凭证登录返回 `401 工号或密码错误`。

@@ -2,7 +2,7 @@
 
 - 创建日期：`2026-06-08`
 - 关联主计划：`S72`
-- 当前状态：`[-]` 本地验证已通过，待 GitHub Actions 自动部署复核
+- 当前状态：`[x]` 已完成
 - 触发问题：教师管理后台输入错误账号或密码时，后端已返回 `工号或密码错误`，但 Web 全局 401 拦截器把所有 401 统一展示为 `登录已失效 / 请重新登录后继续操作`。
 
 ## 范围
@@ -11,7 +11,7 @@
 - [x] `S72.2` 修改 Web 请求拦截器，将 `/auth/login` 的 `401` 从会话失效分支中排除，直接展示后端错误文案。
 - [x] `S72.3` 修改登录页失败处理，避免登录失败 Promise 继续冒泡。
 - [x] `S72.4` 运行 Web 类型检查与构建验证。
-- [ ] `S72.5` 推送 GitHub 并监督 GitHub Actions 自动部署成功。
+- [x] `S72.5` 推送 GitHub 并监督 GitHub Actions 自动部署成功。
 
 ## 约束
 
@@ -23,4 +23,7 @@
 
 - `2026-06-08`：`corepack pnpm -C web build` 通过，包含 `vue-tsc --noEmit` 与 `vite build`。
 - `2026-06-08`：`git diff --check` 通过。
-- GitHub commit 与自动部署 workflow run 结果待推送后回写。
+- `2026-06-08`：提交 `eb10ae9297e94397648f4c15cc0f31cd19e8b57f` 已推送到 `origin/main`。
+- `2026-06-08`：GitHub Actions `Intranet Production Deploy` run `27111760299` 成功，job `Deploy to 10.10.0.13` 在 `2m20s` 内完成。
+- `2026-06-08`：生产 `GET http://10.10.0.13/healthz` 返回 `code=0,message=ok,status=ok`。
+- `2026-06-08`：生产 `POST /api/v1/auth/login` 使用错误凭证返回 `401` 与 `message=工号或密码错误`，后端错误体保持正确；Web 已在请求层对该路径单独展示该文案。
