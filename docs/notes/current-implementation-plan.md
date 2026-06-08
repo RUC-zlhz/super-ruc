@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程当前节点状态展示修正、`S59` 党团流程学生提交材料与老师确认推进闭环、`S60` 证明 PDF 信息学院品牌与中文字体修复、`S61` 生产部署 GitHub SSH 443 与超时治理、`S62` 学业缺口课程推荐无开课数据兜底增强、`S63` 成绩单课程匹配推荐和教师审核辅助、`S64` 微信订阅消息可达性复测已完成；`S65` 小程序按钮源码级反馈修复完成，DevTools 自动化点击验收仍受本机自动化 WebSocket 端点连接阻塞；`S66` 管理端初始密码提醒文案去硬编码已完成；`S67` 请假起止日期顺序校验代码修复与 DB 集成回归补跑已完成；`S68` 第 12 组收到 bug 复现、代码修复与定向验证已完成；`S69` 仓库本地缓存忽略与 GitHub 同步已完成；`S70` 小程序模板文件直下载与本地落盘已完成
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程当前节点状态展示修正、`S59` 党团流程学生提交材料与老师确认推进闭环、`S60` 证明 PDF 信息学院品牌与中文字体修复、`S61` 生产部署 GitHub SSH 443 与超时治理、`S62` 学业缺口课程推荐无开课数据兜底增强、`S63` 成绩单课程匹配推荐和教师审核辅助、`S64` 微信订阅消息可达性复测已完成；`S65` 小程序按钮源码级反馈修复完成，DevTools 自动化点击验收仍受本机自动化 WebSocket 端点连接阻塞；`S66` 管理端初始密码提醒文案去硬编码已完成；`S67` 请假起止日期顺序校验代码修复与 DB 集成回归补跑已完成；`S68` 第 12 组收到 bug 复现、代码修复与定向验证已完成；`S69` 仓库本地缓存忽略与 GitHub 同步已完成；`S70` 小程序模板文件直下载与本地落盘已完成；`S71` 用户使用说明书与软件测试报告出件已完成；`S72` 教师管理端登录失败提示修复正在验证与部署
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -1153,6 +1153,53 @@
 - 本轮 PR 复核尝试补跑 `tests/integration/test_knowledge_template_flow.py`，但本机 Docker Desktop 未运行，`localhost:54322/sip_db_test` 拒连，未进入业务断言；该测试此前已有后端文件流契约覆盖。
 - 按用户补充要求，本机 DB 拒连后已使用 GitHub Actions 部署后的服务器环境补查：生产 checkout 与 `.deploy/current_commit` 均为 `bb5db624a53b6ef3ff3a78d2af08ba8d6bf3e87c`，生产 smoke 通过，模板总数 `4`，`/admin/knowledge/templates/1/file` 返回 `200`、`filename*=` 响应头和 `11854` 字节文件体。
 
+### S71 用户使用说明书与软件测试报告出件
+
+- 细化文件：
+  - `docs/notes/refinements/2026-06-06-s71-user-manual-and-test-report-delivery.md`
+  - `docs/notes/refinements/2026-06-07-s71-production-facts-realignment.md`
+- 当前状态：`[x]` 已完成模板正规化、脚本化出件与页面 QC；`2026-06-07` 已按真实部署 `http://10.10.0.13/` 再校正。
+- [x] `S71.1` 将根目录乱码命名的测试模板迁移并重命名为 `docs/templates/软件测试报告模板.docx`。
+- [x] `S71.2` 将根目录乱码命名的用户手册模板迁移并重命名为 `docs/templates/用户使用说明书模板.docx`。
+- [x] `S71.3` 新增 `scripts/docs/docx_common.py`、`scripts/docs/build_project_user_manual.py`、`scripts/docs/build_project_test_report.py`，基于当前项目事实生成正式 Word 交付件。
+- [x] `S71.4` 使用本机 Word 导出 PDF 并转 PNG 做页面 QC，确认用户手册 `12` 页、测试报告 `8` 页，无遮挡、无空尾页。
+- [x] `S71.5` 按 `2026-06-07` 生产在线抽检结果校正两份文档中的访问、账号、认证边界和验证结论口径，并重新出件。
+
+当前结论：
+
+- 已完成两份新文档出件，正式交付件为：
+  - `output/doc/用户使用说明书-信息学院学生综合服务与党团管理平台-v1.0.docx`
+  - `output/doc/软件测试报告-信息学院学生综合服务与党团管理平台-v1.0.docx`
+- 用户手册按当前系统真实模块和角色重写，覆盖管理员端、教师端、学生端、常见问题与技术支持；测试报告按 `S50` 最新有效 bug 审查、后续专项验证和 `2026-06-07` 生产在线抽检事实整理。
+- 两份文档当前以 `10.10.0.13` 在线事实和当前代码实现为准；旧互测文档中的 `admin / admin123` 共享口令口径已被明确判定为失效，不再作为正式交付事实。
+- 模板资产已纳入 `docs/templates/` 正式目录，后续可重复运行脚本继续更新出件。
+
+证据：
+
+- 细化文件：
+  - `docs/notes/refinements/2026-06-06-s71-user-manual-and-test-report-delivery.md`
+  - `docs/notes/refinements/2026-06-07-s71-production-facts-realignment.md`
+- 模板资产：`docs/templates/用户使用说明书模板.docx`、`docs/templates/软件测试报告模板.docx`
+- 出件脚本：`scripts/docs/docx_common.py`、`scripts/docs/build_project_user_manual.py`、`scripts/docs/build_project_test_report.py`
+- 最终交付：`output/doc/用户使用说明书-信息学院学生综合服务与党团管理平台-v1.0.docx`、`output/doc/软件测试报告-信息学院学生综合服务与党团管理平台-v1.0.docx`
+- 生产在线核对：`GET /` 返回标题 `信息学院管理后台`；`GET /healthz` 返回 `code=0,status=ok`；`GET /api/v1/knowledge/search?page=1&page_size=20` 返回 `total=16`；`GET /api/v1/knowledge/categories` 返回 `9` 个分类；`/api/v1/knowledge/templates` 与 `/api/v1/workflow/public/templates` 未带 token 返回 `401`；`POST /api/v1/auth/login` 使用 `admin / admin123` 返回 `401 工号或密码错误`
+- 排版验证：已使用本机 Word 导出 PDF，再通过 `pdftoppm` 渲染页面 PNG 做人工 QC；最终用户手册 `12` 页、测试报告 `8` 页。
+
+### S72 教师管理端登录失败提示修复与部署监督
+
+- 细化文件：`docs/notes/refinements/2026-06-08-s72-web-login-error-feedback-deploy.md`
+- 当前状态：`[-]` 本地 Web 构建已通过，待 GitHub 推送与自动部署复核。
+- [x] `S72.1` 定位登录失败提示误判链路：后端 `/auth/login` 对账号密码错误返回 `401 工号或密码错误`，Web 全局 401 拦截器误展示为登录失效。
+- [x] `S72.2` 修改 `web/src/utils/request.ts`，将 `/auth/login` 的 401 从会话失效分支排除，直接展示后端错误文案。
+- [x] `S72.3` 修改 `web/src/views/Login.vue`，登录失败时由请求层展示错误并阻止 Promise 继续冒泡。
+- [x] `S72.4` 运行 Web 类型检查与构建验证。
+- [ ] `S72.5` 推送 GitHub 并监督 GitHub Actions 自动部署成功。
+
+当前结论：
+
+- 登录接口错误凭证不再误导为“登录已失效”；已登录态接口的 401 保护逻辑保持原行为。
+- 本地验证 `corepack pnpm -C web build` 与 `git diff --check` 均通过。
+
 ### S6 前端体验增量优化
 
 - [x] `S6.1` Web 共享导航与默认落点收口
@@ -1740,6 +1787,8 @@
 | 2026-06-01 | S68 第 12 组收到 bug 复现与代码修复 | `docs/notes/refinements/2026-06-01-s68-peer-received-bug-fixes.md` | `S68.1, S68.2, S68.3, S68.4, S68.5, S68.6, S68.7` | `[x]` | 已修复小程序通知时间、模板下载回退、Web 画像快照错误反馈和培养方案空课程明细；知识 URL 来源新增草稿回归已通过；后端 ruff/py_compile、Miniapp 类型检查、Web build、Miniapp build 与 S68 定向 DB 集成 `4 passed` 通过 |
 | 2026-06-03 | S69 仓库本地缓存忽略与 GitHub 同步 | `docs/notes/refinements/2026-06-03-s69-repo-hygiene-github-upload.md` | `S69.1, S69.2, S69.3, S69.4` | `[x]` | 已补根目录 `.pytest_cache/`、`.ruff_cache/`、`.uv-cache/`、`.uv-cache-local/` 忽略规则；`git check-ignore`、`git diff --check` 与 Git 状态复核通过，并已提交推送到 GitHub |
 | 2026-06-03 | S70 小程序模板文件直下载与本地落盘 | `docs/notes/refinements/2026-06-03-s70-miniapp-template-direct-download.md` | `S70.1, S70.2, S70.3, S70.4` | `[x]` | 已将学生端模板下载主链路切换为认证接口二进制直取、本地落盘、可用时保存到系统并继续打开文档；Miniapp `vue-tsc` 与 `mp-weixin` 构建通过；`2026-06-06` PR #6 已合并到 `main`，自动部署 run `27066179182` 成功；服务器补查模板文件接口返回 `200` |
+| 2026-06-07 | S71 真实部署事实回填校正 | `docs/notes/refinements/2026-06-07-s71-production-facts-realignment.md` | `S71.5` | `[x]` | 已按 `10.10.0.13` 在线抽检重写用户手册与测试报告，修正访问方式、共享账号失效、线上验证边界和页数 QC；重新出件后用户手册 `12` 页、测试报告 `8` 页 |
+| 2026-06-08 | S72 教师管理端登录失败提示修复与部署监督 | `docs/notes/refinements/2026-06-08-s72-web-login-error-feedback-deploy.md` | `S72.1, S72.2, S72.3, S72.4, S72.5` | `[-]` | 已修复 `/auth/login` 401 被误展示为登录失效的问题；Web 构建与 `git diff --check` 通过，待 GitHub Actions 部署复核 |
 
 ## 会话更新要求
 
@@ -1881,3 +1930,6 @@
 - `2026-06-03`：完成 `S70` 小程序模板文件直下载与本地落盘；新增 `miniapp/src/utils/file.ts`，将学生端模板下载主链路改为认证接口二进制直取、本地用户目录落盘、微信能力存在时调用 `saveFileToDisk`，并在知识库页传入真实模板名、展示更具体的错误提示。验证通过 `.\web\node_modules\.bin\vue-tsc.CMD --noEmit -p miniapp\tsconfig.json` 与 `corepack pnpm -C miniapp build:mp-weixin`。
 - `2026-06-06`：完成 PR #6 审查与合并复核；本地在 PR head `8933447` 上通过 Miniapp 类型检查、`corepack pnpm -C miniapp build:mp-weixin` 和 `git diff --check`，后端知识模板集成测试因 Docker Desktop 未运行导致 `localhost:54322/sip_db_test` 拒连而未进入业务断言。随后 GitHub PR #6 以 merge commit `c81cf643eb372b96efe0a000ff2a4c834c046e39` 合并到 `main`，`Intranet Production Deploy` run `27066179182` 成功。
 - `2026-06-06`：按用户补充要求，遇到本机 DB 拒连后改用 GitHub Actions 部署后的服务器环境检查；服务器 `/opt/super-ruc/app` 与 `.deploy/current_commit` 均为 `bb5db624a53b6ef3ff3a78d2af08ba8d6bf3e87c`，`docker compose ps` 显示 backend/web/db/redis/minio 均 healthy，`deploy/intranet-prod/scripts/smoke.sh` 通过；在 backend 容器内生成短时 access token 后只读检查模板列表与文件接口，结果 `template_total=4`、`file_status=200`、`content_disposition_has_filename_star=True`、`bytes=11854`。
+- `2026-06-06`：完成 `S71` 用户使用说明书与软件测试报告出件；已将两个乱码模板重命名并迁移到 `docs/templates/用户使用说明书模板.docx` 与 `docs/templates/软件测试报告模板.docx`，新增 `scripts/docs/docx_common.py`、`build_project_user_manual.py`、`build_project_test_report.py`，生成 `output/doc/用户使用说明书-信息学院学生综合服务与党团管理平台-v1.0.docx` 与 `output/doc/软件测试报告-信息学院学生综合服务与党团管理平台-v1.0.docx`。随后使用本机 Word 导出 PDF、`pdftoppm` 渲染页面 PNG 做人工 QC，确认用户手册 `11` 页、测试报告 `7` 页版式可读。
+- `2026-06-07`：按用户补充要求，以 `http://10.10.0.13/` 真实部署为准重做 `S71` 文档口径；在线核对根页标题、`/healthz`、知识搜索、知识分类、受保护接口未登录 `401`，以及历史共享口令 `admin / admin123` 登录 `401`。随后更新两份出件脚本，重新生成 `output/doc/用户使用说明书-信息学院学生综合服务与党团管理平台-v1.0.docx` 与 `output/doc/软件测试报告-信息学院学生综合服务与党团管理平台-v1.0.docx`，并完成 Word/PDF/PNG 页面 QC，最终页数分别为 `12` 页和 `8` 页。
+- `2026-06-08`：新增 `S72` 教师管理端登录失败提示修复；已定位为 Web 全局 401 拦截器误把 `/auth/login` 的账号密码错误当作会话失效，并完成 `request.ts` 与 `Login.vue` 代码修复。随后执行 `corepack pnpm -C web build` 与 `git diff --check` 通过，后续继续执行 GitHub 推送与 Actions 自动部署监督。

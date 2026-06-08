@@ -121,6 +121,8 @@ async function onSubmit() {
       return
     }
     router.replace(redirect)
+  } catch {
+    // 请求层已展示登录失败原因。
   } finally {
     loading.value = false
   }

@@ -17,6 +17,12 @@ export interface ApiEnvelope<T> {
   data: T
 }
 
+function isAuthLoginRequest(url?: string): boolean {
+  if (!url) return false
+  const path = url.split('?')[0]?.replace(/\/+$/, '')
+  return path === '/auth/login' || path.endsWith('/api/v1/auth/login')
+}
+
 const http: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE || '/api/v1',
   timeout: 30_000,
@@ -50,6 +56,10 @@ http.interceptors.response.use(
     const data = error.response?.data
     const msg = data?.message || error.message || '网络异常'
     if (status === 401) {
+      if (isAuthLoginRequest(error.config?.url)) {
+        message.error(msg)
+        return Promise.reject(error)
+      }
       setAccessToken(null)
       notification.warning({
         message: '登录已失效',
