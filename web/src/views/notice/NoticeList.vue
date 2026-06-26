@@ -1349,6 +1349,14 @@ function buildPayload(): NoticeInput {
   }
 }
 
+function validateEffectiveRange() {
+  if (form.effective_start && form.effective_end && form.effective_start > form.effective_end) {
+    message.warning('生效结束日期不能早于生效开始日期')
+    return false
+  }
+  return true
+}
+
 function buildSourcePayload() {
   return {
     name: sourceForm.name.trim(),
@@ -1660,6 +1668,9 @@ async function onSubmit() {
   }
   if (!payload.body_md) {
     message.warning('请填写正文')
+    return
+  }
+  if (!validateEffectiveRange()) {
     return
   }
 

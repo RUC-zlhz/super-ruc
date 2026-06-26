@@ -436,7 +436,7 @@ async function onDownloadProof() {
   }
 }
 
-async function onDownloadAttachment(attachmentId: number, filename: string) {
+async function onDownloadAttachment(attachmentId: number, filename?: string) {
   if (!detail.value || downloadingAttachmentId.value != null) return
   downloadingAttachmentId.value = attachmentId
   try {

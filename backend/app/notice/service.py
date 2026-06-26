@@ -200,6 +200,15 @@ def notice_to_brief(notice: Notice) -> NoticeBrief:
     )
 
 
+def _ensure_notice_effective_range(notice: Notice) -> None:
+    if (
+        notice.effective_start is not None
+        and notice.effective_end is not None
+        and notice.effective_start > notice.effective_end
+    ):
+        raise BizError("生效结束日期不能早于生效开始日期", code=40034, http_status=422)
+
+
 def source_to_out(source: NoticeSource) -> NoticeSourceOut:
     return NoticeSourceOut.model_validate(source)
 
@@ -470,6 +479,7 @@ async def publish_notice(
         raise ConflictError("通知已发布")
     if row.status == NOTICE_STATUS_ARCHIVED:
         raise BizError("已归档通知不可重新发布", code=40031)
+    _ensure_notice_effective_range(row)
 
     row.status = NOTICE_STATUS_PUBLISHED
     row.published_at = datetime.now(UTC)
@@ -1034,6 +1044,7 @@ async def dispatch_notice(
         raise NotFoundError("通知不存在")
     if notice.status != NOTICE_STATUS_PUBLISHED:
         raise BizError("通知未发布，不能发送", code=40032)
+    _ensure_notice_effective_range(notice)
 
     channels = override_channels or _str_to_channels(notice.channels)
     if not channels:

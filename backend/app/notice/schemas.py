@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class TargetRule(BaseModel):
@@ -32,6 +32,16 @@ class NoticeIn(BaseModel):
     is_pinned: bool = False
     source_type: str = "MANUAL"
     source_url: str | None = None
+
+    @model_validator(mode="after")
+    def validate_effective_range(self) -> NoticeIn:
+        if (
+            self.effective_start is not None
+            and self.effective_end is not None
+            and self.effective_start > self.effective_end
+        ):
+            raise ValueError("生效结束日期不能早于生效开始日期")
+        return self
 
 
 class NoticeOut(BaseModel):

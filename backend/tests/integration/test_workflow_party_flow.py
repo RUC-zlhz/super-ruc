@@ -597,7 +597,7 @@ async def test_manual_workflow_reminder_can_force_current_node_before_due(
     assert run["sent_count"] == 1
 
     inbox = await client.get(
-        "/api/v1/notices",
+        "/api/v1/notices/inbox",
         headers={"Authorization": f"Bearer {_tok}"},
     )
     assert inbox.status_code == 200, inbox.text

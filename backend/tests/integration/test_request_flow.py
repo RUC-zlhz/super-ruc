@@ -607,6 +607,12 @@ async def test_request_detail_contract_uses_canonical_attachment_and_approval_fi
     assert counselor_download.status_code == 200, counselor_download.text
     assert counselor_download.content == b"%PDF-1.4 test"
 
+    download_log = await _latest_audit(
+        db, action="DOWNLOAD_ATTACHMENT", entity_id=attachment["id"]
+    )
+    assert download_log is not None
+    assert download_log.entity_code == "REQUEST_ATTACHMENT"
+
 
 async def test_proof_preview_returns_pdf_stream(
     client: AsyncClient,

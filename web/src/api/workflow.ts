@@ -1,6 +1,6 @@
 import { del, get, patch, post } from '@/utils/request'
-import type { ApiEnvelope } from '@/utils/request'
 import { downloadFile } from '@/utils/download'
+import type { ApiEnvelope } from '@/utils/request'
 import type { Paginated } from './types'
 import type { StudentBasic } from './profile'
 

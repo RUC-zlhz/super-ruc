@@ -10,6 +10,8 @@
 """
 from __future__ import annotations
 
+from datetime import date
+
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +24,7 @@ from app.notice.models import (
     DELIVERY_STATUS_SENT,
     WECHAT_SUBSCRIBE_SCENE_REQUEST_STATUS,
     WECHAT_SUBSCRIBE_SCENE_WORKFLOW_REMINDER,
+    Notice,
     NoticeDeliveryAttempt,
     WechatSubscribeAuthorization,
 )
@@ -529,6 +532,56 @@ async def test_archived_notice_cannot_be_edited(
     )
     assert patch.status_code == 400
     assert patch.json()["code"] == 40030
+
+
+async def test_notice_rejects_invalid_effective_date_range(
+    admin_client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    invalid_create = await admin_client.post(
+        "/api/v1/admin/notices",
+        json={
+            "title": "非法日期通知",
+            "body_md": "x",
+            "channels": ["IN_APP"],
+            "effective_start": "2026-07-02",
+            "effective_end": "2026-07-01",
+        },
+    )
+    assert invalid_create.status_code == 422
+
+    publish_seed = await admin_client.post(
+        "/api/v1/admin/notices",
+        json={"title": "历史非法日期待发布", "body_md": "x", "channels": ["IN_APP"]},
+    )
+    publish_notice_id = publish_seed.json()["data"]["id"]
+    publish_notice = await db.get(Notice, publish_notice_id)
+    assert publish_notice is not None
+    publish_notice.effective_start = date(2026, 7, 2)
+    publish_notice.effective_end = date(2026, 7, 1)
+    await db.commit()
+
+    publish = await admin_client.post(f"/api/v1/admin/notices/{publish_notice_id}/publish")
+    assert publish.status_code == 422
+    assert publish.json()["code"] == 40034
+
+    dispatch_seed = await admin_client.post(
+        "/api/v1/admin/notices",
+        json={"title": "历史非法日期待发送", "body_md": "x", "channels": ["IN_APP"]},
+    )
+    dispatch_notice_id = dispatch_seed.json()["data"]["id"]
+    dispatch_notice = await db.get(Notice, dispatch_notice_id)
+    assert dispatch_notice is not None
+    dispatch_notice.status = "PUBLISHED"
+    dispatch_notice.effective_start = date(2026, 7, 2)
+    dispatch_notice.effective_end = date(2026, 7, 1)
+    await db.commit()
+
+    dispatch = await admin_client.post(
+        f"/api/v1/admin/notices/{dispatch_notice_id}/dispatch", json={}
+    )
+    assert dispatch.status_code == 422
+    assert dispatch.json()["code"] == 40034
 
 
 async def test_notice_source_rejects_local_private_and_resolved_private_urls(

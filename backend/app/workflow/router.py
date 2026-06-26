@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+from io import BytesIO
 from typing import Annotated
 from urllib.parse import quote
 
@@ -226,6 +227,20 @@ async def upload_attachment(
     return ok(AttachmentOut.model_validate(row))
 
 
+def _attachment_file_response(data: bytes, filename: str, media_type: str) -> StreamingResponse:
+    ascii_filename = "".join(ch if ch.isascii() and ch not in {'"', "\\"} else "_" for ch in filename)
+    encoded_filename = quote(filename)
+    return StreamingResponse(
+        BytesIO(data),
+        media_type=media_type,
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=\"{ascii_filename}\"; filename*=UTF-8''{encoded_filename}"
+            )
+        },
+    )
+
+
 @request_router.get("/{request_id}/attachments/{attachment_id}/download")
 async def download_attachment(
     request_id: int,
@@ -241,17 +256,7 @@ async def download_attachment(
         user.roles,
         viewer_student_id=user.student_id,
     )
-    ascii_filename = "".join(ch if ch.isascii() and ch not in {'"', "\\"} else "_" for ch in filename)
-    encoded_filename = quote(filename)
-    return StreamingResponse(
-        iter([data]),
-        media_type=media_type,
-        headers={
-            "Content-Disposition": (
-                f"attachment; filename=\"{ascii_filename}\"; filename*=UTF-8''{encoded_filename}"
-            )
-        },
-    )
+    return _attachment_file_response(data, filename, media_type)
 
 
 @request_router.get("/{request_id}", response_model=ApiResponse[RequestDetail])

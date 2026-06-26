@@ -13,7 +13,7 @@
 
     <div class="quiz-workbench">
       <section class="quiz-main">
-        <a-form layout="inline" class="filter-card quiz-filter" @finish="onSearch">
+        <a-form layout="inline" class="filter-card quiz-filter">
           <a-form-item label="主题">
             <a-input v-model:value="filters.topic" allow-clear placeholder="党史 / 团章…" />
           </a-form-item>
@@ -44,7 +44,7 @@
             </a-select>
           </a-form-item>
           <a-form-item>
-            <a-button type="primary" html-type="submit">
+            <a-button type="primary" @click="onSearch">
               <template #icon><SearchOutlined /></template>
               查询
             </a-button>
