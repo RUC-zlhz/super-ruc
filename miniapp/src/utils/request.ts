@@ -214,8 +214,21 @@ function withQuery(url: string, params?: Record<string, any>) {
   return `${url}${qs ? `?${qs}` : ''}`
 }
 
+// GET 去重：同一完整 URL 的并发只读请求复用同一在途 promise，
+// 避免重复点击 / 页面 onShow 重复拉取导致的冗余往返。settle 后清理。
+const inflightGet = new Map<string, Promise<ApiEnvelope<unknown>>>()
+
 export function get<T>(url: string, params?: Record<string, any>) {
-  return request<T>(withQuery(url, params), 'GET')
+  const fullUrl = withQuery(url, params)
+  const existing = inflightGet.get(fullUrl)
+  if (existing) return existing as Promise<ApiEnvelope<T>>
+  const p = request<T>(fullUrl, 'GET')
+  inflightGet.set(fullUrl, p as Promise<ApiEnvelope<unknown>>)
+  const cleanup = () => {
+    if (inflightGet.get(fullUrl) === p) inflightGet.delete(fullUrl)
+  }
+  p.then(cleanup, cleanup)
+  return p
 }
 
 export function post<T>(url: string, data?: any) {
