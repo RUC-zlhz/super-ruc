@@ -37,6 +37,9 @@ os.environ.setdefault(
 )
 # 测试里的网络调用全部走 mock，保证离线可运行
 os.environ["AI_QA_ENABLED"] = "false"
+# 缓存默认关：避免「写后立刻读」断言被缓存命中干扰，保证测试确定性。
+# 缓存命中/降级路径由 tests/integration/test_report_overview_cache.py 单独覆盖。
+os.environ["CACHE_ENABLED"] = "false"
 
 from collections.abc import AsyncGenerator, Generator  # noqa: E402
 

@@ -30,6 +30,7 @@ from app.auth import repository as auth_repo
 from app.auth.models import Student, User
 from app.auth.role_codes import normalize_role_code, normalize_role_codes
 from app.auth.scopes import StudentScopeSet, split_student_scope_codes, student_in_scope
+from app.core.cache import cache_get_text, cache_set_text
 from app.core.config import settings
 from app.core.exceptions import BizError, NotFoundError, PermissionError
 from app.core.sql import order_by_nulls_last_desc
@@ -1292,6 +1293,52 @@ def _term_code_date_range(term_code: str | None) -> tuple[datetime, datetime] | 
 
 
 async def build_overview(
+    db: AsyncSession,
+    *,
+    term_code: str | None = None,
+    viewer_user_id: int | None = None,
+    viewer_roles: list[str] | None = None,
+) -> OverviewResult:
+    """看板概览（带 Redis 缓存，TTL = REPORT_OVERVIEW_CACHE_TTL_SECONDS）。
+
+    缓存键包含 viewer_user_id —— 概览数据按查看者数据范围过滤，**绝不可跨用户共享**，
+    否则会造成越权数据泄露。缓存故障时自动降级为直算（见 app.core.cache）。
+    陈旧度上界为 TTL（默认 60s），适合看板这类对短延迟容忍度高的聚合视图。
+    """
+    cache_key = (
+        "report:overview:v1:"
+        f"{viewer_user_id if viewer_user_id is not None else 'all'}:"
+        f"{_normalize_term_code(term_code) or 'default'}"
+    )
+    cached = await cache_get_text(cache_key)
+    if cached is not None:
+        parsed = _parse_cached_overview(cached)
+        if parsed is not None:
+            return parsed
+
+    result = await _build_overview_uncached(
+        db,
+        term_code=term_code,
+        viewer_user_id=viewer_user_id,
+        viewer_roles=viewer_roles,
+    )
+    await cache_set_text(
+        cache_key,
+        result.model_dump_json(),
+        settings.REPORT_OVERVIEW_CACHE_TTL_SECONDS,
+    )
+    return result
+
+
+def _parse_cached_overview(raw: str) -> OverviewResult | None:
+    try:
+        return OverviewResult.model_validate_json(raw)
+    except Exception as exc:  # noqa: BLE001 — 缓存损坏/schema 漂移则直算覆盖
+        logger.warning("overview cache parse failed, recomputing: %s", exc)
+        return None
+
+
+async def _build_overview_uncached(
     db: AsyncSession,
     *,
     term_code: str | None = None,

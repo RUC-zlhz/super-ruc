@@ -17,6 +17,7 @@ from app.audit.router import router as audit_router
 from app.auth.router import admin_router as auth_admin_router
 from app.auth.router import router as auth_router
 from app.core.audit_archive_scheduler import get_audit_archive_scheduler
+from app.core.cache import close_cache
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.core.response import ApiResponse, ok
@@ -75,6 +76,7 @@ async def lifespan(app: FastAPI):
         await workflow_scheduler.stop()
     if audit_scheduler is not None:
         await audit_scheduler.stop()
+    await close_cache()
     logger.info("SIP backend shutting down")
 
 

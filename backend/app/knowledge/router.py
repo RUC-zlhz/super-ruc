@@ -67,8 +67,7 @@ admin_router = APIRouter(prefix="/admin/knowledge", tags=["knowledge-admin"])
 # ========== 学生侧 ==========
 @router.get("/categories", response_model=ApiResponse[list[CategoryOut]])
 async def list_categories(db: DBDep) -> ApiResponse[list[CategoryOut]]:
-    rows = await repo.list_categories(db)
-    return ok([CategoryOut.model_validate(r) for r in rows])
+    return ok(await service.list_categories_for_student(db))
 
 
 @router.get("/search", response_model=ApiResponse[Paginated[EntryBrief]])
@@ -170,6 +169,7 @@ async def admin_upsert_category(
     )
     await db.commit()
     await db.refresh(row)
+    await service.invalidate_knowledge_cache()
     return ok(CategoryOut.model_validate(row))
 
 

@@ -8,9 +8,11 @@ from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from typing import Any
 
+from pydantic import TypeAdapter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import log_action
+from app.core.cache import cache_delete_prefix, cache_get_text, cache_set_text
 from app.core.config import settings
 from app.core.exceptions import BizError, ConflictError, NotFoundError
 from app.core.storage import get_object_bytes, presigned_get, put_object
@@ -31,6 +33,7 @@ from app.knowledge.models import (
 from app.knowledge.schemas import (
     AiMatchCandidate,
     AiMatchResponse,
+    CategoryOut,
     EntryBrief,
     EntryCreate,
     EntryDetail,
@@ -40,6 +43,23 @@ from app.knowledge.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+# ---------- 知识库热点只读缓存（公开已发布内容；写操作即清空命名空间）----------
+_KNOWLEDGE_CACHE_PREFIX = "knowledge:"
+_CATEGORIES_CACHE_KEY = "knowledge:categories:v1"
+_category_list_adapter = TypeAdapter(list[CategoryOut])
+
+
+def _entry_cache_key(entry_id: int) -> str:
+    return f"knowledge:entry:v1:{entry_id}"
+
+
+async def invalidate_knowledge_cache() -> None:
+    """任何知识写操作后清空知识缓存命名空间（分类 + 条目详情）。
+
+    知识写操作（管理端）频率低，整命名空间清空足够简单且保证一致，
+    避免逐键失效的耦合。"""
+    await cache_delete_prefix(_KNOWLEDGE_CACHE_PREFIX)
 
 
 # ---------- 展示转换 ----------
@@ -165,11 +185,40 @@ async def list_templates_for_student(
     return list(rows), total
 
 
+async def list_categories_for_student(db: AsyncSession) -> list[CategoryOut]:
+    """知识分类列表（公开、变更稀疏）——带缓存，写分类时整命名空间失效。"""
+    cached = await cache_get_text(_CATEGORIES_CACHE_KEY)
+    if cached is not None:
+        try:
+            return _category_list_adapter.validate_json(cached)
+        except Exception as exc:  # noqa: BLE001 — 缓存损坏则直查覆盖
+            logger.warning("knowledge categories cache parse failed: %s", exc)
+    rows = await repo.list_categories(db)
+    result = [CategoryOut.model_validate(r) for r in rows]
+    await cache_set_text(
+        _CATEGORIES_CACHE_KEY,
+        _category_list_adapter.dump_json(result).decode("utf-8"),
+        settings.KNOWLEDGE_CACHE_TTL_SECONDS,
+    )
+    return result
+
+
 async def get_for_student(db: AsyncSession, entry_id: int) -> EntryDetail:
+    cache_key = _entry_cache_key(entry_id)
+    cached = await cache_get_text(cache_key)
+    if cached is not None:
+        try:
+            return EntryDetail.model_validate_json(cached)
+        except Exception as exc:  # noqa: BLE001 — 缓存损坏则直查覆盖
+            logger.warning("knowledge entry cache parse failed id=%s: %s", entry_id, exc)
     entry = await repo.get_entry(db, entry_id)
     if entry is None or entry.status != ENTRY_STATUS_PUBLISHED:
         raise NotFoundError("知识条目不存在或未发布")
-    return entry_to_detail(entry)
+    result = entry_to_detail(entry)
+    await cache_set_text(
+        cache_key, result.model_dump_json(), settings.KNOWLEDGE_CACHE_TTL_SECONDS
+    )
+    return result
 
 
 async def get_for_admin(db: AsyncSession, entry_id: int) -> EntryDetail:
@@ -293,6 +342,7 @@ async def create_entry(
     )
     await db.commit()
     await db.refresh(entry)
+    await invalidate_knowledge_cache()
     return entry_to_detail(entry)
 
 
@@ -341,6 +391,7 @@ async def update_entry(
     )
     await db.commit()
     await db.refresh(entry)
+    await invalidate_knowledge_cache()
     return entry_to_detail(entry)
 
 
@@ -387,6 +438,7 @@ async def publish_entry(
     )
     await db.commit()
     await db.refresh(entry)
+    await invalidate_knowledge_cache()
     return entry_to_detail(entry)
 
 
@@ -426,6 +478,7 @@ async def deprecate_entry(
     )
     await db.commit()
     await db.refresh(entry)
+    await invalidate_knowledge_cache()
     return entry_to_detail(entry)
 
 

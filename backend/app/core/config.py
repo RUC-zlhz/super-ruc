@@ -36,6 +36,12 @@ class Settings(BaseSettings):
 
     REDIS_URL: str = "redis://:sip_redis_dev@localhost:6379/0"
 
+    # 热点只读缓存（故障自动降级为直算）。测试默认关，保证断言确定性。
+    CACHE_ENABLED: bool = True
+    REPORT_OVERVIEW_CACHE_TTL_SECONDS: int = 60
+    # 知识库分类/条目详情缓存：公开已发布内容，写操作（创建/更新/发布/停用/改分类）即清空命名空间。
+    KNOWLEDGE_CACHE_TTL_SECONDS: int = 300
+
     AUDIT_ARCHIVE_ENABLED: bool = False
     AUDIT_ARCHIVE_RUN_AT: str = "03:30"
     AUDIT_ARCHIVE_RETENTION_DAYS: int = 180
@@ -156,6 +162,10 @@ class Settings(BaseSettings):
             errors.append("AUDIT_ARCHIVE_LOCK_TTL_SECONDS 必须大于 0")
         if self.WORKFLOW_REMINDER_INTERVAL_MINUTES <= 0:
             errors.append("WORKFLOW_REMINDER_INTERVAL_MINUTES 必须大于 0")
+        if self.REPORT_OVERVIEW_CACHE_TTL_SECONDS <= 0:
+            errors.append("REPORT_OVERVIEW_CACHE_TTL_SECONDS 必须大于 0")
+        if self.KNOWLEDGE_CACHE_TTL_SECONDS <= 0:
+            errors.append("KNOWLEDGE_CACHE_TTL_SECONDS 必须大于 0")
         if self.WORKFLOW_REMINDER_LOCK_TTL_SECONDS <= 0:
             errors.append("WORKFLOW_REMINDER_LOCK_TTL_SECONDS 必须大于 0")
         if self.WORKFLOW_REMINDER_CHANNEL != "IN_APP":
