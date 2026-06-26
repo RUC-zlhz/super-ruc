@@ -4,9 +4,52 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>信息学院管理后台</title>
+    <style>
+      /* 首屏引导态：在 JS 加载/Vue 挂载前展示品牌化加载，避免白屏闪烁。
+         Vue 挂载到 #app 时会替换其内容，引导态随之消失。 */
+      .app-boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        background: #f5f6f8;
+        font-family: "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+      }
+      .app-boot__spinner {
+        width: 36px;
+        height: 36px;
+        border: 3px solid #e6e8ee;
+        border-top-color: #b00018;
+        border-radius: 50%;
+        animation: app-boot-spin 0.8s linear infinite;
+      }
+      .app-boot__text {
+        color: #8a9099;
+        font-size: 14px;
+        letter-spacing: 2px;
+      }
+      @keyframes app-boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .app-boot__spinner {
+          animation-duration: 1.6s;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="app-boot">
+        <div class="app-boot__spinner"></div>
+        <div class="app-boot__text">信息学院管理后台</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

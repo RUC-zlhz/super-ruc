@@ -59,6 +59,24 @@ body {
   box-sizing: border-box;
 }
 
+/* 无障碍：尊重系统“减少动态效果”偏好，弱化过渡/动画，避免眩晕（普通用户无变化） */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* 无障碍：键盘导航可见焦点环（仅键盘聚焦出现，鼠标点击不显示，不影响既有视觉） */
+:focus-visible {
+  outline: 2px solid var(--ruc-red);
+  outline-offset: 2px;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
