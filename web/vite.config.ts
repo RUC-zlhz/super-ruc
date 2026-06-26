@@ -29,5 +29,23 @@ export default defineConfig({
     target: 'es2020',
     sourcemap: false,
     chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        // 拆分第三方依赖，改善长效缓存命中与首屏：业务代码更新时 vendor chunk 不失效
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('ant-design-vue') || id.includes('@ant-design')) return 'antdv'
+          if (
+            id.includes('node_modules/vue/') ||
+            id.includes('node_modules/vue-router/') ||
+            id.includes('node_modules/pinia/') ||
+            id.includes('node_modules/@vue/')
+          ) {
+            return 'vue'
+          }
+          return 'vendor'
+        },
+      },
+    },
   },
 })

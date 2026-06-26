@@ -5,7 +5,7 @@ import {
 } from "vue-router";
 import { useAuthStore } from "@/store/auth";
 import { getDefaultRouteForRoles } from "@/config/navigation";
-import { getAccessToken } from "@/utils/request";
+import { cancelPendingRequests, getAccessToken } from "@/utils/request";
 import {
   APPROVER_ROLES,
   AUDIT_VIEWER_ROLES,
@@ -160,6 +160,8 @@ export const router = createRouter({
 });
 
 router.beforeEach(async (to) => {
+  // 离开当前页时取消上一页尚未返回的只读请求，避免迟到响应覆盖新页面
+  cancelPendingRequests();
   const auth = useAuthStore();
   if (to.meta.public) {
     if (to.path === "/error/403" && auth.isAuthenticated && !auth.user) {
@@ -196,6 +198,13 @@ router.beforeEach(async (to) => {
     return { path: "/error/403" };
   }
   return true;
+});
+
+// 浏览器标签标题随路由更新：标签页/历史/书签可读出当前页面
+const BASE_TITLE = "信息学院管理后台";
+router.afterEach((to) => {
+  const pageTitle = to.meta.title as string | undefined;
+  document.title = pageTitle ? `${pageTitle} · ${BASE_TITLE}` : BASE_TITLE;
 });
 
 export default router;
