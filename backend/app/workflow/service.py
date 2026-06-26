@@ -22,7 +22,7 @@ from app.core.exceptions import (
 from app.core.exceptions import (
     PermissionError as AppPermissionError,
 )
-from app.core.storage import put_object
+from app.core.storage import get_object_bytes, put_object
 from app.notice import repository as notice_repo
 from app.notice.models import (
     WECHAT_SUBSCRIBE_SCENE_REQUEST_STATUS,
@@ -1295,6 +1295,52 @@ async def upload_request_attachment(
     await db.commit()
     await db.refresh(row)
     return row
+
+
+async def download_request_attachment(
+    db: AsyncSession,
+    request_id: int,
+    attachment_id: int,
+    viewer_user_id: int,
+    viewer_roles: list[str],
+    viewer_student_id: int | None = None,
+) -> tuple[bytes, str, str]:
+    req = await repo.get_request(db, request_id)
+    if req is None:
+        raise NotFoundError("申请不存在")
+    await _ensure_request_visible_to_viewer(
+        db,
+        req=req,
+        viewer_user_id=viewer_user_id,
+        viewer_student_id=viewer_student_id,
+        viewer_roles=viewer_roles,
+        action="DOWNLOAD_ATTACHMENT_DENIED",
+        message="无权下载该申请附件",
+    )
+
+    attachment = await repo.get_attachment(db, attachment_id)
+    if attachment is None or attachment.request_id != req.id:
+        raise NotFoundError("附件不存在")
+    try:
+        data = get_object_bytes(attachment.object_bucket, attachment.object_key)
+    except Exception as e:
+        raise BizError(f"附件下载失败：{e}", code=50006, http_status=500) from e
+
+    await log_action(
+        db,
+        event_type="REQUEST",
+        entity_code="REQUEST_ATTACHMENT",
+        action="DOWNLOAD_ATTACHMENT",
+        entity_id=attachment.id,
+        actor_user_id=viewer_user_id,
+        actor_role=",".join(viewer_roles) or None,
+        detail=build_audit_detail(
+            target={"request_id": req.id, "attachment_id": attachment.id},
+            refs=[{"filename": attachment.filename}],
+        ),
+    )
+    await db.commit()
+    return data, attachment.filename, attachment.mime_type or "application/octet-stream"
 
 
 async def create_draft_request(

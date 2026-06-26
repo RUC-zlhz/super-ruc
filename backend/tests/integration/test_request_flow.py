@@ -592,6 +592,27 @@ async def test_request_detail_contract_uses_canonical_attachment_and_approval_fi
     assert all("operated_at" not in row for row in detail_data["approval_records"])
     assert any(row["action"] == "OFFLINE_HANDLE" for row in detail_data["approval_records"])
 
+    student_download = await client.get(
+        f"/api/v1/requests/{request_id}/attachments/{attachment['id']}/download",
+        headers=stu_headers,
+    )
+    assert student_download.status_code == 200, student_download.text
+    assert student_download.content == b"%PDF-1.4 test"
+    assert "agreement.pdf" in student_download.headers["content-disposition"]
+
+    counselor_download = await client.get(
+        f"/api/v1/requests/{request_id}/attachments/{attachment['id']}/download",
+        headers=counselor_headers,
+    )
+    assert counselor_download.status_code == 200, counselor_download.text
+    assert counselor_download.content == b"%PDF-1.4 test"
+
+    download_log = await _latest_audit(
+        db, action="DOWNLOAD_ATTACHMENT", entity_id=attachment["id"]
+    )
+    assert download_log is not None
+    assert download_log.entity_code == "REQUEST_ATTACHMENT"
+
 
 async def test_proof_preview_returns_pdf_stream(
     client: AsyncClient,

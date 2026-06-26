@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -55,6 +56,10 @@ def _envelope(code: int, message: str, data: object | None = None) -> dict:
     return {"code": code, "message": message, "data": data}
 
 
+def _validation_errors(exc: RequestValidationError) -> object:
+    return jsonable_encoder(exc.errors(), custom_encoder={Exception: str})
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(BizError)
     async def handle_biz(_: Request, exc: BizError) -> JSONResponse:
@@ -74,7 +79,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def handle_validation(_: Request, exc: RequestValidationError) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content=_envelope(42200, "请求参数校验失败", {"errors": exc.errors()}),
+            content=_envelope(42200, "请求参数校验失败", {"errors": _validation_errors(exc)}),
         )
 
     @app.exception_handler(Exception)

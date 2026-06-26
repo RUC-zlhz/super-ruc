@@ -93,12 +93,22 @@
               :key="attachment.id"
               class="attachment-item"
             >
-              <div class="attachment-title">{{ attachment.filename }}</div>
-              <div class="detail-muted">
-                {{ attachment.mime_type || '未知类型' }} ·
-                {{ formatFileSize(attachment.file_size) }} ·
-                上传于 {{ formatDateTime(attachment.uploaded_at) }}
+              <div class="attachment-main">
+                <div class="attachment-title">{{ attachment.filename }}</div>
+                <div class="detail-muted">
+                  {{ attachment.mime_type || '未知类型' }} ·
+                  {{ formatFileSize(attachment.file_size) }} ·
+                  上传于 {{ formatDateTime(attachment.uploaded_at) }}
+                </div>
               </div>
+              <a-button
+                size="small"
+                :loading="downloadingAttachmentId === attachment.id"
+                @click="onDownloadAttachment(attachment.id, attachment.filename)"
+              >
+                <template #icon><DownloadOutlined /></template>
+                下载
+              </a-button>
             </div>
           </div>
           <a-empty v-else description="当前申请没有附件材料" />
@@ -231,6 +241,7 @@ import {
   ADMIN_REQUEST_ACTION_META,
   approveRequest,
   claimRequest,
+  downloadRequestAttachment,
   getApprovalActionMeta,
   getRequestDetail,
   getRequestStatusMeta,
@@ -259,6 +270,7 @@ const claiming = ref(false)
 const actionSubmitting = ref(false)
 const proofPreviewLoading = ref(false)
 const proofDownloadLoading = ref(false)
+const downloadingAttachmentId = ref<number | null>(null)
 
 const actionModal = reactive({
   visible: false,
@@ -424,6 +436,18 @@ async function onDownloadProof() {
   }
 }
 
+async function onDownloadAttachment(attachmentId: number, filename?: string) {
+  if (!detail.value || downloadingAttachmentId.value != null) return
+  downloadingAttachmentId.value = attachmentId
+  try {
+    await downloadRequestAttachment(detail.value.id, attachmentId, filename)
+  } catch {
+    message.error('附件下载失败')
+  } finally {
+    downloadingAttachmentId.value = null
+  }
+}
+
 async function loadDetail() {
   if (!Number.isFinite(id) || id <= 0) {
     detail.value = null
@@ -557,16 +581,25 @@ onMounted(loadDetail)
 }
 
 .attachment-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
   padding: 12px 14px;
   border: 1px solid var(--line-soft);
   border-radius: 10px;
   background: #fafbfc;
 }
 
+.attachment-main {
+  min-width: 0;
+}
+
 .attachment-title {
   margin-bottom: 4px;
   color: #262626;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .timeline-title-row {

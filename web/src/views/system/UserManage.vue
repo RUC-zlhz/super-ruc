@@ -4,7 +4,7 @@
 
     <a-tabs v-model:activeKey="activeTab">
       <a-tab-pane v-if="canManageStudents" key="students" tab="学生管理">
-        <a-form layout="inline" class="filter-card user-filter" @finish="onStudentSearch">
+        <a-form layout="inline" class="filter-card user-filter">
           <a-form-item label="搜索">
             <a-input
               v-model:value="stuFilters.q"
@@ -51,7 +51,7 @@
           </a-form-item>
           <a-form-item>
             <a-space wrap>
-              <a-button type="primary" html-type="submit">
+              <a-button type="primary" @click="onStudentSearch">
                 <template #icon><SearchOutlined /></template>
                 查询
               </a-button>

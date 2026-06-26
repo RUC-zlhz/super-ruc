@@ -780,7 +780,11 @@ async def test_profile_student_search_defaults_active_and_allows_explicit_histor
     graduated_only = await client.get(
         "/api/v1/admin/profile/students",
         headers=admin_headers,
-        params={"class_code": "CS2401", "enrollment_status": ENROLLMENT_GRADUATED},
+        params={
+            "q": "毕业历史",
+            "class_code": "CS2401",
+            "enrollment_status": ENROLLMENT_GRADUATED,
+        },
     )
     assert graduated_only.status_code == 200, graduated_only.text
     assert [item["student_no"] for item in graduated_only.json()["data"]["items"]] == [

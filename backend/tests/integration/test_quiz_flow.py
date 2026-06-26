@@ -106,6 +106,21 @@ async def test_quiz_admin_crud_and_validation(admin_client: AsyncClient) -> None
     assert listing.status_code == 200
     assert listing.json()["data"]["meta"]["total"] >= 3
 
+    filtered = await admin_client.get(
+        "/api/v1/admin/quiz/questions",
+        params={
+            "topic": "党建",
+            "qtype": "MULTI",
+            "q": "三大法宝",
+            "is_active": "true",
+            "page": 1,
+            "size": 20,
+        },
+    )
+    assert filtered.status_code == 200, filtered.text
+    filtered_items = filtered.json()["data"]["items"]
+    assert [item["id"] for item in filtered_items] == [multi["id"]]
+
     # 校验：未知题型
     bad1 = await admin_client.post(
         "/api/v1/admin/quiz/questions",
@@ -162,7 +177,7 @@ async def test_quiz_admin_crud_and_validation(admin_client: AsyncClient) -> None
     # 软删：仍可查，但 is_active=False
     again = await admin_client.get(
         "/api/v1/admin/quiz/questions",
-        params={"is_active": "false"},
+        params={"is_active": "false", "q": "中国共产党成立"},
     )
     assert again.status_code == 200
     ids_inactive = [q["id"] for q in again.json()["data"]["items"]]
