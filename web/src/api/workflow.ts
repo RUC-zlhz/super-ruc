@@ -1,5 +1,6 @@
 import { del, get, patch, post } from '@/utils/request'
 import type { ApiEnvelope } from '@/utils/request'
+import { downloadFile } from '@/utils/download'
 import type { Paginated } from './types'
 import type { StudentBasic } from './profile'
 
@@ -611,6 +612,17 @@ export function getMyRequests(params: { status?: RequestStatus; page?: number; s
 
 export function getRequestDetail(id: number) {
   return get<ApiEnvelope<RequestDetail>>(`/requests/${id}`)
+}
+
+export function downloadRequestAttachment(
+  requestId: number,
+  attachmentId: number,
+  filename?: string,
+) {
+  return downloadFile(
+    `/requests/${requestId}/attachments/${attachmentId}/download`,
+    filename,
+  )
 }
 
 export function previewRequestProof(id: number) {
