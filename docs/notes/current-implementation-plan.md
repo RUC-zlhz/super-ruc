@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程当前节点状态展示修正、`S59` 党团流程学生提交材料与老师确认推进闭环、`S60` 证明 PDF 信息学院品牌与中文字体修复、`S61` 生产部署 GitHub SSH 443 与超时治理、`S62` 学业缺口课程推荐无开课数据兜底增强、`S63` 成绩单课程匹配推荐和教师审核辅助、`S64` 微信订阅消息可达性复测已完成；`S65` 小程序按钮源码级反馈修复完成，DevTools 自动化点击验收仍受本机自动化 WebSocket 端点连接阻塞；`S66` 管理端初始密码提醒文案去硬编码已完成；`S67` 请假起止日期顺序校验代码修复与 DB 集成回归补跑已完成；`S68` 第 12 组收到 bug 复现、代码修复与定向验证已完成；`S69` 仓库本地缓存忽略与 GitHub 同步已完成；`S70` 小程序模板文件直下载与本地落盘已完成；`S71` 用户使用说明书与软件测试报告出件已完成；`S72` 教师管理端登录失败提示修复与生产部署已完成；`S73` 小程序时间格式化 Intl 运行时兼容修复已完成
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程当前节点状态展示修正、`S59` 党团流程学生提交材料与老师确认推进闭环、`S60` 证明 PDF 信息学院品牌与中文字体修复、`S61` 生产部署 GitHub SSH 443 与超时治理、`S62` 学业缺口课程推荐无开课数据兜底增强、`S63` 成绩单课程匹配推荐和教师审核辅助、`S64` 微信订阅消息可达性复测已完成；`S65` 小程序按钮源码级反馈修复完成，DevTools 自动化点击验收仍受本机自动化 WebSocket 端点连接阻塞；`S66` 管理端初始密码提醒文案去硬编码已完成；`S67` 请假起止日期顺序校验代码修复与 DB 集成回归补跑已完成；`S68` 第 12 组收到 bug 复现、代码修复与定向验证已完成；`S69` 仓库本地缓存忽略与 GitHub 同步已完成；`S70` 小程序模板文件直下载与本地落盘已完成；`S71` 用户使用说明书与软件测试报告出件已完成；`S72` 教师管理端登录失败提示修复与生产部署已完成；`S73` 小程序时间格式化 Intl 运行时兼容修复已完成；`S74` 教师审批附件下载入口代码已完成，DB 集成补跑待本机 Docker / 测试库恢复；`S75` UI/UX 与前后端性能优化（三端综合按优先级）committed 项已收口：后端 N+1×2 消除 + status 索引(迁移 0021) + report overview Redis 缓存、web 加载条/vite 分包/GET 去重路由取消/AsyncBoundary、miniapp GET 去重；S75.5 评估判定虚拟化不需要；后端全量 141 passed（1 既有失败已登记）+ 缓存 10 passed + 双端构建通过；lazyCodeLoading 留待人工 devtools smoke
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -1216,6 +1216,21 @@
 - `formatShanghaiDateTime` 与 `formatShanghaiDate` 不再依赖 `Intl`，微信小程序缺少全局 `Intl` 时不会因时间展示崩溃。
 - 验证通过 Miniapp 类型检查、`mp-weixin` 构建和产物 `Intl / DateTimeFormat` 残留扫描。
 
+### S74 教师审批附件下载入口补齐
+
+- 细化文件：`docs/notes/refinements/2026-06-13-s74-request-attachment-download.md`
+- 当前状态：`[-]` 代码已完成，DB 集成回归待本机 Docker / `localhost:54322` 测试库恢复后补跑。
+- [x] `S74.1` 确认教师管理端审批详情页已有“附件列表”，但当前仅展示文件元数据，缺少下载入口。
+- [x] `S74.2` 后端新增受申请详情可见性约束保护的附件下载接口，并记录下载审计。
+- [x] `S74.3` Web 审批详情页附件行新增“下载”按钮，复用现有 blob 下载工具。
+- [x] `S74.4` 扩展申请流集成测试，覆盖学生本人和辅导员下载附件。
+- [ ] `S74.5` Docker / 测试库恢复后补跑定向 DB 集成测试，并在生产部署后做真实浏览器下载验收。
+
+当前结论：
+
+- 老师后续入口为：管理后台 `审批工作台 -> 审批详情 -> 附件列表 -> 下载`。
+- 本地已通过后端 ruff、Python 编译检查与 Web 构建；定向 pytest 当前因本机 Docker Desktop 未运行导致 `localhost:54322/sip_db_test` 拒连，尚未进入业务断言。
+
 ### S6 前端体验增量优化
 
 - [x] `S6.1` Web 共享导航与默认落点收口
@@ -1806,6 +1821,8 @@
 | 2026-06-07 | S71 真实部署事实回填校正 | `docs/notes/refinements/2026-06-07-s71-production-facts-realignment.md` | `S71.5` | `[x]` | 已按 `10.10.0.13` 在线抽检重写用户手册与测试报告，修正访问方式、共享账号失效、线上验证边界和页数 QC；重新出件后用户手册 `12` 页、测试报告 `8` 页 |
 | 2026-06-08 | S72 教师管理端登录失败提示修复与部署监督 | `docs/notes/refinements/2026-06-08-s72-web-login-error-feedback-deploy.md` | `S72.1, S72.2, S72.3, S72.4, S72.5` | `[x]` | 已修复 `/auth/login` 401 被误展示为登录失效的问题；Web 构建、`git diff --check`、GitHub Actions run `27111760299` 与生产健康检查均通过 |
 | 2026-06-08 | S73 小程序时间格式化 Intl 运行时兼容修复 | `docs/notes/refinements/2026-06-08-s73-miniapp-intl-datetime-runtime-fix.md` | `S73.1, S73.2, S73.3, S73.4` | `[x]` | 已定位 `Intl is not defined` 为小程序运行时兼容问题，并将 Miniapp 上海时间格式化改为不依赖 `Intl` 的时间戳偏移计算；Miniapp 类型检查、`mp-weixin` 构建、`Intl / DateTimeFormat` 产物残留扫描与 GitHub 推送均已完成 |
+| 2026-06-13 | S74 教师审批附件下载入口补齐 | `docs/notes/refinements/2026-06-13-s74-request-attachment-download.md` | `S74.1, S74.2, S74.3, S74.4, S74.5` | `[-]` | 已新增申请附件下载接口与教师审批详情页下载按钮；后端 ruff、py_compile 与 Web build 通过，DB 集成测试因本机 Docker / `localhost:54322` 测试库未运行待补跑 |
+| 2026-06-26 | S75 UI/UX 与前后端性能优化 | `docs/notes/refinements/2026-06-26-s75-ui-ux-perf-optimization.md` | `S75.1~S75.10`（`S75.1~4/6/7/9/10` 完成、`S75.5` 评估判定不需要、`S75.8` miniapp 去重完成） | `[x]` | 三端综合按优先级，committed 项全部收口。已落地：后端 N+1×2 消除、`student_workflows.status` 补索引(迁移 0021)、report overview Redis 缓存(TTL 60s/按 viewer 隔离键/故障降级)、web 全局加载条 + vite 分包 + GET 去重/路由取消 + `AsyncBoundary` 基元、miniapp GET 去重。S75.5 经证据评估（全表服务端分页、无 live-search）判定虚拟化无收益不做。已自启 Docker：后端全量 `141 passed, 1 failed`（唯一失败为既有 `/notices/inbox` 测试缺陷，已登记独立任务，零回归）+ 缓存定向 `10 passed` + 迁移往返 + ruff + import smoke + web build + miniapp `mp-weixin` build 均通过。后续优化已执行：knowledge categories/detail 缓存 + 写路径事件失效（新增 `test_knowledge_cache` 证明命中+失效），AsyncBoundary 逐页接入经实测判定会回归故不接入（组件保留为新页面基元）；后端全量回归 `144 passed, 1 failed`（既有 `/notices/inbox` 缺陷，零回归）。UI/UX 增强：miniapp 下拉刷新死代码激活（8 页 `enablePullDownRefresh`，产物已核对）、web 首屏引导态消除白屏、`prefers-reduced-motion` + `:focus-visible` 无障碍、标签标题随路由；双端构建通过。待外部动作：`lazyCodeLoading` 需人工 devtools smoke（推荐项，未盲改） |
 
 ## 会话更新要求
 
@@ -1951,3 +1968,4 @@
 - `2026-06-07`：按用户补充要求，以 `http://10.10.0.13/` 真实部署为准重做 `S71` 文档口径；在线核对根页标题、`/healthz`、知识搜索、知识分类、受保护接口未登录 `401`，以及历史共享口令 `admin / admin123` 登录 `401`。随后更新两份出件脚本，重新生成 `output/doc/用户使用说明书-信息学院学生综合服务与党团管理平台-v1.0.docx` 与 `output/doc/软件测试报告-信息学院学生综合服务与党团管理平台-v1.0.docx`，并完成 Word/PDF/PNG 页面 QC，最终页数分别为 `12` 页和 `8` 页。
 - `2026-06-08`：完成 `S72` 教师管理端登录失败提示修复；已定位为 Web 全局 401 拦截器误把 `/auth/login` 的账号密码错误当作会话失效，并完成 `request.ts` 与 `Login.vue` 代码修复。随后执行 `corepack pnpm -C web build` 与 `git diff --check` 通过，提交 `eb10ae9297e94397648f4c15cc0f31cd19e8b57f` 已推送到 `origin/main`，GitHub Actions `Intranet Production Deploy` run `27111760299` 成功；生产 `/healthz` 返回 ok，错误凭证登录返回 `401 工号或密码错误`。
 - `2026-06-08`：完成 `S73` 小程序时间格式化 `Intl` 运行时兼容修复；`miniapp/src/utils/datetime.ts` 已改为纯时间戳 `UTC+8` 偏移计算，不再依赖微信小程序运行时可能缺失的 `Intl` 全局对象。验证通过 Miniapp 类型检查、`corepack pnpm -C miniapp build:mp-weixin`、产物 `Intl / DateTimeFormat` 残留扫描与 `git diff --check`。
+- `2026-06-13`：推进 `S74` 教师审批附件下载入口补齐；确认原审批详情页“附件列表”只展示附件元数据，已新增 `GET /api/v1/requests/{request_id}/attachments/{attachment_id}/download` 下载接口、下载审计、Web 附件行“下载”按钮与申请流回归断言。验证通过后端 ruff、py_compile 与 `corepack pnpm -C web build`；定向 DB 集成测试因本机 Docker Desktop 未运行导致 `localhost:54322/sip_db_test` 拒连，待环境恢复后补跑。

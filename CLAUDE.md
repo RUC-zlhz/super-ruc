@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # CLAUDE.md — 信息学院学生综合服务与党团管理平台
 
 > 本文件是 Claude Code Agent 的项目开发指南。每次进入项目时读取此文件以获取上下文。
@@ -92,17 +96,22 @@ super-ruc/
 ## 后端模块职责（`backend/app/`）
 
 ```
-core/          配置、数据库连接、依赖注入、安全工具
+core/          配置、数据库连接、依赖注入、安全工具、对象存储、两个后台调度器
 auth/          身份绑定、JWT 鉴权、角色加载（微信 code 换 openid + 学号绑定）
+admin_users/   管理端账号（work_no 登录）的增删改查与角色分配
 knowledge/     知识条目、标准答案、模板文件、受控 AI 匹配（Claude API）、来源治理
-workflow/      党团阶段、节点提醒、自测题库、事务申请、证明 PDF 预览、审批状态机
+workflow/      党团阶段、节点提醒、自测题库（quiz_*）、事务申请、证明 PDF 预览（pdf_generator）、审批状态机（state_machine）
+progress/      学生侧党团进度 / 申请进度的聚合只读视图
 notice/        通知内容、标签、受控抓取/手工录入、目标人群、站内/邮件/短信发送
-exchange/      Excel/Word/PDF 导入导出、批次管理、模板识别、校验与整批回滚
-report/        统计看板、学业缺口展示、课程类型建议（弱结论）
+exchange/      Excel/Word/PDF 导入导出、批次管理、模板识别、校验与整批回滚（validators/ 按主数据类型分文件）
+report/        统计看板、学业缺口展示、课程类型建议（弱结论）、成绩单 PDF
 honor/         奖励荣誉公示（校级及以上）、榜样风采、归档/撤销
 profile/       学生画像聚合（学籍 + 动态成长）、纠错申诉、敏感字段治理
-audit/         操作日志、敏感访问记录、字段权限策略
+audit/         操作日志、敏感访问记录、字段权限策略（policies / enforcement）
+pdf_assets/    PDF 生成所需的字体 / 品牌素材（无代码逻辑，配合 core/pdf_branding）
 ```
+
+> 注意：CLAUDE.md 闭环表里写的 `app/workflow/approval/` 是逻辑归类，实际审批状态机就在 `workflow/state_machine.py` + `workflow/service.py`，没有独立的 `approval/` 子包。
 
 每个模块内部结构：
 ```
@@ -114,6 +123,20 @@ audit/         操作日志、敏感访问记录、字段权限策略
 ├── schemas.py      Pydantic 请求/响应 schema
 └── deps.py         模块级依赖（可选）
 ```
+
+### 新增接口的标准构件（跨文件约定）
+
+- **路由注册**：一个模块通常导出多个 router（如 `router` 学生侧 / `admin_router` 管理侧 / `request_router` / `quiz_router`），**全部**在 [`app/main.py`](backend/app/main.py) 的 `create_app()` 里以 `settings.API_V1_PREFIX` 挂载。新加路由后必须回到 `main.py` `include_router`，否则不会生效。
+- **统一响应**：返回类型用 `ApiResponse[T]`，正常路径用 [`app/core/response.py`](backend/app/core/response.py) 的 `ok(data)`；不要手写 `{code,message,data}`。
+- **异常**：抛 `app/core/exceptions.py` 的 `BizError` / `AuthError`（401）/ `PermissionError`（403，可带自定义 `code` 如 `40311`），全局 handler 自动封装成统一包装体。不要直接 `raise HTTPException`。
+- **鉴权与会话依赖**（来自 [`app/core/dependencies.py`](backend/app/core/dependencies.py)）：
+  - `DBDep` = `Annotated[AsyncSession, Depends(get_db)]`
+  - `CurrentUserDep` / `get_current_user`：解析 JWT，校验 `token_version`（改密 / 踢下线靠它失效旧 token）
+  - `require_role("COUNSELOR", ...)`：角色门禁（C-03，权限只在后端判）
+  - `ActiveStudentDep` / `require_active_enrollment`：**学生端写操作专用**，非在读学籍（休学/毕业/转出/归档）只读拦截
+- **ORM 模型注册**：新建 `models.py` 后，须在 [`tests/conftest.py`](backend/tests/conftest.py) 与 `alembic/env.py` 的「导入所有模型」段落里 import，否则 `Base.metadata` 不含该表，建表 / TRUNCATE 都会漏。
+- **两个后台调度器**：审计归档 + 党团节点提醒，定义在 `app/core/*_scheduler.py`，由 `lifespan` 按 `AUDIT_ARCHIVE_ENABLED` / `WORKFLOW_REMINDER_ENABLED` 开关启动（默认关）。
+- **种子数据**：`scripts/seed/` 是一个包，导出 `SEEDERS` 列表（roles / audit_policies / request_types / workflow_templates / …）。`scripts/seed_initial.py` 和测试 conftest 都消费它；新增字典种子加到该列表即可同时覆盖运行期与测试。
 
 ---
 
@@ -156,7 +179,16 @@ Excel 主数据导入：存在任一 `fatal` 级错误 → 整批回滚（使用
 
 ### C-07: 受控 AI 问答必须有来源
 知识查询的 AI 匹配返回内容必须携带 `knowledge_entry_id` 和官方来源链接。  
-由配置开关 `settings.AI_QA_ENABLED` 控制，`False` 时降级为关键词匹配，不调用 Claude API。
+由配置开关 `settings.AI_QA_ENABLED` 控制，`False` 时降级为关键词匹配，不调用 Claude API。  
+注意：`config.py` 的生产守卫 `_enforce_prod_invariants` 目前**强制** `AI_QA_ENABLED=False`（一期仅检索式），改这个开关会让 Settings 启动即报错。同类被守卫的开关还有 `WORKFLOW_REMINDER_CHANNEL` 仅 `IN_APP`、prod 下禁用 `WECHAT_MOCK_ENABLED` 等。
+
+### C-08: 持久化实现计划（每次会话必读 / 必回写）
+> 与 `AGENTS.md` 一致——这是工作记录的权威纪律，不是可选项。
+
+- 全局实现计划唯一权威主文件：[`docs/notes/current-implementation-plan.md`](docs/notes/current-implementation-plan.md)。**新会话开始先读它**；有关联细化文件一并读。
+- 任何新确认的细化方案 / 范围调整 / 阶段拆分，**新增独立文件**放 `docs/notes/refinements/`，并在主计划登记关联与状态。
+- 每完成一段实质工作，回写主计划与相关细化文件，状态标记：`[ ]` 未开始 / `[-]` 进行中 / `[x]` 已完成 / `[!]` 阻塞。
+- 不得静默丢弃旧计划；被替换的只能标「已替代/已失效」并留引用。未在主计划登记的笔记（`fix.md`、`pending-business-decisions.md` 等）默认是参考材料，不能直接当执行依据。
 
 ---
 
@@ -233,6 +265,20 @@ pnpm -C miniapp dev:mp-weixin  # 学生端 微信小程序（需 HBuilderX 或�
 | MinIO Console | 9001 | **9011** |
 | MailHog SMTP / UI | 1025 / 8025 | 1025 / 8025 |
 
+### 代码质量命令（提交前自检）
+
+```bash
+# 后端（cd backend）— ruff/black/mypy 配置都在 pyproject.toml
+uv run ruff check app tests       # lint（line-length=110，已选 E/F/I/B/UP/N/S）
+uv run ruff check --fix app tests # 自动修复
+uv run black app tests            # 格式化
+uv run mypy app                   # 类型检查
+
+# 前端
+pnpm -C web lint                  # eslint（.ts/.vue）
+pnpm -C web build                 # vue-tsc --noEmit 类型检查 + vite 构建
+```
+
 ### 集成测试
 测试库与开发库共用同一 docker-compose Postgres 实例，但使用独立 database（`sip_db_test`）：
 
@@ -242,12 +288,21 @@ python -c "import asyncio, asyncpg; asyncio.run(asyncpg.connect(dsn='postgresql:
 # 或手动 CREATE DATABASE sip_db_test;
 
 cd backend
-uv run pytest tests/ -v
+uv run pytest                       # 跑全部（testpaths = tests + unit_tests）
+uv run pytest tests/integration -v  # 只跑集成测试
+uv run pytest unit_tests -v         # 只跑纯单元测试（无需 DB）
+
+# 单个文件 / 单个用例
+uv run pytest tests/integration/test_request_flow.py -v
+uv run pytest tests/integration/test_request_flow.py::test_某用例 -v
+uv run pytest -k "request and reject" -v   # 按名字过滤
 ```
 
-- `tests/conftest.py`：每个 test 前 TRUNCATE + 重塞种子，避免 service 层自 commit 与 SAVEPOINT-rollback 冲突
-- `tests/integration/`：happy-path 集成测试，覆盖 auth 与 knowledge 闭环
-- `scripts/seed_initial.py`：初始化种子数据；`scripts/archive_audit_logs.py`：审计日志归档脚本
+- `pyproject.toml` 的 `testpaths = ["tests", "unit_tests"]`，`asyncio_mode = "auto"`，临时文件落在 `.tmp/`。
+- `tests/conftest.py`：session 级 drop+create schema 并塞种子；**每个 test 前** TRUNCATE 全部业务表 + 重塞种子，避免 service 层自 commit 与 SAVEPOINT-rollback 冲突。新增 ORM 模型记得在此 import（见上文「标准构件」）。
+- 关键 fixtures：`client`（进程内 ASGI，不起端口）、`admin_client`（带 SUPER_ADMIN token）、`counselor_headers`（COUNSELOR，按请求独立携带避免覆盖 Authorization）、`db`（直连 DB 做 arrange/assert）。
+- 目录：`tests/integration/`（各闭环 happy-path + 回归）、`unit_tests/`（纯函数 / 校验器 / 模板引擎，离线）、`tests/performance/`（导入基准）。
+- `scripts/seed_initial.py`：初始化种子数据；`scripts/archive_audit_logs.py`：审计日志归档脚本；`scripts/dev/`：本地 Kingbase bootstrap / 库重置 / S4·S14 验收闸门脚本。
 
 ---
 
