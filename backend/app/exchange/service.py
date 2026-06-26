@@ -270,9 +270,14 @@ async def _apply_student(db: AsyncSession, batch: ImportBatch) -> None:
 async def _apply_transcript(db: AsyncSession, batch: ImportBatch) -> None:
     rows = await repo.list_batch_rows(db, batch.id, severity=ROW_SEVERITY_INFO, limit=100000)
     rows_warn = await repo.list_batch_rows(db, batch.id, severity=ROW_SEVERITY_WARN, limit=100000)
-    for r in rows + rows_warn:
+    all_rows = rows + rows_warn
+    # 一次性批量预取所有涉及学生，消除逐行查学生主档的 N+1
+    students_by_no = await repo.get_students_by_nos(
+        db, {str((r.raw_data or {}).get("student_no")) for r in all_rows}
+    )
+    for r in all_rows:
         d = r.raw_data or {}
-        student = await repo.get_student_by_no(db, str(d.get("student_no")))
+        student = students_by_no.get(str(d.get("student_no")))
         if student is None:
             raise BizError(f"学号 {d.get('student_no')} 不存在，需先导入学生主档", code=40044)
         payload = {

@@ -388,6 +388,19 @@ async def list_pending_workflows_admin(
     return rows, total
 
 
+async def get_students_by_ids(
+    db: AsyncSession, ids: set[int]
+) -> dict[int, Student]:
+    """批量按主键取学生，返回 {id: Student}。用于消除分页列表逐行查学生的 N+1。"""
+    id_set = {i for i in ids if i is not None}
+    if not id_set:
+        return {}
+    rows = (
+        await db.execute(select(Student).where(Student.id.in_(id_set)))
+    ).scalars().all()
+    return {s.id: s for s in rows}
+
+
 def _apply_student_scope_filters(
     stmt,
     *,

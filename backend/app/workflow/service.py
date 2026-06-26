@@ -22,7 +22,7 @@ from app.core.exceptions import (
 from app.core.exceptions import (
     PermissionError as AppPermissionError,
 )
-from app.core.storage import put_object
+from app.core.storage import get_object_bytes, put_object
 from app.notice import repository as notice_repo
 from app.notice.models import (
     WECHAT_SUBSCRIBE_SCENE_REQUEST_STATUS,
@@ -805,10 +805,11 @@ async def list_admin_workflows(
         page=page,
         size=size,
     )
+    # 批量取本页学生，消除逐行 db.get 的 N+1（每页一次 IN 查询）
+    students = await repo.get_students_by_ids(db, {sw.student_id for sw in rows})
     items: list[StudentWorkflowBrief] = []
     for sw in rows:
-        # 查学生信息（懒加载避免额外 JOIN；此处单条查询即可）
-        stu = await db.get(Student, sw.student_id)
+        stu = students.get(sw.student_id)
         cur_state = None
         if sw.current_node_id:
             cur_state = next(
@@ -1663,6 +1664,54 @@ async def get_request_detail(
     )
     await db.commit()
     return detail
+
+
+async def download_request_attachment(
+    db: AsyncSession,
+    request_id: int,
+    attachment_id: int,
+    viewer_user_id: int,
+    viewer_roles: list[str],
+    viewer_student_id: int | None = None,
+) -> tuple[bytes, str, str]:
+    req = await repo.get_request(db, request_id)
+    if req is None:
+        raise NotFoundError("申请不存在")
+    await _ensure_request_visible_to_viewer(
+        db,
+        req=req,
+        viewer_user_id=viewer_user_id,
+        viewer_student_id=viewer_student_id,
+        viewer_roles=viewer_roles,
+        action="DOWNLOAD_ATTACHMENT_DENIED",
+        message="无权下载该申请附件",
+        code=40315,
+    )
+    attachment = await repo.get_attachment(db, attachment_id)
+    if attachment is None or attachment.request_id != req.id:
+        raise NotFoundError("附件不存在")
+    try:
+        data = get_object_bytes(attachment.object_bucket, attachment.object_key)
+    except FileNotFoundError as exc:
+        raise NotFoundError("附件文件不存在") from exc
+    except Exception as exc:
+        logger.exception("Object storage download failed")
+        raise BizError("附件下载失败", code=50003, http_status=500) from exc
+    await log_action(
+        db,
+        event_type="REQUEST",
+        entity_code="REQUEST_ATTACHMENT",
+        action="DOWNLOAD_ATTACHMENT",
+        entity_id=attachment.id,
+        actor_user_id=viewer_user_id,
+        actor_role=",".join(viewer_roles) or None,
+        detail=build_audit_detail(
+            target={"request_id": req.id, "attachment_id": attachment.id},
+            refs=[{"filename": attachment.filename}],
+        ),
+    )
+    await db.commit()
+    return data, attachment.filename, attachment.mime_type or "application/octet-stream"
 
 
 def _approver_has_role(rt, roles: list[str]) -> bool:

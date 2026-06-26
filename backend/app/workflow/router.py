@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
@@ -223,6 +224,34 @@ async def upload_attachment(
         operator_id=user.user_id,
     )
     return ok(AttachmentOut.model_validate(row))
+
+
+@request_router.get("/{request_id}/attachments/{attachment_id}/download")
+async def download_attachment(
+    request_id: int,
+    attachment_id: int,
+    db: DBDep,
+    user: CurrentUserDep,
+) -> StreamingResponse:
+    data, filename, media_type = await service.download_request_attachment(
+        db,
+        request_id,
+        attachment_id,
+        user.user_id,
+        user.roles,
+        viewer_student_id=user.student_id,
+    )
+    ascii_filename = "".join(ch if ch.isascii() and ch not in {'"', "\\"} else "_" for ch in filename)
+    encoded_filename = quote(filename)
+    return StreamingResponse(
+        iter([data]),
+        media_type=media_type,
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=\"{ascii_filename}\"; filename*=UTF-8''{encoded_filename}"
+            )
+        },
+    )
 
 
 @request_router.get("/{request_id}", response_model=ApiResponse[RequestDetail])

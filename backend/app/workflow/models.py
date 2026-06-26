@@ -185,7 +185,7 @@ class StudentWorkflow(Base):
         BigInteger, ForeignKey("workflow_templates.id"), nullable=False, index=True
     )
     status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="ACTIVE",
+        String(16), nullable=False, default="ACTIVE", index=True,
         comment="ACTIVE/COMPLETED/SUSPENDED",
     )
     started_at: Mapped[datetime] = mapped_column(

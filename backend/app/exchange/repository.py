@@ -214,6 +214,20 @@ async def get_student_by_no(db: AsyncSession, student_no: str) -> Student | None
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
+async def get_students_by_nos(
+    db: AsyncSession, student_nos: set[str]
+) -> dict[str, Student]:
+    """批量按学号取学生，返回 {student_no: Student}。
+    用于成绩单等导入逐行查学生主档时消除 N+1。"""
+    nos = {n for n in student_nos if n}
+    if not nos:
+        return {}
+    rows = (
+        await db.execute(select(Student).where(Student.student_no.in_(nos)))
+    ).scalars().all()
+    return {s.student_no: s for s in rows}
+
+
 # ============================================================
 # 培养方案
 # ============================================================
