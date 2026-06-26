@@ -1,7 +1,7 @@
 # S76 第 12 组 Pending 反馈修复闭环
 
 - 关联主计划：`S76.1 ~ S76.7`
-- 状态：`[-]` 进行中
+- 状态：`[x]` 已完成
 - 日期：`2026-06-26`
 - 工作区：`D:\Codes\super-ruc-wt\s76-peer-pending-bugs`
 - 分支：`codex/s76-peer-pending-bugs`
@@ -24,7 +24,7 @@
 - [x] `S76.4` 为理论自测题库组合筛选补后端回归，锁定 `topic/qtype/q/is_active` 参数。
 - [x] `S76.5` 为通知生效日期增加前端提示、Pydantic 入参校验，以及发布/发送历史非法数据兜底。
 - [x] `S76.6` 本地 Docker/DB 定向验证、后端静态验证与 Web 构建。
-- [ ] `S76.7` 提交、推送、监督 GitHub Actions 部署并通过 `n150` 做生产只读 smoke。
+- [x] `S76.7` 提交、推送、监督 GitHub Actions 部署并通过 `n150` 做生产只读 smoke。
 
 ## 验证记录
 
@@ -33,4 +33,6 @@
 - 定向 DB 集成：本地 `kingbase / redis / minio` 容器 healthy，`pytest` 覆盖附件下载、通知非法日期、题库筛选、学生查询筛选，结果 `4 passed, 1 warning in 71.47s`。
 - 前端构建：`corepack pnpm -C web build` 通过；首次构建发现 `downloadFile` 漏导入，已修复后重跑通过。
 - 额外修复：Pydantic 跨字段校验触发项目原有 validation handler 的 `ValueError` JSON 序列化问题，已在 `app/core/exceptions.py` 对 validation errors 做通用 JSON 编码清洗。
-- 待补：GitHub Actions 自动部署与生产 `healthz`。
+- Git 提交：`f1e15074367e37dee11047e0ab59aed69446fb7a`（`fix: close group 12 pending feedback`）已推送到 `codex/s76-peer-pending-bugs` 与 `origin/main`。
+- GitHub Actions：`Intranet Production Deploy` run `28224357502` 成功，部署提交为 `f1e15074367e37dee11047e0ab59aed69446fb7a`。
+- 生产只读 smoke（经 `ssh n150`）：`http://10.10.0.13/healthz` 返回 `{"status":"ok"}`，首页返回 `200 text/html`，未登录访问 `/api/v1/admin/notices` 返回 `401 application/json`。
