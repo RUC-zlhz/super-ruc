@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600">
+<defs><marker id='arrow' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'><path d='M 0 0 L 10 5 L 0 10 z' fill='#666'/></marker></defs>
+<rect width='100%' height='100%' fill='#ffffff'/>
+<text x="600" y="54" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="34" font-weight="700" fill="#222"><tspan x="600" dy="0">系统总体架构</tspan></text>
+<rect x="70" y="115" width="1060" height="285" rx="24" fill="#fff7f8" stroke="#d8a3ab" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="600" y="151" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="24" font-weight="700" fill="#222"><tspan x="600" dy="0">用户接入层</tspan></text>
+<rect x="136" y="189" width="430" height="78" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="351" y="228" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="351" dy="0">学生端微信小程序</tspan></text>
+<rect x="632" y="189" width="430" height="78" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="847" y="228" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="847" dy="0">PC 管理端 Web</tspan></text>
+<rect x="70" y="465" width="1060" height="285" rx="24" fill="#f7fbff" stroke="#d8a3ab" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="600" y="501" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="24" font-weight="700" fill="#222"><tspan x="600" dy="0">统一接口与鉴权层</tspan></text>
+<rect x="110" y="539" width="300" height="78" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="260" y="578" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="260" dy="0">统一请求封装</tspan></text>
+<rect x="450" y="539" width="300" height="78" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="600" y="563" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="600" dy="0">微信登录/账号角</tspan><tspan x="600" dy="29">色</tspan></text>
+<rect x="790" y="539" width="300" height="78" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="940" y="563" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="940" dy="0">JWT 与权限校</tspan><tspan x="940" dy="29">验</tspan></text>
+<line x1="600" y1="408" x2="600" y2="455" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="70" y="815" width="1060" height="285" rx="24" fill="#f9fff7" stroke="#d8a3ab" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="600" y="851" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="24" font-weight="700" fill="#222"><tspan x="600" dy="0">后端领域服务层</tspan></text>
+<rect x="110" y="889" width="300" height="78" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="260" y="928" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="260" dy="0">知识库</tspan></text>
+<rect x="450" y="889" width="300" height="78" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="600" y="928" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="600" dy="0">流程/申请/进度</tspan></text>
+<rect x="790" y="889" width="300" height="78" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="940" y="928" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="940" dy="0">通知触达</tspan></text>
+<rect x="110" y="995" width="300" height="78" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="260" y="1034" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="260" dy="0">学业/导入</tspan></text>
+<rect x="450" y="995" width="300" height="78" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="600" y="1034" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="600" dy="0">画像/荣誉</tspan></text>
+<rect x="790" y="995" width="300" height="78" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="940" y="1034" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="940" dy="0">审计</tspan></text>
+<line x1="600" y1="758" x2="600" y2="805" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="70" y="1165" width="1060" height="285" rx="24" fill="#fffaf2" stroke="#d8a3ab" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="600" y="1201" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="24" font-weight="700" fill="#222"><tspan x="600" dy="0">数据与外部支撑层</tspan></text>
+<rect x="110" y="1239" width="300" height="78" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="260" y="1278" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="260" dy="0">Kingbase</tspan></text>
+<rect x="450" y="1239" width="300" height="78" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="600" y="1278" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="600" dy="0">Redis</tspan></text>
+<rect x="790" y="1239" width="300" height="78" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="940" y="1278" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="940" dy="0">对象存储</tspan></text>
+<rect x="110" y="1345" width="300" height="78" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="260" y="1369" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="260" dy="0">SMTP/Moc</tspan><tspan x="260" dy="29">k SMS</tspan></text>
+<rect x="450" y="1345" width="300" height="78" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="600" y="1369" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="600" dy="0">微信 code2</tspan><tspan x="600" dy="29">session</tspan></text>
+<line x1="600" y1="1108" x2="600" y2="1155" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+</svg>

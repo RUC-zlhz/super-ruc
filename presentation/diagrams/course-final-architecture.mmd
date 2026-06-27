@@ -1,0 +1,43 @@
+%%{init: {"theme": "base", "flowchart": {"htmlLabels": false, "curve": "basis", "nodeSpacing": 48, "rankSpacing": 58}, "themeVariables": {"fontFamily": "Microsoft YaHei, SimSun, Arial", "primaryColor": "#F9FAFB", "primaryTextColor": "#111827", "primaryBorderColor": "#B91C1C", "lineColor": "#6B7280", "tertiaryColor": "#EFF6FF"}}}%%
+flowchart TB
+  A["学生端\nuni-app 微信小程序"] --> B["统一 API\n/api/v1"]
+  C["教师/管理员端\nVue 3 + Vite + Ant Design Vue"] --> B
+
+  subgraph D["FastAPI 后端应用层"]
+    D1["auth\n登录/微信绑定/角色"]
+    D2["knowledge\n知识库/模板/受控匹配"]
+    D3["workflow\n党团流程/申请/审批"]
+    D4["notice\n通知/投递/已读"]
+    D5["exchange\n导入导出/培养方案"]
+    D6["report\n学业缺口/运营看板"]
+    D7["honor/profile\n荣誉/画像"]
+    D8["audit\n权限策略/审计日志"]
+  end
+
+  B --> D1
+  B --> D2
+  B --> D3
+  B --> D4
+  B --> D5
+  B --> D6
+  B --> D7
+  B --> D8
+
+  D1 --> E["Kingbase / PostgreSQL\n业务数据与迁移"]
+  D2 --> E
+  D3 --> E
+  D4 --> E
+  D5 --> E
+  D6 --> E
+  D7 --> E
+  D8 --> E
+
+  D2 --> F["MinIO\n模板/附件/导出文件"]
+  D3 --> F
+  D5 --> F
+  D6 --> G["Redis\n缓存/锁/热点数据"]
+  D4 --> H["邮件/短信/微信接口\n外部触达能力"]
+
+  I["GitHub Actions\nself-hosted runner"] --> J["内网生产 Docker Compose\nweb/backend/db/redis/minio"]
+  J --> C
+  J --> B

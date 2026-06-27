@@ -1,0 +1,11 @@
+%%{init: {"theme": "base", "flowchart": {"htmlLabels": false, "curve": "basis", "nodeSpacing": 42, "rankSpacing": 52}, "themeVariables": {"fontFamily": "Microsoft YaHei, SimSun, Arial", "primaryColor": "#F9FAFB", "primaryTextColor": "#111827", "primaryBorderColor": "#B91C1C", "lineColor": "#6B7280", "tertiaryColor": "#F0FDF4"}}}%%
+flowchart TB
+  A["需求与规格\nFR-001~FR-018 / NFR-001~NFR-005"] --> B["S0 基线冻结\n构建与测试基线"]
+  B --> C["S1~S3 核心闭环\n知识/流程/审批/通知/学业/画像"]
+  C --> D["S4 治理闭环\n权限/审计/索引/Kingbase 回归"]
+  D --> E["S28 生产部署\nDocker Compose / Nginx / 内网入口"]
+  E --> F["S44 自动部署\nGitHub Actions self-hosted runner"]
+  F --> G["S45~S50 测试审查\n缺陷分级/修复/全栈回归"]
+  G --> H["S71 文档交付\n用户手册/测试报告"]
+  H --> I["S76 互测反馈闭环\n附件下载/查询交互/日期校验"]
+  I --> J["S77 主线整合\n146 passed / Web build / Miniapp build / 生产回归"]

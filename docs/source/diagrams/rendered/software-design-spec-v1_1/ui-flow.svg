@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600">
+<defs><marker id='arrow' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'><path d='M 0 0 L 10 5 L 0 10 z' fill='#666'/></marker></defs>
+<rect width='100%' height='100%' fill='#ffffff'/>
+<text x="600" y="54" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="34" font-weight="700" fill="#222"><tspan x="600" dy="0">主要界面跳转</tspan></text>
+<rect x="445" y="105" width="310" height="70" rx="18" fill="#fff7f8" stroke="#b70f24" stroke-width="3"/>
+<text x="600" y="140" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="600" dy="0">进入平台</tspan></text>
+<rect x="445" y="220" width="310" height="70" rx="18" fill="#fff7f8" stroke="#b70f24" stroke-width="3"/>
+<text x="600" y="255" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="600" dy="0">角色与访问端判断</tspan></text>
+<line x1="600" y1="175" x2="600" y2="220" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="70" y="340" width="500" height="1120" rx="24" fill="#f9fff7" stroke="#d8a3ab" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="320" y="376" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="24" font-weight="700" fill="#222"><tspan x="320" dy="0">学生端微信小程序</tspan></text>
+<rect x="630" y="340" width="500" height="1120" rx="24" fill="#f7fbff" stroke="#d8a3ab" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="880" y="376" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="24" font-weight="700" fill="#222"><tspan x="880" dy="0">PC 管理端 Web</tspan></text>
+<rect x="145" y="430" width="350" height="70" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="320" y="465" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="320" dy="0">首页</tspan></text>
+<rect x="145" y="548" width="350" height="70" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="320" y="583" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="320" dy="0">知识查询</tspan></text>
+<line x1="320" y1="500" x2="320" y2="548" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="145" y="666" width="350" height="70" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="320" y="701" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="320" dy="0">事务申请</tspan></text>
+<line x1="320" y1="618" x2="320" y2="666" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="145" y="784" width="350" height="70" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="320" y="819" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="320" dy="0">通知中心</tspan></text>
+<line x1="320" y1="736" x2="320" y2="784" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="145" y="902" width="350" height="70" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="320" y="937" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="320" dy="0">我的画像</tspan></text>
+<line x1="320" y1="854" x2="320" y2="902" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="145" y="1020" width="350" height="70" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="320" y="1055" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="320" dy="0">统一进度</tspan></text>
+<line x1="320" y1="972" x2="320" y2="1020" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="145" y="1138" width="350" height="70" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="320" y="1173" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="320" dy="0">学业查看</tspan></text>
+<line x1="320" y1="1090" x2="320" y2="1138" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="145" y="1256" width="350" height="70" rx="18" fill="#ffffff" stroke="#b70f24" stroke-width="3"/>
+<text x="320" y="1291" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="320" dy="0">荣誉榜</tspan></text>
+<line x1="320" y1="1208" x2="320" y2="1256" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="705" y="430" width="350" height="70" rx="18" fill="#ffffff" stroke="#2166ac" stroke-width="3"/>
+<text x="880" y="465" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="880" dy="0">登录</tspan></text>
+<rect x="705" y="548" width="350" height="70" rx="18" fill="#ffffff" stroke="#2166ac" stroke-width="3"/>
+<text x="880" y="583" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="880" dy="0">运营看板</tspan></text>
+<line x1="880" y1="500" x2="880" y2="548" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="705" y="666" width="350" height="70" rx="18" fill="#ffffff" stroke="#2166ac" stroke-width="3"/>
+<text x="880" y="701" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="880" dy="0">审批工作台</tspan></text>
+<line x1="880" y1="618" x2="880" y2="666" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="705" y="784" width="350" height="70" rx="18" fill="#ffffff" stroke="#2166ac" stroke-width="3"/>
+<text x="880" y="819" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="880" dy="0">知识条目</tspan></text>
+<line x1="880" y1="736" x2="880" y2="784" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="705" y="902" width="350" height="70" rx="18" fill="#ffffff" stroke="#2166ac" stroke-width="3"/>
+<text x="880" y="937" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="880" dy="0">通知中心</tspan></text>
+<line x1="880" y1="854" x2="880" y2="902" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="705" y="1020" width="350" height="70" rx="18" fill="#ffffff" stroke="#2166ac" stroke-width="3"/>
+<text x="880" y="1055" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="880" dy="0">导入中心</tspan></text>
+<line x1="880" y1="972" x2="880" y2="1020" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="705" y="1138" width="350" height="70" rx="18" fill="#ffffff" stroke="#2166ac" stroke-width="3"/>
+<text x="880" y="1173" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="880" dy="0">学生画像</tspan></text>
+<line x1="880" y1="1090" x2="880" y2="1138" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="705" y="1256" width="350" height="70" rx="18" fill="#ffffff" stroke="#2166ac" stroke-width="3"/>
+<text x="880" y="1291" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="23" font-weight="400" fill="#222"><tspan x="880" dy="0">审计/用户</tspan></text>
+<line x1="880" y1="1208" x2="880" y2="1256" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="510" y1="290" x2="320" y2="340" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="415" y="305" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="18" font-weight="400" fill="#222"><tspan x="415" dy="0">学生</tspan></text>
+<line x1="690" y1="290" x2="880" y2="340" stroke="#666" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="785" y="305" text-anchor="middle" font-family="SimSun, Microsoft YaHei, Times New Roman, serif" font-size="18" font-weight="400" fill="#222"><tspan x="785" dy="0">教师/管理员</tspan></text>
+</svg>

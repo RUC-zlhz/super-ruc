@@ -1262,6 +1262,34 @@
 
 - `e7b6c0cdff048bdcd83aab60e119a02525b27e12` 已推送到 `origin/main`，`Intranet Production Deploy` run `28233332227` 成功；经 `ssh n150` 完成生产健康、首页、静态 chunk、知识公开读路径与受保护接口鉴权边界回归。
 
+### S78 软件工程导论课程结项汇报提纲
+
+- 细化文件：`docs/notes/refinements/2026-06-27-s78-course-final-report-outline.md`
+- 当前状态：`[x]` 已完成。
+- [x] `S78.1` 重新读取主计划与当前相关细化，确认以 `S77` 主线整合后的代码和验证记录为准。
+- [x] `S78.2` 核对 README、CLAUDE 项目说明、后端入口、Web/Miniapp 页面目录、测试目录、部署说明与追踪矩阵。
+- [x] `S78.3` 生成《软件工程导论》课程结项汇报提纲 Markdown，未在仓库中出现的信息保留为待填写。
+- [x] `S78.4` 新增结项汇报用竖版 Mermaid 图源：总体架构图与进度验证闭环图。
+
+当前结论：
+
+- 已生成 `output/doc/软件工程导论课程结项汇报提纲-信息学院学生综合服务与党团管理平台.md`。
+- 已新增图源 `docs/source/diagrams/mermaid/course-final-architecture.mmd` 与 `docs/source/diagrams/mermaid/course-final-progress.mmd`，并渲染 SVG 到 `docs/source/diagrams/rendered/course-final/`；两个 SVG 均检查为真实 `<text>` 节点且不含 `foreignObject/html/div/span`。图中内容均来自当前代码、部署文档和计划证据，不新增无来源功能。
+
+### S79 课程结项汇报材料复核与 presentation 归档
+
+- 细化文件：`docs/notes/refinements/2026-06-27-s79-presentation-package-polish.md`
+- 当前状态：`[x]` 已完成。
+- [x] `S79.1` 重新读取主计划、S78 细化文件和现有结项提纲，确认所有补充继续以当前仓库证据为边界。
+- [x] `S79.2` 复核课程提纲十个一级栏目，确认当前 Markdown 均已覆盖。
+- [x] `S79.3` 补充 PPT 页结构建议、三条演示路线、实际进度对照表、大模型/人工优化分工表和近期 commit 节点表。
+- [x] `S79.4` 整理正式产物到 `presentation/`，包含提纲、图源、SVG 和产物说明。
+- [x] `S79.5` 验证 SVG 兼容性、Markdown 基本格式和 `git diff --check`，并汇总剩余人工确认项。
+
+当前结论：
+
+- 文档主体已覆盖《软件工程导论》课程结项汇报给定十个一级栏目，现补充了更适合转 PPT 和现场演示的结构化内容；正式产物已归档到 `presentation/`，其中两张 SVG 均复核为真实 `<text>` 节点且不含 `foreignObject/html/div/span`。团队成员、汇报人、真实截图/录屏和课堂原需求编号仍保留为人工确认项。
+
 ### S6 前端体验增量优化
 
 - [x] `S6.1` Web 共享导航与默认落点收口
@@ -1856,6 +1884,7 @@
 | 2026-06-26 | S75 UI/UX 与前后端性能优化 | `docs/notes/refinements/2026-06-26-s75-ui-ux-perf-optimization.md` | `S75.1~S75.10`（`S75.1~4/6/7/9/10` 完成、`S75.5` 评估判定不需要、`S75.8` miniapp 去重完成） | `[x]` | 三端综合按优先级，committed 项全部收口。已落地：后端 N+1×2 消除、`student_workflows.status` 补索引(迁移 0021)、report overview Redis 缓存、knowledge categories/detail 缓存 + 写路径事件失效、web 全局加载条 + vite 分包 + GET 去重/路由取消 + `AsyncBoundary` 基元、miniapp GET 去重与下拉刷新激活；后续 `lazyCodeLoading` 需人工 devtools smoke（推荐项，未盲改） |
 | 2026-06-26 | S76 第 12 组 Pending 反馈修复闭环 | `docs/notes/refinements/2026-06-26-s76-peer-pending-bug-closure.md` | `S76.1, S76.2, S76.3, S76.4, S76.5, S76.6, S76.7` | `[x]` | 已完成附件下载、查询按钮显式触发、题库筛选回归和通知日期校验；后端静态检查、关键模块编译、定向 DB 集成回归、Web build、GitHub Actions run `28224581224` 与生产只读 smoke 均通过 |
 | 2026-06-26 | S77 Worktree 整理、主线合并与生产回归 | `docs/notes/refinements/2026-06-26-s77-worktree-consolidation-production-validation.md` | `S77.1, S77.2, S77.3, S77.4, S77.5, S77.6` | `[x]` | 已盘点并合并所有注册 worktree 中需要进入主线的改动，解决 S75/S76 冲突并纳入 Claude worktree 测试修正；本地 ruff、py_compile、Alembic、后端全量 `146 passed`、Web build、Miniapp build、GitHub Actions run `28233332227` 与生产回归均通过 |
+| 2026-06-27 | S79 课程结项汇报材料复核与 presentation 归档 | `docs/notes/refinements/2026-06-27-s79-presentation-package-polish.md` | `S79.1, S79.2, S79.3, S79.4, S79.5` | `[x]` | 已复核课程结项汇报十个一级栏目完整覆盖，补充 PPT 页结构、演示路线、进度对照、大模型/人工分工和近期 commit 节点；正式产物归档到 `presentation/`，SVG 兼容性与 `git diff --check` 通过 |
 
 ## 会话更新要求
 
