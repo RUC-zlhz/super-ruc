@@ -25,12 +25,17 @@ from docx_common import (
 
 
 TEMPLATE = ROOT / "docs" / "templates" / "用户使用说明书模板.docx"
-DEFAULT_OUTPUT = ROOT / "output" / "doc" / "用户使用说明书-信息学院学生综合服务与党团管理平台-v1.0.docx"
+DEFAULT_OUTPUT = ROOT / "output" / "doc" / "用户使用说明书-信息学院学生综合服务与党团管理平台-v2.0.docx"
 
 
 PROJECT_NAME = "信息学院学生综合服务与党团管理平台"
+DOC_VERSION = "V2.0"
+DOC_NUMBER = "SIP-UM-2.0"
 PRODUCTION_BASE_URL = "http://10.10.0.13/"
-PRODUCTION_SNAPSHOT_DATE = "2026-06-07"
+PRODUCTION_SNAPSHOT_DATE = "2026-06-26"
+PRODUCTION_KNOWLEDGE_TOTAL = 16
+PRODUCTION_CATEGORY_COUNT = 9
+PRODUCTION_HEAD = "ca3b8de"
 MINIAPP_BUILD_ENTRY = "miniapp/dist/build/mp-weixin"
 
 
@@ -38,7 +43,7 @@ def build_doc(output_path: Path) -> Path:
     doc = prepare_document(TEMPLATE)
     updated_at = today_label()
 
-    add_direct_paragraph(doc, "文档编号：SIP-UM-1.0", size=11, color=MUTED)
+    add_direct_paragraph(doc, f"文档编号：{DOC_NUMBER}", size=11, color=MUTED)
     add_direct_paragraph(
         doc,
         PROJECT_NAME,
@@ -50,7 +55,7 @@ def build_doc(output_path: Path) -> Path:
     )
     add_direct_paragraph(
         doc,
-        "用户使用说明书",
+        "用户使用说明书（最终提交版）",
         size=18,
         bold=True,
         color=DEEP_BLUE,
@@ -59,7 +64,7 @@ def build_doc(output_path: Path) -> Path:
     )
     add_direct_paragraph(
         doc,
-        f"版本：V1.0    更新日期：{updated_at}",
+        f"版本：{DOC_VERSION}    更新日期：{updated_at}",
         size=11,
         color=MUTED,
         align=WD_ALIGN_PARAGRAPH.CENTER,
@@ -71,7 +76,8 @@ def build_doc(output_path: Path) -> Path:
         [
             ("适用对象", "学院管理员、辅导员/班主任/党团教师、班团骨干、学生"),
             ("适用范围", "Web 管理端、微信小程序学生端、部署维护与课程验收场景"),
-            ("生产核对基准", f"{PRODUCTION_SNAPSHOT_DATE} 已在线核对 {PRODUCTION_BASE_URL}、/healthz、知识搜索与分类接口"),
+            ("生产核对基准", f"{PRODUCTION_SNAPSHOT_DATE} 经 n150 跳板在线核对 {PRODUCTION_BASE_URL}、/healthz、知识搜索/分类/详情与受保护接口认证边界"),
+            ("当前代码基线", f"仓库 HEAD {PRODUCTION_HEAD}（feat/s75-perf-uiux 已合并 S72~S77 修复与性能/UI 优化并部署至生产）"),
             ("推荐入口", f"生产 Web：{PRODUCTION_BASE_URL}；健康检查：{PRODUCTION_BASE_URL}healthz；小程序产物：{MINIAPP_BUILD_ENTRY}"),
             ("文档定位", "用于真实部署环境使用说明、互测交接和课程验收答辩；内容以线上事实和当前代码实现为准"),
         ],
@@ -82,7 +88,16 @@ def build_doc(output_path: Path) -> Path:
     add_table(
         doc,
         ["序号", "日期", "编写人", "变更内容", "版本"],
-        [["1", updated_at, "项目组 / Codex", "按 2026-06-07 线上部署事实与当前代码实现同步整理的正式用户使用说明书。", "V1.0"]],
+        [
+            ["1", "2026-06-07", "项目组 / Codex", "按 2026-06-07 线上部署事实与当时代码实现整理的首版正式用户使用说明书。", "V1.0"],
+            [
+                "2",
+                updated_at,
+                "项目组 / Codex",
+                "最终提交版：按 2026-06-26 生产在线核对与当前 HEAD 代码实现重新校准；补充审批附件下载、通知生效日期校验、小程序下拉刷新、Web 全局加载与标签标题等已上线能力。",
+                "V2.0",
+            ],
+        ],
         [0.55, 1.0, 1.0, 3.25, 0.7],
     )
 
@@ -107,7 +122,7 @@ def build_doc(output_path: Path) -> Path:
     add_paragraph(doc, "1.1 编写目的", style="Heading 2")
     add_paragraph(
         doc,
-        f"本文档面向系统实际使用者，说明 {PROJECT_NAME} 的访问方式、角色边界、核心功能和常见操作步骤。文档内容以 {PRODUCTION_SNAPSHOT_DATE} 对 {PRODUCTION_BASE_URL} 的在线核对结果和当前仓库代码实现为准，帮助管理员、教师和学生在统一口径下完成日常事务办理、通知触达、流程跟进和学业辅助工作。",
+        f"本文档为最终提交版，面向系统实际使用者，说明 {PROJECT_NAME} 的访问方式、角色边界、核心功能和常见操作步骤。文档内容以 {PRODUCTION_SNAPSHOT_DATE} 对 {PRODUCTION_BASE_URL} 的在线核对结果和当前仓库 HEAD（{PRODUCTION_HEAD}）代码实现为准，帮助管理员、教师和学生在统一口径下完成日常事务办理、通知触达、流程跟进和学业辅助工作。相对首版（V1.0），本版同步了截至 2026-06-26 已上线的审批附件下载、通知生效日期校验、小程序下拉刷新与 Web 全局加载等使用变化。",
         style="Body Text",
     )
 
@@ -126,7 +141,7 @@ def build_doc(output_path: Path) -> Path:
             ["知识库与模板", "政策知识检索、AI 辅助匹配、常用模板下载、知识条目与模板维护", "学生、教师、管理员"],
             ["党团流程", "流程模板维护、学生流程发起、节点推进、提醒记录、理论自测", "学生、辅导员、党团教师、班团骨干"],
             ["通知中心", "通知录入、标签化圈人、批次发送、站内消息查看、订阅消息配置", "管理员、教师、学生"],
-            ["事务申请与证明", "请假/盖章/证明申请、附件上传、审批工作台、审批意见留痕、批准后 PDF 预览", "学生、教师"],
+            ["事务申请与证明", "请假/盖章/证明申请、附件上传与认证态下载、审批工作台、审批意见留痕、批准后 PDF 预览", "学生、教师"],
             ["画像与学业分析", "学生主档、成长事实、荣誉展示、成绩单核验、培养方案比对、课程建议", "学生、教师、管理员"],
         ],
         [1.2, 3.15, 2.15],
@@ -175,15 +190,19 @@ def build_doc(output_path: Path) -> Path:
         doc,
         ["场景", "访问方式", "备注"],
         [
-            ["生产 Web", PRODUCTION_BASE_URL, "2026-06-07 在线核对可返回“信息学院管理后台”首页"],
-            ["生产健康检查", f"{PRODUCTION_BASE_URL}healthz", "2026-06-07 在线核对返回 code=0、status=ok"],
-            ["生产知识搜索", f"{PRODUCTION_BASE_URL}api/v1/knowledge/search?page=1&page_size=20", "当前线上可返回官方知识与模板下载条目"],
-            ["生产知识分类", f"{PRODUCTION_BASE_URL}api/v1/knowledge/categories", "2026-06-07 在线核对返回 9 个分类"],
+            ["生产 Web", PRODUCTION_BASE_URL, f"{PRODUCTION_SNAPSHOT_DATE} 在线核对返回“信息学院管理后台”首页"],
+            ["生产健康检查", f"{PRODUCTION_BASE_URL}healthz", f"{PRODUCTION_SNAPSHOT_DATE} 在线核对返回 code=0、status=ok"],
+            ["生产知识搜索", f"{PRODUCTION_BASE_URL}api/v1/knowledge/search?page=1&size=20", f"{PRODUCTION_SNAPSHOT_DATE} 在线核对 total={PRODUCTION_KNOWLEDGE_TOTAL}，含官方知识与模板下载条目"],
+            ["生产知识分类", f"{PRODUCTION_BASE_URL}api/v1/knowledge/categories", f"{PRODUCTION_SNAPSHOT_DATE} 在线核对返回 {PRODUCTION_CATEGORY_COUNT} 个分类"],
             ["本地开发 Web", "运行 scripts/dev/start-dev.ps1 后访问 http://localhost:4173", "适合离线演示与问题复现"],
             ["本地后端文档", "http://localhost:8080/docs", "适合接口联调和参数核对"],
             ["微信小程序", f"导入 {MINIAPP_BUILD_ENTRY} 或由部署维护方提供测试包", "适合学生视角验证；真实登录方式取决于当前部署配置"],
         ],
         [1.05, 2.75, 2.7],
+    )
+    add_callout(
+        doc,
+        "提示：内网生产环境通过 n150 跳板访问；如本机无法直连 10.10.0.13，请先确认已配置跳板或由部署维护方代为联调。",
     )
 
     add_paragraph(doc, "3 系统登录与退出", style="Heading 1")
@@ -202,7 +221,7 @@ def build_doc(output_path: Path) -> Path:
     add_bullets(
         doc,
         [
-            "本轮 2026-06-07 在线核对中，历史互测文档曾使用的共享口令 admin / admin123 已不再可登录；正式使用必须以当前部署维护方发放的账号为准。",
+            f"{PRODUCTION_SNAPSHOT_DATE} 在线核对中，历史互测文档曾使用的共享口令 admin / admin123 仍返回 401（工号或密码错误），不能登录；正式使用必须以当前部署维护方发放的账号为准。",
             "登录后如果弹出“请尽快修改当前初始密码”，说明该账号仍处于系统生成密码阶段；正式使用建议尽快改密。",
             "小程序学生端的真实微信登录、绑定或测试态登录方式取决于当前部署配置；如无法进入，请先确认学生主档已导入且测试包来源正确。",
         ],
@@ -233,8 +252,18 @@ def build_doc(output_path: Path) -> Path:
         doc,
         [
             "Web 首页提供角色默认入口、统计卡片或快捷菜单，便于管理员快速进入通知、审批、学生管理和流程管理页面。",
+            "Web 端在打开页面或切换路由时会展示顶部全局加载进度条，并在首次进入时显示品牌化加载占位，减少白屏闪烁；浏览器标签标题会随当前页面变化，便于在多标签间识别。",
             "小程序首页提供通知、知识库、事务申请、党团流程和学业分析等高频入口，并展示未读通知和待跟进事项。",
             "首页数据受当前角色和权限范围限制，不同用户看到的卡片与数量可能不同。",
+        ],
+    )
+    add_paragraph(doc, "4.4 列表刷新与分页", style="Heading 2")
+    add_bullets(
+        doc,
+        [
+            "小程序首页、党团流程、事务申请、通知中心、学业分析、进度和个人中心等页面支持下拉刷新：在页面顶部下拉即可重新拉取最新数据。",
+            "事务申请、画像历史等较长列表支持上拉“加载更多”，列表底部会提示是否还有更多数据，避免只看到第一页内容。",
+            "如下拉或加载失败，页面会保留上一次结果并给出错误提示，可重试后再次同步，不会直接清空已加载内容。",
         ],
     )
 
@@ -312,8 +341,10 @@ def build_doc(output_path: Path) -> Path:
         doc,
         [
             "通知中心支持录入通知标题、正文、标签、目标规则和发送渠道，并可预览命中学生人数。",
-            "发送后可查看批次记录、投递明细、阅读状态和失败原因，方便做结果回看和治理。",
-            "通知推送默认支持站内消息；如启用微信订阅消息或邮件渠道，应提前完成对应配置与授权验证。",
+            "通知“生效日期 / 失效日期”需符合先后顺序，前端会即时提示，后端也会做入参校验并对历史非法数据兜底，避免出现生效晚于失效的异常配置。",
+            "目标人群预览与批次分发会按操作者的数据范围（scope）收口，带班级/支部范围的教师不能预览或投递范围之外的学生。",
+            "发送后可查看批次记录、投递明细、阅读状态和失败原因，方便做结果回看和治理；详情/批次接口失败时会显示明确的加载错误，而不会被当成“暂无数据”的正常空态。",
+            "通知推送默认支持站内消息；如启用微信订阅消息或邮件渠道，应提前完成对应配置与授权验证。生产环境的“模拟短信回执”入口仅在开发态可见，正式管理界面不会出现。",
         ],
     )
 
@@ -343,6 +374,15 @@ def build_doc(output_path: Path) -> Path:
         doc,
         "辅导员、班主任和业务教师可在审批工作台查看待处理申请，核对表单信息与附件后执行通过、驳回或转线下。驳回后学生可在原草稿基础上修改重提，状态与审批意见都会留痕。",
         style="Body Text",
+    )
+    add_paragraph(doc, "审批附件下载", style="Heading 3")
+    add_bullets(
+        doc,
+        [
+            "在审批详情页的“附件列表”中，每条附件提供“下载”按钮，可在登录态下直接获取学生上传的原始文件，便于离线核对材料真伪。",
+            "附件下载走认证接口（GET /api/v1/requests/{id}/attachments/{attachment_id}/download），未登录访问会被拒绝；下载动作会写入审计日志。",
+            "2026-06-26 生产在线核对中，未登录访问该下载接口返回 401，符合最小授权与审计要求。",
+        ],
     )
 
     add_paragraph(doc, "6.2 党团流程推进", style="Heading 2")
