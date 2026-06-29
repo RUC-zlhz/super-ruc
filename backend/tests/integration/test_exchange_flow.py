@@ -324,6 +324,66 @@ async def test_exchange_export_permissions_follow_policy_and_write_audit(
     assert error_report_log.result_code == "SUCCESS"
 
 
+async def test_transcript_export_uses_student_name_and_no_not_internal_id(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    admin_headers = await _create_admin_headers(
+        db,
+        work_no="T-EXPORT-TRANSCRIPT",
+        display_name="Transcript Export Admin",
+    )
+    student = Student(
+        student_no="EXP-T-001",
+        full_name="成绩导出学生",
+        grade_code="2024",
+        major_code="CS",
+        class_code="CS2401",
+    )
+    db.add(student)
+    await db.flush()
+    db.add(
+        StudentCourseRecord(
+            student_id=student.id,
+            term_code="2024-FALL",
+            course_code="CS101",
+            course_name="程序设计",
+            credits=3,
+            course_type="必修",
+            score=95,
+            grade_letter="A",
+            pass_flag=True,
+        )
+    )
+    await db.commit()
+
+    resp = await client.get(
+        "/api/v1/admin/exchange/exports/transcripts",
+        headers=admin_headers,
+    )
+    assert resp.status_code == 200, resp.text
+
+    wb = load_workbook(io.BytesIO(resp.content))
+    ws = wb.active
+    headers = [cell.value for cell in ws[1]]
+    values = [cell.value for cell in ws[2]]
+    assert headers[:5] == [
+        "student_no",
+        "full_name",
+        "term_code",
+        "course_code",
+        "course_name",
+    ]
+    assert "student_id" not in headers
+    assert values[:5] == [
+        "EXP-T-001",
+        "成绩导出学生",
+        "2024-FALL",
+        "CS101",
+        "程序设计",
+    ]
+
+
 async def test_transcript_pdf_review_batch_cannot_be_committed_to_formal_records(
     admin_client: AsyncClient,
     db: AsyncSession,

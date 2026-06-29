@@ -24,6 +24,7 @@ B. 常见事务申请（FR-006/007/008）
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     BigInteger,
@@ -42,6 +43,9 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.auth.models import Student, User
 
 # ---------- 党团流程状态 ----------
 WORKFLOW_KIND_PARTY = "PARTY"
@@ -444,6 +448,16 @@ class Request(Base):
     )
 
     type_ref: Mapped[RequestType] = relationship("RequestType", lazy="joined")
+    applicant_user: Mapped[User] = relationship(
+        "User",
+        foreign_keys=[applicant_user_id],
+        lazy="joined",
+    )
+    applicant_student: Mapped[Student] = relationship(
+        "Student",
+        foreign_keys=[applicant_student_id],
+        lazy="joined",
+    )
     attachments: Mapped[list[RequestAttachment]] = relationship(
         "RequestAttachment",
         back_populates="request",

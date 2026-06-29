@@ -56,6 +56,17 @@
         <template v-if="column.key === 'status'">
           <StatusTag :status="record.status" />
         </template>
+        <template v-else-if="column.key === 'applicant'">
+          <div class="applicant-cell">
+            <div>{{ formatApplicant(record) }}</div>
+            <span
+              v-if="record.applicant_user_name && record.applicant_student_name && record.applicant_user_name !== record.applicant_student_name"
+              class="muted"
+            >
+              账号：{{ record.applicant_user_name }}
+            </span>
+          </div>
+        </template>
         <template v-else-if="column.key === 'actions'">
           <router-link class="action-link" :to="`/approval/${record.id}`">查看详情</router-link>
         </template>
@@ -80,6 +91,7 @@ const columns = [
   { title: '单号', dataIndex: 'request_no', key: 'request_no' },
   { title: '类型', dataIndex: 'type_code', key: 'type_code' },
   { title: '标题', dataIndex: 'title', key: 'title' },
+  { title: '申请人', key: 'applicant', width: 180 },
   { title: '状态', key: 'status' },
   { title: '版本', dataIndex: 'revision', key: 'revision', width: 70 },
   { title: '更新时间', dataIndex: 'updated_at', key: 'updated_at' },
@@ -95,6 +107,23 @@ const filters = reactive<{
 const rows = ref<RequestBrief[]>([])
 const loading = ref(false)
 const pagination = reactive({ current: 1, pageSize: 20, total: 0 })
+
+type ApplicantIdentity = {
+  applicant_student_name?: string | null
+  applicant_student_no?: string | null
+  applicant_user_name?: string | null
+}
+
+function formatStudentIdentity(name?: string | null, studentNo?: string | null) {
+  if (name && studentNo) return `${name}（${studentNo}）`
+  return name || studentNo || '-'
+}
+
+function formatApplicant(record: ApplicantIdentity) {
+  const student = formatStudentIdentity(record.applicant_student_name, record.applicant_student_no)
+  if (student !== '-') return student
+  return record.applicant_user_name || '-'
+}
 
 const metrics = computed(() => {
   const pending = rows.value.filter((item) => item.status === 'SUBMITTED').length
@@ -167,5 +196,14 @@ onMounted(reload)
 .action-link {
   color: var(--ruc-red);
   font-weight: 600;
+}
+
+.applicant-cell {
+  line-height: 1.45;
+}
+
+.muted {
+  color: #8c8c8c;
+  font-size: 12px;
 }
 </style>

@@ -98,6 +98,7 @@ export interface KnowledgeTemplateItem {
   category_code?: string | null
   applicable_scenario?: string | null
   version_label?: string | null
+  tags: string[]
   file_size?: number | null
   mime_type?: string | null
   status: string

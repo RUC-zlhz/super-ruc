@@ -85,6 +85,9 @@
             <text class="template-meta">
               {{ [tpl.template_type, tpl.version_label, tpl.category_code].filter(Boolean).join(' · ') || '官方模板' }}
             </text>
+            <view v-if="tpl.tags?.length" class="template-tags">
+              <text v-for="tag in tpl.tags" :key="tag" class="template-tag">#{{ tag }}</text>
+            </view>
             <text v-if="tpl.applicable_scenario" class="template-meta">{{ tpl.applicable_scenario }}</text>
           </view>
           <view class="template-side">
@@ -696,6 +699,22 @@ onMounted(async () => {
 .template-side-note {
   font-size: 20rpx;
   color: #8a8f98;
+}
+
+.template-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-top: 8rpx;
+}
+
+.template-tag {
+  padding: 4rpx 10rpx;
+  border-radius: 6rpx;
+  background: #fff4f5;
+  color: #9f1239;
+  font-size: 20rpx;
+  line-height: 1.4;
 }
 
 .template-download-btn {

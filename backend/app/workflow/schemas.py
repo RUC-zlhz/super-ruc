@@ -295,6 +295,10 @@ class ApprovalRecordOut(BaseModel):
     status_after: str | None
     operator_id: int | None
     operator_role: str | None
+    operator_name: str | None = None
+    operator_work_no: str | None = None
+    operator_student_no: str | None = None
+    operator_student_name: str | None = None
     comment: str | None
     occurred_at: datetime
 
@@ -310,6 +314,9 @@ class RequestBrief(BaseModel):
     revision: int
     applicant_user_id: int
     applicant_student_id: int | None
+    applicant_user_name: str | None = None
+    applicant_student_no: str | None = None
+    applicant_student_name: str | None = None
     submitted_at: datetime | None
     updated_at: datetime
 
@@ -329,9 +336,14 @@ class RequestDetail(BaseModel):
     revision: int
     applicant_user_id: int
     applicant_student_id: int | None
+    applicant_user_name: str | None = None
+    applicant_student_no: str | None = None
+    applicant_student_name: str | None = None
     submitted_at: datetime | None
     decided_at: datetime | None
     decided_by: int | None
+    decided_by_name: str | None = None
+    decided_by_work_no: str | None = None
     decision_comment: str | None
     withdrawn_at: datetime | None
     attachments: list[AttachmentOut]

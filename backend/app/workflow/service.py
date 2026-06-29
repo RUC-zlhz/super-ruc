@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.enforcement import audit_forbidden_and_raise
 from app.audit.service import build_audit_detail, log_action
+from app.auth import repository as auth_repo
 from app.auth.models import Student
 from app.auth.role_codes import ROLE_CODE_COLLABORATOR_ROLES, normalize_role_codes
 from app.auth.scopes import StudentScopeSet, split_student_scope_codes, student_in_scope
@@ -1175,7 +1176,57 @@ async def _ensure_applicant_student_id(
     return user.student_id if user and user.student_id else None
 
 
-def _request_to_detail(req: Request) -> RequestDetail:
+def _user_display_name(user) -> str | None:
+    if user is None:
+        return None
+    return user.display_name or user.work_no or None
+
+
+def _request_identity_payload(req: Request) -> dict[str, str | None]:
+    applicant_user = getattr(req, "applicant_user", None)
+    applicant_student = getattr(req, "applicant_student", None) or getattr(
+        applicant_user,
+        "student",
+        None,
+    )
+    return {
+        "applicant_user_name": _user_display_name(applicant_user),
+        "applicant_student_no": applicant_student.student_no if applicant_student else None,
+        "applicant_student_name": applicant_student.full_name if applicant_student else None,
+    }
+
+
+def _approval_record_to_out(record, users_by_id: dict[int, object]) -> ApprovalRecordOut:
+    operator = users_by_id.get(record.operator_id or 0)
+    operator_student = getattr(operator, "student", None)
+    return ApprovalRecordOut(
+        id=record.id,
+        revision=record.revision,
+        action=record.action,
+        status_before=record.status_before,
+        status_after=record.status_after,
+        operator_id=record.operator_id,
+        operator_role=record.operator_role,
+        operator_name=_user_display_name(operator),
+        operator_work_no=getattr(operator, "work_no", None) if operator else None,
+        operator_student_no=operator_student.student_no if operator_student else None,
+        operator_student_name=operator_student.full_name if operator_student else None,
+        comment=record.comment,
+        occurred_at=record.occurred_at,
+    )
+
+
+async def _request_to_detail(db: AsyncSession, req: Request) -> RequestDetail:
+    operator_ids = {
+        user_id
+        for user_id in (
+            req.decided_by,
+            *(record.operator_id for record in (req.approval_records or [])),
+        )
+        if user_id is not None
+    }
+    users_by_id = await auth_repo.get_users_by_ids(db, operator_ids)
+    decider = users_by_id.get(req.decided_by or 0)
     return RequestDetail(
         id=req.id,
         request_no=req.request_no,
@@ -1189,14 +1240,17 @@ def _request_to_detail(req: Request) -> RequestDetail:
         revision=req.revision,
         applicant_user_id=req.applicant_user_id,
         applicant_student_id=req.applicant_student_id,
+        **_request_identity_payload(req),
         submitted_at=req.submitted_at,
         decided_at=req.decided_at,
         decided_by=req.decided_by,
+        decided_by_name=_user_display_name(decider),
+        decided_by_work_no=getattr(decider, "work_no", None) if decider else None,
         decision_comment=req.decision_comment,
         withdrawn_at=req.withdrawn_at,
         attachments=[AttachmentOut.model_validate(a) for a in (req.attachments or [])],
         approval_records=[
-            ApprovalRecordOut.model_validate(r) for r in (req.approval_records or [])
+            _approval_record_to_out(r, users_by_id) for r in (req.approval_records or [])
         ],
     )
 
@@ -1211,6 +1265,7 @@ def _request_to_brief(req: Request) -> RequestBrief:
         revision=req.revision,
         applicant_user_id=req.applicant_user_id,
         applicant_student_id=req.applicant_student_id,
+        **_request_identity_payload(req),
         submitted_at=req.submitted_at,
         updated_at=req.updated_at,
     )
@@ -1337,7 +1392,7 @@ async def create_draft_request(
     )
     await db.commit()
     await db.refresh(req)
-    return _request_to_detail(req)
+    return await _request_to_detail(db, req)
 
 
 async def submit_request(
@@ -1392,7 +1447,7 @@ async def submit_request(
     )
     await db.commit()
     await db.refresh(req)
-    return _request_to_detail(req)
+    return await _request_to_detail(db, req)
 
 
 async def update_draft_request(
@@ -1412,7 +1467,7 @@ async def update_draft_request(
         setattr(req, k, v)
     await db.commit()
     await db.refresh(req)
-    return _request_to_detail(req)
+    return await _request_to_detail(db, req)
 
 
 async def withdraw_request(
@@ -1461,7 +1516,7 @@ async def withdraw_request(
     )
     await db.commit()
     await db.refresh(req)
-    return _request_to_detail(req)
+    return await _request_to_detail(db, req)
 
 
 # ======================================================================
@@ -1648,7 +1703,7 @@ async def get_request_detail(
         viewer_student_id=viewer_student_id,
         viewer_roles=viewer_roles,
     )
-    detail = _request_to_detail(req)
+    detail = await _request_to_detail(db, req)
     await log_action(
         db,
         event_type="REQUEST",
@@ -1715,10 +1770,13 @@ async def download_request_attachment(
 
 
 def _approver_has_role(rt, roles: list[str]) -> bool:
+    normalized_roles = set(normalize_role_codes(roles))
+    if "SUPER_ADMIN" in normalized_roles:
+        return True
     if not rt or not rt.approver_roles:
         return True
     allowed = set(normalize_role_codes(rt.approver_roles.split(",")))
-    return bool(set(normalize_role_codes(roles)) & allowed)
+    return bool(normalized_roles & allowed)
 
 
 def _request_status_label(status: str) -> str:
@@ -1835,7 +1893,7 @@ async def decide_request(
     )
     await db.commit()
     await db.refresh(req)
-    return _request_to_detail(req)
+    return await _request_to_detail(db, req)
 
 
 async def mark_request_offline(
@@ -1917,7 +1975,7 @@ async def mark_request_offline(
     )
     await db.commit()
     await db.refresh(req)
-    return _request_to_detail(req)
+    return await _request_to_detail(db, req)
 
 
 async def reopen_request(
@@ -1982,7 +2040,7 @@ async def reopen_request(
     )
     await db.commit()
     await db.refresh(req)
-    return _request_to_detail(req)
+    return await _request_to_detail(db, req)
 
 
 async def claim_in_review(
@@ -2033,7 +2091,7 @@ async def claim_in_review(
     )
     await db.commit()
     await db.refresh(req)
-    return _request_to_detail(req)
+    return await _request_to_detail(db, req)
 
 
 # ======================================================================

@@ -45,11 +45,11 @@
             </a-descriptions-item>
             <a-descriptions-item label="事务类别">{{ detail.category }}</a-descriptions-item>
             <a-descriptions-item label="当前版本">第 {{ detail.revision }} 版</a-descriptions-item>
-            <a-descriptions-item label="申请人用户 ID">
-              {{ detail.applicant_user_id }}
+            <a-descriptions-item label="申请人">
+              {{ formatApplicant(detail) }}
             </a-descriptions-item>
-            <a-descriptions-item label="申请人学生 ID">
-              {{ detail.applicant_student_id ?? '-' }}
+            <a-descriptions-item label="申请账号">
+              {{ detail.applicant_user_name || '-' }}
             </a-descriptions-item>
             <a-descriptions-item label="提交时间">
               {{ formatDateTime(detail.submitted_at) }}
@@ -57,8 +57,8 @@
             <a-descriptions-item label="最近处理时间">
               {{ formatDateTime(detail.decided_at || detail.withdrawn_at) }}
             </a-descriptions-item>
-            <a-descriptions-item label="审批人 ID">
-              {{ detail.decided_by ?? '-' }}
+            <a-descriptions-item label="审批人">
+              {{ formatUserIdentity(detail.decided_by_name, detail.decided_by_work_no) }}
             </a-descriptions-item>
             <a-descriptions-item label="撤回时间">
               {{ formatDateTime(detail.withdrawn_at) }}
@@ -128,7 +128,7 @@
                 <span class="detail-muted">{{ formatDateTime(record.occurred_at) }}</span>
               </div>
               <div class="timeline-line">
-                操作人：{{ formatOperator(record.operator_role, record.operator_id) }}
+                操作人：{{ formatOperator(record) }}
               </div>
               <div v-if="formatTransition(record.status_before, record.status_after)" class="timeline-line">
                 状态变更：{{ formatTransition(record.status_before, record.status_after) }}
@@ -250,6 +250,7 @@ import {
   reopenRequest,
   rejectRequest,
   type RequestDetail,
+  type ApprovalRecord,
 } from '@/api/workflow'
 
 type ActionModalType = 'approve' | 'reject' | 'offline' | 'reopen' | null
@@ -379,10 +380,28 @@ function formatFieldValue(value: unknown): string {
   return JSON.stringify(value, null, 2)
 }
 
-function formatOperator(role?: string | null, operatorId?: number | null) {
-  if (role && operatorId != null) return `${role} / 用户 ${operatorId}`
-  if (operatorId != null) return `用户 ${operatorId}`
-  if (role) return role
+function formatStudentIdentity(name?: string | null, studentNo?: string | null) {
+  if (name && studentNo) return `${name}（${studentNo}）`
+  return name || studentNo || '-'
+}
+
+function formatUserIdentity(name?: string | null, workNo?: string | null) {
+  if (name && workNo) return `${name}（${workNo}）`
+  return name || workNo || '-'
+}
+
+function formatApplicant(record: Pick<RequestDetail, 'applicant_student_name' | 'applicant_student_no' | 'applicant_user_name'>) {
+  const student = formatStudentIdentity(record.applicant_student_name, record.applicant_student_no)
+  if (student !== '-') return student
+  return record.applicant_user_name || '-'
+}
+
+function formatOperator(record: ApprovalRecord) {
+  const student = formatStudentIdentity(record.operator_student_name, record.operator_student_no)
+  if (student !== '-') return student
+  const user = formatUserIdentity(record.operator_name, record.operator_work_no)
+  if (user !== '-') return user
+  if (record.operator_role) return record.operator_role
   return '系统'
 }
 

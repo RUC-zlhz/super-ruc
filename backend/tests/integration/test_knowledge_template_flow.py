@@ -48,10 +48,30 @@ async def test_student_template_list_and_download_after_publish(
             "category_code": "LEAVE",
             "applicable_scenario": "学生请假",
             "version_label": "示例模板",
+            "tags": '["请假","模板下载"]',
         },
     )
     assert upload_resp.status_code == 200, upload_resp.text
     template_id = upload_resp.json()["data"]["id"]
+    assert upload_resp.json()["data"]["tags"] == ["请假", "模板下载"]
+
+    template_list = await client.get(
+        "/api/v1/knowledge/templates",
+        headers={"Authorization": f"Bearer {student_token}"},
+    )
+    assert template_list.status_code == 200, template_list.text
+    items = template_list.json()["data"]["items"]
+    assert len(items) == 1
+    assert items[0]["template_name"] == "请假模板示例"
+    assert items[0]["tags"] == ["请假", "模板下载"]
+
+    searchable_template_list = await client.get(
+        "/api/v1/knowledge/templates",
+        params={"q": "模板下载"},
+        headers={"Authorization": f"Bearer {student_token}"},
+    )
+    assert searchable_template_list.status_code == 200, searchable_template_list.text
+    assert searchable_template_list.json()["data"]["meta"]["total"] == 1
 
     entry_resp = await admin_client.post(
         "/api/v1/admin/knowledge/entries",
@@ -76,12 +96,12 @@ async def test_student_template_list_and_download_after_publish(
     )
     assert publish_resp.status_code == 200, publish_resp.text
 
-    template_list = await client.get(
+    template_list_after_publish = await client.get(
         "/api/v1/knowledge/templates",
         headers={"Authorization": f"Bearer {student_token}"},
     )
-    assert template_list.status_code == 200, template_list.text
-    items = template_list.json()["data"]["items"]
+    assert template_list_after_publish.status_code == 200, template_list_after_publish.text
+    items = template_list_after_publish.json()["data"]["items"]
     assert len(items) == 1
     assert items[0]["template_name"] == "请假模板示例"
 

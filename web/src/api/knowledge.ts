@@ -25,6 +25,7 @@ export interface KnowledgeTemplate {
   category_code?: string | null
   applicable_scenario?: string | null
   version_label?: string | null
+  tags: string[]
   file_size?: number | null
   mime_type?: string | null
   status: TemplateStatus
@@ -177,6 +178,7 @@ export function uploadTemplate(payload: {
   category_code?: string | null
   applicable_scenario?: string | null
   version_label?: string | null
+  tags?: string[]
 }) {
   const body = new FormData()
   body.append('file', payload.file)
@@ -185,6 +187,7 @@ export function uploadTemplate(payload: {
   if (payload.category_code) body.append('category_code', payload.category_code)
   if (payload.applicable_scenario) body.append('applicable_scenario', payload.applicable_scenario)
   if (payload.version_label) body.append('version_label', payload.version_label)
+  if (payload.tags?.length) body.append('tags', JSON.stringify(payload.tags))
   return post<ApiEnvelope<KnowledgeTemplate>>('/admin/knowledge/templates', body, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })

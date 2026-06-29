@@ -177,7 +177,7 @@
                 {{ record.operator_role || "待分配审批人" }}
               </text>
               <text v-if="record.comment" class="record-comment">{{ record.comment }}</text>
-              <text class="record-operator">操作人 ID：{{ operatorIdLabel(record.operator_id) }}</text>
+              <text class="record-operator">操作人：{{ operatorLabel(record) }}</text>
             </view>
           </view>
         </view>
@@ -261,6 +261,7 @@ import {
   isEditableRequestStatus,
   previewProof,
   withdrawRequest,
+  type ApprovalRecord,
   type RequestDetail,
 } from "@/api/workflow";
 
@@ -399,8 +400,22 @@ function onEdit() {
   });
 }
 
-function operatorIdLabel(operatorId?: number | string | null) {
-  return operatorId == null ? "-" : String(operatorId);
+function formatStudentIdentity(name?: string | null, studentNo?: string | null) {
+  if (name && studentNo) return `${name}（${studentNo}）`;
+  return name || studentNo || "";
+}
+
+function formatUserIdentity(name?: string | null, workNo?: string | null) {
+  if (name && workNo) return `${name}（${workNo}）`;
+  return name || workNo || "";
+}
+
+function operatorLabel(record: ApprovalRecord) {
+  const student = formatStudentIdentity(record.operator_student_name, record.operator_student_no);
+  if (student) return student;
+  const user = formatUserIdentity(record.operator_name, record.operator_work_no);
+  if (user) return user;
+  return record.operator_role || "系统";
 }
 
 function openPdf(filePath: string) {

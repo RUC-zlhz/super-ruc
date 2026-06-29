@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import date
 
-from sqlalchemy import and_, case, exists, func, or_, select
+from sqlalchemy import String, and_, case, cast, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.knowledge.models import (
@@ -239,19 +239,6 @@ async def get_template(db: AsyncSession, template_id: int) -> TemplateAsset | No
     return await db.get(TemplateAsset, template_id)
 
 
-async def template_has_published_entry(db: AsyncSession, template_id: int) -> bool:
-    stmt = (
-        select(func.count())
-        .select_from(KnowledgeEntryTemplate)
-        .join(KnowledgeEntry, KnowledgeEntry.id == KnowledgeEntryTemplate.entry_id)
-        .where(
-            KnowledgeEntryTemplate.template_id == template_id,
-            KnowledgeEntry.status == ENTRY_STATUS_PUBLISHED,
-        )
-    )
-    return (await db.execute(stmt)).scalar_one() > 0
-
-
 async def list_templates(
     db: AsyncSession,
     *,
@@ -272,6 +259,7 @@ async def list_templates(
             or_(
                 TemplateAsset.template_name.ilike(like),
                 TemplateAsset.applicable_scenario.ilike(like),
+                cast(TemplateAsset.tags, String).ilike(like),
             )
         )
     count_stmt = select(func.count()).select_from(stmt.subquery())
@@ -281,7 +269,7 @@ async def list_templates(
     return rows, total
 
 
-async def list_published_templates_for_student(
+async def list_active_templates_for_student(
     db: AsyncSession,
     *,
     category_code: str | None = None,
@@ -289,16 +277,7 @@ async def list_published_templates_for_student(
     page: int = 1,
     size: int = 20,
 ) -> tuple[Sequence[TemplateAsset], int]:
-    stmt = (
-        select(TemplateAsset)
-        .join(KnowledgeEntryTemplate, KnowledgeEntryTemplate.template_id == TemplateAsset.id)
-        .join(KnowledgeEntry, KnowledgeEntry.id == KnowledgeEntryTemplate.entry_id)
-        .where(
-            TemplateAsset.status == "ACTIVE",
-            KnowledgeEntry.status == ENTRY_STATUS_PUBLISHED,
-        )
-        .distinct()
-    )
+    stmt = select(TemplateAsset).where(TemplateAsset.status == "ACTIVE")
     if category_code:
         stmt = stmt.where(TemplateAsset.category_code == category_code)
     if q:
@@ -307,6 +286,7 @@ async def list_published_templates_for_student(
             or_(
                 TemplateAsset.template_name.ilike(like),
                 TemplateAsset.applicable_scenario.ilike(like),
+                cast(TemplateAsset.tags, String).ilike(like),
             )
         )
     total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()

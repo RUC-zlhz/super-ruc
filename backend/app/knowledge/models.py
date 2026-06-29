@@ -200,11 +200,12 @@ class TemplateAsset(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     template_name: Mapped[str] = mapped_column(String(256), nullable=False)
     template_type: Mapped[str] = mapped_column(
-        String(16), nullable=False, comment="DOCX/XLSX/PDF/OTHER"
+        String(16), nullable=False, comment="DOC/DOCX/XLSX/PDF/OTHER"
     )
     category_code: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     applicable_scenario: Mapped[str | None] = mapped_column(String(512), nullable=True)
     version_label: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    tags: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
 
     object_bucket: Mapped[str] = mapped_column(String(64), nullable=False)
     object_key: Mapped[str] = mapped_column(String(512), nullable=False)

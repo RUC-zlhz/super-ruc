@@ -29,7 +29,7 @@
               class="mb16 compact-alert"
               type="info"
               show-icon
-              message="知识条目需先保存为草稿，再发布到学生端。来源、版本、模糊场景人工兜底和关联模板会一并进入治理链路。"
+              message="知识条目需先保存为草稿再发布；模板文件上传为可用后会直接进入学生端“常用模板”，也可继续关联到具体知识条目。"
             />
 
             <a-table
@@ -327,6 +327,10 @@
             <template v-else-if="column.key === 'file_size'">
               {{ formatSize(record.file_size) }}
             </template>
+            <template v-else-if="column.key === 'tags'">
+              <a-tag v-for="tag in record.tags || []" :key="tag" size="small">{{ tag }}</a-tag>
+              <span v-if="!record.tags?.length" class="muted">-</span>
+            </template>
             <template v-else-if="column.key === 'uploaded_at'">
               {{ formatDateTime(record.uploaded_at) }}
             </template>
@@ -473,10 +477,13 @@
           <a-input v-model:value="templateForm.template_name" />
         </a-form-item>
         <a-row :gutter="16">
-          <a-col :span="12"><a-form-item label="类型"><a-select v-model:value="templateForm.template_type"><a-select-option value="DOCX">DOCX</a-select-option><a-select-option value="XLSX">XLSX</a-select-option><a-select-option value="PDF">PDF</a-select-option><a-select-option value="OTHER">OTHER</a-select-option></a-select></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="类型"><a-select v-model:value="templateForm.template_type"><a-select-option value="DOCX">DOCX</a-select-option><a-select-option value="DOC">DOC</a-select-option><a-select-option value="XLSX">XLSX</a-select-option><a-select-option value="PDF">PDF</a-select-option><a-select-option value="OTHER">OTHER</a-select-option></a-select></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="分类"><a-input v-model:value="templateForm.category_code" /></a-form-item></a-col>
         </a-row>
         <a-form-item label="版本"><a-input v-model:value="templateForm.version_label" /></a-form-item>
+        <a-form-item label="标签">
+          <a-select v-model:value="templateForm.tags" mode="tags" placeholder="输入标签后回车" style="width: 100%" />
+        </a-form-item>
         <a-form-item label="适用场景"><a-textarea v-model:value="templateForm.applicable_scenario" :rows="3" /></a-form-item>
         <a-form-item label="文件" required>
           <a-upload :show-upload-list="false" :before-upload="onBeforeTemplateUpload">
@@ -553,6 +560,7 @@ const templateColumns = [
   { title: '类型', dataIndex: 'template_type', key: 'template_type', width: 100 },
   { title: '分类', dataIndex: 'category_code', key: 'category_code', width: 120 },
   { title: '版本', dataIndex: 'version_label', key: 'version_label', width: 120 },
+  { title: '标签', key: 'tags', width: 180 },
   { title: '大小', key: 'file_size', width: 100 },
   { title: '状态', key: 'status', width: 100 },
   { title: '上传时间', key: 'uploaded_at', width: 180 },
@@ -669,6 +677,7 @@ const templateForm = reactive({
   category_code: '',
   applicable_scenario: '',
   version_label: '',
+  tags: [] as string[],
 })
 
 const revisionModalOpen = ref(false)
@@ -1086,6 +1095,7 @@ function resetTemplateForm() {
     category_code: '',
     applicable_scenario: '',
     version_label: '',
+    tags: [],
   })
 }
 
@@ -1109,8 +1119,9 @@ async function onSubmitTemplate() {
       category_code: templateForm.category_code || undefined,
       applicable_scenario: templateForm.applicable_scenario || undefined,
       version_label: templateForm.version_label || undefined,
+      tags: templateForm.tags,
     })
-    message.success('模板已上传')
+    message.success('模板已上传，学生端常用模板会直接可见')
     resetTemplateForm()
     reloadTemplates()
   } finally {

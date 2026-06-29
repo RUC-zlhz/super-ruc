@@ -558,6 +558,9 @@ export interface RequestBrief {
   revision: number
   applicant_user_id: number
   applicant_student_id?: number | null
+  applicant_user_name?: string | null
+  applicant_student_no?: string | null
+  applicant_student_name?: string | null
   submitted_at?: string | null
   updated_at: string
 }
@@ -578,6 +581,10 @@ export interface ApprovalRecord {
   status_after?: string | null
   operator_id?: number | null
   operator_role?: string | null
+  operator_name?: string | null
+  operator_work_no?: string | null
+  operator_student_no?: string | null
+  operator_student_name?: string | null
   comment?: string | null
   occurred_at: string
 }
@@ -589,6 +596,8 @@ export interface RequestDetail extends RequestBrief {
   summary?: string | null
   decided_at?: string | null
   decided_by?: number | null
+  decided_by_name?: string | null
+  decided_by_work_no?: string | null
   decision_comment?: string | null
   withdrawn_at?: string | null
   attachments: RequestAttachment[]

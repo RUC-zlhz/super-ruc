@@ -71,6 +71,7 @@ class TemplateOut(BaseModel):
     category_code: str | None
     applicable_scenario: str | None
     version_label: str | None
+    tags: list[str] = []
     file_size: int | None
     mime_type: str | None
     status: str

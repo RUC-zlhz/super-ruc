@@ -565,6 +565,7 @@ async def list_requests_admin(
 ) -> tuple[Sequence[Request], int]:
     stmt = select(Request)
     conds = []
+    joined_student = False
     if (
         class_scope_codes is not None
         or major_scope_codes is not None
@@ -589,6 +590,7 @@ async def list_requests_admin(
             )
         if scope_conds:
             stmt = stmt.join(Student, Request.applicant_student_id == Student.id)
+            joined_student = True
             conds.append(or_(*scope_conds))
         else:
             conds.append(false())
@@ -602,11 +604,16 @@ async def list_requests_admin(
         )
     if q:
         like = f"%{q}%"
+        if not joined_student:
+            stmt = stmt.outerjoin(Student, Request.applicant_student_id == Student.id)
+            joined_student = True
         conds.append(
             or_(
                 Request.title.ilike(like),
                 Request.request_no.ilike(like),
                 Request.summary.ilike(like),
+                Student.student_no.ilike(like),
+                Student.full_name.ilike(like),
             )
         )
     if conds:

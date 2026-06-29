@@ -406,11 +406,12 @@ async def admin_upload_template(
     db: DBDep,
     user: Annotated[CurrentUserDep, Depends(_EditorRole)],
     template_name: Annotated[str, Form()],
-    template_type: Annotated[str, Form(description="DOCX/XLSX/PDF/OTHER")],
+    template_type: Annotated[str, Form(description="DOC/DOCX/XLSX/PDF/OTHER")],
     file: Annotated[UploadFile, File()],
     category_code: Annotated[str | None, Form()] = None,
     applicable_scenario: Annotated[str | None, Form()] = None,
     version_label: Annotated[str | None, Form()] = None,
+    tags: Annotated[str | None, Form()] = None,
 ) -> ApiResponse[TemplateOut]:
     content = await read_upload_file_limited(file)
     row = await service.upload_template(
@@ -423,6 +424,7 @@ async def admin_upload_template(
         category_code=category_code,
         applicable_scenario=applicable_scenario,
         version_label=version_label,
+        tags=tags,
         operator_id=user.user_id,
         operator_role=",".join(user.roles) or None,
     )

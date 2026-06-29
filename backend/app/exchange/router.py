@@ -28,6 +28,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 
 from app.audit.enforcement import ensure_export_permission, sanitize_student_mapping
 from app.audit.policies import (
@@ -37,6 +38,7 @@ from app.audit.policies import (
     EXPORT_TRANSCRIPTS_DETAIL,
 )
 from app.audit.service import build_audit_detail, log_action
+from app.auth.models import Student
 from app.core.dependencies import CurrentUserDep, DBDep, require_role
 from app.core.exceptions import BizError, ConflictError, NotFoundError
 from app.core.response import ApiResponse, PageMeta, Paginated, ok
@@ -403,15 +405,34 @@ async def export_transcripts(
     records, _ = await repo.list_student_records(
         db, student_no=student_no, term_code=term_code, page=1, size=10000
     )
+    student_ids = {record.student_id for record in records}
+    students_by_id: dict[int, Student] = {}
+    if student_ids:
+        students = (
+            await db.execute(select(Student).where(Student.id.in_(student_ids)))
+        ).scalars().all()
+        students_by_id = {student.id: student for student in students}
     headers = [
-        "student_id", "term_code", "course_code", "course_name",
+        "student_no", "full_name", "term_code", "course_code", "course_name",
         "credits", "course_type", "score", "grade_letter", "pass_flag",
     ]
-    rows = [
-        [r.student_id, r.term_code, r.course_code, r.course_name,
-         r.credits, r.course_type, r.score, r.grade_letter, r.pass_flag]
-        for r in records
-    ]
+    rows: list[list[object | None]] = []
+    for record in records:
+        student = students_by_id.get(record.student_id)
+        rows.append(
+            [
+                student.student_no if student else None,
+                student.full_name if student else None,
+                record.term_code,
+                record.course_code,
+                record.course_name,
+                record.credits,
+                record.course_type,
+                record.score,
+                record.grade_letter,
+                record.pass_flag,
+            ]
+        )
     data = service.export_workbook(headers, rows, sheet_name="transcripts")
     await log_action(
         db,

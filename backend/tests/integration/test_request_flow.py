@@ -117,6 +117,9 @@ async def test_request_happy_path_draft_submit_claim_approve(
     detail = create.json()["data"]
     assert detail["status"] == "DRAFT"
     assert detail["revision"] == 1
+    assert detail["applicant_student_no"] == "R100001"
+    assert detail["applicant_student_name"] == "req-R100001"
+    assert detail["applicant_user_name"] == "req-R100001"
     request_id = detail["id"]
 
     # 2. PATCH 草稿
@@ -153,8 +156,74 @@ async def test_request_happy_path_draft_submit_claim_approve(
     approved = approve.json()["data"]
     assert approved["status"] == "APPROVED"
     assert approved["decision_comment"] == "已核实，批准"
+    assert approved["applicant_student_no"] == "R100001"
+    assert approved["applicant_student_name"] == "req-R100001"
+    assert approved["decided_by_name"] == "Test Counselor"
+    assert approved["decided_by_work_no"] == "T0002"
     actions = {r["action"] for r in approved["approval_records"]}
     assert {"SUBMIT", "CLAIM", "APPROVE"}.issubset(actions)
+    submit_record = next(r for r in approved["approval_records"] if r["action"] == "SUBMIT")
+    assert submit_record["operator_student_no"] == "R100001"
+    assert submit_record["operator_student_name"] == "req-R100001"
+    claim_record = next(r for r in approved["approval_records"] if r["action"] == "CLAIM")
+    assert claim_record["operator_name"] == "Test Counselor"
+    assert claim_record["operator_work_no"] == "T0002"
+
+    workbench = await client.get(
+        "/api/v1/admin/requests",
+        params={"q": "R100001"},
+        headers=counselor_headers,
+    )
+    assert workbench.status_code == 200, workbench.text
+    workbench_items = workbench.json()["data"]["items"]
+    assert workbench_items[0]["applicant_student_no"] == "R100001"
+    assert workbench_items[0]["applicant_student_name"] == "req-R100001"
+
+
+async def test_super_admin_can_approve_request_type_without_explicit_approver_role(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    admin_headers = await _headers_for_role(
+        db,
+        role_code="SUPER_ADMIN",
+        work_no="REQSUPERAPPROVE01",
+    )
+    token = await _login_as_student(
+        client, db, student_no="R100098", wx_code="wx_r100098"
+    )
+    stu_headers = {"Authorization": f"Bearer {token}"}
+
+    request_type = (
+        await db.execute(select(RequestType).where(RequestType.code == "CERTIFICATE_IN_SCHOOL"))
+    ).scalar_one()
+    request_type.approver_roles = "COUNSELOR"
+    await db.commit()
+
+    create = await client.post(
+        "/api/v1/requests",
+        headers=stu_headers,
+        json={
+            "type_code": "CERTIFICATE_IN_SCHOOL",
+            "title": "超管审批在读证明",
+            "form_data": {"purpose": "测试 SUPER_ADMIN 兜底审批"},
+        },
+    )
+    assert create.status_code == 200, create.text
+    request_id = create.json()["data"]["id"]
+
+    submit = await client.post(
+        f"/api/v1/requests/{request_id}/submit", headers=stu_headers
+    )
+    assert submit.status_code == 200, submit.text
+
+    approve = await client.post(
+        f"/api/v1/admin/requests/{request_id}/approve",
+        headers=admin_headers,
+        json={"comment": "超管兜底审批通过"},
+    )
+    assert approve.status_code == 200, approve.text
+    assert approve.json()["data"]["status"] == "APPROVED"
 
 
 async def test_leave_request_rejects_start_date_after_end_date(

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import uuid
 from datetime import UTC, datetime
@@ -175,7 +176,7 @@ async def list_templates_for_student(
     page: int,
     size: int,
 ) -> tuple[list[TemplateAsset], int]:
-    rows, total = await repo.list_published_templates_for_student(
+    rows, total = await repo.list_active_templates_for_student(
         db,
         q=q,
         category_code=category_code,
@@ -483,6 +484,32 @@ async def deprecate_entry(
 
 
 # ---------- 模板 ----------
+def normalize_template_tags(raw: list[str] | str | None) -> list[str]:
+    if raw is None:
+        return []
+    values: list[str]
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return []
+        try:
+            parsed = json.loads(text)
+            values = parsed if isinstance(parsed, list) else [text]
+        except json.JSONDecodeError:
+            values = text.replace("\n", ",").split(",")
+    else:
+        values = raw
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        tag = str(value or "").strip()
+        if not tag or tag in seen:
+            continue
+        normalized.append(tag[:64])
+        seen.add(tag)
+    return normalized
+
+
 async def upload_template(
     db: AsyncSession,
     *,
@@ -494,6 +521,7 @@ async def upload_template(
     category_code: str | None,
     applicable_scenario: str | None,
     version_label: str | None,
+    tags: list[str] | str | None,
     operator_id: int,
     operator_role: str | None,
 ) -> TemplateAsset:
@@ -524,6 +552,7 @@ async def upload_template(
         category_code=category_code,
         applicable_scenario=applicable_scenario,
         version_label=version_label,
+        tags=normalize_template_tags(tags),
         object_bucket=bucket,
         object_key=object_key,
         file_size=len(content),
@@ -570,21 +599,6 @@ async def deprecate_template(
     return tpl
 
 
-def _can_admin_download_template(operator_role: str | None) -> bool:
-    roles = {role.strip() for role in (operator_role or "").split(",") if role.strip()}
-    return bool(
-        roles
-        & {
-            "SUPER_ADMIN",
-            "COLLEGE_LEADER",
-            "COUNSELOR",
-            "HEAD_TEACHER",
-            "YOUTH_LEAGUE_TEACHER",
-            "PARTY_BUILD_TEACHER",
-        }
-    )
-
-
 async def template_download_url(
     db: AsyncSession,
     template_id: int,
@@ -594,9 +608,6 @@ async def template_download_url(
     tpl = await repo.get_template(db, template_id)
     if tpl is None or tpl.status != TEMPLATE_STATUS_ACTIVE:
         raise NotFoundError("模板不存在或已停用")
-    if not _can_admin_download_template(operator_role):
-        if not await repo.template_has_published_entry(db, template_id):
-            raise NotFoundError("模板不存在或未发布")
     expires_minutes = 10
     try:
         url = presigned_get(tpl.object_bucket, tpl.object_key, expires_minutes=expires_minutes)
@@ -631,9 +642,6 @@ async def template_download_file(
     tpl = await repo.get_template(db, template_id)
     if tpl is None or tpl.status != TEMPLATE_STATUS_ACTIVE:
         raise NotFoundError("模板不存在或已停用")
-    if not _can_admin_download_template(operator_role):
-        if not await repo.template_has_published_entry(db, template_id):
-            raise NotFoundError("模板不存在或未发布")
     try:
         data = get_object_bytes(tpl.object_bucket, tpl.object_key)
     except Exception as e:
