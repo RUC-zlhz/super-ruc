@@ -20,6 +20,7 @@ from app.audit import models as _audit_models  # noqa: F401
 from app.auth import models as _auth_models  # noqa: F401
 from app.core.config import settings
 from app.core.database import Base
+from app.data_dict import models as _data_dict_models  # noqa: F401
 from app.exchange import models as _exchange_models  # noqa: F401
 from app.honor import models as _honor_models  # noqa: F401
 from app.knowledge import models as _knowledge_models  # noqa: F401

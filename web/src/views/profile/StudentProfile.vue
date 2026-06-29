@@ -287,35 +287,109 @@
           <a-input v-model:value="academicForm.full_name" />
         </a-form-item>
         <a-form-item label="性别">
-          <a-input v-model:value="academicForm.gender" placeholder="男 / 女" />
+          <a-input-group compact>
+            <a-select
+              v-model:value="academicForm.gender"
+              placeholder="选择性别"
+              allow-clear
+              show-search
+              :options="dictOptions.student_gender.map(v => ({ label: v, value: v }))"
+              style="width: calc(100% - 32px)"
+            />
+            <a-button title="添加新选项" @click="openAddDict('student_gender')">
+              <template #icon><PlusOutlined /></template>
+            </a-button>
+          </a-input-group>
         </a-form-item>
         <a-form-item label="年级">
-          <a-input v-model:value="academicForm.grade_code" placeholder="如 2024" />
+          <a-input-group compact>
+            <a-select
+              v-model:value="academicForm.grade_code"
+              placeholder="选择年级"
+              allow-clear
+              show-search
+              :options="dictOptions.student_grade.map(v => ({ label: v, value: v }))"
+              style="width: calc(100% - 32px)"
+            />
+            <a-button title="添加新选项" @click="openAddDict('student_grade')">
+              <template #icon><PlusOutlined /></template>
+            </a-button>
+          </a-input-group>
         </a-form-item>
         <a-form-item label="专业">
-          <a-input v-model:value="academicForm.major_code" placeholder="专业代码或名称" />
+          <a-input-group compact>
+            <a-select
+              v-model:value="academicForm.major_code"
+              placeholder="选择专业"
+              allow-clear
+              show-search
+              :options="dictOptions.student_major.map(v => ({ label: v, value: v }))"
+              style="width: calc(100% - 32px)"
+            />
+            <a-button title="添加新选项" @click="openAddDict('student_major')">
+              <template #icon><PlusOutlined /></template>
+            </a-button>
+          </a-input-group>
         </a-form-item>
         <a-form-item label="班级">
-          <a-input v-model:value="academicForm.class_code" placeholder="如 CS2401" />
+          <a-input-group compact>
+            <a-select
+              v-model:value="academicForm.class_code"
+              placeholder="选择班级"
+              allow-clear
+              show-search
+              :options="dictOptions.student_class.map(v => ({ label: v, value: v }))"
+              style="width: calc(100% - 32px)"
+            />
+            <a-button title="添加新选项" @click="openAddDict('student_class')">
+              <template #icon><PlusOutlined /></template>
+            </a-button>
+          </a-input-group>
         </a-form-item>
         <a-form-item label="政治面貌">
-          <a-input v-model:value="academicForm.political_status" />
+          <a-input-group compact>
+            <a-select
+              v-model:value="academicForm.political_status"
+              placeholder="选择政治面貌"
+              allow-clear
+              show-search
+              :options="dictOptions.political_status.map(v => ({ label: v, value: v }))"
+              style="width: calc(100% - 32px)"
+            />
+            <a-button title="添加新选项" @click="openAddDict('political_status')">
+              <template #icon><PlusOutlined /></template>
+            </a-button>
+          </a-input-group>
         </a-form-item>
         <a-form-item label="入学年份">
-          <a-input-number
-            v-model:value="academicForm.enrollment_year"
-            :min="2000"
-            :max="2100"
-            style="width: 100%"
-          />
+          <a-input-group compact>
+            <a-select
+              v-model:value="academicForm.enrollment_year"
+              placeholder="选择入学年份"
+              allow-clear
+              show-search
+              :options="dictOptions.enrollment_year.map(v => ({ label: v, value: Number(v) }))"
+              style="width: calc(100% - 32px)"
+            />
+            <a-button title="添加新选项" @click="openAddDict('enrollment_year')">
+              <template #icon><PlusOutlined /></template>
+            </a-button>
+          </a-input-group>
         </a-form-item>
         <a-form-item label="预计毕业年份">
-          <a-input-number
-            v-model:value="academicForm.expected_graduation_year"
-            :min="2000"
-            :max="2100"
-            style="width: 100%"
-          />
+          <a-input-group compact>
+            <a-select
+              v-model:value="academicForm.expected_graduation_year"
+              placeholder="选择预计毕业年份"
+              allow-clear
+              show-search
+              :options="dictOptions.graduation_year.map(v => ({ label: v, value: Number(v) }))"
+              style="width: calc(100% - 32px)"
+            />
+            <a-button title="添加新选项" @click="openAddDict('graduation_year')">
+              <template #icon><PlusOutlined /></template>
+            </a-button>
+          </a-input-group>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -420,6 +494,20 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-modal
+      v-model:open="addDictOpen"
+      :title="`添加${DICT_TYPE_LABELS[addDictType]}选项`"
+      :confirm-loading="addDictSubmitting"
+      @ok="onSubmitAddDict"
+      @cancel="addDictOpen = false"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="选项值" required>
+          <a-input v-model:value="addDictValue" :placeholder="`输入新的${DICT_TYPE_LABELS[addDictType]}选项`" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -461,6 +549,7 @@ import {
   type ProfileFactOut,
   type ProfileSummary,
 } from '@/api/profile'
+import { listDataDict, createDataDict } from '@/api/dataDict'
 
 const route = useRoute()
 const studentId = Number(route.params.studentId)
@@ -473,6 +562,67 @@ const pendingFacts = ref<ProfileFactOut[]>([])
 const pendingFactsSupported = ref(true)
 const fullViewRequests = ref<ProfileFullViewRequestOut[]>([])
 const snapshotLoading = ref<'pdf' | 'xlsx' | ''>('')
+
+// ---------- 数据字典管理 ----------
+const DICT_TYPES = ['student_gender', 'student_grade', 'student_major', 'student_class', 'political_status', 'enrollment_year', 'graduation_year'] as const
+type DictType = typeof DICT_TYPES[number]
+
+const dictOptions = reactive<Record<DictType, string[]>>({
+  student_gender: [],
+  student_grade: [],
+  student_major: [],
+  student_class: [],
+  political_status: [],
+  enrollment_year: [],
+  graduation_year: [],
+})
+
+const DICT_TYPE_LABELS: Record<DictType, string> = {
+  student_gender: '性别',
+  student_grade: '年级',
+  student_major: '专业',
+  student_class: '班级',
+  political_status: '政治面貌',
+  enrollment_year: '入学年份',
+  graduation_year: '预计毕业年份',
+}
+
+async function loadAllDicts() {
+  const results = await Promise.allSettled(DICT_TYPES.map(t => listDataDict(t)))
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') {
+      dictOptions[DICT_TYPES[i]] = r.value.data.map(item => item.value)
+    }
+  })
+}
+
+const addDictOpen = ref(false)
+const addDictSubmitting = ref(false)
+const addDictType = ref<DictType>('student_gender')
+const addDictValue = ref('')
+
+function openAddDict(dictType: DictType) {
+  addDictType.value = dictType
+  addDictValue.value = ''
+  addDictOpen.value = true
+}
+
+async function onSubmitAddDict() {
+  const val = addDictValue.value.trim()
+  if (!val) {
+    message.warning('请输入选项值')
+    return
+  }
+  addDictSubmitting.value = true
+  try {
+    await createDataDict({ dict_type: addDictType.value, value: val, label: val })
+    message.success(`已添加${DICT_TYPE_LABELS[addDictType.value]}选项：${val}`)
+    dictOptions[addDictType.value].push(val)
+    addDictOpen.value = false
+  } finally {
+    addDictSubmitting.value = false
+  }
+}
 const academicModalOpen = ref(false)
 const academicSubmitting = ref(false)
 const academicForm = reactive<{
@@ -1005,7 +1155,10 @@ async function onDownloadSnapshot(format: 'pdf' | 'xlsx') {
   }
 }
 
-onMounted(loadProfile)
+onMounted(() => {
+  loadProfile()
+  loadAllDicts()
+})
 </script>
 
 <style scoped>

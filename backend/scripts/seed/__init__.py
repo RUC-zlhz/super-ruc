@@ -40,6 +40,7 @@ class SeedResult:
 from . import (  # noqa: E402
     admin_user,
     audit_policies,
+    data_dicts,
     honor_categories,
     knowledge_categories,
     knowledge_entries,
@@ -54,6 +55,7 @@ SEEDERS = (
     roles,
     admin_user,
     audit_policies,
+    data_dicts,
     knowledge_categories,
     knowledge_entries,
     honor_categories,

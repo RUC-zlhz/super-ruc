@@ -56,6 +56,7 @@ from app.audit import models as _audit_models  # noqa: F401,E402
 
 # 导入所有模型以注册到 Base.metadata（同 alembic/env.py）
 from app.auth import models as _auth_models  # noqa: F401,E402
+from app.data_dict import models as _data_dict_models  # noqa: F401,E402
 from app.core.database import AsyncSessionLocal, Base, engine  # noqa: E402
 from app.exchange import models as _exchange_models  # noqa: F401,E402
 from app.honor import models as _honor_models  # noqa: F401,E402

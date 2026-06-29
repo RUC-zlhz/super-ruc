@@ -22,6 +22,8 @@ from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.core.response import ApiResponse, ok
 from app.core.workflow_reminder_scheduler import get_workflow_reminder_scheduler
+from app.data_dict.router import admin_router as data_dict_admin_router
+from app.data_dict.router import router as data_dict_router
 from app.exchange.router import curriculum_router as curriculum_router
 from app.exchange.router import router as exchange_router
 from app.honor.router import admin_router as honor_admin_router
@@ -132,6 +134,8 @@ def create_app() -> FastAPI:
     app.include_router(profile_student_admin_router, prefix=prefix)
     app.include_router(progress_router, prefix=prefix)
     app.include_router(audit_router, prefix=prefix)
+    app.include_router(data_dict_router, prefix=prefix)
+    app.include_router(data_dict_admin_router, prefix=prefix)
 
     return app
 
