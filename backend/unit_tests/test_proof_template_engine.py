@@ -118,12 +118,21 @@ def test_render_proof_html_uses_request_type_and_approval_context() -> None:
 
     assert "中国人民大学信息学院" in html
     assert "RENMIN UNIVERSITY OF CHINA" in html
-    assert "data:image/svg+xml;base64," in html
-    assert "data:image/png;base64," in html
+    assert "社会学院" not in html
+    assert "School of Social" not in html
+    assert "data:image/svg+xml;base64," not in html
+    assert html.count("data:image/png;base64,") >= 2
     assert "<h1>在读证明</h1>" in html
     assert "2024000001 CERT-260524-UNIT" in html
     assert "2026-05-20 2026-05-23" in html
     assert "同意开具" in html
+
+
+def test_ruc_logo_asset_uses_ruc_only_png_not_legacy_svg() -> None:
+    assert pdf_branding.ruc_logo_uri().startswith("data:image/png;base64,")
+
+    legacy_svg = pdf_branding._asset_path("ruc-logo.svg")
+    assert legacy_svg is None or not legacy_svg.exists()
 
 
 def test_default_proof_template_is_information_school_branded() -> None:

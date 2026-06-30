@@ -48,7 +48,7 @@ def _asset_data_uri(filename: str, mime_type: str) -> str:
 
 
 def ruc_logo_uri() -> str:
-    return _asset_data_uri("ruc-logo.svg", "image/svg+xml")
+    return _asset_data_uri("ruc-logo-red.png", "image/png")
 
 
 def info_logo_uri() -> str:

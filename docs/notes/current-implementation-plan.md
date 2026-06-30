@@ -1,7 +1,7 @@
 # 当前全局实现计划（v1.6）
 
 - 状态：`ACTIVE`
-- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程学生提交材料与老师确认推进闭环、`S59` 党团流程学生提交材料与老师确认推进闭环、`S60` 证明 PDF 信息学院品牌与中文字体修复、`S61` 生产部署 GitHub SSH 443 与超时治理、`S62` 学业缺口课程推荐无开课数据兜底增强、`S63` 成绩单课程匹配推荐和教师审核辅助、`S64` 微信订阅消息可达性复测已完成；`S65` 小程序按钮源码级反馈修复完成，DevTools 自动化点击验收仍受本机自动化 WebSocket 端点连接阻塞；`S66` 管理端初始密码提醒文案去硬编码已完成；`S67` 请假起止日期顺序校验代码修复与 DB 集成回归补跑已完成；`S68` 第 12 组收到 bug 复现、代码修复与定向验证已完成；`S69` 仓库本地缓存忽略与 GitHub 同步已完成；`S70` 小程序模板文件直下载与本地落盘已完成；`S71` 用户使用说明书与软件测试报告出件已完成；`S72` 教师管理端登录失败提示修复与生产部署已完成；`S73` 小程序时间格式化 Intl 运行时兼容修复已完成；`S74` 教师审批附件下载入口代码已完成，DB 集成补跑待最终整合验证确认；`S75` UI/UX 与前后端性能优化（三端综合按优先级）committed 项已收口：后端 N+1×2 消除 + status 索引(迁移 0021) + report overview Redis 缓存、web 加载条/vite 分包/GET 去重路由取消/AsyncBoundary、miniapp GET 去重；S75.5 评估判定虚拟化不需要；`S76` 第 12 组 Pending 反馈修复闭环已完成；`S77` Worktree 整理、主线合并与生产回归已完成；`S78` 软件工程导论课程结项汇报提纲已完成；`S79` 课程结项汇报材料复核与 presentation 归档已完成；`S80` 知识模板可见性、超管审批与荣誉展示答疑修复已完成；`S81` 审批与导出可读身份展示修复进行中
+- 当前目标：`S1 ~ S33` 已闭合；`S34` 可直接落地项已完成，真实微信联调与真实学院数据仍等待外部输入；`S35` 电子证明正式模板引擎、`S36` 生产 EDR Agent 安装、`S37` 党团官方流程默认模板修正、`S38` 学生画像与荣誉展示 P1 补齐、`S39` 官方风格 PDF 导出版式统一、`S40` bug-report 生产事实审查、`S41` bug-report P1 代码修复、`S42` 生产运行时代理隔离修复、`S43` 生产网络与构建出网治理、`S44` GitHub Actions 自动部署底座、`S45` 全栈测试与 DB 集成补跑、`S46` S45 缺陷修复闭环、`S47` 多角色联通完成度审计与补测、`S48` Miniapp 微信开发者工具告警排查与首页 key 修复、`S49` 官方知识种子/本学期开课推荐/题库导入与敏感字段加密审计、`S50` 当前 HEAD 测试工程师 bug 审查、`S51` 第 12 组互测使用说明出件、`S52` 党团平台文件 2 知识导入闭环、`S53` 默认示例知识开箱即有、`S54` 小程序开发态本地接口自动回正、`S55` 默认示例模板开箱即有、`S56` PR #4 融合与生产模板 seed 修复、`S57` 生产证明 PDF 预览验证与使用说明校正、`S58` 小程序党团流程学生提交材料与老师确认推进闭环、`S59` 党团流程学生提交材料与老师确认推进闭环、`S60` 证明 PDF 信息学院品牌与中文字体修复、`S61` 生产部署 GitHub SSH 443 与超时治理、`S62` 学业缺口课程推荐无开课数据兜底增强、`S63` 成绩单课程匹配推荐和教师审核辅助、`S64` 微信订阅消息可达性复测已完成；`S65` 小程序按钮源码级反馈修复完成，DevTools 自动化点击验收仍受本机自动化 WebSocket 端点连接阻塞；`S66` 管理端初始密码提醒文案去硬编码已完成；`S67` 请假起止日期顺序校验代码修复与 DB 集成回归补跑已完成；`S68` 第 12 组收到 bug 复现、代码修复与定向验证已完成；`S69` 仓库本地缓存忽略与 GitHub 同步已完成；`S70` 小程序模板文件直下载与本地落盘已完成；`S71` 用户使用说明书与软件测试报告出件已完成；`S72` 教师管理端登录失败提示修复与生产部署已完成；`S73` 小程序时间格式化 Intl 运行时兼容修复已完成；`S74` 教师审批附件下载入口代码已完成，DB 集成补跑待最终整合验证确认；`S75` UI/UX 与前后端性能优化（三端综合按优先级）committed 项已收口：后端 N+1×2 消除 + status 索引(迁移 0021) + report overview Redis 缓存、web 加载条/vite 分包/GET 去重路由取消/AsyncBoundary、miniapp GET 去重；S75.5 评估判定虚拟化不需要；`S76` 第 12 组 Pending 反馈修复闭环已完成；`S77` Worktree 整理、主线合并与生产回归已完成；`S78` 软件工程导论课程结项汇报提纲已完成；`S79` 课程结项汇报材料复核与 presentation 归档已完成；`S80` 知识模板可见性、超管审批与荣誉展示答疑修复已完成；`S81` 审批与导出可读身份展示修复进行中；`S82` 证明 PDF RUC logo 错误资产修复已完成
 - 计划性质：本文件是当前仓库的权威主计划文件；后续所有细化必须引用本文件中的条目编号
 - 首次落盘日期：`2026-04-18`
 
@@ -553,7 +553,7 @@
 证据：
 
 - 后端实现：`backend/app/core/pdf_branding.py`、`backend/app/workflow/pdf_generator.py`、`backend/app/profile/service.py`
-- 品牌资产：`backend/app/pdf_assets/ruc-logo.svg`、`backend/app/pdf_assets/ruc-logo.png`、`backend/app/pdf_assets/info-logo.png`
+- 品牌资产：`backend/app/pdf_assets/ruc-logo-red.png`、`backend/app/pdf_assets/ruc-logo.png`、`backend/app/pdf_assets/info-logo.png`
 - 默认模板：`backend/scripts/seed/proof_templates.py`
 - 依赖：`backend/pyproject.toml` 与 `backend/uv.lock` 新增 `reportlab>=4.2`
 - 验证：`ruff check`、`py_compile`、`unit_tests/test_proof_template_engine.py` 均通过；证明 PDF smoke 生成 `%PDF` 字节流 `133064` bytes，画像快照 PDF smoke 生成 `%PDF` 字节流 `159179` bytes。
@@ -1319,6 +1319,20 @@
 
 - 用户指出的审批详情“申请人用户 ID / 申请人学生 ID / 审批人 ID”和小程序“操作人 ID”已改为姓名、学号或工号；成绩单导出已改为姓名 + 学号口径。
 
+### S82 证明 PDF RUC logo 错误资产修复
+
+- 细化文件：`docs/notes/refinements/2026-06-30-s82-proof-pdf-ruc-logo-asset-fix.md`
+- 当前状态：`[x]` 已完成。
+- [x] `S82.1` 复制并渲染用户提供的微信开发者工具临时 PDF，确认错误位于标题区左侧图形资产。
+- [x] `S82.2` 将 HTML/WeasyPrint 路径的 `ruc_logo_uri()` 改为使用已视觉确认的 `ruc-logo-red.png`。
+- [x] `S82.3` 删除误导性的旧 `ruc-logo.svg` 资产，避免后续再次被误用。
+- [x] `S82.4` 补单元测试，要求证明 HTML 不再引用 SVG logo，且 RUC logo 使用 PNG 资产。
+- [x] `S82.5` 重新生成证明 HTML/PDF 并渲染检查，确认标题区不再出现“社会学院”。
+
+当前结论：
+
+- 小程序“预览 PDF”链路确实是后端 HTML -> PDF 生成链路；本轮缺陷不是证明模板或小程序 UI 文案错误，而是 WeasyPrint 路径引用的 `ruc-logo.svg` 实际包含“社会学院 / School of Social Research”。当前已改为 RUC-only PNG 并删除旧 SVG。
+
 ### S6 前端体验增量优化
 
 - [x] `S6.1` Web 共享导航与默认落点收口
@@ -1917,6 +1931,7 @@
 | 2026-06-27 | S79 课程结项汇报材料复核与 presentation 归档 | `docs/notes/refinements/2026-06-27-s79-presentation-package-polish.md` | `S79.1, S79.2, S79.3, S79.4, S79.5` | `[x]` | 已复核课程结项汇报十个一级栏目完整覆盖，补充 PPT 页结构、演示路线、进度对照、大模型/人工分工和近期 commit 节点；正式产物归档到 `presentation/`，SVG 兼容性与 `git diff --check` 通过 |
 | 2026-06-29 | S80 知识模板可见性、超管审批与荣誉展示答疑修复 | `docs/notes/refinements/2026-06-29-s80-template-superadmin-honor-qa-fixes.md` | `S80.1, S80.2, S80.3, S80.4, S80.5, S80.6` | `[x]` | 已修复模板上传后学生端不可见、模板下载旧发布关联门禁和超管审批被 `approver_roles` 拦截问题；补模板标签管理与学生端展示；验证通过 ruff、py_compile、定向 DB 集成 `2 passed`、Web build、Miniapp `mp-weixin` build |
 | 2026-06-29 | S81 审批与导出可读身份展示修复 | `docs/notes/refinements/2026-06-29-s81-human-readable-identities.md` | `S81.1, S81.2, S81.3, S81.4, S81.5` | `[-]` | 已将申请/审批响应与 Web/Miniapp 展示改为姓名、学号或工号；成绩单导出不再以内部 `student_id` 作为识别列；定向验证进行中 |
+| 2026-06-30 | S82 证明 PDF RUC logo 错误资产修复 | `docs/notes/refinements/2026-06-30-s82-proof-pdf-ruc-logo-asset-fix.md` | `S82.1, S82.2, S82.3, S82.4, S82.5` | `[x]` | 已定位用户临时 PDF 中“社会学院”来自标题区旧 `ruc-logo.svg` 资产；HTML/WeasyPrint 路径改用 `ruc-logo-red.png`，删除旧 SVG，并通过单测、ruff、py_compile 和本地 PDF 渲染复核 |
 
 ## 会话更新要求
 
@@ -1929,6 +1944,7 @@
 
 ## 变更记录
 
+- `2026-06-30`：新增并完成 `S82` 证明 PDF RUC logo 错误资产修复；确认小程序“预览 PDF”链路为后端 HTML -> PDF，错误来自 WeasyPrint 使用的旧 `ruc-logo.svg` 视觉资产，已切换到 RUC-only PNG、删除旧 SVG 并补单元测试和本地渲染验证。
 - `2026-06-29`：新增并完成 `S80` 知识模板可见性、超管审批与荣誉展示答疑修复；可用模板现在直接进入学生端常用模板，模板文件补标签管理，`SUPER_ADMIN` 可作为审批兜底角色处理未显式配置超管的申请类型，定向 DB 集成、Web 构建与 Miniapp 构建均通过。
 - `2026-06-29`：新增 `S81` 审批与导出可读身份展示修复；审批详情、审批列表、小程序申请详情和成绩单导出已切换到姓名、学号或工号口径，避免业务页面直接展示内部数据库 ID。
 - `2026-04-18`：首次建立当前全局实现计划主文件，作为后续对话与实施的统一依据。
